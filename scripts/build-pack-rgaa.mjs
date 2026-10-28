@@ -148,7 +148,7 @@ const RULE_SC = {
   "multiple-main-landmark": ["1.3.1"], "nav-landmark-missing": ["1.3.1"], "nav-landmark-unnamed": ["1.3.1"],
   "nested-interactive": ["4.1.2"], "object-embed-no-name": ["1.1.1"], "radio-checkbox-group-ungrouped": ["1.3.1", "3.3.2"],
   "placeholder-as-label": ["4.1.2"], "positive-tabindex": ["2.4.3"], "redundant-aria": ["4.1.2"], "select-has-option": ["4.1.2"],
-  "skip-link-target-missing": ["2.4.1"], "sortable-header-no-aria-sort": ["1.3.1"], "status-message-not-assertive": ["4.1.3"],
+  "skip-link-target-missing": ["2.4.1"], "bypass-blocks-missing": ["2.4.1"], "sortable-header-no-aria-sort": ["1.3.1"], "status-message-not-assertive": ["4.1.3"],
   "table-caption-missing": ["1.3.1"], "table-empty-data-cell": ["1.3.1"], "title-missing-empty": ["2.4.2"],
 };
 
@@ -267,6 +267,11 @@ const RULE_TO_CRITERIA = {
   "axe:autocomplete-valid": ["11.13"], "axe:fieldset": ["11.6"],
   // Theme 12 — navigation (12.7 skip link, 12.8 tab order, 12.9 keyboard trap)
   "skip-link-target-missing": ["12.7"], "axe:skip-link": ["12.7"], "axe:bypass": ["12.7"],
+  // A page whose <nav> precedes content with no landmark, heading, button or in-page link at
+  // all: the content zone can be neither reached nor the navigation skipped (12.6), and no
+  // skip link exists (12.7). Candidate, not decisive: the tests also ask about the other zones
+  // and about links built in script, which this source-only rule does not see.
+  "bypass-blocks-missing": ["12.6", "12.7"],
   "positive-tabindex": ["12.8"], "axe:tabindex": ["12.8"],
   // 12.9 « la navigation ne doit pas contenir de piège au clavier ». The probe that answers it
   // has existed since `probeKeyboardTrap` landed, and it was mapped to WCAG 2.1.2 alone — so a

@@ -106,6 +106,7 @@ const PAGE_SEED: Record<string, string> = {
   "lang-invalid": `<!doctype html><html lang="english"><head><title>t</title></head><body><main>x</main></body></html>`,
   "title-missing-empty": `<!doctype html><html lang="en"><head><title></title></head><body><main>x</main></body></html>`,
   "skip-link-target-missing": `<!doctype html><html lang="en"><head><title>t</title></head><body><a href="#gone">Skip</a><div>content, no #gone target</div></body></html>`,
+  "bypass-blocks-missing": `<!doctype html><html lang="en"><head><title>t</title></head><body><nav><a href="/a">A</a><a href="/b">B</a></nav><div><p>The page content follows the menu, with nothing to skip it.</p></div></body></html>`,
   "h1-missing": `<!doctype html><html lang="en"><head><title>t</title></head><body><main><h2>Sub</h2></main></body></html>`,
   "h1-multiple": `<!doctype html><html lang="en"><head><title>t</title></head><body><main><h1>A</h1><h1>B</h1></main></body></html>`,
   "heading-order-skip": `<!doctype html><html lang="en"><head><title>t</title></head><body><main><h1>A</h1><h4>Deep</h4></main></body></html>`,

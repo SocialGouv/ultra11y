@@ -1,0 +1,35 @@
+<!doctype html>
+<!-- JEU D'ESSAI DE RAPPEL — thématique RGAA 12 (navigation). Voir l'en-tête de index.html.
+     La « version imprimable » des tarifs : un gabarit à part, hérité d'un ancien CMS, qui a
+     gardé le menu du site mais perdu tout le reste — ni <main>, ni titre, ni lien
+     d'évitement. Elle n'est liée depuis aucune page : le crawl ne la visite pas, l'audit des
+     sources la lit. -->
+<!-- lang-invalid · RGAA 8.4 · WCAG 3.1.1 — « francais » n'est pas une étiquette
+     BCP-47. Sur TOUTES les pages : 8.4 est `judgment: true`, et un code de langue invalide
+     sur une seule page laisse le critère « à évaluer » sur toutes les autres. -->
+<html lang="francais">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tarifs (version imprimable) — Orbit, hébergement statique</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <!-- bypass-blocks-missing · RGAA 12.6 / 12.7 · WCAG 2.4.1 — le menu répété précède le
+         contenu, et rien ne permet de le contourner : aucun titre hors du menu, aucune région
+         autour du contenu, aucun lien d'évitement, aucun bouton pour masquer le menu. -->
+    <nav aria-label="Navigation principale">
+      <ul>
+        <li><a href="/">Accueil</a></li>
+        <li><a href="/tarifs.html">Tarifs</a></li>
+        <li><a href="/contact.html">Contact</a></li>
+        <li><a href="/plan.html">Plan du site</a></li>
+      </ul>
+    </nav>
+
+    <div class="contenu">
+      <p>Formule Découverte : un site statique, un domaine, cent gigaoctets de trafic par mois.</p>
+      <p>Formule Équipe : dix sites, domaines illimités, déploiement à chaque fusion de branche.</p>
+    </div>
+  </body>
+</html>

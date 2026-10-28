@@ -659,7 +659,7 @@ const RULE_SC_COVERAGE = {
   "2.1.1": ["clickable-noninteractive"],
   "2.2.1": ["meta-refresh-redirect"],
   "2.2.2": ["autoplay-media", "blink-marquee"],
-  "2.4.1": ["skip-link-target-missing"],
+  "2.4.1": ["skip-link-target-missing", "bypass-blocks-missing"],
   "2.4.2": ["title-missing-empty"],
   "2.4.3": ["positive-tabindex"],
   "2.4.7": ["rendered-focus-not-visible"],

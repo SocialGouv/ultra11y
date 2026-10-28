@@ -1,7 +1,7 @@
 // Theme 5 — Data tables (+ layout-table heuristic to avoid false positives).
 import type { Doc, El } from "../parse/html.js";
-import { attr, hasAttr, hasBoundAttr, descendants, ancestors, visibleText } from "../parse/html.js";
-import { mayInjectContent } from "../name.js";
+import { attr, hasAttr, hasBoundAttr, descendants, ancestors, visibleText, textContent } from "../parse/html.js";
+import { mayInjectContent, isHiddenFromAT } from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 const declaredLayout = (t: El): boolean => ["presentation", "none"].includes((attr(t, "role") ?? "").trim());
@@ -237,6 +237,123 @@ const tableScopeInvalid: Rule = {
   },
 };
 
+// ---- a simple-grid table model -----------------------------------------------------------
+//
+// Decides the header-assignment question only for the tables where the HTML algorithm has a
+// single, obvious answer: every cell spans one row and one column, the leading rows are made
+// of header cells only, and nothing in the table is injected or templated. A column header
+// in such a row heads every later cell in its column, unless that cell carries an explicit
+// `headers` list (which REPLACES the implicit assignment). Anything outside that shape
+// returns no grid, and the rule stays silent.
+interface GridCell {
+  el: El;
+  header: boolean;
+  headers?: string[]; // explicit `headers` id list, when present
+}
+type Grid = GridCell[][] | undefined;
+
+const TEMPLATE_MARKER = /\{\{|\{%|<%|\$\{/;
+
+function elementChildren(el: El): El[] {
+  return el.children.filter((c): c is El => c.type === "element");
+}
+
+/** The rows of a `<table>` in source order, as cells — or undefined when the table is not a
+ *  simple grid this model can read. */
+function htmlTableGrid(table: El): Grid {
+  if (mayInjectContent(table) || TEMPLATE_MARKER.test(textContent(table))) return undefined;
+  const rows: El[] = [];
+  for (const child of elementChildren(table)) {
+    if (child.tag === "tr") rows.push(child);
+    else if (["thead", "tbody", "tfoot"].includes(child.tag)) {
+      for (const r of elementChildren(child)) {
+        if (r.tag !== "tr") return undefined;
+        rows.push(r);
+      }
+    } else if (!["caption", "colgroup"].includes(child.tag)) return undefined;
+  }
+  // A <tfoot> written before the body still renders last; keep the model honest by refusing.
+  if (elementChildren(table).some((c, i, all) => c.tag === "tfoot" && i < all.length - 1)) return undefined;
+  const grid: GridCell[][] = [];
+  // An explicit role that re-maps a row or cell (`<th role="cell">`) changes the table the
+  // accessibility tree exposes — not this model's shape.
+  const NATIVE_ROLE_OK: Record<string, string[]> = { tr: ["row"], th: ["columnheader"], td: ["cell", "gridcell"] };
+  const remapped = (el: El): boolean => {
+    const role = (attr(el, "role") ?? "").trim().toLowerCase();
+    return role !== "" && !(NATIVE_ROLE_OK[el.tag] ?? []).includes(role);
+  };
+  for (const r of rows) {
+    if (remapped(r)) return undefined;
+    const cells: GridCell[] = [];
+    for (const c of elementChildren(r)) {
+      if ((c.tag !== "td" && c.tag !== "th") || remapped(c)) return undefined;
+      for (const span of ["colspan", "rowspan"]) {
+        const v = attr(c, span);
+        if (v !== undefined && v.trim() !== "1") return undefined;
+      }
+      const headers = attr(c, "headers");
+      if (headers?.includes("{")) return undefined;
+      const scope = (attr(c, "scope") ?? "").trim().toLowerCase();
+      if (c.tag === "th" && scope !== "" && scope !== "col") return undefined; // row/group scopes: not this model
+      cells.push({ el: c, header: c.tag === "th", ...(headers !== undefined ? { headers: headers.split(/\s+/).filter(Boolean) } : {}) });
+    }
+    grid.push(cells);
+  }
+  return grid;
+}
+
+/** The same grid read from ARIA roles: role=row children with cell roles. */
+function ariaGrid(grid: El): Grid {
+  if (mayInjectContent(grid) || TEMPLATE_MARKER.test(textContent(grid)) || hasAttr(grid, "aria-owns")) return undefined;
+  const rows: El[] = [];
+  for (const child of elementChildren(grid)) {
+    const role = (attr(child, "role") ?? "").trim().toLowerCase();
+    if (role === "row") rows.push(child);
+    else if (role === "rowgroup") {
+      for (const r of elementChildren(child)) {
+        if ((attr(r, "role") ?? "").trim().toLowerCase() !== "row") return undefined;
+        rows.push(r);
+      }
+    } else return undefined;
+  }
+  const out: GridCell[][] = [];
+  for (const r of rows) {
+    const cells: GridCell[] = [];
+    for (const c of elementChildren(r)) {
+      const role = (attr(c, "role") ?? "").trim().toLowerCase();
+      if (!["columnheader", "gridcell", "cell", "rowheader"].includes(role)) return undefined;
+      if (hasAttr(c, "aria-colspan") || hasAttr(c, "aria-rowspan") || hasAttr(c, "aria-colindex")) return undefined;
+      if (role === "rowheader") return undefined;
+      cells.push({ el: c, header: role === "columnheader" });
+    }
+    out.push(cells);
+  }
+  return out;
+}
+
+/** Column headers (in the leading all-header rows) that no later cell of their column is
+ *  assigned to. */
+function unassignedColumnHeaders(grid: Grid): El[] {
+  if (!grid || grid.length < 2) return [];
+  let headRows = 0;
+  while (headRows < grid.length && grid[headRows]!.length > 0 && grid[headRows]!.every((c) => c.header)) headRows++;
+  if (headRows === 0 || headRows === grid.length) return [];
+  const out: El[] = [];
+  // Explicit `headers` lists assign a header to a cell wherever that cell sits.
+  const referenced = new Set(grid.flat().flatMap((c) => c.headers ?? []));
+  for (let h = 0; h < headRows; h++) {
+    grid[h]!.forEach((header, col) => {
+      if (isHiddenFromAT(header.el) || !visibleText(header.el).trim()) return; // empty/hidden: other rules own it
+      const id = (attr(header.el, "id") ?? "").trim();
+      if (id && referenced.has(id)) return;
+      // implicitly: a later cell in the same column that carries no `headers` list of its own
+      const assigned = grid.slice(headRows).some((row) => row[col] !== undefined && row[col]!.headers === undefined);
+      if (!assigned) out.push(header.el);
+    });
+  }
+  return out;
+}
+
 // A header cell that heads NOTHING — no data cell resolves to it, by scope or by `headers`.
 // It is announced as a header for an empty set, and the columns it looks like it covers are
 // in fact unheaded.
@@ -255,16 +372,28 @@ const thNoDataCells: Rule = {
       // A table with no data cells at all is a heading-only skeleton — nothing to assign,
       // and data-table-no-headers already owns that shape.
       if (!dataCells.length) continue;
-      // Only a FULLY headers-wired table can be judged here: as soon as one data cell
-      // relies on implicit row/column position, an unreferenced header may still head it,
-      // and deciding that needs a real table model (colspan, rowspan, header rows).
-      if (!dataCells.every((c) => (attr(c, "headers") ?? "").trim() !== "")) continue;
+      // Only a FULLY headers-wired table can be judged by references alone: as soon as one
+      // data cell relies on implicit row/column position, an unreferenced header may still
+      // head it — which the simple-grid model below decides when the table allows it.
+      if (!dataCells.every((c) => (attr(c, "headers") ?? "").trim() !== "")) {
+        if (doc.kind === "html")
+          for (const th of unassignedColumnHeaders(htmlTableGrid(table))) out.push({ criteriaId: "1.3.1", el: th, msgId: "th-no-data-cells" });
+        continue;
+      }
       const referenced = new Set(dataCells.flatMap((c) => (attr(c, "headers") ?? "").split(/\s+/).filter(Boolean)));
       for (const th of headers) {
         if (mayInjectContent(th) || !visibleText(th).trim()) continue; // empty/injected: other rules own it
         const id = attr(th, "id") ?? "";
         if (id && referenced.has(id)) continue; // explicitly referenced by a data cell
         out.push({ criteriaId: "1.3.1", el: th, msgId: "th-no-data-cells" });
+      }
+    }
+    // The same question for an ARIA grid/table built from role=row / columnheader / gridcell.
+    if (doc.kind === "html") {
+      for (const grid of doc.elements) {
+        const role = (attr(grid, "role") ?? "").trim().toLowerCase();
+        if (!["grid", "table", "treegrid"].includes(role) || grid.tag === "table" || isHiddenFromAT(grid)) continue;
+        for (const th of unassignedColumnHeaders(ariaGrid(grid))) out.push({ criteriaId: "1.3.1", el: th, msgId: "th-no-data-cells" });
       }
     }
     return out;

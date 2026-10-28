@@ -782,7 +782,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.0",
       automatability: "judgment",
-      ruleIds: ["skip-link-target-missing"],
+      ruleIds: ["skip-link-target-missing", "bypass-blocks-missing"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/bypass-blocks.html",
       techniques: ["ARIA11", "ARIA12", "ARIA4", "F15", "F66", "G1", "G10", "G115", "G123", "G124", "G130", "G135", "G141", "G59", "H42", "H69", "SCR28"],
       text: "A mechanism is available to bypass blocks of content that are repeated on multiple web pages.",
@@ -38904,6 +38904,26 @@ var MSG_CATALOG = {
       en: (p) => `Use a value WAI-ARIA defines for ${p.attr} (e.g. true/false, or an integer for aria-level).`
     }
   },
+  "invalid-aria-value.dangling-required": {
+    message: {
+      fr: (p) => `role="${p.role}" exige ${p.attr}, mais ${p.attr}="${p.value}" ne d\xE9signe aucun \xE9l\xE9ment de la page \u2014 la relation requise n'existe pas.`,
+      en: (p) => `role="${p.role}" requires ${p.attr}, but ${p.attr}="${p.value}" names no element of the page \u2014 the required relationship does not exist.`
+    },
+    remediation: {
+      fr: (p) => `Faites pointer ${p.attr} vers l'id d'un \xE9l\xE9ment pr\xE9sent dans la page.`,
+      en: (p) => `Point ${p.attr} at the id of an element present in the page.`
+    }
+  },
+  "aria-prohibited-attr.unsupported": {
+    message: {
+      fr: (p) => `${p.attrs} n'est pas pris en charge par le r\xF4le ${p.role} \u2014 la propri\xE9t\xE9 est ignor\xE9e et l'\xE9tat voulu n'est pas restitu\xE9.`,
+      en: (p) => `${p.attrs} is not supported by the ${p.role} role \u2014 the property is dropped and the intended state never reaches the user.`
+    },
+    remediation: {
+      fr: (p) => `Retirez ${p.attrs}, ou donnez \xE0 l'\xE9l\xE9ment le r\xF4le qui porte cette propri\xE9t\xE9.`,
+      en: (p) => `Remove ${p.attrs}, or give the element the role that carries this property.`
+    }
+  },
   "aria-required-attr": {
     message: {
       fr: (p) => `role="${p.role}" sans ${p.attrs} \u2014 l'\xE9tat requis par ce r\xF4le n'est pas expos\xE9.`,
@@ -39240,6 +39260,16 @@ var MSG_CATALOG = {
     remediation: {
       fr: () => `Ajoutez les \xE9l\xE9ments enfants au r\xF4le appropri\xE9, ou utilisez les \xE9l\xE9ments HTML natifs.`,
       en: () => `Add child elements with the appropriate role, or use native HTML elements.`
+    }
+  },
+  "aria-required-children.forbidden-child": {
+    message: {
+      fr: (p) => `role="${p.role}" poss\xE8de un \xE9l\xE9ment de r\xF4le ${p.child}, qu'il n'admet pas (attendus : ${p.req}) \u2014 structure ARIA invalide.`,
+      en: (p) => `role="${p.role}" owns an element with role ${p.child}, which it does not allow (expected: ${p.req}) \u2014 invalid ARIA structure.`
+    },
+    remediation: {
+      fr: () => `Sortez cet \xE9l\xE9ment du conteneur, ou donnez-lui un r\xF4le que le conteneur admet.`,
+      en: () => `Move that element out of the container, or give it a role the container allows.`
     }
   },
   "aria-hidden-focusable": {
@@ -39605,6 +39635,16 @@ var MSG_CATALOG = {
     }
   },
   // ---- Theme 12 — Navigation & landmarks (src/rules/navigation.ts) ------------
+  "bypass-blocks-missing": {
+    message: {
+      fr: () => `La page r\xE9p\xE8te un bloc de navigation avant son contenu sans aucun moyen de le contourner : ni titre hors de la navigation, ni r\xE9gion (main, aside, section\u2026) autour du contenu, ni lien d'\xE9vitement.`,
+      en: () => `The page repeats a navigation block before its content with no way to bypass it: no heading outside the navigation, no landmark (main, aside, section\u2026) around the content, and no skip link.`
+    },
+    remediation: {
+      fr: () => `Placez le contenu principal dans <main>, ouvrez-le par un titre, et/ou ajoutez en t\xEAte de page un lien d'\xE9vitement vers lui.`,
+      en: () => `Wrap the main content in <main>, start it with a heading, and/or add a skip link to it at the top of the page.`
+    }
+  },
   "skip-link-target-missing": {
     message: {
       fr: (p) => `Lien interne href="${p.href}" \u2014 la cible #${p.id} n'existe pas dans la page (lien d'\xE9vitement/ancre cass\xE9).`,
@@ -45938,7 +45978,14 @@ var rgaa_default = {
       techniques: ["H69", "G115", "ARIA4", "ARIA11"],
       wcag: ["1.3.1", "2.4.1", "4.1.2"],
       appliesTo: {
-        ruleIds: ["axe:landmark-one-main", "missing-main-landmark", "multiple-main-landmark", "nav-landmark-missing", "nav-landmark-unnamed"]
+        ruleIds: [
+          "axe:landmark-one-main",
+          "bypass-blocks-missing",
+          "missing-main-landmark",
+          "multiple-main-landmark",
+          "nav-landmark-missing",
+          "nav-landmark-unnamed"
+        ]
       },
       automation: {
         tests: {
@@ -45947,6 +45994,12 @@ var rgaa_default = {
         rules: [
           {
             id: "axe:landmark-one-main",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "bypass-blocks-missing",
             tests: ["1"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
@@ -46010,7 +46063,7 @@ var rgaa_default = {
       ],
       wcag: ["2.4.1", "2.4.3", "3.2.3"],
       appliesTo: {
-        ruleIds: ["axe:bypass", "axe:skip-link", "skip-link-target-missing"]
+        ruleIds: ["axe:bypass", "axe:skip-link", "bypass-blocks-missing", "skip-link-target-missing"]
       },
       automation: {
         tests: {
@@ -46027,6 +46080,12 @@ var rgaa_default = {
           {
             id: "axe:skip-link",
             tests: ["2"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "bypass-blocks-missing",
+            tests: ["1", "2"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
@@ -48945,16 +49004,45 @@ function isHiddenFromAT(el) {
   if (isDisplayHidden(el)) return true;
   return [el, ...ancestors(el)].some((node) => attr(node, "aria-hidden") === "true");
 }
+var NATIVE_FOCUSABLE = /* @__PURE__ */ new Set(["button", "select", "textarea", "iframe", "summary"]);
+var DISABLEABLE = /* @__PURE__ */ new Set(["button", "input", "select", "textarea"]);
+function isFocusableElement(el) {
+  const ti = attr(el, "tabindex");
+  if (ti !== void 0 && !ti.includes("{") && ti.trim() !== "" && !Number.isNaN(Number(ti.trim()))) return true;
+  if (DISABLEABLE.has(el.tag) && hasAttr(el, "disabled")) return false;
+  if (NATIVE_FOCUSABLE.has(el.tag)) return true;
+  if (el.tag === "a" || el.tag === "area") return hasAttr(el, "href");
+  if (el.tag === "input") return (attr(el, "type") ?? "text").trim().toLowerCase() !== "hidden";
+  return false;
+}
 function isPresentational(el) {
-  return ["presentation", "none"].includes((attr(el, "role") ?? "").trim().toLowerCase());
+  if (!["presentation", "none"].includes((attr(el, "role") ?? "").trim().toLowerCase())) return false;
+  return !isFocusableElement(el);
 }
 function isNameExempt(el) {
   return isHiddenFromAT(el) || isPresentational(el);
 }
 function embeddedImageName(n, doc) {
+  if (isPresentational(n)) return "";
   const labelled = (attr(n, "aria-labelledby") ?? "").trim();
-  if (labelled) return doc ? ariaLabelledbyText(n, doc) || labelled : labelled;
+  if (labelled && !(doc && labelledbyResolvesEmpty(n, doc))) return doc ? ariaLabelledbyText(n, doc) || labelled : labelled;
   return (boundAttr(n, "aria-label") ?? attr(n, "alt") ?? attr(n, "title") ?? "").trim();
+}
+function labelledbyResolvesEmpty(el, doc) {
+  const raw = attr(el, "aria-labelledby");
+  if (raw === void 0 || raw.includes("{")) return false;
+  const ids = raw.split(/\s+/).filter(Boolean);
+  if (!ids.length) return false;
+  for (const id of ids) {
+    const ref = doc.byId.get(id);
+    if (!ref) {
+      if (doc.kind !== "html") return false;
+      continue;
+    }
+    if (nameFromContent(ref, doc, isHiddenFromAT(ref)) || (attr(ref, "aria-label") ?? "").trim()) return false;
+    if (mayInjectContent(ref)) return false;
+  }
+  return true;
 }
 function nameFromContent(el, doc, includeHiddenSubtree = false) {
   let out2 = "";
@@ -48970,6 +49058,7 @@ function nameFromContent(el, doc, includeHiddenSubtree = false) {
       return;
     }
     if (n.tag === "svg") {
+      if (isPresentational(n)) return;
       const title = descendants(n).find((d) => d.tag === "title");
       if (title && (includeHiddenSubtree || !isLocallyDisplayHidden(title) && attr(title, "aria-hidden") !== "true")) {
         out2 += " " + nameFromContent(title, doc, includeHiddenSubtree);
@@ -49074,7 +49163,7 @@ function controlLabel(el, doc) {
 
 // src/rules/images.ts
 var isHidden = isNameExempt;
-var named = (el) => !!(boundAttr(el, "aria-label") ?? "").trim() || hasBoundAttr(el, "aria-labelledby");
+var named = (el, doc) => !!(boundAttr(el, "aria-label") ?? "").trim() || hasBoundAttr(el, "aria-labelledby") && !labelledbyResolvesEmpty(el, doc);
 var imgAltMissing = {
   id: "img-alt-missing",
   criteria: ["1.1.1"],
@@ -49082,14 +49171,19 @@ var imgAltMissing = {
   run(doc) {
     const out2 = [];
     for (const el of doc.elements) {
-      const isImg = el.tag === "img" || el.tag === "area" || (attr(el, "role") ?? "") === "img";
+      const role = attr(el, "role") ?? "";
+      const svgTree = el.tag === "svg" || ancestors(el).some((a) => a.tag === "svg");
+      const isImg = el.tag === "img" || el.tag === "area" || role === "img" || svgTree && (role === "graphics-document" || role === "graphics-symbol");
       if (!isImg) continue;
       if (isHidden(el) && el.tag !== "area") continue;
       const altLiteral = attr(el, "alt");
       const whitespaceAlt = altLiteral !== void 0 && altLiteral !== "" && altLiteral.trim() === "";
-      if (hasBoundAttr(el, "alt") && !whitespaceAlt || named(el)) continue;
+      if (hasBoundAttr(el, "alt") && !whitespaceAlt || named(el, doc)) continue;
       if (hasDynamicSpread(el)) continue;
-      if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
+      if (svgTree && el.tag !== "img") {
+        if (descendants(el).some((d) => d.tag === "title" && visibleText(d).trim() !== "")) continue;
+        if (doc.kind !== "html" && (mayInjectContent(el) || textContent(el).includes("{"))) continue;
+      } else if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
       if ((attr(el, "title") ?? "").trim() !== "") {
         out2.push({
           criteriaId: "1.1.1",
@@ -49151,7 +49245,7 @@ var canvasFallbackMissing = {
       if (el.tag !== "canvas") continue;
       if (attr(el, "aria-hidden") === "true") continue;
       const hasFallback = el.children.some((c2) => c2.type === "element" ? true : c2.data.trim().length > 0);
-      if (hasFallback || named(el) || visibleText(el)) continue;
+      if (hasFallback || named(el, doc) || visibleText(el)) continue;
       out2.push({
         criteriaId: "1.1.1",
         el,
@@ -49171,7 +49265,7 @@ var inputImageAltMissing = {
       if (el.tag !== "input" || (attr(el, "type") ?? "").toLowerCase() !== "image") continue;
       if (isHidden(el)) continue;
       const alt = (boundAttr(el, "alt") ?? "").trim();
-      if (alt || named(el) || (attr(el, "title") ?? "").trim()) continue;
+      if (alt || named(el, doc) || (attr(el, "title") ?? "").trim()) continue;
       out2.push({
         criteriaId: "1.1.1",
         el,
@@ -49191,7 +49285,7 @@ var objectEmbedNoName = {
       if (el.tag !== "object" && el.tag !== "embed") continue;
       if (isHidden(el)) continue;
       if (hasDynamicSpread(el)) continue;
-      if (named(el) || accessibleName(el, doc).trim() !== "") continue;
+      if (named(el, doc) || accessibleName(el, doc).trim() !== "") continue;
       out2.push({
         criteriaId: "1.1.1",
         el,
@@ -49216,10 +49310,10 @@ var chartNoAccessibleName = {
       if (isHidden(el)) continue;
       if (hasDynamicSpread(el)) continue;
       if (ancestors(el).some((a) => CHART_CLASS.test(attr(a, "class") ?? ""))) continue;
-      if (named(el) || accessibleName(el, doc).trim() !== "") continue;
+      if (named(el, doc) || accessibleName(el, doc).trim() !== "") continue;
       const fig = ancestors(el).find((a) => a.tag === "figure");
       if (fig && descendants(fig).some((d) => d.tag === "figcaption" && visibleText(d))) continue;
-      if (ancestors(el).some((a) => (attr(a, "role") ?? "") === "img" && (named(a) || (attr(a, "aria-label") ?? "").trim()))) continue;
+      if (ancestors(el).some((a) => (attr(a, "role") ?? "") === "img" && (named(a, doc) || (attr(a, "aria-label") ?? "").trim()))) continue;
       out2.push({
         criteriaId: "1.1.1",
         el,
@@ -49470,8 +49564,8 @@ function isInteractive(el) {
   if (el.tag === "input") return (attr(el, "type") ?? "text").toLowerCase() !== "hidden";
   return INTERACTIVE_ROLES.includes((attr(el, "role") ?? "").trim());
 }
-var DISABLEABLE = /* @__PURE__ */ new Set(["button", "input", "select", "textarea", "fieldset", "optgroup", "option"]);
-var isDisabled = (el) => DISABLEABLE.has(el.tag) && hasAttr(el, "disabled");
+var DISABLEABLE2 = /* @__PURE__ */ new Set(["button", "input", "select", "textarea", "fieldset", "optgroup", "option"]);
+var isDisabled = (el) => DISABLEABLE2.has(el.tag) && hasAttr(el, "disabled");
 function isFocusable(el) {
   const tiRaw = attr(el, "tabindex");
   if (tiRaw !== void 0) {
@@ -49480,6 +49574,9 @@ function isFocusable(el) {
   }
   if (isDisabled(el)) return false;
   if (isInteractive(el)) return true;
+  if (el.tag === "summary" && el.parent?.tag === "details") {
+    return el.parent.children.find((c2) => c2.type === "element" && c2.tag === "summary") === el;
+  }
   return hasAttr(el, "contenteditable") && attr(el, "contenteditable") !== "false";
 }
 var VALID_ROLES = /* @__PURE__ */ new Set([
@@ -49706,7 +49803,74 @@ function satisfiesChild(d, reqRoles) {
   if (reqRoles.includes(role)) return true;
   if (reqRoles.includes("listitem") && d.tag === "li") return true;
   if (reqRoles.includes("radio") && d.tag === "input" && (attr(d, "type") ?? "").toLowerCase() === "radio") return true;
+  if (!role && (d.tag === "td" || d.tag === "th") && reqRoles.some((r) => r === "cell" || r === "gridcell" || r === "columnheader" || r === "rowheader"))
+    return true;
   return false;
+}
+var OWNED_ALLOWED = {
+  // `separator` is not in ARIA 1.2's list for menus but every APG menu example uses one;
+  // allowing it can only under-report.
+  menu: ["menuitem", "menuitemcheckbox", "menuitemradio", "separator"],
+  menubar: ["menuitem", "menuitemcheckbox", "menuitemradio", "separator"],
+  tablist: ["tab"],
+  list: ["listitem"],
+  tree: ["treeitem"],
+  row: ["cell", "columnheader", "gridcell", "rowheader"],
+  grid: ["row", "rowgroup"],
+  treegrid: ["row", "rowgroup"],
+  table: ["row", "rowgroup"],
+  rowgroup: ["row"]
+};
+var REQUIRED_ANY = { ...REQUIRED_CHILDREN, row: OWNED_ALLOWED.row };
+function nativeOwnedRole(el) {
+  if (el.tag === "li") return "listitem";
+  if (el.tag === "tr") return "row";
+  if (el.tag === "td") return "cell";
+  if (el.tag === "button") return "button";
+  if (el.tag === "a" && hasAttr(el, "href")) return "link";
+  if (/^h[1-6]$/.test(el.tag)) return "heading";
+  if (el.tag === "input") {
+    const type = (attr(el, "type") ?? "text").trim().toLowerCase();
+    if (type === "radio") return "radio";
+    if (type === "checkbox") return "checkbox";
+  }
+  return void 0;
+}
+var GENERIC_TAGS = /* @__PURE__ */ new Set(["div", "span", "b", "i", "u", "small", "font", "bdi", "bdo"]);
+function ownedElements(el, doc) {
+  const out2 = [];
+  const visit = (c2) => {
+    if (isHiddenFromAT(c2) || c2.tag === "script" || c2.tag === "template" || c2.tag === "style") return;
+    const explicit = (attr(c2, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
+    if (explicit === "group") {
+      walk3(c2);
+      return;
+    }
+    if (explicit === "none" || explicit === "presentation" || explicit === "generic" || !explicit && GENERIC_TAGS.has(c2.tag)) {
+      if (!explicit && Object.keys(c2.attribs).some((k) => k.startsWith("aria-"))) out2.push({ el: c2, role: "?" });
+      else walk3(c2);
+      return;
+    }
+    if (!isIntrinsic(c2.tag)) {
+      out2.push({ el: c2, role: "?" });
+      return;
+    }
+    out2.push({ el: c2, role: explicit && VALID_ROLES.has(explicit) ? explicit : nativeOwnedRole(c2) ?? "?" });
+  };
+  const walk3 = (n) => {
+    for (const c2 of n.children) if (c2.type === "element") visit(c2);
+  };
+  walk3(el);
+  const owns = attr(el, "aria-owns");
+  if (owns !== void 0) {
+    if (owns.includes("{") || doc.kind !== "html") return void 0;
+    for (const id of owns.split(/\s+/).filter(Boolean)) {
+      const ref = doc.byId.get(id);
+      if (!ref) return void 0;
+      visit(ref);
+    }
+  }
+  return out2;
 }
 var ariaRequiredChildren = {
   id: "aria-required-children",
@@ -49716,19 +49880,21 @@ var ariaRequiredChildren = {
     const out2 = [];
     for (const el of doc.elements) {
       const role = (attr(el, "role") ?? "").trim();
-      const req = REQUIRED_CHILDREN[role];
-      if (!req) continue;
-      if (hasAttr(el, "aria-owns")) continue;
+      const req = REQUIRED_ANY[role];
+      const allowed = OWNED_ALLOWED[role];
+      if (!req && !allowed) continue;
       if (attr(el, "aria-busy") === "true") continue;
       if (isHiddenFromAT(el)) continue;
-      if (descendants(el).some((d) => satisfiesChild(d, req))) continue;
       if (mayInjectContent(el)) continue;
-      out2.push({
-        criteriaId: "4.1.2",
-        el,
-        msgId: "aria-required-children",
-        params: { role, req: req.join("/") }
-      });
+      if (req && !hasAttr(el, "aria-owns") && !descendants(el).some((d) => satisfiesChild(d, req))) {
+        out2.push({ criteriaId: "4.1.2", el, msgId: "aria-required-children", params: { role, req: req.join("/") } });
+        continue;
+      }
+      if (!allowed) continue;
+      const bad = ownedElements(el, doc)?.find((o) => o.role !== "?" && !allowed.includes(o.role));
+      if (bad) {
+        out2.push({ criteriaId: "4.1.2", el, msgId: "aria-required-children.forbidden-child", params: { role, child: bad.role, req: allowed.join("/") } });
+      }
     }
     return out2;
   }
@@ -49778,7 +49944,8 @@ var presentationalChildrenFocusable = {
   run(doc) {
     const out2 = [];
     for (const el of doc.elements) {
-      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      const explicit = (attr(el, "role") ?? "").trim().toLowerCase();
+      const role = explicit || (el.tag === "button" ? "button" : "");
       if (!PRESENTATIONAL_CHILDREN.has(role) || isHiddenFromAT(el)) continue;
       const child = descendants(el).find((node) => isFocusable(node) && !isDisplayHidden(node));
       if (child) out2.push({ criteriaId: "4.1.2", el: child, msgId: "presentational-children-focusable", params: { role } });
@@ -49928,6 +50095,14 @@ var invalidAriaAttr = {
     return out2;
   }
 };
+function requiredIdrefDangling(el, doc, name2, value) {
+  if (doc.kind !== "html" || !IDREF_ATTRS.includes(name2)) return false;
+  const role = (attr(el, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
+  if (!ARIA_REQUIRED_ATTRS[role]?.includes(name2)) return false;
+  if (role === "combobox" && (attr(el, "aria-expanded") ?? "").trim().toLowerCase() !== "true") return false;
+  const ids = value.split(/\s+/).filter(Boolean);
+  return ids.length > 0 && ids.every((id) => !doc.byId.has(id));
+}
 var invalidAriaValue = {
   id: "invalid-aria-value",
   criteria: ["4.1.2"],
@@ -49939,8 +50114,16 @@ var invalidAriaValue = {
       for (const [name2, value] of literalAriaAttrs(el)) {
         if (!ARIA_ATTRS.has(name2)) continue;
         if (hasBoundAttr(el, name2) && !value) continue;
-        if (isValidAriaValue(name2, value)) continue;
-        out2.push({ criteriaId: "4.1.2", el, msgId: "invalid-aria-value", params: { attr: name2, value } });
+        if (!isValidAriaValue(name2, value)) {
+          out2.push({ criteriaId: "4.1.2", el, msgId: "invalid-aria-value", params: { attr: name2, value } });
+        } else if (requiredIdrefDangling(el, doc, name2, value)) {
+          out2.push({
+            criteriaId: "4.1.2",
+            el,
+            msgId: "invalid-aria-value.dangling-required",
+            params: { attr: name2, value, role: (attr(el, "role") ?? "").trim() }
+          });
+        }
       }
     }
     return out2;
@@ -49977,7 +50160,8 @@ var ariaRequiredAttr = {
       if (!required) continue;
       if (isHiddenFromAT(el)) continue;
       if (hasDynamicSpread(el)) continue;
-      const missing = required.filter((a) => !hasBoundAttr(el, a) && !nativelyProvides(el, a));
+      const absent = (a) => !hasBoundAttr(el, a) || attr(el, a) !== void 0 && attr(el, a).trim() === "";
+      const missing = required.filter((a) => absent(a) && !nativelyProvides(el, a));
       if (!missing.length) continue;
       out2.push({ criteriaId: "4.1.2", el, msgId: "aria-required-attr", params: { role, attrs: missing.join(", ") } });
     }
@@ -50005,7 +50189,8 @@ var ariaRequiredParent = {
       const chain = ancestors(el);
       if (chain.some((a) => !isIntrinsic(a.tag))) continue;
       if (doc.elements.some((e) => hasAttr(e, "aria-owns"))) continue;
-      const owner = chain.find((a) => !isPresentational(a) && ((attr(a, "role") ?? "").trim() !== "" || IMPLICIT_CONTAINER_ROLE[a.tag]));
+      const exposedGeneric = (a) => !(attr(a, "role") ?? "").trim() && GENERIC_TAGS.has(a.tag) && literalAriaAttrs(a).some(([k]) => k !== "aria-hidden");
+      const owner = chain.find((a) => !isPresentational(a) && ((attr(a, "role") ?? "").trim() !== "" || IMPLICIT_CONTAINER_ROLE[a.tag] || exposedGeneric(a)));
       if (owner && accepted.includes(effectiveRole(owner))) continue;
       if (!owner && chain.some((a) => accepted.includes(effectiveRole(a)))) continue;
       out2.push({ criteriaId: "1.3.1", el, msgId: "aria-required-parent", params: { role, parents: accepted.join(" / ") } });
@@ -50013,6 +50198,37 @@ var ariaRequiredParent = {
     return out2;
   }
 };
+var ROLE_SPECIFIC_ATTRS = {
+  "aria-sort": ["columnheader", "rowheader"],
+  "aria-orientation": ["scrollbar", "select", "separator", "slider", "tablist", "toolbar", "listbox", "menu", "menubar", "radiogroup", "tree", "treegrid"],
+  "aria-multiline": ["textbox", "searchbox"],
+  "aria-multiselectable": ["grid", "listbox", "tablist", "tree", "treegrid"],
+  "aria-modal": ["dialog", "alertdialog"],
+  "aria-pressed": ["button"],
+  "aria-valuemax": ["meter", "progressbar", "scrollbar", "separator", "slider", "spinbutton"],
+  "aria-valuemin": ["meter", "progressbar", "scrollbar", "separator", "slider", "spinbutton"],
+  "aria-valuenow": ["meter", "progressbar", "scrollbar", "separator", "slider", "spinbutton"],
+  "aria-valuetext": ["meter", "progressbar", "scrollbar", "separator", "slider", "spinbutton"]
+};
+function decidableRole(el) {
+  const raw = attr(el, "role");
+  if (raw !== void 0) {
+    const first = raw.trim().toLowerCase().split(/\s+/)[0] ?? "";
+    if (!first || !VALID_ROLES.has(first) || first === "none" || first === "presentation") return void 0;
+    return first;
+  }
+  if (el.tag === "button") return "button";
+  if (el.tag === "input") {
+    const type = (attr(el, "type") ?? "text").trim().toLowerCase();
+    return ["button", "submit", "reset", "image"].includes(type) ? "button" : void 0;
+  }
+  if (el.tag === "a") return hasAttr(el, "href") ? "link" : void 0;
+  if (/^h[1-6]$/.test(el.tag)) return "heading";
+  if (el.tag === "p") return "paragraph";
+  if (el.tag === "audio" || el.tag === "video") return "";
+  if (el.tag === "div" || el.tag === "span") return "generic";
+  return void 0;
+}
 var ariaProhibitedAttr = {
   id: "aria-prohibited-attr",
   criteria: ["4.1.2"],
@@ -50022,11 +50238,24 @@ var ariaProhibitedAttr = {
     for (const el of doc.elements) {
       if (!isIntrinsic(el.tag)) continue;
       const role = (attr(el, "role") ?? "").trim().toLowerCase();
-      if (!role || role.includes("{")) continue;
-      if (!NAME_PROHIBITED_ROLES.has(role)) continue;
-      const named3 = ["aria-label", "aria-labelledby"].filter((a) => (attr(el, a) ?? "").trim() !== "");
-      if (!named3.length) continue;
-      out2.push({ criteriaId: "4.1.2", el, msgId: "aria-prohibited-attr", params: { role, attrs: named3.join(", ") } });
+      if (role.includes("{")) continue;
+      if (NAME_PROHIBITED_ROLES.has(role)) {
+        const named3 = ["aria-label", "aria-labelledby"].filter((a) => (attr(el, a) ?? "").trim() !== "");
+        if (named3.length) {
+          out2.push({ criteriaId: "4.1.2", el, msgId: "aria-prohibited-attr", params: { role, attrs: named3.join(", ") } });
+          continue;
+        }
+      }
+      const semantics = decidableRole(el);
+      if (semantics === void 0 || isHiddenFromAT(el) || hasDynamicSpread(el)) continue;
+      const unsupported = literalAriaAttrs(el).map(([k]) => k).filter((k) => ROLE_SPECIFIC_ATTRS[k] && !ROLE_SPECIFIC_ATTRS[k].includes(semantics));
+      if (!unsupported.length) continue;
+      out2.push({
+        criteriaId: "4.1.2",
+        el,
+        msgId: "aria-prohibited-attr.unsupported",
+        params: { role: semantics || el.tag, attrs: unsupported.join(", ") }
+      });
     }
     return out2;
   }
@@ -50157,8 +50386,8 @@ var titleMissingEmpty = {
   severity: "bloquant",
   scope: "page",
   run(doc) {
-    const titles = elementsByTag(doc, "title");
-    const hasNonEmpty = titles.some((t3) => visibleText(t3).length > 0);
+    const titles = elementsByTag(doc, "title").filter((t3) => !ancestors(t3).some((a) => a.tag === "svg" || a.tag === "math"));
+    const hasNonEmpty = doc.kind === "html" ? !!titles[0] && visibleText(titles[0]).length > 0 : titles.some((t3) => visibleText(t3).length > 0);
     if (hasNonEmpty) return [];
     if (titleSetByFramework(doc) || shellHeadInjected(doc)) return [];
     const anchor = elementsByTag(doc, "head")[0] ?? elementsByTag(doc, "html")[0] ?? doc.elements[0];
@@ -50230,11 +50459,24 @@ var inlineLangChangeMissing = {
   }
 };
 var BCP47 = /^([A-Za-z]{2,3}|[xXiI])(-[A-Za-z0-9]{1,8})*$/;
+var TWO_LETTER_SUBTAGS = new Set(
+  "aa ab ae af ak am an ar as av ay az ba be bg bh bi bm bn bo br bs ca ce ch co cr cs cu cv cy da de dv dz ee el en eo es et eu fa ff fi fj fo fr fy ga gd gl gn gu gv ha he hi ho hr ht hu hy hz ia id ie ig ii ik io is it iu ja jv ka kg ki kj kk kl km kn ko kr ks ku kv kw ky la lb lg li ln lo lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny oc oj om or os pa pi pl ps pt qu rm rn ro ru rw sa sc sd se sg si sk sl sm sn so sq sr ss st su sv sw ta te tg th ti tk tl tn to tr ts tt tw ty ug uk ur uz ve vi vo wa wo xh yi yo za zh zu in iw ji jw mo sh".split(" ")
+);
+var THREE_LETTER_SHADOWED = new Set(
+  "eng fra fre deu ger spa ita por nld dut rus zho chi jpn kor ara pol swe nob nno dan fin ces cze ell gre tur heb hin hun ron rum ukr cat eus baq glg ltz gle gla cym wel isl ice lit lav est slk slo slv hrv srp bul mkd mac sqi alb hye arm kat geo fas per urd ben tam tel vie tha ind bre cos epo lat afr bel bos mlt".split(" ")
+);
+function primarySubtagUnregistered(lang) {
+  const primary = (lang.split("-")[0] ?? "").toLowerCase();
+  if (primary.length === 2) return !TWO_LETTER_SUBTAGS.has(primary);
+  if (primary.length === 3) return THREE_LETTER_SHADOWED.has(primary);
+  return false;
+}
 function governsText(el) {
   const walk3 = (n) => {
     if (n.type === "text") return n.data.trim() !== "";
     if (hasAttr(n, "lang")) return false;
     if (isDisplayHidden(n)) return false;
+    if (n.tag === "img") return (attr(n, "alt") ?? "").trim() !== "" && attr(n, "aria-hidden") !== "true";
     return n.children.some(walk3);
   };
   return el.children.some(walk3);
@@ -50248,7 +50490,7 @@ var langInvalid = {
     for (const el of doc.elements) {
       const lang = (attr(el, "lang") ?? "").trim();
       if (!lang) continue;
-      if (BCP47.test(lang)) continue;
+      if (BCP47.test(lang) && !primarySubtagUnregistered(lang)) continue;
       if (el.tag !== "html" && !governsText(el)) continue;
       out2.push({
         criteriaId: el.tag === "html" ? "3.1.1" : "3.1.2",
@@ -50641,6 +50883,93 @@ var tableScopeInvalid = {
     return out2;
   }
 };
+var TEMPLATE_MARKER = /\{\{|\{%|<%|\$\{/;
+function elementChildren(el) {
+  return el.children.filter((c2) => c2.type === "element");
+}
+function htmlTableGrid(table) {
+  if (mayInjectContent(table) || TEMPLATE_MARKER.test(textContent(table))) return void 0;
+  const rows = [];
+  for (const child of elementChildren(table)) {
+    if (child.tag === "tr") rows.push(child);
+    else if (["thead", "tbody", "tfoot"].includes(child.tag)) {
+      for (const r of elementChildren(child)) {
+        if (r.tag !== "tr") return void 0;
+        rows.push(r);
+      }
+    } else if (!["caption", "colgroup"].includes(child.tag)) return void 0;
+  }
+  if (elementChildren(table).some((c2, i2, all) => c2.tag === "tfoot" && i2 < all.length - 1)) return void 0;
+  const grid = [];
+  const NATIVE_ROLE_OK = { tr: ["row"], th: ["columnheader"], td: ["cell", "gridcell"] };
+  const remapped = (el) => {
+    const role = (attr(el, "role") ?? "").trim().toLowerCase();
+    return role !== "" && !(NATIVE_ROLE_OK[el.tag] ?? []).includes(role);
+  };
+  for (const r of rows) {
+    if (remapped(r)) return void 0;
+    const cells = [];
+    for (const c2 of elementChildren(r)) {
+      if (c2.tag !== "td" && c2.tag !== "th" || remapped(c2)) return void 0;
+      for (const span of ["colspan", "rowspan"]) {
+        const v = attr(c2, span);
+        if (v !== void 0 && v.trim() !== "1") return void 0;
+      }
+      const headers = attr(c2, "headers");
+      if (headers?.includes("{")) return void 0;
+      const scope = (attr(c2, "scope") ?? "").trim().toLowerCase();
+      if (c2.tag === "th" && scope !== "" && scope !== "col") return void 0;
+      cells.push({ el: c2, header: c2.tag === "th", ...headers !== void 0 ? { headers: headers.split(/\s+/).filter(Boolean) } : {} });
+    }
+    grid.push(cells);
+  }
+  return grid;
+}
+function ariaGrid(grid) {
+  if (mayInjectContent(grid) || TEMPLATE_MARKER.test(textContent(grid)) || hasAttr(grid, "aria-owns")) return void 0;
+  const rows = [];
+  for (const child of elementChildren(grid)) {
+    const role = (attr(child, "role") ?? "").trim().toLowerCase();
+    if (role === "row") rows.push(child);
+    else if (role === "rowgroup") {
+      for (const r of elementChildren(child)) {
+        if ((attr(r, "role") ?? "").trim().toLowerCase() !== "row") return void 0;
+        rows.push(r);
+      }
+    } else return void 0;
+  }
+  const out2 = [];
+  for (const r of rows) {
+    const cells = [];
+    for (const c2 of elementChildren(r)) {
+      const role = (attr(c2, "role") ?? "").trim().toLowerCase();
+      if (!["columnheader", "gridcell", "cell", "rowheader"].includes(role)) return void 0;
+      if (hasAttr(c2, "aria-colspan") || hasAttr(c2, "aria-rowspan") || hasAttr(c2, "aria-colindex")) return void 0;
+      if (role === "rowheader") return void 0;
+      cells.push({ el: c2, header: role === "columnheader" });
+    }
+    out2.push(cells);
+  }
+  return out2;
+}
+function unassignedColumnHeaders(grid) {
+  if (!grid || grid.length < 2) return [];
+  let headRows = 0;
+  while (headRows < grid.length && grid[headRows].length > 0 && grid[headRows].every((c2) => c2.header)) headRows++;
+  if (headRows === 0 || headRows === grid.length) return [];
+  const out2 = [];
+  const referenced = new Set(grid.flat().flatMap((c2) => c2.headers ?? []));
+  for (let h2 = 0; h2 < headRows; h2++) {
+    grid[h2].forEach((header4, col) => {
+      if (isHiddenFromAT(header4.el) || !visibleText(header4.el).trim()) return;
+      const id = (attr(header4.el, "id") ?? "").trim();
+      if (id && referenced.has(id)) return;
+      const assigned = grid.slice(headRows).some((row) => row[col] !== void 0 && row[col].headers === void 0);
+      if (!assigned) out2.push(header4.el);
+    });
+  }
+  return out2;
+}
 var thNoDataCells = {
   id: "th-no-data-cells",
   criteria: ["1.3.1"],
@@ -50654,13 +50983,24 @@ var thNoDataCells = {
       if (!headers.length) continue;
       const dataCells = cells.filter((c2) => c2.tag === "td");
       if (!dataCells.length) continue;
-      if (!dataCells.every((c2) => (attr(c2, "headers") ?? "").trim() !== "")) continue;
+      if (!dataCells.every((c2) => (attr(c2, "headers") ?? "").trim() !== "")) {
+        if (doc.kind === "html")
+          for (const th of unassignedColumnHeaders(htmlTableGrid(table))) out2.push({ criteriaId: "1.3.1", el: th, msgId: "th-no-data-cells" });
+        continue;
+      }
       const referenced = new Set(dataCells.flatMap((c2) => (attr(c2, "headers") ?? "").split(/\s+/).filter(Boolean)));
       for (const th of headers) {
         if (mayInjectContent(th) || !visibleText(th).trim()) continue;
         const id = attr(th, "id") ?? "";
         if (id && referenced.has(id)) continue;
         out2.push({ criteriaId: "1.3.1", el: th, msgId: "th-no-data-cells" });
+      }
+    }
+    if (doc.kind === "html") {
+      for (const grid of doc.elements) {
+        const role = (attr(grid, "role") ?? "").trim().toLowerCase();
+        if (!["grid", "table", "treegrid"].includes(role) || grid.tag === "table" || isHiddenFromAT(grid)) continue;
+        for (const th of unassignedColumnHeaders(ariaGrid(grid))) out2.push({ criteriaId: "1.3.1", el: th, msgId: "th-no-data-cells" });
       }
     }
     return out2;
@@ -50716,6 +51056,13 @@ function isFormButton(el, doc) {
   if (role && role !== "button") return false;
   return formOwner(el, doc)?.tag === "form";
 }
+function isLiveImageMapLink(el, doc) {
+  if (el.tag !== "area" || !hasAttr(el, "href")) return false;
+  const map = ancestors(el).find((a) => a.tag === "map");
+  const name2 = (attr(map ?? el, "name") ?? "").trim();
+  if (!map || !name2 || name2.includes("{")) return false;
+  return doc.elements.some((e) => e.tag === "img" && (attr(e, "usemap") ?? "").trim() === `#${name2}`);
+}
 var linkEmptyName = {
   id: "link-empty-name",
   criteria: ["2.4.4"],
@@ -50723,7 +51070,7 @@ var linkEmptyName = {
   run(doc) {
     const out2 = [];
     for (const el of doc.elements) {
-      if (el.tag !== "a" || !hasAttr(el, "href")) continue;
+      if (!(el.tag === "a" && hasAttr(el, "href")) && !isLiveImageMapLink(el, doc)) continue;
       if (isNameExempt(el)) continue;
       if (accessibleName(el, doc) !== "") continue;
       if (mayInjectContent(el)) continue;
@@ -50957,6 +51304,21 @@ function contentInjected(el) {
   return el.children.some((c2) => c2.type === "element" && c2.tag === "slot" || c2.type === "text" && /\{@render|\{children/.test(c2.data));
 }
 var REAL_LABEL = /* @__PURE__ */ new Set(["for", "wrapping", "aria-label", "aria-labelledby"]);
+var CUSTOM_FIELD_ROLES = /* @__PURE__ */ new Set(["textbox", "searchbox", "combobox", "listbox", "spinbutton", "slider"]);
+var NATIVE_FIELD_TAGS = /* @__PURE__ */ new Set(["input", "select", "textarea", "button"]);
+function isCustomTextField(el) {
+  if (!isIntrinsic(el.tag) || NATIVE_FIELD_TAGS.has(el.tag)) return false;
+  const role = (attr(el, "role") ?? "").trim().toLowerCase();
+  return CUSTOM_FIELD_ROLES.has(role);
+}
+function customFieldNamed(el, doc) {
+  if (isNameExempt(el) || hasDynamicSpread(el)) return true;
+  if (hasAttr(el, "aria-placeholder")) return true;
+  const labelledby = attr(el, "aria-labelledby");
+  if (labelledby !== void 0 ? !labelledbyResolvesEmpty(el, doc) && labelledby.trim() !== "" : hasBoundAttr(el, "aria-labelledby")) return true;
+  if ((boundAttr(el, "aria-label") ?? "").trim()) return true;
+  return (boundAttr(el, "title") ?? "").trim() !== "";
+}
 var controlLabelMissing = {
   id: "control-label-missing",
   criteria: ["4.1.2"],
@@ -50964,6 +51326,10 @@ var controlLabelMissing = {
   run(doc) {
     const out2 = [];
     for (const el of doc.elements) {
+      if (isCustomTextField(el)) {
+        if (!customFieldNamed(el, doc)) out2.push({ criteriaId: "4.1.2", el, msgId: "control-label-missing", params: { tag: el.tag } });
+        continue;
+      }
       if (!isFormField(el)) continue;
       if (isNameExempt(el)) continue;
       const { via } = controlLabel(el, doc);
@@ -51593,7 +51959,56 @@ var navLandmarkUnnamed = {
     return navs.filter((n) => !navIsNamed(n)).map((el) => ({ criteriaId: "1.3.1", el, msgId: "nav-landmark-unnamed" }));
   }
 };
+var CONTENT_LANDMARK_ROLES = /* @__PURE__ */ new Set(["main", "complementary", "region", "form", "search", "application", "document"]);
+var CONTENT_LANDMARK_TAGS = /* @__PURE__ */ new Set(["main", "aside", "section", "form", "search"]);
+var NON_CONTENT_TEXT = /* @__PURE__ */ new Set(["script", "style", "template", "noscript", "title", "head"]);
+var BYPASS_MIN_TEXT = 20;
+function roleOf(el) {
+  return (attr(el, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
+}
+function isRepeatedBlock(el) {
+  const role = roleOf(el);
+  if (role) return role === "navigation" || role === "banner" || role === "contentinfo";
+  return el.tag === "nav" || el.tag === "header" || el.tag === "footer";
+}
+function couldBypass(el) {
+  if (el.tag === "a" && (attr(el, "href") ?? "").trim().startsWith("#") && (attr(el, "href") ?? "").trim() !== "#") return true;
+  if (el.tag === "button" || el.tag === "details" || el.tag === "summary" || el.tag === "dialog") return true;
+  if (el.tag === "input" && ["button", "submit", "reset", "image", "checkbox"].includes((attr(el, "type") ?? "").trim().toLowerCase())) return true;
+  if (["button", "link", "switch", "checkbox", "tab"].includes(roleOf(el))) return true;
+  if (hasAttr(el, "aria-controls") || hasAttr(el, "aria-expanded") || hasAttr(el, "accesskey")) return true;
+  return Object.keys(el.attribs).some((k) => k.startsWith("on"));
+}
+var bypassBlocksMissing = {
+  id: "bypass-blocks-missing",
+  criteria: ["2.4.1"],
+  severity: "majeur",
+  scope: "page",
+  run(doc) {
+    if (doc.kind !== "html" || shellBodyInjected(doc)) return [];
+    const nav = doc.elements.find((e) => (e.tag === "nav" || roleOf(e) === "navigation") && !isHiddenFromAT(e));
+    if (!nav) return [];
+    const insideRepeated = (el) => [el, ...ancestors(el)].some(isRepeatedBlock);
+    for (const el of doc.elements) {
+      if (couldBypass(el)) return [];
+      if (isHiddenFromAT(el)) continue;
+      const role = roleOf(el);
+      if (CONTENT_LANDMARK_ROLES.has(role) || !role && CONTENT_LANDMARK_TAGS.has(el.tag)) return [];
+      const heading = role === "heading" || !role && /^h[1-6]$/.test(el.tag);
+      if (heading && ![el, ...ancestors(el)].some((a) => a.tag === "nav" || roleOf(a) === "navigation")) return [];
+    }
+    let text = "";
+    for (const el of doc.elements) {
+      if (el.start <= nav.end || NON_CONTENT_TEXT.has(el.tag) || isHiddenFromAT(el) || insideRepeated(el)) continue;
+      if (ancestors(el).some((a) => NON_CONTENT_TEXT.has(a.tag))) continue;
+      for (const c2 of el.children) if (c2.type === "text") text += c2.data;
+    }
+    if (text.replace(/\s+/g, " ").trim().length < BYPASS_MIN_TEXT) return [];
+    return [{ criteriaId: "2.4.1", el: nav, msgId: "bypass-blocks-missing" }];
+  }
+};
 var navigationRules = [
+  bypassBlocksMissing,
   skipLinkTargetMissing,
   positiveTabindex,
   missingMainLandmark,
@@ -51676,7 +52091,7 @@ var metaViewportZoomBlock = {
       }
       const userScalable = pairs.get("user-scalable");
       const maxScale = pairs.get("maximum-scale");
-      const maxScaleNum = maxScale !== void 0 && maxScale.trim() !== "" ? Number(maxScale) : Number.NaN;
+      const maxScaleNum = maxScale === "yes" ? 1 : maxScale !== void 0 && maxScale.trim() !== "" ? Number(maxScale) : Number.NaN;
       const blocked = userScalable === "no" || userScalable === "0" || Number.isFinite(maxScaleNum) && maxScaleNum > 0 && maxScaleNum < 2;
       if (!blocked) continue;
       out2.push({
@@ -51748,6 +52163,7 @@ function spacingImportantRule(id, property, minimum) {
         if (raw === "normal" || raw === "initial") value = property === "line-height" ? 1.2 : 0;
         else if (/^-?(?:\d+|\d*\.\d+)em$/.test(raw)) value = Number.parseFloat(raw);
         else if (property === "line-height" && /^-?(?:\d+|\d*\.\d+)$/.test(raw)) value = Number.parseFloat(raw);
+        else if (property === "line-height" && /^-?(?:\d+|\d*\.\d+)%$/.test(raw)) value = Number.parseFloat(raw) / 100;
         else if (/^0(?:[a-z%]+)?$/.test(raw)) value = 0;
         if (value === void 0 || value >= minimum) continue;
         out2.push({ criteriaId: "1.4.12", el, msgId: "text-spacing-important", params: { property, value: raw, minimum } });
@@ -51821,7 +52237,7 @@ var presentationalAttribute = {
     return out2;
   }
 };
-var SPELLED_OUT = new RegExp("(?:\\p{L}[ \\u00a0]){4,}\\p{L}", "u");
+var SPELLED_OUT = new RegExp("(?<!\\p{L})(?:\\p{L}[ \\u00a0]){4,}\\p{L}(?!\\p{L})", "u");
 var NBSP_RUN = /\u00a0{3,}/u;
 var SPACING_EXEMPT = /* @__PURE__ */ new Set(["pre", "code", "kbd", "samp", "textarea", "script", "style", "svg"]);
 var presentationalSpacing = {
@@ -51949,13 +52365,16 @@ var contrastLiteral = {
 var colorsRules = [contrastLiteral];
 
 // src/rules/timing.ts
+var SPEC_PARSEABLE_REFRESH = /^[\t\n\f\r ]*(?:\d|\.)[\d.]*(?:[\t\n\f\r ;,]|$)/;
 var metaRefreshRedirect = {
   id: "meta-refresh-redirect",
   criteria: ["2.2.1"],
   severity: "majeur",
   run(doc) {
     const out2 = [];
-    const first = doc.elements.find((e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh");
+    const first = doc.elements.find(
+      (e) => e.tag === "meta" && (attr(e, "http-equiv") ?? "").toLowerCase() === "refresh" && SPEC_PARSEABLE_REFRESH.test(attr(e, "content") ?? "")
+    );
     for (const el of first ? [first] : []) {
       const content = (attr(el, "content") ?? "").trim();
       if (!/^\d+\s*(?:[;,]|$)/.test(content)) continue;

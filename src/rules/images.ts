@@ -1,7 +1,7 @@
 // Theme 1 — Images.
 import type { Doc, El } from "../parse/html.js";
-import { attr, hasBoundAttr, boundAttr, hasDynamicSpread, visibleText, ancestors, descendants } from "../parse/html.js";
-import { accessibleName, isNameExempt } from "../name.js";
+import { attr, hasBoundAttr, boundAttr, hasDynamicSpread, visibleText, textContent, ancestors, descendants } from "../parse/html.js";
+import { accessibleName, isNameExempt, labelledbyResolvesEmpty, mayInjectContent } from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 // Not exposed to assistive tech (aria-hidden / [hidden] / an inline display:none or
@@ -11,7 +11,10 @@ import type { Rule, RuleFinding } from "./rule.js";
 const isHidden = isNameExempt;
 // A dynamically-bound name (`:aria-label`, `v-bind:aria-labelledby`) names the element
 // even though we cannot resolve its value — treat it as present, not missing.
-const named = (el: El): boolean => !!(boundAttr(el, "aria-label") ?? "").trim() || hasBoundAttr(el, "aria-labelledby");
+// A literal aria-labelledby that provably resolves to nothing (an empty target, or an id
+// the page does not contain) names nothing — accname falls through to the next step.
+const named = (el: El, doc: Doc): boolean =>
+  !!(boundAttr(el, "aria-label") ?? "").trim() || (hasBoundAttr(el, "aria-labelledby") && !labelledbyResolvesEmpty(el, doc));
 
 const imgAltMissing: Rule = {
   id: "img-alt-missing",
@@ -20,18 +23,27 @@ const imgAltMissing: Rule = {
   run(doc: Doc): RuleFinding[] {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
-      const isImg = el.tag === "img" || el.tag === "area" || (attr(el, "role") ?? "") === "img";
+      const role = attr(el, "role") ?? "";
+      const svgTree = el.tag === "svg" || ancestors(el).some((a) => a.tag === "svg");
+      // The SVG graphics roles name a picture exactly as role=img does (Graphics-ARIA).
+      const isImg = el.tag === "img" || el.tag === "area" || role === "img" || (svgTree && (role === "graphics-document" || role === "graphics-symbol"));
       if (!isImg) continue;
       if (isHidden(el) && el.tag !== "area") continue;
       // alt="" is the decorative opt-out (maps the image to presentation); a whitespace-only
       // alt is NOT — it provides no accessible name yet keeps the image in the a11y tree.
       const altLiteral = attr(el, "alt");
       const whitespaceAlt = altLiteral !== undefined && altLiteral !== "" && altLiteral.trim() === "";
-      if ((hasBoundAttr(el, "alt") && !whitespaceAlt) || named(el)) continue; // alt="" / :alt="x" / aria-* → present
+      if ((hasBoundAttr(el, "alt") && !whitespaceAlt) || named(el, doc)) continue; // alt="" / :alt="x" / aria-* → present
       if (hasDynamicSpread(el)) continue; // {...props} / Svelte {alt} shorthand may carry alt
       // role="img" on a non-<img> element (e.g. <svg role="img"><title>…) is named by its
       // <title>/text content, not an alt attribute — accept that accessible name.
-      if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
+      // Inside SVG, an img/graphics role takes NO name from content (SVG-AAM): a <title> names
+      // it, the drawn <text> does not — a screen reader announces "image", unnamed.
+      if (svgTree && el.tag !== "img") {
+        if (descendants(el).some((d) => d.tag === "title" && visibleText(d).trim() !== "")) continue;
+        // a component / slot / {expression} child may render the <title> this parse cannot see
+        if (doc.kind !== "html" && (mayInjectContent(el) || textContent(el).includes("{"))) continue;
+      } else if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
       // `title` IS an accname fallback for an image, so 1.1.1 is technically satisfied and
       // asserting a non-conformity would be inventing one. It is still the wrong tool —
       // `title` is hover-only, absent on touch and unevenly announced — so this stays a
@@ -99,7 +111,7 @@ const canvasFallbackMissing: Rule = {
       if (el.tag !== "canvas") continue;
       if (attr(el, "aria-hidden") === "true") continue; // explicitly removed from the a11y tree (named on a role=img wrapper)
       const hasFallback = el.children.some((c) => (c.type === "element" ? true : c.data.trim().length > 0));
-      if (hasFallback || named(el) || visibleText(el)) continue;
+      if (hasFallback || named(el, doc) || visibleText(el)) continue;
       out.push({
         criteriaId: "1.1.1",
         el,
@@ -120,7 +132,7 @@ const inputImageAltMissing: Rule = {
       if (el.tag !== "input" || (attr(el, "type") ?? "").toLowerCase() !== "image") continue;
       if (isHidden(el)) continue;
       const alt = (boundAttr(el, "alt") ?? "").trim();
-      if (alt || named(el) || (attr(el, "title") ?? "").trim()) continue;
+      if (alt || named(el, doc) || (attr(el, "title") ?? "").trim()) continue;
       out.push({
         criteriaId: "1.1.1",
         el,
@@ -143,10 +155,10 @@ const objectEmbedNoName: Rule = {
       if (el.tag !== "object" && el.tag !== "embed") continue;
       if (isHidden(el)) continue;
       if (hasDynamicSpread(el)) continue; // a spread may inject aria-label/title
-      // named(el) catches a dynamically-bound aria-label / :aria-labelledby / aria-labelledby={x}
+      // named(el, doc) catches a dynamically-bound aria-label / :aria-labelledby / aria-labelledby={x}
       // (present name, value unknown) the same way chart-no-accessible-name does — without it,
       // a bound aria-labelledby re-fired as a false "no name" finding on <object>/<embed>.
-      if (named(el) || accessibleName(el, doc).trim() !== "") continue; // aria-label/labelledby, title, or fallback content
+      if (named(el, doc) || accessibleName(el, doc).trim() !== "") continue; // aria-label/labelledby, title, or fallback content
       out.push({
         criteriaId: "1.1.1",
         el,
@@ -181,11 +193,11 @@ const chartNoAccessibleName: Rule = {
       if (hasDynamicSpread(el)) continue;
       // report only the outermost chart container (skip nested chart nodes)
       if (ancestors(el).some((a) => CHART_CLASS.test(attr(a, "class") ?? ""))) continue;
-      if (named(el) || accessibleName(el, doc).trim() !== "") continue; // aria-label/labelledby, <svg><title>, text
+      if (named(el, doc) || accessibleName(el, doc).trim() !== "") continue; // aria-label/labelledby, <svg><title>, text
       // named by a wrapping <figure><figcaption> or a role=img wrapper
       const fig = ancestors(el).find((a) => a.tag === "figure");
       if (fig && descendants(fig).some((d) => d.tag === "figcaption" && visibleText(d))) continue;
-      if (ancestors(el).some((a) => (attr(a, "role") ?? "") === "img" && (named(a) || (attr(a, "aria-label") ?? "").trim()))) continue;
+      if (ancestors(el).some((a) => (attr(a, "role") ?? "") === "img" && (named(a, doc) || (attr(a, "aria-label") ?? "").trim()))) continue;
       out.push({
         criteriaId: "1.1.1",
         el,

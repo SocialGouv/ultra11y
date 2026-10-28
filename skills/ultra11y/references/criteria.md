@@ -73,7 +73,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 2.4.1 | Bypass Blocks | A | judgment | skip-link-target-missing | 9.1, 12.6, 12.7, 13.3, 13.4 |
+| 2.4.1 | Bypass Blocks | A | judgment | skip-link-target-missing, bypass-blocks-missing | 9.1, 12.6, 12.7, 13.3, 13.4 |
 | 2.4.2 | Page Titled | A | static | title-missing-empty | 8.5, 8.6 |
 | 2.4.3 | Focus Order | A | judgment | positive-tabindex | 10.3, 12.7, 12.8, 13.3, 13.4 |
 | 2.4.4 | Link Purpose (In Context) | A | judgment | link-empty-name, icon-only-control-unnamed | 6.1, 6.2 |

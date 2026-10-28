@@ -131,8 +131,12 @@ const titleMissingEmpty: Rule = {
   severity: "bloquant",
   scope: "page",
   run(doc: Doc): RuleFinding[] {
-    const titles = elementsByTag(doc, "title");
-    const hasNonEmpty = titles.some((t) => visibleText(t).length > 0);
+    // An <svg>/<math> <title> names a graphic, never the document.
+    const titles = elementsByTag(doc, "title").filter((t) => !ancestors(t).some((a) => a.tag === "svg" || a.tag === "math"));
+    // In a plain HTML page the document's title is the FIRST <title> in tree order — a
+    // stray non-empty one further down (say, in <body>) does not rescue an empty one in
+    // <head>. JSX/SFC may render alternatives in exclusive branches, so any one counts there.
+    const hasNonEmpty = doc.kind === "html" ? !!titles[0] && visibleText(titles[0]).length > 0 : titles.some((t) => visibleText(t).length > 0);
     if (hasNonEmpty) return [];
     // <title> injected by the Next.js metadata API, or by a framework shell placeholder
     // in <head> (e.g. SvelteKit `%sveltekit.head%`, `<%= title %>`).
@@ -223,6 +227,39 @@ const inlineLangChangeMissing: Rule = {
 // singletons must not be flagged invalid (the old /^[A-Za-z]{2,3}…/ rejected them).
 const BCP47 = /^([A-Za-z]{2,3}|[xXiI])(-[A-Za-z0-9]{1,8})*$/;
 
+// The IANA Language Subtag Registry is closed over two-letter primary subtags: they are
+// exactly the ISO 639-1 codes (plus the deprecated in/iw/ji/jw/mo and the sh macrolanguage).
+// Any other two-letter primary subtag (`em`) names no language at all.
+const TWO_LETTER_SUBTAGS = new Set(
+  (
+    "aa ab ae af ak am an ar as av ay az ba be bg bh bi bm bn bo br bs ca ce ch co cr cs cu cv cy da de dv dz ee el en eo es et eu " +
+    "fa ff fi fj fo fr fy ga gd gl gn gu gv ha he hi ho hr ht hu hy hz ia id ie ig ii ik io is it iu ja jv ka kg ki kj kk kl km kn " +
+    "ko kr ks ku kv kw ky la lb lg li ln lo lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny oc oj om or os " +
+    "pa pi pl ps pt qu rm rn ro ru rw sa sc sd se sg si sk sl sm sn so sq sr ss st su sv sw ta te tg th ti tk tl tn to tr ts tt tw " +
+    "ty ug uk ur uz ve vi vo wa wo xh yi yo za zh zu in iw ji jw mo sh"
+  ).split(" "),
+);
+// RFC 5646 §2.2.1: a language that HAS an ISO 639-1 code is registered under that code only,
+// so its ISO 639-2 three-letter spellings (`eng`, `fra`/`fre`, `deu`/`ger`…) are not valid
+// subtags. Only codes whose two-letter twin is certain are listed — a three-letter subtag
+// missing from this list is simply not judged, never guessed at.
+const THREE_LETTER_SHADOWED = new Set(
+  (
+    "eng fra fre deu ger spa ita por nld dut rus zho chi jpn kor ara pol swe nob nno dan fin ces cze ell gre tur heb hin hun " +
+    "ron rum ukr cat eus baq glg ltz gle gla cym wel isl ice lit lav est slk slo slv hrv srp bul mkd mac sqi alb hye arm kat geo " +
+    "fas per urd ben tam tel vie tha ind bre cos epo lat afr bel bos mlt"
+  ).split(" "),
+);
+
+/** Is the tag's primary language subtag provably absent from the IANA registry? Only the
+ *  two closed cases above are decided; anything else is left to the syntax check. */
+function primarySubtagUnregistered(lang: string): boolean {
+  const primary = (lang.split("-")[0] ?? "").toLowerCase();
+  if (primary.length === 2) return !TWO_LETTER_SUBTAGS.has(primary);
+  if (primary.length === 3) return THREE_LETTER_SHADOWED.has(primary);
+  return false;
+}
+
 /** Does this element govern any rendered text of its own — text that is neither hidden nor
  *  re-declared by a descendant's own `lang`? */
 function governsText(el: El): boolean {
@@ -230,6 +267,8 @@ function governsText(el: El): boolean {
     if (n.type === "text") return n.data.trim() !== "";
     if (hasAttr(n, "lang")) return false; // the descendant declares its own language
     if (isDisplayHidden(n)) return false;
+    // An image's text alternative is text in this element's language as much as a text node.
+    if (n.tag === "img") return (attr(n, "alt") ?? "").trim() !== "" && attr(n, "aria-hidden") !== "true";
     return n.children.some(walk);
   };
   return el.children.some(walk);
@@ -244,7 +283,7 @@ const langInvalid: Rule = {
     for (const el of doc.elements) {
       const lang = (attr(el, "lang") ?? "").trim();
       if (!lang) continue; // empty handled by inline-lang-change-missing / html-lang-missing
-      if (BCP47.test(lang)) continue;
+      if (BCP47.test(lang) && !primarySubtagUnregistered(lang)) continue;
       // A malformed `lang` only misdeclares something if it actually GOVERNS text. On
       // <html> that is the whole document; elsewhere, text sitting under a descendant with
       // its own `lang`, or inside a hidden subtree, is not governed by this attribute — and

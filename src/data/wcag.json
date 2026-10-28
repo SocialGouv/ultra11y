@@ -766,7 +766,7 @@
       "level": "A",
       "addedIn": "2.0",
       "automatability": "judgment",
-      "ruleIds": ["skip-link-target-missing"],
+      "ruleIds": ["skip-link-target-missing", "bypass-blocks-missing"],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/bypass-blocks.html",
       "techniques": ["ARIA11", "ARIA12", "ARIA4", "F15", "F66", "G1", "G10", "G115", "G123", "G124", "G130", "G135", "G141", "G59", "H42", "H69", "SCR28"],
       "text": "A mechanism is available to bypass blocks of content that are repeated on multiple web pages.",

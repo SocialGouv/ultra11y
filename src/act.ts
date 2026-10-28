@@ -79,11 +79,20 @@ export const ACT_RULES: Record<string, ActMapping> = {
     note: "`placeholder-as-label` is deliberately NOT mapped: a placeholder does contribute to the accessible name, so ACT passes it — ultra11y still reports it, as a stricter house rule under 3.3.2.",
   },
   ffd0e9: { engineRules: ["empty-heading"], scope: "static" },
-  b5c3f8: { engineRules: ["html-lang-missing"], scope: "static" },
-  bf051a: { engineRules: ["lang-invalid"], scope: "static" },
+  b5c3f8: {
+    engineRules: ["html-lang-missing"],
+    scope: "static",
+    note: "an `xml:lang` alone is accepted as a declared default language, as RGAA 8.3 accepts it; ACT requires the HTML `lang` attribute",
+  },
+  bf051a: {
+    engineRules: ["lang-invalid"],
+    scope: "static",
+    note: "beyond syntax, a primary subtag is checked against the closed two-letter registry and the ISO 639-2 spellings of languages that have one (`eng`, `fre`); the deprecated grandfathered `i-*` tags (`i-lux`) are knowingly accepted",
+  },
   de46e4: {
     engineRules: ["lang-invalid", "inline-lang-change-missing"],
     scope: "static",
+    note: "same registry check as the page language; the deprecated grandfathered `i-*` tags are knowingly accepted",
     divergences: {
       "949f41987201e52f8404c1246d1229eec06dea08":
         'lang="" on an element carrying text declares no language for that text; ACT deems the rule inapplicable, this engine reports it under 3.1.2',
@@ -103,10 +112,9 @@ export const ACT_RULES: Record<string, ActMapping> = {
   },
   "6a7281": { engineRules: ["invalid-aria-value", "live-region-conflict"], scope: "static" },
   b40fd1: {
-    engineRules: [],
+    engineRules: ["bypass-blocks-missing"],
     scope: "static",
-    gap: true,
-    note: "ACT asks that the non-repeated content sit in SOME landmark — a weaker claim than `missing-main-landmark`, which requires a <main>, so the two are not equivalent",
+    note: 'decided only where a <nav> marks the repeated block and no landmark, heading or skip link exists at all; which block is repeated is otherwise a cross-page judgment. `missing-main-landmark` is NOT mapped: it requires a <main>, a stricter claim than ACT\'s "some landmark"',
   },
   "80f0bf": {
     engineRules: ["autoplay-media"],
@@ -132,9 +140,12 @@ export const ACT_RULES: Record<string, ActMapping> = {
     note: "this variant drops the >20h exception the engine honours, so long delays are knowingly not reported",
   },
   b4f0c3: { engineRules: ["meta-viewport-zoom-block"], scope: "static" },
-  f51b46: { engineRules: ["media-no-track"], scope: "static", note: "presence of a caption track; whether the captions are accurate is a judgment call" },
+  f51b46: {
+    engineRules: ["media-no-track"],
+    scope: "static",
+    note: "`media-no-track` is advisory by design — captions can be embedded in the media file and its audio track may be silent, neither visible in source — so it never counts as a catch here; whether captions exist and are accurate is decided by the agent against the media",
+  },
 
-  // ---- gaps: statically decidable, not implemented yet ----------------------------
   "2ee8b8": {
     engineRules: ["label-in-name-mismatch"],
     scope: "static",
@@ -148,24 +159,39 @@ export const ACT_RULES: Record<string, ActMapping> = {
   "5c01ea": {
     engineRules: ["aria-prohibited-attr"],
     scope: "static",
-    note: "covers the name-prohibited roles; the full per-role permitted-attribute matrix is not encoded",
+    note: "covers the name-prohibited roles and a closed set of role-specific properties (aria-sort, aria-orientation, aria-value*, aria-pressed, aria-modal…) on roles the source makes certain; the full permitted-attribute matrix is not encoded",
   },
   "4e8ab6": { engineRules: ["aria-required-attr"], scope: "static" },
-  ff89c9: { engineRules: ["aria-required-parent"], scope: "static" },
+  ff89c9: {
+    engineRules: ["aria-required-parent"],
+    scope: "static",
+    note: "ownership assembled in script (a shadow root built at runtime) is not in the source",
+  },
   "307n5z": { engineRules: ["presentational-children-focusable"], scope: "static" },
   a25f45: { engineRules: ["headers-attr-dangling"], scope: "static" },
   d0f69e: {
     engineRules: ["th-no-data-cells"],
     scope: "static",
-    note: "only the explicit `headers`-wired shape is decided; scope-based assignment needs a full table model",
+    note: "decided for a fully `headers`-wired table, and for a simple grid (no row/col spans, leading header rows, nothing templated); other shapes need a full table model",
   },
   e6952f: { engineRules: ["duplicate-attribute"], scope: "static" },
   "5b7ae0": { engineRules: ["html-lang-xml-lang-mismatch"], scope: "static" },
   m6b1q3: { engineRules: ["menuitem-empty-name"], scope: "static" },
-  ffbc54: { engineRules: [], scope: "static", gap: true, note: "2.1.4 single-character keyboard shortcuts" },
-  ye5d6e: { engineRules: [], scope: "static", gap: true, note: "presence of a bypass instrument" },
-  cf77f2: { engineRules: [], scope: "static", gap: true, note: "presence of a bypass mechanism (landmark or skip link)" },
-  "047fe0": { engineRules: [], scope: "static", gap: true, note: "a heading for the non-repeated content (h1-missing is advisory, so it does not count)" },
+  ye5d6e: {
+    engineRules: ["bypass-blocks-missing"],
+    scope: "static",
+    note: "decided only when the page has no in-page link at all; whether an existing skip link lands on the non-repeated content, or what is repeated without a <nav> marking it, is a judgment",
+  },
+  cf77f2: {
+    engineRules: ["bypass-blocks-missing"],
+    scope: "static",
+    note: "decided only where a <nav> marks the repeated block; the corpus' failing page has none, so identifying its repeated block is left to the agent",
+  },
+  "047fe0": {
+    engineRules: ["bypass-blocks-missing"],
+    scope: "static",
+    note: "decided only where a <nav> marks the repeated block and no heading, landmark or skip link exists outside it (h1-missing is advisory, so it does not count); an off-screen heading needs the rendered page",
+  },
   "24afc2": {
     engineRules: ["letter-spacing-important"],
     scope: "static",
@@ -174,7 +200,7 @@ export const ACT_RULES: Record<string, ActMapping> = {
   "78fd32": {
     engineRules: ["line-height-important"],
     scope: "static",
-    note: "definite below-threshold author-important values; computed-unit cases remain rendered",
+    note: "definite below-threshold author-important values (em, unitless, or a percentage of the own font size); a `px` value against a stylesheet font size needs the cascade and remains rendered",
   },
   "9e45ec": {
     engineRules: ["word-spacing-important"],
@@ -203,6 +229,11 @@ export const ACT_RULES: Record<string, ActMapping> = {
   qt1vmo: { engineRules: [], scope: "judgment", note: "is the alt relevant (1.1.1)" },
   e88epe: { engineRules: [], scope: "judgment", note: "is the image genuinely decorative" },
   "5effbb": { engineRules: [], scope: "judgment", note: "link purpose in context (2.4.4)" },
+  ffbc54: {
+    engineRules: [],
+    scope: "judgment",
+    note: "2.1.4 single-character shortcuts are registered and disarmed in script (a keydown handler, a settings toggle); whether one exists and can be turned off or remapped is read from the behaviour, not the markup",
+  },
   aizyf1: { engineRules: [], scope: "judgment" },
   b20e66: { engineRules: [], scope: "judgment" },
   fd3a94: { engineRules: [], scope: "judgment" },

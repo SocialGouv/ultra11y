@@ -77,10 +77,10 @@ describe("ACT corpus — precision (absolute)", () => {
 // COUNTS, not percentages, so the gate cannot be gamed by dropping a mapping — narrowing
 // coverage lowers the count and fails just as loudly as a recall regression.
 const RATCHET = {
-  scoredRules: 32, // ACT rules with at least one mapped engine rule
-  cleanRules: 6, // of those, consistent or divergent-with-a-reason (i.e. no missed failure)
-  caughtFailures: 103, // `failed` examples caught across all scored rules
-  cleanCases: 291, // `passed`/`inapplicable` examples checked and left alone
+  scoredRules: 44, // ACT rules with at least one mapped engine rule
+  cleanRules: 31, // of those, consistent or divergent-with-a-reason (i.e. no missed failure)
+  caughtFailures: 168, // `failed` examples caught across all scored rules
+  cleanCases: 401, // `passed`/`inapplicable` examples checked and left alone
 };
 
 describe("ACT corpus — recall (ratchet)", () => {

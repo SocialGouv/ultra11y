@@ -24,7 +24,9 @@ const metaViewportZoomBlock: Rule = {
       const maxScale = pairs.get("maximum-scale");
       // Only a real, finite maximum-scale < 2 blocks zoom. An empty (`maximum-scale=`)
       // or malformed value must NOT be treated as 0 (Number("") === 0) and falsely flagged.
-      const maxScaleNum = maxScale !== undefined && maxScale.trim() !== "" ? Number(maxScale) : Number.NaN;
+      // The viewport keyword `yes` is defined as the number 1 (CSS Device Adaptation's
+      // legacy meta-viewport translation), so `maximum-scale=yes` pins the scale to 100%.
+      const maxScaleNum = maxScale === "yes" ? 1 : maxScale !== undefined && maxScale.trim() !== "" ? Number(maxScale) : Number.NaN;
       // A maximum-scale of 0 or less is invalid: browsers discard it, so zoom is NOT
       // blocked (`maximum-scale=-1` is a W3C ACT "passed" example).
       const blocked = userScalable === "no" || userScalable === "0" || (Number.isFinite(maxScaleNum) && maxScaleNum > 0 && maxScaleNum < 2);
@@ -118,6 +120,9 @@ function spacingImportantRule(id: string, property: SpacingProperty, minimum: nu
         if (raw === "normal" || raw === "initial") value = property === "line-height" ? 1.2 : 0;
         else if (/^-?(?:\d+|\d*\.\d+)em$/.test(raw)) value = Number.parseFloat(raw);
         else if (property === "line-height" && /^-?(?:\d+|\d*\.\d+)$/.test(raw)) value = Number.parseFloat(raw);
+        // A line-height percentage resolves against the element's OWN font size, exactly
+        // like `em` — so `120%` is a definite 1.2, whatever that font size turns out to be.
+        else if (property === "line-height" && /^-?(?:\d+|\d*\.\d+)%$/.test(raw)) value = Number.parseFloat(raw) / 100;
         else if (/^0(?:[a-z%]+)?$/.test(raw)) value = 0;
         if (value === undefined || value >= minimum) continue;
         out.push({ criteriaId: "1.4.12", el, msgId: "text-spacing-important", params: { property, value: raw, minimum } });
@@ -257,7 +262,9 @@ const presentationalAttribute: Rule = {
 // DIRECT text only, and never inside the elements where spacing is the content.
 // Written as escapes, not as literal characters: a non-breaking space is invisible in a
 // diff, and a reviewer must be able to see which space this matches.
-const SPELLED_OUT = /(?:\p{L}[ \u00a0]){4,}\p{L}/u;
+// Anchored on letter boundaries at both ends: every letter of the run must stand ALONE, so
+// the tail of an ordinary word (\u00ab Il y a \u00e0 faire \u00bb \u2014 `y a \u00e0 f` then \u00ab aire \u00bb) is not a run.
+const SPELLED_OUT = /(?<!\p{L})(?:\p{L}[ \u00a0]){4,}\p{L}(?!\p{L})/u;
 const NBSP_RUN = /\u00a0{3,}/u;
 const SPACING_EXEMPT = new Set(["pre", "code", "kbd", "samp", "textarea", "script", "style", "svg"]);
 

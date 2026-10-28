@@ -224,6 +224,26 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
       en: (p) => `Use a value WAI-ARIA defines for ${p.attr} (e.g. true/false, or an integer for aria-level).`,
     },
   },
+  "invalid-aria-value.dangling-required": {
+    message: {
+      fr: (p) => `role="${p.role}" exige ${p.attr}, mais ${p.attr}="${p.value}" ne désigne aucun élément de la page — la relation requise n'existe pas.`,
+      en: (p) => `role="${p.role}" requires ${p.attr}, but ${p.attr}="${p.value}" names no element of the page — the required relationship does not exist.`,
+    },
+    remediation: {
+      fr: (p) => `Faites pointer ${p.attr} vers l'id d'un élément présent dans la page.`,
+      en: (p) => `Point ${p.attr} at the id of an element present in the page.`,
+    },
+  },
+  "aria-prohibited-attr.unsupported": {
+    message: {
+      fr: (p) => `${p.attrs} n'est pas pris en charge par le rôle ${p.role} — la propriété est ignorée et l'état voulu n'est pas restitué.`,
+      en: (p) => `${p.attrs} is not supported by the ${p.role} role — the property is dropped and the intended state never reaches the user.`,
+    },
+    remediation: {
+      fr: (p) => `Retirez ${p.attrs}, ou donnez à l'élément le rôle qui porte cette propriété.`,
+      en: (p) => `Remove ${p.attrs}, or give the element the role that carries this property.`,
+    },
+  },
   "aria-required-attr": {
     message: {
       fr: (p) => `role="${p.role}" sans ${p.attrs} — l'état requis par ce rôle n'est pas exposé.`,
@@ -595,6 +615,16 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
     remediation: {
       fr: () => `Ajoutez les éléments enfants au rôle approprié, ou utilisez les éléments HTML natifs.`,
       en: () => `Add child elements with the appropriate role, or use native HTML elements.`,
+    },
+  },
+  "aria-required-children.forbidden-child": {
+    message: {
+      fr: (p) => `role="${p.role}" possède un élément de rôle ${p.child}, qu'il n'admet pas (attendus : ${p.req}) — structure ARIA invalide.`,
+      en: (p) => `role="${p.role}" owns an element with role ${p.child}, which it does not allow (expected: ${p.req}) — invalid ARIA structure.`,
+    },
+    remediation: {
+      fr: () => `Sortez cet élément du conteneur, ou donnez-lui un rôle que le conteneur admet.`,
+      en: () => `Move that element out of the container, or give it a role the container allows.`,
     },
   },
   "aria-hidden-focusable": {
@@ -995,6 +1025,18 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
   },
 
   // ---- Theme 12 — Navigation & landmarks (src/rules/navigation.ts) ------------
+  "bypass-blocks-missing": {
+    message: {
+      fr: () =>
+        `La page répète un bloc de navigation avant son contenu sans aucun moyen de le contourner : ni titre hors de la navigation, ni région (main, aside, section…) autour du contenu, ni lien d'évitement.`,
+      en: () =>
+        `The page repeats a navigation block before its content with no way to bypass it: no heading outside the navigation, no landmark (main, aside, section…) around the content, and no skip link.`,
+    },
+    remediation: {
+      fr: () => `Placez le contenu principal dans <main>, ouvrez-le par un titre, et/ou ajoutez en tête de page un lien d'évitement vers lui.`,
+      en: () => `Wrap the main content in <main>, start it with a heading, and/or add a skip link to it at the top of the page.`,
+    },
+  },
   "skip-link-target-missing": {
     message: {
       fr: (p) => `Lien interne href="${p.href}" — la cible #${p.id} n'existe pas dans la page (lien d'évitement/ancre cassé).`,

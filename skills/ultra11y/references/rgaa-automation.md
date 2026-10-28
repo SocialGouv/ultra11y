@@ -98,8 +98,8 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 12.3 | 0 / 0 / 3 | 0 / 0 / 0 | no | AI |
 | 12.4 | 0 / 0 / 3 | 0 / 0 / 0 | no | AI |
 | 12.5 | 0 / 0 / 3 | 0 / 0 / 0 | no | AI |
-| 12.6 | 0 / 0 / 1 | 0 / 5 / 0 | no | AI + signals |
-| 12.7 | 0 / 0 / 2 | 0 / 3 / 0 | no | AI + signals |
+| 12.6 | 0 / 0 / 1 | 0 / 6 / 0 | no | AI + signals |
+| 12.7 | 0 / 0 / 2 | 0 / 4 / 0 | no | AI + signals |
 | 12.8 | 0 / 0 / 2 | 0 / 2 / 0 | no | AI + signals |
 | 12.9 | 0 / 0 / 1 | 0 / 1 / 0 | no | AI + signals |
 | 12.10 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
@@ -350,9 +350,9 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 12.5.1 | judgment | — | — |
 | 12.5.2 | judgment | — | — |
 | 12.5.3 | judgment | — | — |
-| 12.6.1 | judgment | — | `axe:landmark-one-main`, `missing-main-landmark`, `multiple-main-landmark`, `nav-landmark-missing`, `nav-landmark-unnamed` |
-| 12.7.1 | judgment | — | `axe:bypass` |
-| 12.7.2 | judgment | — | `axe:skip-link`, `skip-link-target-missing` |
+| 12.6.1 | judgment | — | `axe:landmark-one-main`, `bypass-blocks-missing`, `missing-main-landmark`, `multiple-main-landmark`, `nav-landmark-missing`, `nav-landmark-unnamed` |
+| 12.7.1 | judgment | — | `axe:bypass`, `bypass-blocks-missing` |
+| 12.7.2 | judgment | — | `axe:skip-link`, `bypass-blocks-missing`, `skip-link-target-missing` |
 | 12.8.1 | judgment | — | `axe:tabindex`, `positive-tabindex` |
 | 12.8.2 | judgment | — | — |
 | 12.9.1 | judgment | — | `dyn-keyboard-trap` |

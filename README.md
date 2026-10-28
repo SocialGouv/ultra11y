@@ -25,7 +25,7 @@ Full details, thresholds and off-switches under [Install](#install).</sub>
 
 > Audit HTML/CSS/JSX against **WCAG 2.2 AA** accessibility and produce a dated compliance report — or author/review accessible markup without regressions. A [skills.sh](https://skills.sh) agent skill: a deterministic, zero-dependency static engine **plus** the agent's judgment, with `check`/`verify` gates against hallucinated non-conformities. **The central deliverable is the auditor conformance block** — theme, criterion + official wording, test(s), WCAG mapping + level, finding, expected state, verification, `file:line` occurrences — rendered identically by the `report` (compliance doc), the `prd` backlog and the GitHub issues, in the active standard's vocabulary and **in your language** (`--lang auto` follows the conversation/repo). **WCAG is the worldwide core; country standards (RGAA, …) are pluggable in-repo packs.**
 
-ultra11y is built around an honest **division of labour**. Automated tools only catch a fraction of accessibility problems, so the engine does the *mechanical* work — 93 machine-detectable static checks tied to the WCAG 2.2 success criteria — and is explicit about everything it can't decide statically. What it can't, the **AI agent adjudicates** (statically, from the evidence, gated by `verify`/`check`) — not a deferral to a human:
+ultra11y is built around an honest **division of labour**. Automated tools only catch a fraction of accessibility problems, so the engine does the *mechanical* work — 94 machine-detectable static checks tied to the WCAG 2.2 success criteria — and is explicit about everything it can't decide statically. What it can't, the **AI agent adjudicates** (statically, from the evidence, gated by `verify`/`check`) — not a deferral to a human:
 
 - **Automatable (engine):** missing `alt`/`lang`/`title`, unlabeled fields, empty links/buttons, icon-only controls, iframes without title, tables without headers, heading-level skips, empty/dangling headings & labels, duplicate ids, invalid/broken ARIA, positive `tabindex`, autoplay/timed-refresh/`blink`/`marquee` media…
 - **Agent judgment (gated):** alt-text relevance, link purpose in context, reading/tab order, caption accuracy — the agent rules on these via `verify --manual` → `--apply`, each verdict carrying a justification (or a groundable NC), never a silent "conforming".
@@ -41,11 +41,11 @@ A self-authored fixture can only prove that a rule fires on the defect written f
 
 | | |
 |---|---|
-| Rules scored | **40** (the ACT rules an equivalent engine check exists for) |
-| `failed` examples caught | **125 / 176** |
-| `passed` / `inapplicable` examples left alone | **364 / 364** — no unexplained false positive |
+| Rules scored | **44** (the ACT rules an equivalent engine check exists for) |
+| `failed` examples caught | **168 / 187** |
+| `passed` / `inapplicable` examples left alone | **401 / 401** — no unexplained false positive |
 | Deliberate divergences | 9, each argued on the record |
-| Declared gaps (statically decidable, not implemented) | 5 |
+| Declared gaps (statically decidable, not implemented) | 0 |
 
 Rules needing a rendered page (computed contrast, keyboard traps) or a human call (is this heading descriptive?) are **declared and routed**, not silently scored zero. The full per-rule matrix — including every gap and every divergence — is generated into [`skills/ultra11y/references/act.md`](skills/ultra11y/references/act.md) and re-checked on every build; the corpus itself is refreshed daily by a workflow, so the numbers cannot quietly go stale.
 
@@ -316,7 +316,7 @@ a test). See [`CONTRIBUTING.md`](CONTRIBUTING.md) and `skills/ultra11y/reference
 
 ### What RGAA automation actually covers
 
-The engine's 93 rules are not 93 RGAA criteria: several rules can evidence the same official
+The engine's 94 rules are not 94 RGAA criteria: several rules can evidence the same official
 test, and a rule can detect a useful symptom without exhausting the criterion's alternatives,
 exceptions or relevance checks. The generated contract classifies all **258 official RGAA
 tests**:
@@ -346,8 +346,8 @@ The number can grow, but the useful target is **more observed, exact failures**,
 marketing count. The best next candidates are complete rendered probes for zoom/reflow and
 hover content (10.4, 10.11, 10.13), and contrast,
 link distinction or orientation checks (3.2, 3.3, 10.6, 13.9) that first rule out every
-official alternative and particular case. The 5 declared ACT gaps are another implementation
-queue, although adding one does not necessarily cover a new RGAA criterion. A candidate is
+official alternative and particular case. The ACT corpus's remaining misses are another
+implementation queue, although closing one does not necessarily cover a new RGAA criterion. A candidate is
 promoted only when a narrower rule demonstrably exhausts its cited official test; the two
 `C`-by-silence criteria stay unchanged until an equally complete proof exists.
 

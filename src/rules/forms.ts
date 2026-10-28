@@ -1,8 +1,8 @@
 // Theme 11 — Forms: every field has a programmatic label + group/structure checks.
 import type { Doc, El } from "../parse/html.js";
-import { attr, hasAttr, hasBoundAttr, hasDynamicSpread, descendants, ancestors, visibleText, textContent } from "../parse/html.js";
+import { attr, boundAttr, hasAttr, hasBoundAttr, hasDynamicSpread, descendants, ancestors, visibleText, textContent } from "../parse/html.js";
 import { isIntrinsic } from "../parse/jsx-bridge.js";
-import { controlLabel, isFormField, mayInjectContent, isNameExempt } from "../name.js";
+import { controlLabel, isFormField, mayInjectContent, isNameExempt, labelledbyResolvesEmpty } from "../name.js";
 import { isValidAutocomplete, CREDENTIAL_FIELDS } from "../autofill.js";
 
 // The element's WHOLE content is a slot/snippet passthrough — a DIRECT `<slot>` child or
@@ -17,6 +17,29 @@ import type { Rule, RuleFinding } from "./rule.js";
 // title/placeholder are NOT real labels for these rules
 const REAL_LABEL = new Set(["for", "wrapping", "aria-label", "aria-labelledby"]);
 
+// ARIA field roles that take NO name from their content: a `<div role="textbox">` is not
+// named by the text typed into it, nor by a <label> (which only labels native labelable
+// elements). Only aria-labelledby, aria-label or title can name it.
+const CUSTOM_FIELD_ROLES = new Set(["textbox", "searchbox", "combobox", "listbox", "spinbutton", "slider"]);
+const NATIVE_FIELD_TAGS = new Set(["input", "select", "textarea", "button"]);
+
+/** A custom (non-native) element given a field role, in plain intrinsic markup. */
+function isCustomTextField(el: El): boolean {
+  if (!isIntrinsic(el.tag) || NATIVE_FIELD_TAGS.has(el.tag)) return false;
+  const role = (attr(el, "role") ?? "").trim().toLowerCase();
+  return CUSTOM_FIELD_ROLES.has(role);
+}
+
+/** Can the source show a name for a custom field — or fail to rule one out? */
+function customFieldNamed(el: El, doc: Doc): boolean {
+  if (isNameExempt(el) || hasDynamicSpread(el)) return true; // not exposed / props may name it
+  if (hasAttr(el, "aria-placeholder")) return true; // a hint stands in, like placeholder: not this rule's call
+  const labelledby = attr(el, "aria-labelledby");
+  if (labelledby !== undefined ? !labelledbyResolvesEmpty(el, doc) && labelledby.trim() !== "" : hasBoundAttr(el, "aria-labelledby")) return true;
+  if ((boundAttr(el, "aria-label") ?? "").trim()) return true;
+  return (boundAttr(el, "title") ?? "").trim() !== "";
+}
+
 const controlLabelMissing: Rule = {
   id: "control-label-missing",
   criteria: ["4.1.2"],
@@ -24,6 +47,10 @@ const controlLabelMissing: Rule = {
   run(doc: Doc): RuleFinding[] {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
+      if (isCustomTextField(el)) {
+        if (!customFieldNamed(el, doc)) out.push({ criteriaId: "4.1.2", el, msgId: "control-label-missing", params: { tag: el.tag } });
+        continue;
+      }
       if (!isFormField(el)) continue;
       if (isNameExempt(el)) continue; // not exposed, or explicitly presentational
       const { via } = controlLabel(el, doc);

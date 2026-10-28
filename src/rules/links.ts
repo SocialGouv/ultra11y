@@ -53,6 +53,16 @@ function isFormButton(el: El, doc: Doc): boolean {
   return formOwner(el, doc)?.tag === "form";
 }
 
+/** An `<area href>` is a link only once its `<map>` is actually wired to an image: an area in
+ *  a map no `<img usemap>` references renders nothing and is in no focus order. */
+function isLiveImageMapLink(el: El, doc: Doc): boolean {
+  if (el.tag !== "area" || !hasAttr(el, "href")) return false;
+  const map = ancestors(el).find((a) => a.tag === "map");
+  const name = (attr(map ?? el, "name") ?? "").trim();
+  if (!map || !name || name.includes("{")) return false;
+  return doc.elements.some((e) => e.tag === "img" && (attr(e, "usemap") ?? "").trim() === `#${name}`);
+}
+
 const linkEmptyName: Rule = {
   id: "link-empty-name",
   criteria: ["2.4.4"],
@@ -60,7 +70,7 @@ const linkEmptyName: Rule = {
   run(doc: Doc): RuleFinding[] {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
-      if (el.tag !== "a" || !hasAttr(el, "href")) continue;
+      if (!(el.tag === "a" && hasAttr(el, "href")) && !isLiveImageMapLink(el, doc)) continue;
       if (isNameExempt(el)) continue; // not exposed, or explicitly presentational
       if (accessibleName(el, doc) !== "") continue;
       if (mayInjectContent(el)) continue; // name supplied by a <slot>/child component

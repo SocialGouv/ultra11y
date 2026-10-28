@@ -1,7 +1,8 @@
 // Theme 12 — Navigation + page landmarks (statically-checkable slice).
 import type { Doc, El } from "../parse/html.js";
-import { attr, descendants, elementsByTag, hasAttr, hasBoundAttr, hasDynamicSpread } from "../parse/html.js";
+import { ancestors, attr, descendants, elementsByTag, hasAttr, hasBoundAttr, hasDynamicSpread } from "../parse/html.js";
 import { isIntrinsic } from "../parse/jsx-bridge.js";
+import { isHiddenFromAT } from "../name.js";
 import { type Rule, type RuleFinding, shellBodyInjected } from "./rule.js";
 
 // JSX/SFC: a child component or a `{children}`/`{expr}` child may inject the <main> at
@@ -180,7 +181,77 @@ const navLandmarkUnnamed: Rule = {
   },
 };
 
+// ---- 2.4.1 Bypass Blocks: the case where NO mechanism can exist -----------------------
+//
+// WCAG 2.4.1 is met by ANY of three mechanisms — a heading at the start of the content, a
+// landmark around it, or an in-page link to it — or by a control that hides the repeated
+// block. Which block is "repeated" is normally a cross-page judgment, so this rule only
+// speaks when the page itself marks it: a <nav> landmark followed by real content. It then
+// fires only when every mechanism is provably absent from the source:
+//   • no exposed heading outside the navigation (a page heading in a <header> counts);
+//   • no landmark that could hold the content — main, aside, section, form, search, or the
+//     equivalent roles (a hidden one does not count);
+//   • no in-page link (`href="#…"`), and no button, disclosure, `aria-controls` or event
+//     handler that could hide the navigation or move focus past it.
+// Plain HTML pages only: a component's layout supplies headings and landmarks this file
+// does not contain. ACT 047fe0, b40fd1, ye5d6e and cf77f2 all fail on such a page.
+const CONTENT_LANDMARK_ROLES = new Set(["main", "complementary", "region", "form", "search", "application", "document"]);
+const CONTENT_LANDMARK_TAGS = new Set(["main", "aside", "section", "form", "search"]);
+const NON_CONTENT_TEXT = new Set(["script", "style", "template", "noscript", "title", "head"]);
+const BYPASS_MIN_TEXT = 20;
+
+function roleOf(el: El): string {
+  return (attr(el, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
+}
+
+/** <nav>/role=navigation and the page-level header/footer: the repeated blocks themselves. */
+function isRepeatedBlock(el: El): boolean {
+  const role = roleOf(el);
+  if (role) return role === "navigation" || role === "banner" || role === "contentinfo";
+  return el.tag === "nav" || el.tag === "header" || el.tag === "footer";
+}
+
+function couldBypass(el: El): boolean {
+  if (el.tag === "a" && (attr(el, "href") ?? "").trim().startsWith("#") && (attr(el, "href") ?? "").trim() !== "#") return true;
+  if (el.tag === "button" || el.tag === "details" || el.tag === "summary" || el.tag === "dialog") return true;
+  if (el.tag === "input" && ["button", "submit", "reset", "image", "checkbox"].includes((attr(el, "type") ?? "").trim().toLowerCase())) return true;
+  if (["button", "link", "switch", "checkbox", "tab"].includes(roleOf(el))) return true;
+  if (hasAttr(el, "aria-controls") || hasAttr(el, "aria-expanded") || hasAttr(el, "accesskey")) return true;
+  return Object.keys(el.attribs).some((k) => k.startsWith("on"));
+}
+
+const bypassBlocksMissing: Rule = {
+  id: "bypass-blocks-missing",
+  criteria: ["2.4.1"],
+  severity: "majeur",
+  scope: "page",
+  run(doc: Doc): RuleFinding[] {
+    if (doc.kind !== "html" || shellBodyInjected(doc)) return [];
+    const nav = doc.elements.find((e) => (e.tag === "nav" || roleOf(e) === "navigation") && !isHiddenFromAT(e));
+    if (!nav) return [];
+    const insideRepeated = (el: El): boolean => [el, ...ancestors(el)].some(isRepeatedBlock);
+    for (const el of doc.elements) {
+      if (couldBypass(el)) return [];
+      if (isHiddenFromAT(el)) continue;
+      const role = roleOf(el);
+      if (CONTENT_LANDMARK_ROLES.has(role) || (!role && CONTENT_LANDMARK_TAGS.has(el.tag))) return [];
+      const heading = role === "heading" || (!role && /^h[1-6]$/.test(el.tag));
+      if (heading && ![el, ...ancestors(el)].some((a) => a.tag === "nav" || roleOf(a) === "navigation")) return [];
+    }
+    // Real content after the navigation, outside every repeated block.
+    let text = "";
+    for (const el of doc.elements) {
+      if (el.start <= nav.end || NON_CONTENT_TEXT.has(el.tag) || isHiddenFromAT(el) || insideRepeated(el)) continue;
+      if (ancestors(el).some((a) => NON_CONTENT_TEXT.has(a.tag))) continue;
+      for (const c of el.children) if (c.type === "text") text += c.data;
+    }
+    if (text.replace(/\s+/g, " ").trim().length < BYPASS_MIN_TEXT) return [];
+    return [{ criteriaId: "2.4.1", el: nav, msgId: "bypass-blocks-missing" }];
+  },
+};
+
 export const navigationRules: Rule[] = [
+  bypassBlocksMissing,
   skipLinkTargetMissing,
   positiveTabindex,
   missingMainLandmark,

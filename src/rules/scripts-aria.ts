@@ -43,6 +43,10 @@ function isFocusable(el: El): boolean {
   }
   if (isDisabled(el)) return false; // a disabled control is not focusable
   if (isInteractive(el)) return true;
+  // A <details>' first <summary> child is its disclosure button, focusable by default.
+  if (el.tag === "summary" && el.parent?.tag === "details") {
+    return el.parent.children.find((c): c is El => c.type === "element" && c.tag === "summary") === el;
+  }
   return hasAttr(el, "contenteditable") && attr(el, "contenteditable") !== "false";
 }
 
@@ -288,7 +292,96 @@ function satisfiesChild(d: El, reqRoles: string[]): boolean {
   if (reqRoles.includes(role)) return true;
   if (reqRoles.includes("listitem") && d.tag === "li") return true;
   if (reqRoles.includes("radio") && d.tag === "input" && (attr(d, "type") ?? "").toLowerCase() === "radio") return true;
+  if (!role && (d.tag === "td" || d.tag === "th") && reqRoles.some((r) => r === "cell" || r === "gridcell" || r === "columnheader" || r === "rowheader"))
+    return true;
   return false;
+}
+
+// What each container may OWN (WAI-ARIA 1.2 "Required Owned Elements"). Used for the
+// second test below — "owns an element whose role it does not allow" — which runs only on
+// containers whose owned set is closed in practice. A `group` is not listed: it is looked
+// THROUGH, so a list owning a group of listitems is fine and a menu whose group owns a
+// treeitem is not, which is how WAI-ARIA reads `group → listitem`.
+// (`radiogroup` is deliberately absent: its owned elements are routinely labels and
+// headings, and only the "owns no radio at all" test is decisive for it.)
+const OWNED_ALLOWED: Record<string, string[]> = {
+  // `separator` is not in ARIA 1.2's list for menus but every APG menu example uses one;
+  // allowing it can only under-report.
+  menu: ["menuitem", "menuitemcheckbox", "menuitemradio", "separator"],
+  menubar: ["menuitem", "menuitemcheckbox", "menuitemradio", "separator"],
+  tablist: ["tab"],
+  list: ["listitem"],
+  tree: ["treeitem"],
+  row: ["cell", "columnheader", "gridcell", "rowheader"],
+  grid: ["row", "rowgroup"],
+  treegrid: ["row", "rowgroup"],
+  table: ["row", "rowgroup"],
+  rowgroup: ["row"],
+};
+// First test, "owns none of its required elements": the historical containers, plus a row,
+// which must own at least one cell — a row of plain text is not a row of anything.
+const REQUIRED_ANY: Record<string, string[]> = { ...REQUIRED_CHILDREN, row: OWNED_ALLOWED.row! };
+
+// The native roles an owned element can carry that matter for these containers. Only the
+// unambiguous ones: an element whose role depends on context is "unknown" and never judged.
+function nativeOwnedRole(el: El): string | undefined {
+  if (el.tag === "li") return "listitem";
+  if (el.tag === "tr") return "row";
+  if (el.tag === "td") return "cell";
+  if (el.tag === "button") return "button";
+  if (el.tag === "a" && hasAttr(el, "href")) return "link";
+  if (/^h[1-6]$/.test(el.tag)) return "heading";
+  if (el.tag === "input") {
+    const type = (attr(el, "type") ?? "text").trim().toLowerCase();
+    if (type === "radio") return "radio";
+    if (type === "checkbox") return "checkbox";
+  }
+  return undefined;
+}
+
+// Tags with no role of their own: ownership passes straight through them.
+const GENERIC_TAGS = new Set(["div", "span", "b", "i", "u", "small", "font", "bdi", "bdo"]);
+
+/** The elements `el` OWNS in the accessibility tree, each with its role: the first
+ *  descendants that carry a role — generic and presentational wrappers, and groups, being
+ *  looked through. `"?"` marks an owned element whose role is not decidable here;
+ *  `undefined` means the owned set itself is not knowable (an unresolvable aria-owns). */
+function ownedElements(el: El, doc: Doc): { el: El; role: string }[] | undefined {
+  const out: { el: El; role: string }[] = [];
+  const visit = (c: El): void => {
+    if (isHiddenFromAT(c) || c.tag === "script" || c.tag === "template" || c.tag === "style") return;
+    const explicit = (attr(c, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
+    if (explicit === "group") {
+      walk(c);
+      return;
+    }
+    if (explicit === "none" || explicit === "presentation" || explicit === "generic" || (!explicit && GENERIC_TAGS.has(c.tag))) {
+      // a generic wrapper carrying ARIA attributes is itself in the tree — not transparent
+      if (!explicit && Object.keys(c.attribs).some((k) => k.startsWith("aria-"))) out.push({ el: c, role: "?" });
+      else walk(c);
+      return;
+    }
+    if (!isIntrinsic(c.tag)) {
+      out.push({ el: c, role: "?" }); // a component renders whatever it renders
+      return;
+    }
+    out.push({ el: c, role: explicit && VALID_ROLES.has(explicit) ? explicit : (nativeOwnedRole(c) ?? "?") });
+  };
+  const walk = (n: El): void => {
+    for (const c of n.children) if (c.type === "element") visit(c);
+  };
+  walk(el);
+  const owns = attr(el, "aria-owns");
+  if (owns !== undefined) {
+    // Resolvable only when the whole page is in hand and every id exists.
+    if (owns.includes("{") || doc.kind !== "html") return undefined;
+    for (const id of owns.split(/\s+/).filter(Boolean)) {
+      const ref = doc.byId.get(id);
+      if (!ref) return undefined;
+      visit(ref);
+    }
+  }
+  return out;
 }
 
 const ariaRequiredChildren: Rule = {
@@ -299,19 +392,23 @@ const ariaRequiredChildren: Rule = {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
       const role = (attr(el, "role") ?? "").trim();
-      const req = REQUIRED_CHILDREN[role];
-      if (!req) continue;
-      if (hasAttr(el, "aria-owns")) continue; // children may be referenced elsewhere
+      const req = REQUIRED_ANY[role];
+      const allowed = OWNED_ALLOWED[role];
+      if (!req && !allowed) continue;
       if (attr(el, "aria-busy") === "true") continue; // still loading — the tree is knowingly incomplete
       if (isHiddenFromAT(el)) continue; // not exposed: no owned elements to require
-      if (descendants(el).some((d) => satisfiesChild(d, req))) continue;
       if (mayInjectContent(el)) continue; // required children injected via <slot>/component/{@render}
-      out.push({
-        criteriaId: "4.1.2",
-        el,
-        msgId: "aria-required-children",
-        params: { role, req: req.join("/") },
-      });
+      // 1. owns none of its required elements (aria-owns may supply them from elsewhere)
+      if (req && !hasAttr(el, "aria-owns") && !descendants(el).some((d) => satisfiesChild(d, req))) {
+        out.push({ criteriaId: "4.1.2", el, msgId: "aria-required-children", params: { role, req: req.join("/") } });
+        continue;
+      }
+      // 2. owns an element whose role the container does not allow
+      if (!allowed) continue;
+      const bad = ownedElements(el, doc)?.find((o) => o.role !== "?" && !allowed.includes(o.role));
+      if (bad) {
+        out.push({ criteriaId: "4.1.2", el, msgId: "aria-required-children.forbidden-child", params: { role, child: bad.role, req: allowed.join("/") } });
+      }
     }
     return out;
   },
@@ -369,7 +466,10 @@ const presentationalChildrenFocusable: Rule = {
   run(doc: Doc): RuleFinding[] {
     const out: RuleFinding[] = [];
     for (const el of doc.elements) {
-      const role = (attr(el, "role") ?? "").trim().toLowerCase();
+      // A native <button> carries the button role (and its presentational children) with
+      // no `role` attribute at all; an explicit role on it replaces that.
+      const explicit = (attr(el, "role") ?? "").trim().toLowerCase();
+      const role = explicit || (el.tag === "button" ? "button" : "");
       if (!PRESENTATIONAL_CHILDREN.has(role) || isHiddenFromAT(el)) continue;
       const child = descendants(el).find((node) => isFocusable(node) && !isDisplayHidden(node));
       if (child) out.push({ criteriaId: "4.1.2", el: child, msgId: "presentational-children-focusable", params: { role } });
@@ -557,6 +657,20 @@ const invalidAriaAttr: Rule = {
   },
 };
 
+/** An ID-reference property the element's role REQUIRES (`aria-controls` on a scrollbar)
+ *  whose ids name no element of the page: the required relationship is not there at all.
+ *  Decided only in a plain HTML document, where the whole page is in hand — a component may
+ *  reference an id another component renders. A combobox that is not expanded is exempt:
+ *  its popup legitimately does not exist yet. */
+function requiredIdrefDangling(el: El, doc: Doc, name: string, value: string): boolean {
+  if (doc.kind !== "html" || !IDREF_ATTRS.includes(name)) return false;
+  const role = (attr(el, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
+  if (!ARIA_REQUIRED_ATTRS[role]?.includes(name)) return false;
+  if (role === "combobox" && (attr(el, "aria-expanded") ?? "").trim().toLowerCase() !== "true") return false;
+  const ids = value.split(/\s+/).filter(Boolean);
+  return ids.length > 0 && ids.every((id) => !doc.byId.has(id));
+}
+
 // An out-of-vocabulary VALUE (`aria-expanded="yes"`, `aria-level="0"`) is treated as if the
 // attribute were absent, so the state the author meant to expose never reaches the user.
 const invalidAriaValue: Rule = {
@@ -570,8 +684,16 @@ const invalidAriaValue: Rule = {
       for (const [name, value] of literalAriaAttrs(el)) {
         if (!ARIA_ATTRS.has(name)) continue; // invalid-aria-attr owns unknown names
         if (hasBoundAttr(el, name) && !value) continue; // dynamically bound: present, value unknown
-        if (isValidAriaValue(name, value)) continue;
-        out.push({ criteriaId: "4.1.2", el, msgId: "invalid-aria-value", params: { attr: name, value } });
+        if (!isValidAriaValue(name, value)) {
+          out.push({ criteriaId: "4.1.2", el, msgId: "invalid-aria-value", params: { attr: name, value } });
+        } else if (requiredIdrefDangling(el, doc, name, value)) {
+          out.push({
+            criteriaId: "4.1.2",
+            el,
+            msgId: "invalid-aria-value.dangling-required",
+            params: { attr: name, value, role: (attr(el, "role") ?? "").trim() },
+          });
+        }
       }
     }
     return out;
@@ -615,7 +737,10 @@ const ariaRequiredAttr: Rule = {
       if (!required) continue;
       if (isHiddenFromAT(el)) continue; // not exposed: no state to expose
       if (hasDynamicSpread(el)) continue; // a spread may carry the state
-      const missing = required.filter((a) => !hasBoundAttr(el, a) && !nativelyProvides(el, a));
+      // A literal EMPTY value (`aria-controls=""`) is the same as no attribute: ARIA treats
+      // an empty state/property as absent. A dynamic binding stays "present".
+      const absent = (a: string): boolean => !hasBoundAttr(el, a) || (attr(el, a) !== undefined && attr(el, a)!.trim() === "");
+      const missing = required.filter((a) => absent(a) && !nativelyProvides(el, a));
       if (!missing.length) continue;
       out.push({ criteriaId: "4.1.2", el, msgId: "aria-required-attr", params: { role, attrs: missing.join(", ") } });
     }
@@ -656,7 +781,12 @@ const ariaRequiredParent: Rule = {
       // its items are everywhere in real markup, and browsers repair them.
       // `role="presentation"`/`none` removes the element's semantics, so it is transparent
       // for ownership — the list below it still owns the items.
-      const owner = chain.find((a) => !isPresentational(a) && ((attr(a, "role") ?? "").trim() !== "" || IMPLICIT_CONTAINER_ROLE[a.tag]));
+      // A role-less wrapper is NOT traversed once it carries ARIA attributes of its own
+      // (`<div aria-live="polite">`): it is then included in the accessibility tree as a
+      // generic node, and that node — not the list above it — owns the item.
+      const exposedGeneric = (a: El): boolean =>
+        !(attr(a, "role") ?? "").trim() && GENERIC_TAGS.has(a.tag) && literalAriaAttrs(a).some(([k]) => k !== "aria-hidden");
+      const owner = chain.find((a) => !isPresentational(a) && ((attr(a, "role") ?? "").trim() !== "" || IMPLICIT_CONTAINER_ROLE[a.tag] || exposedGeneric(a)));
       if (owner && accepted.includes(effectiveRole(owner))) continue;
       if (!owner && chain.some((a) => accepted.includes(effectiveRole(a)))) continue;
       out.push({ criteriaId: "1.3.1", el, msgId: "aria-required-parent", params: { role, parents: accepted.join(" / ") } });
@@ -664,6 +794,46 @@ const ariaRequiredParent: Rule = {
     return out;
   },
 };
+
+// Role-specific (non-global) WAI-ARIA 1.2 properties, with EVERY role that supports or
+// inherits them. Only properties whose role set is short and certain are listed — a
+// property missing here is never judged, so the list can only under-report.
+const ROLE_SPECIFIC_ATTRS: Record<string, string[]> = {
+  "aria-sort": ["columnheader", "rowheader"],
+  "aria-orientation": ["scrollbar", "select", "separator", "slider", "tablist", "toolbar", "listbox", "menu", "menubar", "radiogroup", "tree", "treegrid"],
+  "aria-multiline": ["textbox", "searchbox"],
+  "aria-multiselectable": ["grid", "listbox", "tablist", "tree", "treegrid"],
+  "aria-modal": ["dialog", "alertdialog"],
+  "aria-pressed": ["button"],
+  "aria-valuemax": ["meter", "progressbar", "scrollbar", "separator", "slider", "spinbutton"],
+  "aria-valuemin": ["meter", "progressbar", "scrollbar", "separator", "slider", "spinbutton"],
+  "aria-valuenow": ["meter", "progressbar", "scrollbar", "separator", "slider", "spinbutton"],
+  "aria-valuetext": ["meter", "progressbar", "scrollbar", "separator", "slider", "spinbutton"],
+};
+
+/** The role an element exposes, when the source makes it certain: a valid explicit role, or
+ *  the native role of an element whose mapping does not depend on context. `""` stands for
+ *  "no role" (audio/video, which HTML-AAM maps to no ARIA role, and generic div/span).
+ *  `undefined` = not decidable here — never judged. */
+function decidableRole(el: El): string | undefined {
+  const raw = attr(el, "role");
+  if (raw !== undefined) {
+    const first = raw.trim().toLowerCase().split(/\s+/)[0] ?? "";
+    if (!first || !VALID_ROLES.has(first) || first === "none" || first === "presentation") return undefined;
+    return first;
+  }
+  if (el.tag === "button") return "button";
+  if (el.tag === "input") {
+    const type = (attr(el, "type") ?? "text").trim().toLowerCase();
+    return ["button", "submit", "reset", "image"].includes(type) ? "button" : undefined;
+  }
+  if (el.tag === "a") return hasAttr(el, "href") ? "link" : undefined;
+  if (/^h[1-6]$/.test(el.tag)) return "heading";
+  if (el.tag === "p") return "paragraph";
+  if (el.tag === "audio" || el.tag === "video") return "";
+  if (el.tag === "div" || el.tag === "span") return "generic";
+  return undefined;
+}
 
 // Naming a role that PROHIBITS a name (a paragraph, an emphasis, a presentational element)
 // hands assistive tech text it has nowhere to put — dropped by some, announced out of
@@ -678,11 +848,27 @@ const ariaProhibitedAttr: Rule = {
     for (const el of doc.elements) {
       if (!isIntrinsic(el.tag)) continue;
       const role = (attr(el, "role") ?? "").trim().toLowerCase();
-      if (!role || role.includes("{")) continue;
-      if (!NAME_PROHIBITED_ROLES.has(role)) continue;
-      const named = ["aria-label", "aria-labelledby"].filter((a) => (attr(el, a) ?? "").trim() !== "");
-      if (!named.length) continue;
-      out.push({ criteriaId: "4.1.2", el, msgId: "aria-prohibited-attr", params: { role, attrs: named.join(", ") } });
+      if (role.includes("{")) continue;
+      if (NAME_PROHIBITED_ROLES.has(role)) {
+        const named = ["aria-label", "aria-labelledby"].filter((a) => (attr(el, a) ?? "").trim() !== "");
+        if (named.length) {
+          out.push({ criteriaId: "4.1.2", el, msgId: "aria-prohibited-attr", params: { role, attrs: named.join(", ") } });
+          continue;
+        }
+      }
+      // A role-specific property on a role that does not support it is simply dropped.
+      const semantics = decidableRole(el);
+      if (semantics === undefined || isHiddenFromAT(el) || hasDynamicSpread(el)) continue;
+      const unsupported = literalAriaAttrs(el)
+        .map(([k]) => k)
+        .filter((k) => ROLE_SPECIFIC_ATTRS[k] && !ROLE_SPECIFIC_ATTRS[k]!.includes(semantics));
+      if (!unsupported.length) continue;
+      out.push({
+        criteriaId: "4.1.2",
+        el,
+        msgId: "aria-prohibited-attr.unsupported",
+        params: { role: semantics || el.tag, attrs: unsupported.join(", ") },
+      });
     }
     return out;
   },

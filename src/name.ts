@@ -55,10 +55,31 @@ export function isHiddenFromAT(el: El): boolean {
   return [el, ...ancestors(el)].some((node) => attr(node, "aria-hidden") === "true");
 }
 
+const NATIVE_FOCUSABLE = new Set(["button", "select", "textarea", "iframe", "summary"]);
+const DISABLEABLE = new Set(["button", "input", "select", "textarea"]);
+
+/** Can the element receive focus at all (by Tab OR programmatically)? This is the test the
+ *  WAI-ARIA presentational-role conflict resolution uses: ANY `tabindex` — `-1` included —
+ *  or a natively focusable element. Deliberately literal: a dynamic `tabindex={…}` or a
+ *  `disabled` binding proves nothing, so only the source as written counts. */
+export function isFocusableElement(el: El): boolean {
+  const ti = attr(el, "tabindex");
+  if (ti !== undefined && !ti.includes("{") && ti.trim() !== "" && !Number.isNaN(Number(ti.trim()))) return true;
+  if (DISABLEABLE.has(el.tag) && hasAttr(el, "disabled")) return false;
+  if (NATIVE_FOCUSABLE.has(el.tag)) return true;
+  if (el.tag === "a" || el.tag === "area") return hasAttr(el, "href");
+  if (el.tag === "input") return (attr(el, "type") ?? "text").trim().toLowerCase() !== "hidden";
+  return false;
+}
+
 /** `role="presentation"`/`role="none"` — the author has explicitly removed the element's
- *  semantics, so it exposes no name to remove. */
+ *  semantics, so it exposes no name to remove. WAI-ARIA's conflict resolution overrides
+ *  that intent on a FOCUSABLE element: a `<button role="none">` or an `<a href
+ *  role="none">` keeps its native role (a user can still land on it), so it is not
+ *  presentational and still owes a name. */
 export function isPresentational(el: El): boolean {
-  return ["presentation", "none"].includes((attr(el, "role") ?? "").trim().toLowerCase());
+  if (!["presentation", "none"].includes((attr(el, "role") ?? "").trim().toLowerCase())) return false;
+  return !isFocusableElement(el);
 }
 
 /** Should a rule that demands an accessible name stay silent on this element? True when
@@ -76,9 +97,35 @@ export function isNameExempt(el: El): boolean {
  *  presence of the attribute still counts as "named" (the reference may resolve at
  *  runtime, and aria-ref-missing-id owns the dangling-idref case). */
 function embeddedImageName(n: El, doc?: Doc): string {
+  // A presentational image (role=none/presentation, not focusable) is out of the tree: its
+  // alt names nothing — the very reason `decorative-alt-misuse` flags that pairing.
+  if (isPresentational(n)) return "";
   const labelled = (attr(n, "aria-labelledby") ?? "").trim();
-  if (labelled) return doc ? ariaLabelledbyText(n, doc) || labelled : labelled;
+  if (labelled && !(doc && labelledbyResolvesEmpty(n, doc))) return doc ? ariaLabelledbyText(n, doc) || labelled : labelled;
   return (boundAttr(n, "aria-label") ?? attr(n, "alt") ?? attr(n, "title") ?? "").trim();
+}
+
+/** Does a LITERAL `aria-labelledby` provably name nothing? True when every id it lists
+ *  either resolves to an element with no text, or — in a plain HTML document, where the
+ *  whole page is in hand — names no element at all. A JSX/SFC component can reference an
+ *  id another component renders, so a MISSING id proves nothing there; an id that resolves
+ *  to an empty element proves the same thing everywhere. Per accname, an empty
+ *  aria-labelledby result falls through to the next naming step. */
+export function labelledbyResolvesEmpty(el: El, doc: Doc): boolean {
+  const raw = attr(el, "aria-labelledby");
+  if (raw === undefined || raw.includes("{")) return false;
+  const ids = raw.split(/\s+/).filter(Boolean);
+  if (!ids.length) return false;
+  for (const id of ids) {
+    const ref = doc.byId.get(id);
+    if (!ref) {
+      if (doc.kind !== "html") return false;
+      continue;
+    }
+    if (nameFromContent(ref, doc, isHiddenFromAT(ref)) || (attr(ref, "aria-label") ?? "").trim()) return false;
+    if (mayInjectContent(ref)) return false;
+  }
+  return true;
 }
 
 /** Text content of a subtree, with <img> names and <svg><title> folded in. */
@@ -100,6 +147,7 @@ function nameFromContent(el: El, doc?: Doc, includeHiddenSubtree = false): strin
       return;
     }
     if (n.tag === "svg") {
+      if (isPresentational(n)) return; // role=none on a graphic drops its <title> with it
       const title = descendants(n).find((d) => d.tag === "title");
       if (title && (includeHiddenSubtree || (!isLocallyDisplayHidden(title) && attr(title, "aria-hidden") !== "true"))) {
         out += " " + nameFromContent(title, doc, includeHiddenSubtree);

@@ -5221,7 +5221,14 @@
       "techniques": ["H69", "G115", "ARIA4", "ARIA11"],
       "wcag": ["1.3.1", "2.4.1", "4.1.2"],
       "appliesTo": {
-        "ruleIds": ["axe:landmark-one-main", "missing-main-landmark", "multiple-main-landmark", "nav-landmark-missing", "nav-landmark-unnamed"]
+        "ruleIds": [
+          "axe:landmark-one-main",
+          "bypass-blocks-missing",
+          "missing-main-landmark",
+          "multiple-main-landmark",
+          "nav-landmark-missing",
+          "nav-landmark-unnamed"
+        ]
       },
       "automation": {
         "tests": {
@@ -5230,6 +5237,12 @@
         "rules": [
           {
             "id": "axe:landmark-one-main",
+            "tests": ["1"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "bypass-blocks-missing",
             "tests": ["1"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
@@ -5293,7 +5306,7 @@
       ],
       "wcag": ["2.4.1", "2.4.3", "3.2.3"],
       "appliesTo": {
-        "ruleIds": ["axe:bypass", "axe:skip-link", "skip-link-target-missing"]
+        "ruleIds": ["axe:bypass", "axe:skip-link", "bypass-blocks-missing", "skip-link-target-missing"]
       },
       "automation": {
         "tests": {
@@ -5310,6 +5323,12 @@
           {
             "id": "axe:skip-link",
             "tests": ["2"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "bypass-blocks-missing",
+            "tests": ["1", "2"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
