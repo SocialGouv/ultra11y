@@ -17,6 +17,7 @@
     <nav aria-label="Navigation principale">
       <ul>
         <li><a href="index.html">Accueil</a></li>
+        <li><a href="installation.html">Installer</a></li>
         <li><a href="principes.html">Principes</a></li>
         <li><a href="workflow.html">Intégration</a></li>
         <li><a href="audit.html">Audit</a></li>
@@ -56,6 +57,26 @@
 <h2>Le corpus W3C ACT</h2>
 <p><abbr title="Accessibility Conformance Testing">ACT</abbr> est un format du W3C pour écrire des règles de test d’accessibilité. Le groupe ACT Rules publie, pour chaque règle, de petits exemples HTML étiquetés « fautif » ou « correct ». Ils ne sont pas écrits par nous, donc pas taillés pour l’outil. Le corpus compte <span data-gen="act.examples">1 134</span> exemples répartis sur <span data-gen="act.rules">91</span> règles.</p>
 <p>Le moteur est noté sur les <span data-gen="act.scoredRules">44</span> règles ACT pour lesquelles il a une vérification équivalente. Il y détecte <strong><span data-gen="act.caught">168</span> défauts sur <span data-gen="act.failedScored">187</span></strong> et laisse tranquilles les <span data-gen="act.clean">401</span> exemples corrects, sans fausse alerte non expliquée. <span data-gen="act.divergences">9</span> écarts sont volontaires : chacun est argumenté dans <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/act.md"><code>references/act.md</code></a>.</p>
+
+<figure class="act-fig" aria-labelledby="act-cap">
+<!-- gen:act-score -->
+<div class="act-score">
+  <p class="as-h"><strong>187</strong> exemples fautifs, sur les 44 règles ACT notées</p>
+  <div class="as-row">
+    <div class="as-track" aria-hidden="true"><div class="as-fill" style="width:89.84%"></div></div>
+    <p class="as-in"><strong>168 signalés · 90 %</strong></p>
+    <p class="as-side">19 manqués, listés un par un dans le dépôt</p>
+  </div>
+  <p class="as-h"><strong>401</strong> exemples corrects</p>
+  <div class="as-row">
+    <div class="as-track" aria-hidden="true"><div class="as-fill" style="width:100%"></div></div>
+    <p class="as-in"><strong>401 laissés tranquilles</strong></p>
+    <p class="as-side">aucune fausse alerte inexpliquée</p>
+  </div>
+</div>
+<!-- /gen:act-score -->
+  <figcaption id="act-cap" class="cap">Le moteur statique sur le corpus W3C ACT, règles notées seulement : défauts signalés sur les exemples fautifs, et exemples corrects laissés sans alerte. Le détail règle par règle, avec chaque exemple manqué, est dans <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/act.md"><code>references/act.md</code></a>.</figcaption>
+</figure>
 
 <h3>Les <span data-gen="act.failed.total">358</span> exemples fautifs du corpus</h3>
 <div class="card">

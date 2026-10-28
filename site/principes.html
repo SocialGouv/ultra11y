@@ -17,6 +17,7 @@
     <nav aria-label="Navigation principale">
       <ul>
         <li><a href="index.html">Accueil</a></li>
+        <li><a href="installation.html">Installer</a></li>
         <li><a href="principes.html" aria-current="page">Principes</a></li>
         <li><a href="workflow.html">Intégration</a></li>
         <li><a href="audit.html">Audit</a></li>
@@ -38,7 +39,7 @@
 <div class="card">
   <h3>Ce que demandent les <span data-gen="rgaa.tests.total">258</span> tests officiels</h3>
   <!-- gen:tests-bar -->
-<div class="stack" role="img" aria-label="Les 258 tests du RGAA : 27 tranchés par le code, 3 demandent la page affichée, 228 demandent un jugement"><div class="t-static" style="flex:27 1 0">27</div><div class="t-rendered" style="flex:3 1 0">3</div><div class="t-judgment" style="flex:228 1 0">228</div></div>
+<div class="stack stack-lg" role="img" aria-label="Les 258 tests du RGAA : 27 tranchés par le code, 3 demandent la page affichée, 228 demandent un jugement"><div class="t-static" style="flex:27 1 0">27</div><div class="t-rendered" style="flex:3 1 0">3</div><div class="t-judgment" style="flex:228 1 0">228</div></div>
   <ul class="legend legend-col">
     <li><span class="sw t-static"></span><span><strong>27 tests tranchés par le code</strong> — une règle du moteur peut prouver l’échec en lisant le code source</span></li>
     <li><span class="sw t-rendered"></span><span><strong>3 tests demandent la page affichée</strong> — une règle peut prouver l’échec, mais sur la page rendue</span></li>
@@ -60,27 +61,34 @@
   <dt><strong>NC : non conforme</strong></dt>
   <dd>Au moins un élément réel du code échoue à un test. La non-conformité pointe vers le fichier et la ligne.</dd>
   <dt><strong>NA : non applicable</strong></dt>
-  <dd>Le critère ne concerne pas la page (pas de vidéo, pas de tableau…). Le NA doit être justifié.</dd>
+  <dd>Le critère ne concerne pas la page (pas de vidéo, pas de tableau…). Le NA doit être justifié, et un NA prononcé par l’IA passe lui aussi la contre-vérification : il compte comme un succès dans le taux, il ne doit donc jamais servir à fermer un critère sans examen.</dd>
   <dt><strong>À évaluer</strong></dt>
   <dd>Personne n’a encore tranché. Ce n’est ni un échec ni une réussite : c’est un travail restant, affiché comme tel.</dd>
 </dl>
 <p>Un critère que personne n’a vérifié reste <strong>« à évaluer »</strong>, jamais « conforme » par défaut. Le moteur refuse de conclure « conforme » à partir d’une absence d’erreur, sauf pour les critères où cette absence suffit vraiment : <span data-gen="rgaa.deterministic">8.3 et 8.5</span> (langue et titre de la page).</p>
 
 <h2>Le process : qui fait quoi</h2>
-<ol class="flow" aria-label="Les six étapes, du code aux livrables">
-  <li><strong>Code</strong><span>HTML, JSX, Vue, Svelte, Astro</span></li>
-  <li class="machine"><strong>Moteur</strong><span><span data-gen="engine.staticRules">94</span> vérifications sur le code</span></li>
-  <li class="machine"><strong>Navigateur</strong><span>contraste, focus, zoom</span></li>
-  <li><strong>Agent IA</strong><span>juge et justifie</span></li>
-  <li><strong>Garde-fous</strong><span><code>verify</code>, <code>check</code> : preuve exigée</span></li>
-  <li><strong>Livrables</strong><span>rapport RGAA, backlog, tickets</span></li>
-</ol>
-<p>Les étapes 2 et 3 sont mécaniques : <strong>la machine décide</strong>. Les étapes 4 et 5 relèvent du jugement : <strong>l’IA juge, sous contrôle</strong>. Un verdict sans preuve est renvoyé à l’agent.</p>
+<!-- gen:process -->
+<figure class="dia proc" aria-labelledby="proc-cap">
+  <p class="band band-solid proc-b1">La machine décide</p>
+  <p class="band band-dashed proc-b2">L’IA juge, sous contrôle</p>
+  <ol class="proc-steps">
+    <li class="bx bx-plain"><strong>Code</strong><span>HTML, JSX, Vue, Svelte, Astro</span></li>
+    <li class="bx bx-fill"><strong>Moteur</strong><span>94 vérifications sur le code</span></li>
+    <li class="bx bx-fill"><strong>Navigateur</strong><span>contraste, focus, zoom</span></li>
+    <li class="bx bx-line"><strong>Agent IA</strong><span>juge et justifie</span></li>
+    <li class="bx bx-pale"><strong>Garde-fous</strong><span><code>verify</code>, <code>check</code> : preuve exigée</span></li>
+    <li class="bx bx-plain"><strong>Livrables</strong><span>rapport RGAA, backlog, tickets</span></li>
+  </ol>
+  <p class="proc-loop"><span class="loop-line" aria-hidden="true"></span><span class="loop-text">verdict sans preuve : renvoyé à l’agent</span></p>
+  <figcaption id="proc-cap">Le process en six étapes, du code aux livrables. Le moteur et le navigateur sont mécaniques : la machine décide. L’agent IA et les garde-fous relèvent du jugement : l’IA juge, sous contrôle. Un verdict sans preuve est renvoyé par les garde-fous à l’agent IA, qui doit le refaire.</figcaption>
+</figure>
+<!-- /gen:process -->
 <ul>
   <li><strong>Le moteur</strong> lit le code source. Il trouve les défauts que le code suffit à montrer : image sans <code>alt</code>, champ sans étiquette, identifiant en double, ARIA invalide. <em>ARIA</em> désigne les attributs <code>role</code> et <code>aria-*</code> qui décrivent un composant aux technologies d’assistance (lecteurs d’écran…).</li>
   <li><strong>Le navigateur</strong> (commande <code>scan</code>) affiche la vraie page. Il mesure le contraste calculé, le focus visible, le zoom à 200 %, l’affichage à 320 pixels de large, le contenu au survol.</li>
   <li><strong>L’agent IA</strong> reçoit, pour chaque critère non tranché, les preuves collectées et le texte officiel du RGAA. Il rend un verdict justifié, ou dit qu’il ne peut pas trancher.</li>
-  <li><strong>Les garde-fous</strong> rejettent tout verdict qui ne cite pas de preuve vérifiable. Une non-conformité qui ne pointe vers aucun élément réel est supprimée. Un « conforme » contesté repart « à évaluer ».</li>
+  <li><strong>Les garde-fous</strong> rejettent tout verdict qui ne cite pas de preuve vérifiable. Une non-conformité qui ne pointe vers aucun élément réel est supprimée. Un « conforme » ou un « non applicable » contesté repart « à évaluer ».</li>
 </ul>
 
 <h2>Règles et critères : deux choses différentes</h2>

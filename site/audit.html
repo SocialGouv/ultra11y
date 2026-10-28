@@ -17,6 +17,7 @@
     <nav aria-label="Navigation principale">
       <ul>
         <li><a href="index.html">Accueil</a></li>
+        <li><a href="installation.html">Installer</a></li>
         <li><a href="principes.html">Principes</a></li>
         <li><a href="workflow.html">Intégration</a></li>
         <li><a href="audit.html" aria-current="page">Audit</a></li>
@@ -33,14 +34,23 @@
 <h1>L’audit complet : une boucle, pas une passe</h1>
 <p class="lede">Un audit ultra11y ne s’arrête pas au premier rapport. Il enchaîne la lecture du code, la page affichée, le jugement de l’IA et sa contre-vérification, puis recommence après correction.</p>
 
-<ol class="flow">
-  <li class="machine"><strong>Audit</strong><span><code>audit --graph</code> : le moteur lit le code</span></li>
-  <li class="machine"><strong>Rendu</strong><span><code>scan</code> : vraie page, mesures</span></li>
-  <li><strong>Arbitrage IA</strong><span><code>verify --manual</code> : une fiche par critère</span></li>
-  <li><strong>Contre-vérification</strong><span><code>verify --report</code> : verdicts contestés</span></li>
-  <li class="machine"><strong>Correction</strong><span><code>fix --write</code> : correctifs sûrs, puis retour à l’étape 1</span></li>
-</ol>
-<p>Quand tout est prouvé, la boucle sort vers les <strong>livrables</strong> (rapport RGAA daté, backlog, tickets), puis confie le diff corrigé à <code>review-a11y</code>, dans un sous-agent. Chaque étape est détaillée dans la suite de cette page.</p>
+<figure class="dia lp" aria-labelledby="lp-cap">
+  <ol class="lp-steps">
+    <li class="bx bx-fill"><strong>1 · Audit</strong><span><code>audit --graph</code></span><span>le moteur lit le code</span></li>
+    <li class="bx bx-fill"><strong>2 · Rendu</strong><span><code>scan</code></span><span>vraie page, mesures</span></li>
+    <li class="bx bx-line"><strong>3 · Arbitrage IA</strong><span><code>verify --manual</code></span><span>une fiche par critère</span></li>
+    <li class="bx bx-pale"><strong>4 · Contre-vérification</strong><span><code>verify --report</code></span><span>C, NA et NC contestés</span></li>
+    <li class="bx bx-fill"><strong>5 · Correction</strong><span><code>fix --write</code></span><span>correctifs sûrs</span></li>
+  </ol>
+  <p class="lp-back"><span class="lp-head" aria-hidden="true"></span><span class="lp-label">ré-audit : retour à l’étape 1</span></p>
+  <p class="lp-exit"><span class="lp-head" aria-hidden="true"></span><span class="lp-label">quand tout est prouvé</span></p>
+  <ul class="lp-out">
+    <li class="bx bx-grey"><strong>Livrables</strong><span>rapport RGAA daté, backlog, tickets</span></li>
+    <li class="bx bx-pale"><strong><code>review-a11y</code></strong><span>en sous-agent, sur le diff corrigé</span></li>
+  </ul>
+  <figcaption id="lp-cap">La boucle d’audit en cinq étapes : le moteur lit le code (1), le scan mesure la vraie page (2), l’IA arbitre chaque critère non tranché (3), puis ses verdicts sont contestés (4). Ce qui reste non conforme est corrigé (5) et l’audit repart de l’étape 1. Quand tout est prouvé, la contre-vérification ouvre sur les livrables, puis le diff corrigé passe à <code>review-a11y</code>.</figcaption>
+</figure>
+<p>Chaque étape est détaillée dans la suite de cette page.</p>
 
 <h2>1. Audit : le moteur lit le code</h2>
 <pre><code>npx ultra11y audit "src/**/*.{html,tsx}" --graph --standard rgaa --out audits --json</code></pre>
@@ -67,28 +77,33 @@
 <p>Les verdicts sont réintégrés <strong>en mode fermé</strong> : un verdict incomplet, une citation introuvable ou un « conforme » sur des preuves partielles sont refusés, et le critère reste « à évaluer ».</p>
 
 <h2>4. Contre-vérification : l’IA se fait contredire</h2>
-<div class="two">
-  <div class="card">
-    <h3>Premier temps : l’arbitrage</h3>
-    <p>Une fiche par critère non tranché : les preuves du code et le texte officiel du RGAA. L’agent IA juge (<code>verify --manual</code>) et conclut :</p>
-    <ul>
-      <li><strong>Conforme</strong>, avec la preuve citée ;</li>
-      <li><strong>Non conforme</strong>, avec l’élément fautif ;</li>
-      <li><strong>Manuel</strong>, avec une raison.</li>
+<figure class="dia trial" aria-labelledby="trial-cap">
+  <section class="tr-col" aria-labelledby="trial-1">
+    <h3 id="trial-1">1 · Arbitrage</h3>
+    <div class="bx bx-grey tr-head"><strong>Une fiche par critère non tranché</strong><span>preuves du code + texte officiel du RGAA</span></div>
+    <div class="bx bx-line tr-mid"><strong>L’agent IA juge</strong><span><code>verify --manual</code></span></div>
+    <ul class="tr-kids">
+      <li class="bx bx-pale"><strong>Conforme</strong><span>+ preuve citée</span></li>
+      <li class="bx bx-pale"><strong>Non conforme</strong><span>+ élément fautif</span></li>
+      <li class="bx bx-pale"><strong>Non applicable</strong><span>+ justification</span></li>
+      <li class="bx bx-pale"><strong>Manuel</strong><span>+ raison</span></li>
     </ul>
-  </div>
-  <div class="card">
-    <h3>Second temps : la contre-vérification</h3>
-    <p>Chaque verdict est mis en doute (<code>verify --report</code>). Trois issues :</p>
-    <ul>
-      <li><strong>Tenu</strong> : le verdict reste ;</li>
-      <li><strong>Non-conformité réfutée</strong> : elle est retirée ;</li>
-      <li><strong>Conformité réfutée</strong> : le critère repart « à évaluer ».</li>
+  </section>
+  <section class="tr-col" aria-labelledby="trial-2">
+    <h3 id="trial-2">2 · Contre-vérification</h3>
+    <div class="bx bx-grey tr-head"><strong>Chaque verdict est mis en doute</strong><span>« la preuve établit-elle le critère, ou juste que l’élément existe ? » · <code>verify --report</code></span></div>
+    <ul class="tr-kids">
+      <li class="bx bx-fill"><strong>Tenu</strong><span>le verdict reste</span></li>
+      <li class="bx bx-line"><strong>NC réfutée</strong><span>retirée</span></li>
+      <li class="bx bx-line"><strong>C réfutée</strong><span>repart « à évaluer »</span></li>
+      <li class="bx bx-line"><strong>NA réfuté</strong><span>repart « à évaluer »</span></li>
     </ul>
-  </div>
-</div>
+  </section>
+  <figcaption id="trial-cap">L’IA juge, puis se fait contredire. Premier temps : pour chaque critère non tranché, l’agent IA reçoit une fiche (preuves du code et texte officiel) et conclut conforme, non conforme, non applicable ou manuel. Second temps : chaque verdict est mis en doute. Il est tenu, ou réfuté : une non-conformité réfutée est retirée ; une conformité ou une non-applicabilité réfutée repart « à évaluer ».</figcaption>
+</figure>
 <pre><code>npx ultra11y verify --report audits/rgaa-AAAA-MM-JJ.md --in audits/audit-latest.json</code></pre>
-<p>Cette seconde liste attaque les deux sens. Une non-conformité que la page réelle dément est retirée. Un « conforme » est rejugé avec une question inversée : <em>la preuve établit-elle le critère, ou montre-t-elle seulement que l’élément existe ?</em></p>
+<p>Cette seconde liste attaque dans tous les sens. Une non-conformité que la page réelle dément est retirée. Un « conforme » est rejugé avec une question inversée : <em>la preuve établit-elle le critère, ou montre-t-elle seulement que l’élément existe ?</em></p>
+<p>Un « non applicable » passe le même examen. Il compte comme un succès dans le taux de conformité : sans contre-vérification, il fermerait un critère que personne n’a regardé. Un NA est donc rejugé même quand le moteur n’a rien collecté pour ce critère. Seul échappe à l’examen le NA que le moteur prouve lui-même, quand aucun élément concerné n’existe dans le périmètre audité. Et les consignes données à l’IA ne lui proposent plus le NA là où il n’a pas de sens : l’ordre de lecture, l’ordre du focus, l’espacement du texte, l’affichage sur petit écran et l’orientation s’appliquent toujours à une page qui a du contenu.</p>
 <div class="callout">
   <p><strong>Exemple.</strong> L’IA met le critère 1.1 en conforme parce que l’image a <code>alt="logo"</code>. La contre-vérification réfute : cela prouve qu’une alternative existe, pas qu’elle décrit l’image. Le critère repart « à évaluer ». Il ne passe pas en non conforme : réfuter une conformité ne prouve rien contre le critère.</p>
 </div>

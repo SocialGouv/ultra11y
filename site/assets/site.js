@@ -1,6 +1,7 @@
 // ultra11y documentation site — progressive enhancement only. Every page reads fully
 // without this file: the numbers and the criteria grid are written into the HTML at build
-// time (scripts/build-site.mjs). This adds the theme toggle and the grid's source filter.
+// time (scripts/build-site.mjs). This adds the theme toggle, the grid's source filter and the « Copier »
+// buttons of the command blocks.
 (() => {
   const root = document.documentElement;
   const KEY = "ultra11y-theme";
@@ -55,8 +56,79 @@
     }
   }
 
+  // A « Copier » button on every command block. Without this script the commands stay
+  // plain, selectable text: nothing is lost. Output samples (pre.out) get no button.
+  function bindCopy() {
+    const blocks = [...document.querySelectorAll("main pre:not(.out)")];
+    if (!blocks.length) return;
+    const fallback = (text) => {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.append(area);
+      area.select();
+      let ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch {
+        ok = false;
+      }
+      area.remove();
+      return ok;
+    };
+    for (const pre of blocks) {
+      const text = pre.textContent.replace(/\n+$/, "");
+      const first = text.split("\n")[0].replace(/\s+#.*$/, "");
+      // Once wrapped, a line may break only between words, never inside « --standard ».
+      const code = pre.querySelector("code");
+      if (code && code.children.length === 0) {
+        code.replaceChildren(
+          ...text.split(/( +|\n)/).map((part) => {
+            if (!part.trim()) return document.createTextNode(part);
+            const span = document.createElement("span");
+            span.className = "nw";
+            span.textContent = part;
+            return span;
+          }),
+        );
+      }
+      const box = document.createElement("div");
+      box.className = "codebox";
+      pre.replaceWith(box);
+      box.append(pre);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "copy";
+      btn.innerHTML = 'Copier<span class="sr-only"> : </span>';
+      btn.querySelector("span").append(first);
+      // The result is said in a live region next to the button; the button keeps its name.
+      const msg = document.createElement("span");
+      msg.className = "copy-msg";
+      msg.setAttribute("role", "status");
+      box.append(btn, msg);
+      let timer = 0;
+      btn.addEventListener("click", async () => {
+        let ok = false;
+        try {
+          await navigator.clipboard.writeText(text);
+          ok = true;
+        } catch {
+          ok = fallback(text);
+        }
+        msg.textContent = ok ? "Copié" : "Copie impossible : sélectionnez le texte";
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          msg.textContent = "";
+        }, 3000);
+      });
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     bindToggle();
     bindFilters();
+    bindCopy();
   });
 })();

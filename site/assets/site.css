@@ -1,85 +1,115 @@
 /* ultra11y documentation site — one stylesheet, no framework, no remote resource.
    Light and dark themes: prefers-color-scheme by default, overridable by the toggle
-   (html[data-theme]). Every text colour pair below is at least 4.5:1 on its background. */
+   (html[data-theme]). The blues are the presentation's: #000091 and its tints (#6a6af4,
+   #cacafb, #e3e3fd), on neutral greys. Every text colour pair below is at least 4.5:1 on its
+   background, every line or arrow at least 3:1. */
 
 :root {
   color-scheme: light;
-  --page: #f9f9f7;
+  --page: #f6f6f6;
   --surface: #ffffff;
-  --text: #0b0b0b;
-  --text-2: #43423f;
-  --muted: #5f5e59;
-  --grid: #e1e0d9;
-  --axis: #8a897f;
-  --ring: rgba(11, 11, 11, 0.12);
-  --link: #1c4f96;
-  --focus: #0b57d0;
-  --o1: #0d366b;
-  --o2: #1c5cab;
-  --o3: #3987e5;
-  --o4: #a9cbf4;
+  --text: #161616;
+  --text-2: #3a3a3a;
+  --muted: #5e5e5e;
+  --grid: #dddddd;
+  --axis: #8c8c8c;
+  --ring: rgba(22, 22, 22, 0.14);
+  --link: #000091;
+  --focus: #0a76f6;
+  /* the four automation levels, strongest first */
+  --o1: #000091;
+  --o2: #2323b4;
+  --o3: #6a6af4;
+  --o4: #cacafb;
   --on-o1: #fff;
   --on-o2: #fff;
-  --on-o3: #0b0b0b;
-  --on-o4: #0b0b0b;
-  --warn: #eb6834;
-  --on-warn: #0b0b0b;
-  --dim: #ecebe6;
-  --code-bg: #efeee9;
+  --on-o3: #000;
+  --on-o4: #000091;
+  /* diagrams: lines and arrows, titles, the pale and grey boxes */
+  --line: #000091;
+  --title: #000091;
+  --pale: #e3e3fd;
+  --on-pale: #000091;
+  --box-grey: #f6f6f6;
+  --box-border: #c8c8c8;
+  --warn: #e1000f;
+  --on-warn: #fff;
+  --dim: #eeeeee;
+  --code-bg: #eeeeee;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --text: #f0efec;
-    --text-2: #d0cfc7;
-    --muted: #a9a8a0;
-    --grid: #2c2c2a;
-    --axis: #6f6e68;
-    --ring: rgba(255, 255, 255, 0.14);
-    --link: #8fbcf2;
-    --focus: #8fbcf2;
-    --o1: #b7d3f6;
-    --o2: #6da7ec;
-    --o3: #3987e5;
-    --o4: #1f4f8c;
-    --on-o1: #0b0b0b;
-    --on-o2: #0b0b0b;
-    --on-o3: #0b0b0b;
+    --page: #101010;
+    --surface: #1c1c1c;
+    --text: #f0f0f0;
+    --text-2: #d2d2d2;
+    --muted: #ababab;
+    --grid: #333333;
+    --axis: #7a7a7a;
+    --ring: rgba(255, 255, 255, 0.16);
+    --link: #b1b1f9;
+    --focus: #8585f6;
+    --o1: #cacafb;
+    --o2: #9898f8;
+    --o3: #6a6af4;
+    --o4: #2f2f8a;
+    --on-o1: #000091;
+    --on-o2: #000;
+    --on-o3: #000;
     --on-o4: #fff;
-    --warn: #e0703f;
-    --on-warn: #0b0b0b;
-    --dim: #2c2c2a;
-    --code-bg: #262624;
+    --line: #b1b1f9;
+    --title: #cacafb;
+    --pale: #23234d;
+    --on-pale: #e3e3fd;
+    --box-grey: #262626;
+    --box-border: #4a4a4a;
+    --warn: #ff6f61;
+    --on-warn: #000;
+    --dim: #2a2a2a;
+    --code-bg: #2a2a2a;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --text: #f0efec;
-  --text-2: #d0cfc7;
-  --muted: #a9a8a0;
-  --grid: #2c2c2a;
-  --axis: #6f6e68;
-  --ring: rgba(255, 255, 255, 0.14);
-  --link: #8fbcf2;
-  --focus: #8fbcf2;
-  --o1: #b7d3f6;
-  --o2: #6da7ec;
-  --o3: #3987e5;
-  --o4: #1f4f8c;
-  --on-o1: #0b0b0b;
-  --on-o2: #0b0b0b;
-  --on-o3: #0b0b0b;
+  --page: #101010;
+  --surface: #1c1c1c;
+  --text: #f0f0f0;
+  --text-2: #d2d2d2;
+  --muted: #ababab;
+  --grid: #333333;
+  --axis: #7a7a7a;
+  --ring: rgba(255, 255, 255, 0.16);
+  --link: #b1b1f9;
+  --focus: #8585f6;
+  --o1: #cacafb;
+  --o2: #9898f8;
+  --o3: #6a6af4;
+  --o4: #2f2f8a;
+  --on-o1: #000091;
+  --on-o2: #000;
+  --on-o3: #000;
   --on-o4: #fff;
-  --warn: #e0703f;
-  --on-warn: #0b0b0b;
-  --dim: #2c2c2a;
-  --code-bg: #262624;
+  --line: #b1b1f9;
+  --title: #cacafb;
+  --pale: #23234d;
+  --on-pale: #e3e3fd;
+  --box-grey: #262626;
+  --box-border: #4a4a4a;
+  --warn: #ff6f61;
+  --on-warn: #000;
+  --dim: #2a2a2a;
+  --code-bg: #2a2a2a;
+}
+
+:root {
+  /* arrow shapes, drawn as clip-paths on a filled pseudo-element (shaft + head) */
+  --ar-r: polygon(0 40%, 62% 40%, 62% 0, 100% 50%, 62% 100%, 62% 60%, 0 60%);
+  --ar-l: polygon(100% 40%, 38% 40%, 38% 0, 0 50%, 38% 100%, 38% 60%, 100% 60%);
+  --ar-d: polygon(40% 0, 60% 0, 60% 62%, 100% 62%, 50% 100%, 0 62%, 40% 62%);
+  --ar-u: polygon(50% 0, 100% 100%, 0 100%);
 }
 
 *,
@@ -846,4 +876,1340 @@ tbody th {
 .a-judgment,
 .t-judgment {
   box-shadow: inset 0 0 0 1px var(--axis);
+}
+
+.stack-lg {
+  height: 4rem;
+}
+
+.stack-lg > div {
+  font-size: 1.1rem;
+}
+
+/* =======================================================================================
+   Diagrams — the presentation's schemas, rebuilt in HTML and CSS. Every label is real
+   text; only lines and arrows are drawn. Wide screens get the slide layout, narrow screens
+   the same boxes stacked top to bottom, with the arrows turned downwards.
+   ======================================================================================= */
+
+.dia {
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.25rem 0 1.5rem;
+}
+
+.dia figcaption {
+  margin-top: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.dia p,
+.dia li {
+  max-width: none;
+}
+
+/* ---- boxes ---- */
+
+.bx {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+  min-height: 6.5rem;
+  margin: 0;
+  padding: 0.85rem 0.75rem;
+  text-align: center;
+  background: var(--surface);
+  border: 2px solid var(--box-border);
+  color: var(--text);
+}
+
+.bx strong {
+  display: block;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.bx span {
+  display: block;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+
+.bx code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.bx-fill {
+  background: var(--o1);
+  border-color: var(--o1);
+}
+
+.bx-fill strong,
+.bx-fill span,
+.bx-fill code {
+  color: var(--on-o1);
+}
+
+.bx-line {
+  border-color: var(--line);
+}
+
+.bx-line strong {
+  color: var(--title);
+}
+
+.bx-pale {
+  background: var(--pale);
+  border-color: var(--line);
+}
+
+.bx-pale strong {
+  color: var(--on-pale);
+}
+
+.bx-pale span {
+  color: var(--text);
+}
+
+.bx-grey {
+  background: var(--box-grey);
+  border-width: 1px;
+}
+
+.bx-plain {
+  border-width: 1px;
+}
+
+/* ---- arrows (pseudo-elements; decorative, the order is in the markup) ---- */
+
+.ar-r::after,
+.ar-l::after,
+.ar-d::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+}
+
+/* ---- bands above a group of steps ---- */
+
+.band {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+  color: var(--title);
+  padding-bottom: 0.55rem;
+  border-bottom: 3px solid var(--line);
+}
+
+.band-dashed {
+  border-bottom-style: dashed;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Process (slide 3)
+   --------------------------------------------------------------------------------------- */
+
+.proc {
+  --gap: 2rem;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  column-gap: var(--gap);
+  row-gap: 0.9rem;
+}
+
+.proc-b1 {
+  grid-column: 2 / 4;
+  grid-row: 1;
+}
+
+.proc-b2 {
+  grid-column: 4 / 6;
+  grid-row: 1;
+}
+
+.proc-steps {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: subgrid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.proc-steps > li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+  top: 50%;
+  left: calc(100% + 4px);
+  width: calc(var(--gap) - 8px);
+  height: 16px;
+  transform: translateY(-50%);
+  clip-path: var(--ar-r);
+}
+
+.proc-loop {
+  grid-column: 4 / 6;
+  grid-row: 3;
+  margin: 0;
+  text-align: center;
+  color: var(--title);
+}
+
+.proc-loop .loop-line {
+  display: block;
+  position: relative;
+  height: 2.6rem;
+  margin: -0.9rem calc((100% - var(--gap)) / 4) 0.55rem;
+  border: 2px dashed var(--line);
+  border-top: 0;
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+}
+
+.proc-loop .loop-line::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  top: 0;
+  width: 16px;
+  height: 14px;
+  background: var(--line);
+  clip-path: var(--ar-u);
+}
+
+.proc figcaption {
+  grid-column: 1 / -1;
+  grid-row: 4;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Workflow timeline (slide 4)
+   --------------------------------------------------------------------------------------- */
+
+.tl {
+  --gap: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: var(--gap);
+  row-gap: 1.75rem;
+}
+
+.tl-band {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.tl-band code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 1em;
+}
+
+.tl-b1 {
+  grid-column: 1 / 4;
+  grid-row: 1;
+  background: var(--pale);
+  color: var(--on-pale);
+  border-block: 1px solid var(--line);
+}
+
+.tl-b2 {
+  grid-column: 4;
+  grid-row: 1;
+  background: var(--o1);
+  color: var(--on-o1);
+  border-block: 1px solid var(--o1);
+}
+
+.tl-steps {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: subgrid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: tl;
+}
+
+.tl-steps li {
+  position: relative;
+  counter-increment: tl;
+  text-align: center;
+}
+
+.tl-steps li::before {
+  content: counter(tl) / "";
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  background: var(--o1);
+  color: var(--on-o1);
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.tl-steps li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 1.5rem;
+  left: 50%;
+  width: calc(100% + var(--gap));
+  height: 3px;
+  transform: translateY(-50%);
+  background: var(--line);
+}
+
+.tl-steps strong {
+  display: block;
+  font-size: 1.1rem;
+  line-height: 1.3;
+}
+
+.tl-steps strong code {
+  font-size: 0.95em;
+}
+
+.tl-steps span {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-2);
+  margin-top: 0.3rem;
+}
+
+.tl-note {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.tl figcaption {
+  grid-column: 1 / -1;
+  grid-row: 4;
+}
+
+/* ---------------------------------------------------------------------------------------
+   The two skills (slide 5)
+   --------------------------------------------------------------------------------------- */
+
+.skills {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.skill {
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.skill h3 {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  font-size: 1.2rem;
+}
+
+.skill h3 code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 1.05em;
+}
+
+.skill h3 span {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.skill-review h3 {
+  background: var(--pale);
+  color: var(--on-pale);
+  border-bottom: 1px solid var(--line);
+}
+
+.skill-audit h3 {
+  background: var(--o1);
+  color: var(--on-o1);
+}
+
+.skill dl {
+  margin: 0;
+  padding: 0.25rem 1.25rem 1.1rem;
+}
+
+.skill dt {
+  margin-top: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.skill dd {
+  margin: 0.15rem 0 0;
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------------------------------------
+   The audit loop (slide 6)
+   --------------------------------------------------------------------------------------- */
+
+.lp {
+  --gap: 2.5rem;
+  --rgap: 3rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: var(--gap);
+  row-gap: var(--rgap);
+}
+
+.lp-steps,
+.lp-out {
+  grid-column: 1 / -1;
+  grid-row: 1 / 3;
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-template-rows: subgrid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lp-steps > li:nth-child(1) { grid-area: 1 / 1; }
+.lp-steps > li:nth-child(2) { grid-area: 1 / 2; }
+.lp-steps > li:nth-child(3) { grid-area: 1 / 3; }
+.lp-steps > li:nth-child(4) { grid-area: 2 / 3; }
+.lp-steps > li:nth-child(5) { grid-area: 2 / 2; }
+.lp-out > li:nth-child(1) { grid-area: 1 / 4; }
+.lp-out > li:nth-child(2) { grid-area: 1 / 5; }
+
+.lp-steps > li:nth-child(1)::after,
+.lp-steps > li:nth-child(2)::after,
+.lp-out > li:nth-child(1)::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+  top: 50%;
+  left: calc(100% + 4px);
+  width: calc(var(--gap) - 8px);
+  height: 16px;
+  transform: translateY(-50%);
+  clip-path: var(--ar-r);
+}
+
+.lp-steps > li:nth-child(3)::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+  left: 50%;
+  top: calc(100% + 4px);
+  width: 16px;
+  height: calc(var(--rgap) - 8px);
+  transform: translateX(-50%);
+  clip-path: var(--ar-d);
+}
+
+.lp-steps > li:nth-child(4)::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+  top: 50%;
+  right: calc(100% + 4px);
+  width: calc(var(--gap) - 8px);
+  height: 16px;
+  transform: translateY(-50%);
+  clip-path: var(--ar-l);
+}
+
+.lp-back,
+.lp-exit {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  margin: 0;
+  padding-bottom: 0.25rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--title);
+}
+
+.lp-back {
+  grid-area: 2 / 1;
+}
+
+.lp-exit {
+  grid-area: 2 / 4;
+}
+
+/* « ré-audit »: dashed, from the correction box back up to the audit box */
+.lp-back::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  right: calc(-1 * var(--gap));
+  border-top: 2px dashed var(--line);
+}
+
+.lp-back::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(-1 * var(--rgap) + 12px);
+  bottom: 50%;
+  border-left: 2px dashed var(--line);
+}
+
+/* « tout est prouvé »: solid, from the counter-check box up into the deliverables */
+.lp-exit::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(-1 * var(--gap));
+  right: 50%;
+  border-top: 2px solid var(--line);
+}
+
+.lp-exit::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(-1 * var(--rgap) + 12px);
+  bottom: 50%;
+  border-left: 2px solid var(--line);
+}
+
+.lp-head {
+  position: absolute;
+  left: calc(50% - 7px);
+  top: calc(-1 * var(--rgap) + 2px);
+  width: 16px;
+  height: 14px;
+  background: var(--line);
+  clip-path: var(--ar-u);
+}
+
+.lp-label {
+  display: block;
+  padding: 0 0.25rem;
+  background: var(--surface);
+  position: relative;
+}
+
+.lp figcaption {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Judge, then be contradicted (slide 7)
+   --------------------------------------------------------------------------------------- */
+
+.trial {
+  --gap: 3rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--gap);
+  row-gap: 1rem;
+}
+
+.tr-col h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+  color: var(--title);
+}
+
+.tr-head {
+  min-height: 5.5rem;
+}
+
+.tr-mid {
+  width: min(100%, 15rem);
+  margin: 1.75rem auto 0;
+  min-height: 5rem;
+}
+
+/* head → middle box */
+.tr-col:first-child .tr-head::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+  left: 50%;
+  top: calc(100% + 3px);
+  width: 16px;
+  height: calc(1.75rem - 6px);
+  transform: translateX(-50%);
+  clip-path: var(--ar-d);
+}
+
+/* the stem from the parent box down to the fork */
+.tr-mid::after,
+.tr-col + .tr-col .tr-head::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2px);
+  width: 2px;
+  height: calc(1rem - 2px);
+  transform: translateX(-50%);
+  background: var(--line);
+}
+
+/* arbitrage → counter-check */
+.tr-col + .tr-col .tr-head::before {
+  content: "";
+  position: absolute;
+  background: var(--line);
+  top: 50%;
+  right: calc(100% + 4px);
+  width: calc(var(--gap) - 8px);
+  height: 16px;
+  transform: translateY(-50%);
+  clip-path: var(--ar-r);
+}
+
+.tr-kids {
+  --kgap: 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--kgap);
+  list-style: none;
+  margin: 2.25rem 0 0;
+  padding: 0;
+}
+
+.tr-kids > li {
+  min-height: 5.5rem;
+  padding: 0.7rem 0.4rem;
+}
+
+.tr-kids > li strong {
+  font-size: 0.98rem;
+}
+
+.tr-kids > li span {
+  font-size: 0.82rem;
+}
+
+/* the fork: a bar across the children, an arrow down into each */
+.tr-kids > li::before {
+  content: "";
+  position: absolute;
+  top: calc(-1.25rem - 2px);
+  left: calc(-1 * var(--kgap) / 2 - 2px);
+  right: calc(-1 * var(--kgap) / 2 - 2px);
+  border-top: 2px solid var(--line);
+}
+
+.tr-kids > li:first-child::before {
+  left: 50%;
+}
+
+.tr-kids > li:last-child::before {
+  right: 50%;
+}
+
+.tr-kids > li::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+  top: calc(-1.25rem - 2px);
+  left: 50%;
+  width: 16px;
+  height: calc(1.25rem - 2px);
+  transform: translateX(-50%);
+  clip-path: var(--ar-d);
+}
+
+.trial figcaption {
+  grid-column: 1 / -1;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Coverage waffle (slide 8)
+   --------------------------------------------------------------------------------------- */
+
+.waffle {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 5px;
+  max-width: 36rem;
+  margin: 0.5rem 0 1.25rem;
+}
+
+.sq {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.sq.c-det::after {
+  content: "★" / "";
+}
+
+.sq.c-nc::after {
+  content: "▲" / "";
+}
+
+.sq.c-hint::after {
+  content: "◆" / "";
+}
+
+/* ---------------------------------------------------------------------------------------
+   W3C ACT score (slide 9): the slide's dark-blue panel, in both themes
+   --------------------------------------------------------------------------------------- */
+
+.act-score {
+  background: #000091;
+  border: 1px solid #6a6af4;
+  border-radius: 12px;
+  padding: 1.5rem 1.5rem 0.25rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.act-score p,
+.act-score strong {
+  color: #fff;
+  max-width: none;
+  margin: 0;
+}
+
+.act-score .as-h {
+  margin-bottom: 0.5rem;
+}
+
+.act-score .as-h strong {
+  font-size: 1.3rem;
+}
+
+.as-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16rem;
+  column-gap: 1.25rem;
+  align-items: center;
+  margin: 0 0 1.5rem;
+}
+
+.as-track {
+  grid-area: 1 / 1;
+  height: 3.25rem;
+  background: #6a6af4;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.as-fill {
+  height: 100%;
+  background: #fff;
+}
+
+.act-score .as-in {
+  grid-area: 1 / 1;
+  padding-left: 1rem;
+}
+
+.act-score .as-in strong {
+  color: #000091;
+  font-size: 1.1rem;
+}
+
+.act-score .as-side {
+  grid-area: 1 / 2;
+  color: #cacafb;
+  font-size: 0.95rem;
+}
+
+.act-score code {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Home hero (slide 1)
+   --------------------------------------------------------------------------------------- */
+
+.hero {
+  background: #000091;
+  border-radius: 16px;
+  padding: clamp(1.5rem, 1rem + 3vw, 3rem);
+  margin: 0 0 2rem;
+}
+
+.hero .kicker {
+  margin: 0 0 0.75rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  color: #cacafb;
+}
+
+.hero h1 {
+  color: #fff;
+  max-width: 24ch;
+}
+
+.hero p,
+.hero strong {
+  color: #fff;
+}
+
+.hero .lede {
+  max-width: 62ch;
+}
+
+.hero abbr {
+  text-decoration-color: #cacafb;
+}
+
+.hero a {
+  color: #fff;
+}
+
+.hero :focus-visible {
+  outline-color: #fff;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin: 1.5rem 0 0;
+}
+
+.hero a.cta {
+  display: inline-block;
+  padding: 0.8rem 1.3rem;
+  border-radius: 8px;
+  background: #fff;
+  color: #000091;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.hero a.cta:hover {
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Installation page: numbered steps, OS panels, expected output, copy buttons
+   --------------------------------------------------------------------------------------- */
+
+.steps {
+  list-style: none;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  counter-reset: st;
+}
+
+.steps > li {
+  position: relative;
+  counter-increment: st;
+  padding: 0.1rem 0 0 3.1rem;
+  margin: 0 0 1.1rem;
+  max-width: 72ch;
+}
+
+.steps > li::before {
+  content: counter(st) / "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  background: var(--o1);
+  color: var(--on-o1);
+  font-weight: 700;
+}
+
+.steps > li > p {
+  margin: 0.2rem 0 0.5rem;
+}
+
+.os {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 1rem;
+}
+
+.os > section {
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem 0.25rem;
+}
+
+.os > section > h3 {
+  margin-top: 0;
+}
+
+kbd {
+  font: 600 0.85rem/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--axis);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.expect {
+  font-size: 0.95rem;
+}
+
+pre.out {
+  background: var(--surface);
+  border-style: dashed;
+}
+
+pre.out samp {
+  font: inherit;
+}
+
+.codebox {
+  position: relative;
+}
+
+.codebox > pre {
+  padding-right: 6.5rem;
+}
+
+.copy {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--title);
+  cursor: pointer;
+}
+
+.copy:hover {
+  background: var(--pale);
+}
+
+.trouble dt {
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 1.25rem;
+}
+
+.trouble dd {
+  margin: 0.35rem 0 0;
+}
+
+/* ---------------------------------------------------------------------------------------
+   Narrow screens: every diagram stacks top to bottom
+   --------------------------------------------------------------------------------------- */
+
+@media (max-width: 880px) {
+  .proc {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 1.6rem;
+  }
+
+  .proc-steps {
+    grid-column: 1;
+    grid-row: 1 / 10;
+    grid-template-rows: subgrid;
+  }
+
+  .proc-steps > li { grid-column: 1; }
+  .proc-steps > li:nth-child(1) { grid-row: 1; }
+  .proc-steps > li:nth-child(2) { grid-row: 3; }
+  .proc-steps > li:nth-child(3) { grid-row: 4; }
+  .proc-steps > li:nth-child(4) { grid-row: 6; }
+  .proc-steps > li:nth-child(5) { grid-row: 7; }
+  .proc-steps > li:nth-child(6) { grid-row: 9; }
+
+  .proc-b1,
+  .proc-b2 {
+    grid-column: 1;
+    text-align: left;
+  }
+
+  .proc-b1 { grid-row: 2; }
+  .proc-b2 { grid-row: 5; }
+
+  .proc .bx {
+    min-height: 0;
+  }
+
+  .proc-steps > li:not(:last-child)::after {
+    left: 50%;
+    top: calc(100% + 4px);
+    width: 16px;
+    height: calc(1.6rem - 8px);
+    transform: translateX(-50%);
+    clip-path: var(--ar-d);
+  }
+
+  .proc-loop {
+    grid-column: 1;
+    grid-row: 8;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border: 2px dashed var(--line);
+    border-radius: 8px;
+  }
+
+  .proc-loop .loop-line {
+    flex: none;
+    width: 16px;
+    height: 1.4rem;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--line);
+    clip-path: polygon(50% 0, 100% 45%, 62% 45%, 62% 100%, 38% 100%, 38% 45%, 0 45%);
+  }
+
+  .proc-loop .loop-line::before {
+    content: none;
+  }
+
+  .proc-loop::after {
+    content: "";
+    position: absolute;
+    background: var(--line);
+    left: 50%;
+    top: calc(100% + 4px);
+    width: 16px;
+    height: calc(1.6rem - 8px);
+    transform: translateX(-50%);
+    clip-path: var(--ar-d);
+  }
+
+  .proc figcaption {
+    grid-column: 1;
+    grid-row: 10;
+  }
+
+  /* timeline */
+  .tl {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 1.25rem;
+  }
+
+  .tl-b1 { grid-column: 1; grid-row: 1; }
+  .tl-b2 { grid-column: 1; grid-row: 5; }
+
+  .tl-steps {
+    grid-column: 1;
+    grid-row: 2 / 7;
+    grid-template-rows: subgrid;
+  }
+
+  .tl-steps > li { grid-column: 1; }
+  .tl-steps > li:nth-child(1) { grid-row: 1; }
+  .tl-steps > li:nth-child(2) { grid-row: 2; }
+  .tl-steps > li:nth-child(3) { grid-row: 3; }
+  .tl-steps > li:nth-child(4) { grid-row: 5; }
+
+  .tl-steps li {
+    text-align: left;
+    min-height: 3rem;
+    padding-left: 4rem;
+  }
+
+  .tl-steps li::before {
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0;
+  }
+
+  .tl-steps li:not(:last-child)::after {
+    top: 3rem;
+    left: 1.5rem;
+    width: 3px;
+    height: calc(100% - 3rem + 1.25rem);
+    transform: translateX(-50%);
+  }
+
+  .tl-steps li:nth-child(3)::after {
+    content: none;
+  }
+
+  .tl-band {
+    text-align: left;
+  }
+
+  .tl-note { grid-row: 7; text-align: left; }
+  .tl figcaption { grid-column: 1; grid-row: 8; }
+
+  /* audit loop */
+  .lp {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 1.6rem;
+  }
+
+  .lp-steps,
+  .lp-out {
+    grid-column: 1;
+    grid-row: 1 / 10;
+  }
+
+  .lp-steps > li:nth-child(1) { grid-area: 1 / 1; }
+  .lp-steps > li:nth-child(2) { grid-area: 2 / 1; }
+  .lp-steps > li:nth-child(3) { grid-area: 3 / 1; }
+  .lp-steps > li:nth-child(4) { grid-area: 4 / 1; }
+  .lp-steps > li:nth-child(5) { grid-area: 5 / 1; }
+  .lp-out > li:nth-child(1) { grid-area: 8 / 1; }
+  .lp-out > li:nth-child(2) { grid-area: 9 / 1; }
+
+  .lp .bx {
+    min-height: 0;
+  }
+
+  .lp-steps > li:nth-child(1)::after,
+  .lp-steps > li:nth-child(2)::after,
+  .lp-steps > li:nth-child(3)::after,
+  .lp-steps > li:nth-child(4)::after,
+  .lp-steps > li:nth-child(5)::after,
+  .lp-out > li:nth-child(1)::after {
+    content: "";
+    position: absolute;
+    background: var(--line);
+    left: 50%;
+    right: auto;
+    top: calc(100% + 4px);
+    width: 16px;
+    height: calc(1.6rem - 8px);
+    transform: translateX(-50%);
+    clip-path: var(--ar-d);
+  }
+
+  .lp-back,
+  .lp-exit {
+    justify-content: flex-start;
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+  }
+
+  .lp-back {
+    grid-area: 6 / 1;
+    border: 2px dashed var(--line);
+    border-radius: 8px;
+  }
+
+  .lp-exit {
+    grid-area: 7 / 1;
+    padding: 0;
+  }
+
+  .lp-back::before,
+  .lp-back::after,
+  .lp-exit::before,
+  .lp-head {
+    display: none;
+  }
+
+  .lp-exit::after {
+    content: "";
+    left: 50%;
+    top: calc(100% + 4px);
+    bottom: auto;
+    width: 16px;
+    height: calc(1.6rem - 8px);
+    border: 0;
+    transform: translateX(-50%);
+    background: var(--line);
+    clip-path: var(--ar-d);
+  }
+
+  .lp figcaption {
+    grid-column: 1;
+    grid-row: 10;
+  }
+
+  /* judge, then be contradicted */
+  .trial {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 2.75rem;
+  }
+
+  .tr-kids {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 2rem;
+    position: relative;
+  }
+
+  .tr-kids > li::before,
+  .tr-kids > li::after,
+  .tr-mid::after,
+  .tr-col + .tr-col .tr-head::after {
+    content: none;
+  }
+
+  .tr-kids::before {
+    content: "";
+    position: absolute;
+    background: var(--line);
+    left: 50%;
+    top: calc(-2rem + 3px);
+    width: 16px;
+    height: calc(2rem - 6px);
+    transform: translateX(-50%);
+    clip-path: var(--ar-d);
+  }
+
+  .tr-col + .tr-col .tr-head::before {
+    content: none;
+  }
+
+  .tr-col + .tr-col {
+    position: relative;
+  }
+
+  .tr-col + .tr-col::before {
+    content: "";
+    position: absolute;
+    background: var(--line);
+    left: 50%;
+    top: calc(-2.75rem + 3px);
+    width: 16px;
+    height: calc(2.75rem - 6px);
+    transform: translateX(-50%);
+    clip-path: var(--ar-d);
+  }
+
+  /* ACT panel */
+  .as-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.5rem;
+  }
+
+  .act-score .as-side {
+    grid-area: 2 / 1;
+  }
+}
+
+@media print {
+  .copy {
+    display: none;
+  }
+}
+
+/* ---- in-page table of contents ---- */
+
+.toc .toc-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.toc ol {
+  margin: 0;
+  padding-left: 1.4rem;
+  columns: 2 16rem;
+  column-gap: 2rem;
+}
+
+.toc li {
+  margin: 0.15rem 0;
+}
+
+/* With the copy button on, a long command wraps instead of scrolling under the button. */
+.codebox > pre {
+  white-space: pre-wrap;
+}
+
+.codebox > pre code {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .codebox {
+    display: flex;
+    flex-direction: column-reverse;
+  }
+
+  .codebox > pre {
+    padding-right: 1.1rem;
+    margin-top: 0.35rem;
+  }
+
+  .copy {
+    position: static;
+    align-self: flex-end;
+  }
+
+  .steps > li {
+    padding-left: 2.6rem;
+  }
+
+  .os > section {
+    padding: 1rem 0.9rem 0.25rem;
+  }
+}
+
+.codebox .nw {
+  white-space: nowrap;
+}
+
+.copy-msg {
+  position: absolute;
+  top: 0.75rem;
+  right: 5.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--title);
+}
+
+.copy-msg:empty {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .copy-msg {
+    position: static;
+    order: 2;
+    align-self: flex-end;
+  }
 }

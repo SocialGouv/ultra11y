@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ultra11y — audit d’accessibilité RGAA et WCAG, sans fausse promesse</title>
-<meta name="description" content="ultra11y audite l’accessibilité d’un site selon le RGAA et les WCAG 2.2 AA : un moteur fait le travail mécanique, un agent IA juge sous contrôle, et l’outil dit ce qu’il ne sait pas vérifier.">
+<title>ultra11y — audit d’accessibilité RGAA 4.1.2, le référentiel de l’État</title>
+<meta name="description" content="Audit d’accessibilité RGAA 4.1.2, le référentiel de l’État : rapport daté, grille des 106 critères, backlog et tickets. Moteur statique, navigateur et jugement IA contre-vérifié. Il ne déclare jamais conforme ce qu’il n’a pas vérifié. Socle WCAG 2.2 AA.">
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/site.js"></script>
 </head>
@@ -17,6 +17,7 @@
     <nav aria-label="Navigation principale">
       <ul>
         <li><a href="index.html" aria-current="page">Accueil</a></li>
+        <li><a href="installation.html">Installer</a></li>
         <li><a href="principes.html">Principes</a></li>
         <li><a href="workflow.html">Intégration</a></li>
         <li><a href="audit.html">Audit</a></li>
@@ -30,8 +31,15 @@
 </header>
 <!-- /gen:nav -->
 <main id="contenu">
-<h1>ultra11y : l’audit d’accessibilité qui dit ce qu’il ne sait pas vérifier</h1>
-<p class="lede">ultra11y vérifie qu’un site respecte le <abbr title="Référentiel général d’amélioration de l’accessibilité">RGAA</abbr>, la norme française d’accessibilité numérique, et les <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> 2.2 niveau AA, la norme internationale dont il découle. Il fait le travail mécanique. Il dit clairement ce qu’il ne sait pas vérifier.</p>
+<section class="hero" aria-labelledby="titre">
+  <p class="kicker">RGAA <span data-gen="rgaa.version">4.1.2</span> · le référentiel de l’État · socle WCAG 2.2 AA</p>
+  <h1 id="titre">ultra11y : l’audit d’accessibilité RGAA qui dit ce qu’il ne sait pas vérifier</h1>
+  <p class="lede">ultra11y audite un site selon le <abbr title="Référentiel général d’amélioration de l’accessibilité">RGAA</abbr> <span data-gen="rgaa.version">4.1.2</span>, le référentiel d’accessibilité numérique de l’État. Il livre un rapport daté, la grille des <span data-gen="rgaa.criteria">106</span> critères, un backlog et des tickets. Un moteur statique, un passage dans le navigateur et un jugement de l’IA contre-vérifié s’y partagent le travail. <strong>Il ne déclare jamais conforme ce qu’il n’a pas vérifié.</strong> Le RGAA repose sur les <abbr title="Web Content Accessibility Guidelines" lang="en">WCAG</abbr> 2.2 niveau AA, la norme internationale : ultra11y les vérifie du même coup.</p>
+  <div class="cta-row">
+    <a class="cta" href="installation.html">Installer et lancer son premier audit</a>
+    <a href="principes.html">Comprendre qui décide quoi</a>
+  </div>
+</section>
 
 <figure class="callout quote">
   <blockquote><p>Je ne suis pas expert RGAA. Je suis développeur. ultra11y est l’outil que j’aurais voulu avoir : il fait le travail mécanique, et il dit clairement ce qu’il ne sait pas vérifier.</p></blockquote>
@@ -46,12 +54,12 @@
 </ul>
 
 <h2>Essayer en une commande</h2>
-<p>Il faut Node.js 22.18 ou plus récent. Rien d’autre à installer : le moteur tient dans un seul fichier, sans dépendance.</p>
+<p>Vous n’avez jamais ouvert un terminal ? Le guide <a href="installation.html">Installer et lancer son premier audit</a> part de zéro, étape par étape. Sinon : il faut Node.js <span data-gen="node">22.18</span> ou plus récent, et rien d’autre. Le moteur tient dans un seul fichier, sans dépendance.</p>
 <pre><code>npx ultra11y audit src --standard rgaa</code></pre>
-<p>La commande lit les fichiers HTML, JSX, TSX, Vue, Svelte ou Astro du dossier <code>src</code>. Elle affiche les non-conformités trouvées, classées par critère RGAA, avec le fichier et la ligne. Pour un rapport daté :</p>
-<pre><code>npx ultra11y audit src --standard rgaa --out audits --json
-npx ultra11y report --in audits/audit-latest.json --standard rgaa --out audits</code></pre>
-<p>Le rapport liste aussi tout ce qui reste « à évaluer ». C’est normal : un outil automatique ne tranche qu’une petite partie du RGAA. La suite se fait avec un agent IA (voir <a href="audit.html">l’audit complet</a>).</p>
+<p>La commande lit les fichiers HTML, JSX, TSX, Vue, Svelte ou Astro du dossier <code>src</code>. Elle affiche les non-conformités trouvées, classées par critère RGAA, avec le fichier et la ligne. Pour un rapport daté, en Markdown et en HTML :</p>
+<pre><code>npx ultra11y audit src --standard rgaa --out audits
+npx ultra11y report --in audits/audit-latest.json --standard rgaa --html --out audits</code></pre>
+<p>Le rapport s’ouvre sur le résumé (niveau atteint, ce qu’il faut corriger), puis détaille chaque critère. Il liste aussi tout ce qui reste « à évaluer ». C’est normal : un outil automatique ne tranche qu’une petite partie du RGAA. La suite se fait avec un agent IA (voir <a href="audit.html">l’audit complet</a>).</p>
 
 <h3>Dans un agent de code</h3>
 <p>Un <em>agent de code</em> est un assistant IA qui écrit et modifie du code dans votre dépôt (Claude Code, Codex, OpenCode…). Installé comme extension, ultra11y relit vos changements avant chaque commit, push ou <em lang="en">pull request</em>, sans que vous ayez à le demander.</p>
@@ -70,6 +78,23 @@ npx ultra11y report --in audits/audit-latest.json --standard rgaa --out audits</
 <p>Une <em lang="en">skill</em> est un mode d’emploi que l’agent charge quand la tâche s’y prête. Le dépôt en fournit deux : <code>review-a11y</code> pour relire un changement, <code>ultra11y</code> pour l’audit complet. Le détail est sur la page <a href="workflow.html">Intégration</a>.</p>
 
 <h2>Ce que c’est</h2>
+<p>Chacun son travail : la machine décide ce qu’elle sait prouver, l’IA juge le reste sous contrôle, et les garde-fous renvoient tout verdict sans preuve.</p>
+<!-- gen:process -->
+<figure class="dia proc" aria-labelledby="proc-cap">
+  <p class="band band-solid proc-b1">La machine décide</p>
+  <p class="band band-dashed proc-b2">L’IA juge, sous contrôle</p>
+  <ol class="proc-steps">
+    <li class="bx bx-plain"><strong>Code</strong><span>HTML, JSX, Vue, Svelte, Astro</span></li>
+    <li class="bx bx-fill"><strong>Moteur</strong><span>94 vérifications sur le code</span></li>
+    <li class="bx bx-fill"><strong>Navigateur</strong><span>contraste, focus, zoom</span></li>
+    <li class="bx bx-line"><strong>Agent IA</strong><span>juge et justifie</span></li>
+    <li class="bx bx-pale"><strong>Garde-fous</strong><span><code>verify</code>, <code>check</code> : preuve exigée</span></li>
+    <li class="bx bx-plain"><strong>Livrables</strong><span>rapport RGAA, backlog, tickets</span></li>
+  </ol>
+  <p class="proc-loop"><span class="loop-line" aria-hidden="true"></span><span class="loop-text">verdict sans preuve : renvoyé à l’agent</span></p>
+  <figcaption id="proc-cap">Le process en six étapes, du code aux livrables. Le moteur et le navigateur sont mécaniques : la machine décide. L’agent IA et les garde-fous relèvent du jugement : l’IA juge, sous contrôle. Un verdict sans preuve est renvoyé par les garde-fous à l’agent IA, qui doit le refaire.</figcaption>
+</figure>
+<!-- /gen:process -->
 <div class="two pairs">
   <div class="card">
     <h3>Un moteur déterministe</h3>
@@ -85,7 +110,7 @@ npx ultra11y report --in audits/audit-latest.json --standard rgaa --out audits</
   </div>
   <div class="card">
     <h3>Des garde-fous</h3>
-    <p>Les commandes <code>check</code> et <code>verify</code> refusent un verdict sans preuve, un critère inventé ou un « conforme » prononcé sur des éléments incomplets. Une non-conformité doit toujours pointer vers un élément réel du code.</p>
+    <p>Les commandes <code>check</code> et <code>verify</code> refusent un verdict sans preuve, un critère inventé ou un « conforme » prononcé sur des éléments incomplets. Une non-conformité doit toujours pointer vers un élément réel du code. Un « conforme » ou un « non applicable » de l’IA est contre-vérifié avant d’entrer dans le taux.</p>
   </div>
 </div>
 <p>Au bout : un rapport RGAA daté, une grille critère par critère et page par page, un <em lang="en">backlog</em> de corrections et, si vous le voulez, des tickets GitHub, GitLab ou Jira.</p>
@@ -100,6 +125,7 @@ npx ultra11y report --in audits/audit-latest.json --standard rgaa --out audits</
 
 <h2>Pour aller plus loin</h2>
 <ul>
+  <li><a href="installation.html">Installer</a> : de zéro au premier rapport, pour qui n’a jamais utilisé un terminal.</li>
   <li><a href="principes.html">Principes</a> : pourquoi le RGAA se juge plus qu’il ne se mesure, et qui décide quoi.</li>
   <li><a href="workflow.html">Intégration</a> : les deux skills et où l’outil se branche (agent, commit, CI, tests de bout en bout, MCP).</li>
   <li><a href="audit.html">Audit</a> : la boucle d’audit complète et les livrables.</li>
