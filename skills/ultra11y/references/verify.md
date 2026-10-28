@@ -41,8 +41,14 @@ RGAA applicability gate, so a pack report can neither drop nor invent a criterio
 node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --semantic
 ```
 Generates a **worklist** `VERIFY.md` + `VERIFY.todo.json`: one entry per non-conformity
-(criterion ↔ `file:line` ↔ cited claim), capped by `--max-verify` (default 40). For each
-entry, open the cited code and assign a verdict in `VERIFY.todo.json`:
+(criterion ↔ `file:line` ↔ cited claim), and — by default — one per agent-claimed conformity or
+« non applicable » (`kind: "c"`, with its `citations[]`). `--max-verify` caps the
+non-conformities (default 40); the conformity half is uncapped unless `--max-verify` is given,
+because a trial cut short lets every claim past the cap keep counting as conforming. Whatever
+a cap drops is named on stderr and fails `--apply` as « missing »; `--max-verify 0` removes
+the cap. `VERIFY.todo.json` is a bare JSON array of entries (unlike `ADJUDICATE.todo.json`,
+an object with `items`). For each entry, open the cited code and assign a verdict in
+`VERIFY.todo.json`:
 
 - `supported` — the non-conformity is real;
 - `partial` — real but the criterion/wording is imprecise;

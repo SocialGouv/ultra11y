@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { localAvailable, localTierStatus, resolveLocalDeps } from "../src/scan-local.js";
+import { launchChromium, localAvailable, localTierStatus, resolveLocalDeps } from "../src/scan-local.js";
 
 /** A project that RESOLVES both packages, whose Playwright reports a browser path that may or
  *  may not exist. Written as real modules so `createRequire` resolves them for real. */
@@ -103,5 +103,56 @@ describe("localTierStatus", () => {
     expect(localTierStatus(project(true)).ok).toBe(true);
     expect(localTierStatus(project(true)).ok).toBe(localAvailable(project(true)));
     expect(localTierStatus(project(false)).ok).toBe(localAvailable(project(false)));
+  });
+});
+
+// Playwright's default headless launch wants the exact `chromium_headless_shell-<rev>` its own
+// version pins. Measured auditing a static site: Chrome stable installed, other revisions in the
+// cache, and the scan refused to start until a 95 MB download. The launch now falls back on a
+// browser already on the machine, and when it cannot, names the Playwright that was resolved.
+describe("launchChromium", () => {
+  const missing = new Error("browserType.launch: Executable doesn't exist at /cache/chromium_headless_shell-1234/chrome");
+  const fake = (ok: (opts: { channel?: string }) => boolean) => {
+    const calls: (string | undefined)[] = [];
+    return {
+      calls,
+      chromium: {
+        launch: async (opts: { channel?: string }) => {
+          calls.push(opts.channel);
+          if (ok(opts)) return { browser: opts.channel ?? "default" };
+          throw missing;
+        },
+      },
+    };
+  };
+
+  it("uses the pinned browser when it is there, and says nothing", async () => {
+    const f = fake(() => true);
+    const warned: string[] = [];
+    expect(await launchChromium(f.chromium, ".", (m) => warned.push(m))).toEqual({ browser: "default" });
+    expect(f.calls).toEqual([undefined]);
+    expect(warned).toEqual([]);
+  });
+
+  it("falls back on the installed Google Chrome, and says so", async () => {
+    const f = fake((o) => o.channel === "chrome");
+    const warned: string[] = [];
+    expect(await launchChromium(f.chromium, ".", (m) => warned.push(m))).toEqual({ browser: "chrome" });
+    expect(f.calls).toEqual([undefined, "chromium", "chrome"]);
+    expect(warned.join("\n")).toContain('channel "chrome"');
+  });
+
+  it("names the resolved Playwright when no browser at all can start", async () => {
+    const f = fake(() => false);
+    const root = project(false);
+    const err = await launchChromium(f.chromium, root, () => {}).catch((e: Error) => e);
+    expect(String(err)).toMatch(/@playwright\/test@1\.0\.0 resolved at \S*u11y-local-\S*index\.js/);
+    expect(String(err)).toMatch(/install chromium/);
+    expect(String(err)).not.toMatch(/ultra11y's own Playwright/);
+  });
+
+  it("does not mask a launch failure that is not a missing browser", async () => {
+    const boom = { launch: async () => Promise.reject(new Error("Target page, context or browser has been closed")) };
+    await expect(launchChromium(boom, ".", () => {})).rejects.toThrow(/has been closed/);
   });
 });

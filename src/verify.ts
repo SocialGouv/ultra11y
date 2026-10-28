@@ -502,6 +502,11 @@ export interface ApplyResult {
    *  conformity sends its criterion back to « to assess » — nobody has established it, and
    *  that is not the same as having established it fails. */
   conformitiesRefused: VerifyItem[];
+  /** The claimed conformities that were NEVER TRIED: absent from the verdicts file (a capped
+   *  worklist, a dropped item), left blank, or carrying an unknown token. Kept apart from
+   *  `conformitiesRefused` because nobody ruled on them — and `--prune` must not let a claim
+   *  that stood no trial keep standing (src/refute.ts). */
+  conformitiesUntried: VerifyItem[];
 }
 
 // `kind` is part of the key: one criterion can be BOTH claimed non-conformant on one element
@@ -577,10 +582,14 @@ export function applyVerdicts(items: VerifyItem[], expected?: VerifyItem[]): App
   let invalid = 0;
   let missing = 0;
   const failures: VerifyItem[] = [];
+  const withdrawn: VerifyItem[] = [];
+  const untried: VerifyItem[] = [];
   for (const it of items) {
     const v = normalizeVerdict(it.verdict);
     if (v !== null && PASSING.has(v)) continue;
     failures.push(it);
+    if (v === "refuted" || v === "unsupported") withdrawn.push(it);
+    else untried.push(it);
     if (v === "refuted") refuted++;
     else if (v === "unsupported") unsupported++;
     else if (v === null) unadjudicated++;
@@ -591,6 +600,7 @@ export function applyVerdicts(items: VerifyItem[], expected?: VerifyItem[]): App
     for (const e of expected) {
       if (!covered.has(itemKey(e))) {
         failures.push(e);
+        untried.push(e);
         missing++;
       }
     }
@@ -605,7 +615,8 @@ export function applyVerdicts(items: VerifyItem[], expected?: VerifyItem[]): App
     invalid,
     missing,
     failures,
-    conformitiesRefused: failures.filter((f) => f.kind === "c"),
+    conformitiesRefused: withdrawn.filter((f) => f.kind === "c"),
+    conformitiesUntried: untried.filter((f) => f.kind === "c"),
   };
 }
 

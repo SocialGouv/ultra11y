@@ -68,6 +68,7 @@ import {
   type AdjudicationFile,
 } from "./adjudicate.js";
 import {
+  emptyLedger,
   entriesFrom,
   isLedger,
   ledgerPath,
@@ -456,7 +457,9 @@ Options:
                      becomes an item asking whether the evidence ESTABLISHES the criterion.
                      A refuted one sends its criterion back to « to assess » — never to NC
   --no-conformities  verify: do not put the ledger's conformities on trial
-  --max-verify <n>   verify: cap the worklist size; 0 = no cap           (default: 40)
+  --max-verify <n>   verify: cap the worklist size; 0 = no cap           (default: 40, NCs only)
+                     Claimed conformities are uncapped unless this is set; whatever a cap
+                     drops is named on stderr and fails --apply as missing
   --verdicts <file>  check --semantic: the adjudicated verdicts artifact
   --require-sample   check: fail while a page DECLARED in .ultra11yrc.json has no capture under
                      .ultra11y/pages/. Coverage, one level below --require-decided: a sweep that
@@ -2954,7 +2957,7 @@ function cmdVerify(p: ParsedArgs): number {
     // The exit code changes with it, and deliberately: a refuted claim has been HANDLED, so it
     // no longer fails the gate. An unadjudicated, missing or invalid one still does — nothing
     // was tried there, and pruning cannot stand in for a trial that never ran.
-    const pruned = p.flags.prune === true ? applyPrune(p, standard, items, lang) : undefined;
+    const pruned = p.flags.prune === true ? applyPrune(p, standard, items, lang, r.conformitiesUntried) : undefined;
     const ok = (pruned ? r.unadjudicated + r.invalid + r.missing === 0 : r.ok) && grounding.failed === 0;
     if (p.flags.json) console.log(JSON.stringify({ ...r, ok, grounding, ...(pruned ? { pruned } : {}) }, null, 2));
     else if (ok)
@@ -2979,12 +2982,37 @@ function cmdVerify(p: ParsedArgs): number {
       // criterion back to « à évaluer » — nobody has established it, which is not the same
       // claim as having established that it fails, and turning one into the other would be
       // the mirror image of the fabrication this gate exists to refuse.
+      //
+      // AND SAY WHAT ACTUALLY HAPPENED TO THEM. Without --prune nothing is written, so the
+      // message names the remedy rather than claiming an effect. With --prune it names the
+      // effect `applyPrune` really had (and printed above).
       if (r.conformitiesRefused.length) {
         const ids = [...new Set(r.conformitiesRefused.map((f) => f.criteriaId))].join(", ");
         console.error(
-          lang === "fr"
-            ? `✗ ${r.conformitiesRefused.length} conformité(s) revendiquée(s) non étayée(s) — ces critères retournent « à évaluer », ils ne deviennent PAS des non-conformités : ${ids}`
-            : `✗ ${r.conformitiesRefused.length} claimed conformity(ies) unsupported — those criteria go back to "to assess", they do NOT become non-conformities: ${ids}`,
+          pruned
+            ? lang === "fr"
+              ? `✗ ${r.conformitiesRefused.length} conformité(s) revendiquée(s) non étayée(s) — ces critères sont revenus à « à évaluer », ils ne deviennent PAS des non-conformités : ${ids}`
+              : `✗ ${r.conformitiesRefused.length} claimed conformity(ies) unsupported — those criteria are back to "to assess", they do NOT become non-conformities: ${ids}`
+            : lang === "fr"
+              ? `✗ ${r.conformitiesRefused.length} conformité(s) revendiquée(s) non étayée(s) — relancez avec --prune pour renvoyer ces critères à « à évaluer » (ils ne deviennent PAS des non-conformités) : ${ids}`
+              : `✗ ${r.conformitiesRefused.length} claimed conformity(ies) unsupported — re-run with --prune to send those criteria back to "to assess" (they do NOT become non-conformities): ${ids}`,
+        );
+      }
+      // A conformity nobody ruled on is a different failure: the trial is INCOMPLETE. Under
+      // --prune it is sent back to « to assess » too (src/refute.ts) — a claim that stood no
+      // trial must not keep counting as conforming through every later `check`.
+      if (r.conformitiesUntried.length) {
+        const ids = [...new Set(r.conformitiesUntried.map((f) => f.criteriaId))].join(", ");
+        const absent = r.conformitiesUntried.some((f) => !items.includes(f));
+        const regen = absent ? (lang === "fr" ? " Régénérez la worklist avec --max-verify 0." : " Regenerate the worklist with --max-verify 0.") : "";
+        console.error(
+          pruned
+            ? lang === "fr"
+              ? `✗ ${r.conformitiesUntried.length} conformité(s) revendiquée(s) jamais mise(s) à l'épreuve — renvoyée(s) à « à évaluer » : ${ids}.${regen}`
+              : `✗ ${r.conformitiesUntried.length} claimed conformity(ies) never tried — sent back to "to assess": ${ids}.${regen}`
+            : lang === "fr"
+              ? `✗ ${r.conformitiesUntried.length} conformité(s) revendiquée(s) jamais mise(s) à l'épreuve — la contre-expertise est incomplète : ${ids}.${regen}`
+              : `✗ ${r.conformitiesUntried.length} claimed conformity(ies) never tried — the trial is incomplete: ${ids}.${regen}`,
         );
       }
       for (const issue of grounding.issues) console.error(`✗ ${issue}`);
@@ -3000,7 +3028,7 @@ function cmdVerify(p: ParsedArgs): number {
  *  Requires `--in`, because there is nothing to prune without the audit, and refuses silently
  *  doing nothing — a flag that was accepted and ignored is the exact shape of a gate that
  *  reports success over work it never did. */
-function applyPrune(p: ParsedArgs, standard: StandardId, items: VerifyItem[], lang: Lang): PruneResult | undefined {
+function applyPrune(p: ParsedArgs, standard: StandardId, items: VerifyItem[], lang: Lang, untried: VerifyItem[] = []): PruneResult | undefined {
   const inFlag = p.flags.in;
   if (typeof inFlag !== "string" || !inFlag || inFlag === "-") {
     console.error(
@@ -3017,11 +3045,24 @@ function applyPrune(p: ParsedArgs, standard: StandardId, items: VerifyItem[], la
     console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
     return undefined;
   }
-  const pruned = pruneRefuted(audit, standard, items, lang);
+  const pruned = pruneRefuted(audit, standard, items, lang, untried);
   const ledgerFile = ledgerTarget(p, standard);
   let ledgerRepair: ReturnType<typeof pruneLedger> | undefined;
   if (ledgerFile) {
-    const ledger = readLedger(ledgerFile);
+    // NO LEDGER YET IS NOT AN ERROR. The route that asks for `--prune --ledger` may never have
+    // recorded one (the fold ran without `--ledger`), and aborting here used to drop the whole
+    // trial on the floor — a refuted conformity stayed `C`. Start an empty one and say so; an
+    // unreadable file or one for another standard is still refused, since writing over it
+    // would destroy someone's record.
+    let ledger = readLedger(ledgerFile);
+    if (!ledger && !existsSync(ledgerFile)) {
+      ledger = emptyLedger(standard);
+      console.error(
+        lang === "fr"
+          ? `⚠ Aucun registre en ${ledgerFile} — un registre vide est créé. Les verdicts déjà repliés n'y figurent pas : repliez-les avec \`verify --apply <ADJUDICATE.todo.json> --ledger\` pour qu'ils soient rejouables.`
+          : `⚠ No ledger at ${ledgerFile} — creating an empty one. Verdicts folded earlier are not in it: fold them with \`verify --apply <ADJUDICATE.todo.json> --ledger\` to make them replayable.`,
+      );
+    }
     if (!ledger || ledger.standard !== standard) {
       console.error(
         lang === "fr"
@@ -3048,8 +3089,8 @@ function applyPrune(p: ParsedArgs, standard: StandardId, items: VerifyItem[], la
     const reopened = [...new Set([...pruned.reopenedCriteria, ...pruned.clearedConformities])];
     console.log(
       lang === "fr"
-        ? `✓ Contre-expertise appliquée : ${pruned.removedFindings} non-conformité(s) supprimée(s), ${reopened.length} critère(s) de retour à « à évaluer ».`
-        : `✓ Trial applied: ${pruned.removedFindings} non-conformity(ies) deleted, ${reopened.length} criterion(ia) back to “to assess”.`,
+        ? `✓ Contre-expertise appliquée : ${pruned.removedFindings} non-conformité(s) supprimée(s), ${reopened.length} critère(s) de retour à « à évaluer »${pruned.untriedConformities.length ? ` (dont ${pruned.untriedConformities.length} conformité(s) jamais mise(s) à l'épreuve)` : ""}.`
+        : `✓ Trial applied: ${pruned.removedFindings} non-conformity(ies) deleted, ${reopened.length} criterion(ia) back to “to assess”${pruned.untriedConformities.length ? ` (${pruned.untriedConformities.length} of them conformity(ies) never tried)` : ""}.`,
     );
     if (reopened.length) console.log(`  ${reopened.join(", ")}`);
     // A withdrawn claim against an ENGINE verdict is left alone on purpose (src/refute.ts),
@@ -3156,7 +3197,14 @@ function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
     console.error("ultra11y verify: --report <md> is required (or --apply <verdicts.json>, or --manual --in <audit.json>).");
     return 2;
   }
+  // THE CAP. By default it bounds the non-conformity half only: the conformity half is a
+  // TRIAL, and a trial silently cut short let every claim past the cap keep counting as
+  // conforming (measured: 74 C/NA claims on a 7-page site, 40 tried, 34 never seen). An
+  // explicit --max-verify caps both halves — and whatever it drops is named on stderr, and
+  // fails `verify --apply` as missing (and, under --prune, sends those conformities back to
+  // « to assess »).
   let max = VERIFY_MAX;
+  let cMax = Number.POSITIVE_INFINITY;
   const mvFlag = p.flags["max-verify"];
   if (typeof mvFlag === "string" && mvFlag !== "") {
     const n = Number(mvFlag);
@@ -3165,13 +3213,24 @@ function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
       return 2;
     }
     max = n === 0 ? Number.POSITIVE_INFINITY : n; // 0 = no cap
+    cMax = max;
   }
   const repMd = readReportInput(rep, "verify");
   if (repMd === null) return 2;
   const ncItems = buildWorklist(repMd, standard, max);
+  const ncAll = Number.isFinite(max) ? buildWorklist(repMd, standard, Number.POSITIVE_INFINITY).length : ncItems.length;
   const conformities = conformityClaimsFor(p, standard, lang);
-  const cItems = buildConformityWorklist(conformities, ncItems.length, max);
+  const cItems = buildConformityWorklist(conformities, ncItems.length, cMax);
+  const cAll = Number.isFinite(cMax) ? buildConformityWorklist(conformities, 0, Number.POSITIVE_INFINITY).length : cItems.length;
   const items = [...ncItems, ...cItems];
+  const droppedNc = ncAll - ncItems.length;
+  const droppedC = cAll - cItems.length;
+  if (droppedNc > 0 || droppedC > 0)
+    console.error(
+      lang === "fr"
+        ? `⚠ Worklist plafonnée par --max-verify : ${[droppedNc ? `${droppedNc}/${ncAll} non-conformité(s)` : "", droppedC ? `${droppedC}/${cAll} conformité(s) revendiquée(s)` : ""].filter(Boolean).join(" et ")} laissée(s) hors du procès. \`verify --apply\` les comptera absentes et échouera${droppedC ? ", et --prune renverra ces conformités à « à évaluer »" : ""}. Relancez avec --max-verify 0 pour tout mettre à l'épreuve.`
+        : `⚠ Worklist capped by --max-verify: ${[droppedNc ? `${droppedNc}/${ncAll} non-conformity(ies)` : "", droppedC ? `${droppedC}/${cAll} claimed conformity(ies)` : ""].filter(Boolean).join(" and ")} left out of the trial. \`verify --apply\` will count them missing and fail${droppedC ? ", and --prune will send those conformities back to “to assess”" : ""}. Re-run with --max-verify 0 to try everything.`,
+    );
   const { todoPath, mdPath, count } = writeWorklist(items, out, p.flags.semantic === true, standard, lang);
   if (p.flags.json) console.log(JSON.stringify({ mdPath, todoPath, count, nc: ncItems.length, conformities: cItems.length, items }, null, 2));
   else

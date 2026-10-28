@@ -24,6 +24,13 @@
 // Both land on « to assess » from opposite directions, which is the only honest place for a
 // claim that was withdrawn with nothing put in its stead.
 //
+// A CONFORMITY THAT STOOD NO TRIAL DOES NOT STAND EITHER. A claimed conformity the verdicts
+// file never ruled on — absent because the worklist was capped, left blank, or carrying an
+// unknown token — goes back to « to assess » as well, with a reason saying it was never tried.
+// Leaving it `C` while the step reported it as « going back » is how a capped trial used to
+// let 34 untried claims through every later gate. A non-conformity that stood no trial is
+// left as it is: keeping an unexamined failure on the record is the conservative direction.
+//
 // AND IT NEVER REWRITES AN ENGINE VERDICT. A criterion the deterministic engine decided is
 // recomputed from source on every run: pruning it here would be undone by the next audit, and
 // a rule that produces a false positive is a bug in the rule, fixed in the rule. Only recorded
@@ -43,11 +50,15 @@ const REASON = {
     nc: "Non-conformité réfutée à la contre-expertise : le constat ne tient pas sur l'élément cité. Le critère retourne « à évaluer » — réfuter une non-conformité n'établit pas la conformité.",
     c: "Conformité revendiquée non étayée à la contre-expertise : l'évidence citée constate une présence, pas une conformité. Le critère retourne « à évaluer » — il ne devient PAS une non-conformité.",
     na: "« Non applicable » non étayé à la contre-expertise : rien n'avait été collecté, et l'absence de collecte ne prouve pas que le périmètre ne contient rien de concerné. Le critère retourne « à évaluer » — il ne devient PAS une non-conformité.",
+    untried:
+      "Conformité revendiquée jamais mise à l'épreuve : la contre-expertise n'a rendu aucun verdict sur elle (absente de la worklist, ou laissée sans verdict). Le critère retourne « à évaluer » — il ne devient PAS une non-conformité.",
   },
   en: {
     nc: "Non-conformity refuted on review: the observation does not hold on the cited element. The criterion goes back to “to assess” — refuting a non-conformity does not establish conformity.",
     c: "Claimed conformity unsupported on review: the cited evidence observes a presence, not a conformity. The criterion goes back to “to assess” — it does NOT become a non-conformity.",
     na: "“Not applicable” unsupported on review: nothing had been harvested, and an empty harvest does not prove the scope holds nothing concerned. The criterion goes back to “to assess” — it does NOT become a non-conformity.",
+    untried:
+      "Claimed conformity never tried: the review returned no verdict on it (absent from the worklist, or left without a verdict). The criterion goes back to “to assess” — it does NOT become a non-conformity.",
   },
 } as const;
 
@@ -59,11 +70,18 @@ export interface PruneResult {
   reopenedCriteria: string[];
   /** Criteria whose claimed conformity was withdrawn, so they are open again. */
   clearedConformities: string[];
+  /** Criteria whose claimed conformity was never tried, so they are open again. A subset of
+   *  `clearedConformities`, named apart so the caller can say why. */
+  untriedConformities: string[];
   /** Withdrawn claims left untouched because they name an ENGINE verdict. Reported rather
    *  than silently dropped: a refuted engine finding is a real signal about a RULE, and the
    *  caller should be able to say how many it is sitting on. */
   skippedEngine: number;
 }
+
+/** Is this record still a clearing claim (C, or an NA folded to C)? An untried conformity on a
+ *  criterion that is no longer clearing — re-ruled since the worklist was cut — is left alone. */
+const clearing = (rec: { status?: string }): boolean => rec.status === "C" || rec.status === "NA";
 
 /** One element, keyed as the worklist keys it: file, line and selector. */
 const key = (file: string, line: number, selector: string): string => `${file.trim()}|${line}|${(selector ?? "").trim()}`;
@@ -75,10 +93,13 @@ const findingKey = (f: Finding): string => key(f.file, f.line, f.selectorHint);
  * The input is never mutated: a caller that decides not to write the result — because the gate
  * failed for another reason, because it is only reporting — must still hold the audit it had.
  */
-export function pruneRefuted(audit: AuditResult, standard: StandardId, items: VerifyItem[], lang: Lang = "en"): PruneResult {
+export function pruneRefuted(audit: AuditResult, standard: StandardId, items: VerifyItem[], lang: Lang = "en", untried: VerifyItem[] = []): PruneResult {
   const next: AuditResult = structuredClone(audit);
   const reason = REASON[lang] ?? REASON.en;
   const withdrawn = items.filter((it) => WITHDRAWN.has((it.verdict ?? "").trim().toLowerCase()));
+  // A criterion withdrawn on one item is withdrawn, whatever another item left blank.
+  const withdrawnIds = new Set(withdrawn.filter((it) => it.kind === "c").map((it) => it.criteriaId));
+  const untriedC = new Set(untried.filter((it) => it.kind === "c" && !withdrawnIds.has(it.criteriaId)).map((it) => it.criteriaId));
   const removedNc = new Map<string, Set<string>>(); // criterion → anchors to delete
   const withdrawnC = new Set<string>();
   // Criteria whose withdrawn clearing claim cited NOTHING — an NA — so the recorded reason
@@ -104,6 +125,7 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
 
   const reopenedCriteria: string[] = [];
   const clearedConformities: string[] = [];
+  const untriedConformities: string[] = [];
   let removedFindings = 0;
   // Every anchor actually deleted from a criterion, so the flat findings list is filtered by
   // what the criteria agreed to lose — never by the worklist, which may name an engine anchor
@@ -121,7 +143,7 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
 
   /** Shared between the pack layer and the core layer: they carry different record types but
    *  the decision is identical, and writing it twice is how the two drift. */
-  const prune = (rec: { id: string; decidedBy?: string; findings: Finding[] }, setOpen: (why: string) => void) => {
+  const prune = (rec: { id: string; decidedBy?: string; status?: string; findings: Finding[] }, setOpen: (why: string) => void) => {
     const isAgent = rec.decidedBy === "agent";
     const drop = removedNc.get(rec.id);
     if (drop?.size) {
@@ -147,6 +169,10 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
       acted.add(rec.id);
       clearedConformities.push(rec.id);
       setOpen(withReview(rec.id, withdrawnUncited.has(rec.id) ? reason.na : reason.c));
+    } else if (untriedC.has(rec.id) && isAgent && clearing(rec)) {
+      clearedConformities.push(rec.id);
+      untriedConformities.push(rec.id);
+      setOpen(reason.untried);
     }
   };
 
@@ -190,5 +216,5 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
   // recomputing is only needed — and only correct — when the core itself changed.
   if (isCore(standard)) recomputeTallies(next);
 
-  return { audit: next, removedFindings, reopenedCriteria, clearedConformities, skippedEngine };
+  return { audit: next, removedFindings, reopenedCriteria, clearedConformities, untriedConformities, skippedEngine };
 }

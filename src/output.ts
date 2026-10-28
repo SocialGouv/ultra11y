@@ -11,7 +11,8 @@ import { packAuditDocument } from "./standards/document.js";
 type Key =
   | "summaryTitle"
   | "files"
-  | "autoConformance"
+  | "decided"
+  | "toAdjudicate"
   | "guideline"
   | "theme"
   | "naSubset"
@@ -33,10 +34,11 @@ const STR: Record<Lang, Record<Key, string>> = {
   fr: {
     summaryTitle: "Audit WCAG 2.2 AA (moteur statique ultra11y)",
     files: "fichiers analysés",
-    autoConformance: "réussite automatique (vérifications statiques)",
+    decided: "critères décidés",
+    toAdjudicate: "à adjuger",
     guideline: "Règle WCAG",
     theme: "Thématique",
-    naSubset: "(NA est un sous-ensemble de C : C + NC + ⏳ = le nombre de critères.)",
+    naSubset: "(Les NA sont comptés dans C — un critère sans sujet est conforme : C + NC + ⏳ = le nombre de critères.)",
     findingsTitle: "Non-conformités détectées",
     noFindings: "Aucune non-conformité détectée par le moteur statique.",
     residualTitle: "À adjuger (jugement / rendu)",
@@ -49,10 +51,11 @@ const STR: Record<Lang, Record<Key, string>> = {
   en: {
     summaryTitle: "WCAG 2.2 AA audit (ultra11y static engine)",
     files: "files analysed",
-    autoConformance: "automatic static-check pass rate",
+    decided: "criteria decided",
+    toAdjudicate: "to adjudicate",
     guideline: "WCAG guideline",
     theme: "Theme",
-    naSubset: "(NA is a subset of C: C + NC + ⏳ is the criterion count.)",
+    naSubset: "(NA are counted within C — a criterion with no subject conforms: C + NC + ⏳ is the criterion count.)",
     findingsTitle: "Non-conformities detected",
     noFindings: "No non-conformity detected by the static engine.",
     residualTitle: "To adjudicate (judgment / rendering)",
@@ -84,22 +87,35 @@ const ICON: Record<Severity, string> = { bloquant: "🔴", majeur: "🟠", mineu
 export function auditSummary(r: AuditResult, lang: Lang, standard: StandardId = CORE): string {
   const pack = isCore(standard) ? null : packAuditDocument(r, standard, lang);
   const lines: string[] = [];
-  const conformance = pack ? pack.conformancePct : r.conformancePct;
   lines.push(`${pack ? `${auditWord(lang)} ${pack.standardLabel} (${engineWord(lang)})` : t(lang, "summaryTitle")} — ${r.date}`);
-  lines.push(`${r.scope.files} ${t(lang, "files")} · ${conformance}% ${t(lang, "autoConformance")}`);
+  const rows: { name: string; c: number; nc: number; na: number; manual: number }[] = pack
+    ? pack.themes.map((th) => ({ name: `${th.number}. ${th.title}`, c: th.c, nc: th.nc, na: th.na, manual: th.manual }))
+    : // `g.title` is the baked-in English title (JSON back-compat); resolve by key + lang.
+      r.guidelines.map((g) => ({ name: `${g.key} ${guidelineTitle(g.key, lang) ?? g.title}`, c: g.c, nc: g.nc, na: g.na, manual: g.manual }));
+  // DECIDED OUT OF TOTAL, NOT A PERCENTAGE. The pass rate is C ÷ (C + NC) over what the engine
+  // decided, so a fresh RGAA audit read « 100% » with 101 of 106 criteria still to judge —
+  // a number that sounds like a verdict on the site. The count says what was settled.
+  const sum = (k: "c" | "nc" | "manual") => rows.reduce((n, row) => n + row[k], 0);
+  const total = sum("c") + sum("nc") + sum("manual");
+  lines.push(
+    `${r.scope.files} ${t(lang, "files")} · ${total - sum("manual")}/${total} ${t(lang, "decided")} (C ${sum("c")} · NC ${sum("nc")}) · ${sum("manual")} ${t(lang, "toAdjudicate")}`,
+  );
   lines.push("");
-  lines.push(`${pack ? t(lang, "theme") : t(lang, "guideline")}        C  NC  NA  ⏳`);
-  if (pack) {
-    for (const th of pack.themes) {
-      const name = `${th.number}. ${th.title}`.padEnd(28).slice(0, 28);
-      lines.push(`${name} ${String(th.c).padStart(2)}  ${String(th.nc).padStart(2)}  ${String(th.na).padStart(2)}  ${String(th.manual).padStart(2)}`);
-    }
-  } else {
-    for (const g of r.guidelines) {
-      // `g.title` is the baked-in English title (JSON back-compat); resolve by key + lang.
-      const name = `${g.key} ${guidelineTitle(g.key, lang) ?? g.title}`.padEnd(28).slice(0, 28);
-      lines.push(`${name} ${String(g.c).padStart(2)}  ${String(g.nc).padStart(2)}  ${String(g.na).padStart(2)}  ${String(g.manual).padStart(2)}`);
-    }
+  // Columns sized to the widest cell, never truncated: « 9. Structuration de l'inform » was
+  // the theme name a reader got, under a header that did not line up with its numbers.
+  const head = pack ? t(lang, "theme") : t(lang, "guideline");
+  const nameW = Math.max(head.length, ...rows.map((row) => row.name.length));
+  // Display widths, not string lengths: « ⏳ » is one UTF-16 unit drawn two columns wide.
+  const cols = [
+    ["C", 1],
+    ["NC", 2],
+    ["NA", 2],
+    ["⏳", 2],
+  ] as const;
+  const numW = cols.map(([, w], i) => Math.max(w, ...rows.map((row) => String([row.c, row.nc, row.na, row.manual][i]).length)));
+  lines.push(`${head.padEnd(nameW)}  ${cols.map(([label, w], i) => " ".repeat(numW[i]! - w) + label).join("  ")}`);
+  for (const row of rows) {
+    lines.push(`${row.name.padEnd(nameW)}  ${[row.c, row.nc, row.na, row.manual].map((n, i) => String(n).padStart(numW[i]!)).join("  ")}`);
   }
   // `NA` is a SUBSET of `C` — a criterion conforming for want of a subject reads C and the NA
   // column only says how many of them there were. Said out loud because the four columns

@@ -55,7 +55,10 @@ $ENGINE verify --manual --in "$RUN/audit-latest.json" --out "$RUN" --json
 
 # 3. ADJUDICATE — the agent fills every `verdict` (C/NC/NA/manual) in the verdicts file.
 #    The file carries its own `contract` (see below) — the agent needs nothing else. The fold
-#    re-hydrates the evidence from the audit, so a verdicts-only file is accepted.
+#    re-hydrates the evidence from the audit, so a verdicts-only file is accepted. An agent
+#    WITH a shell (a Claude Code session) fills ADJUDICATE.todo.json in place instead — one
+#    file or the other, never both. Each `citations[]` entry is { file, line, selector,
+#    snippet } copied from the criterion's own evidence (references/judgment.md).
 
 # 4. FOLD — partial by default: every verdict the gate accepts lands, every refusal is named
 #    in `rejectedCriteria[]` / `issues[]`, and a criterion absent from the file is refused as a
@@ -222,7 +225,9 @@ produces exactly the false clean bill of health this design exists to prevent.
 
 1. **A missing engine is a failure, never an empty finding set.**
 2. **Report the residual criteria.** The rendering criteria (contrast, focus, zoom, reflow)
-   are undecided until `scan` runs. Say so; do not let a step summary imply full coverage.
+   are undecided until `scan` runs — and under RGAA they stay undecided after a clean scan,
+   which only supplies signals, until someone adjudicates them. Say so; do not let a step
+   summary imply full coverage.
 3. **`conformancePct` is the static pass rate.** Label it as such.
 4. **Never let a model write the counts.** Take them from the JSON — the numbers exist
    precisely so nothing has to be re-derived by a model that may drop a field.
