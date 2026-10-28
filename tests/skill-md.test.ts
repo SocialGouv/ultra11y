@@ -188,7 +188,7 @@ describe("skill docs stay in sync with the CLI", () => {
 });
 
 describe("SKILL.md routes to the references (progressive disclosure)", () => {
-  it("ships exactly the forty reference docs", () => {
+  it("ships exactly the forty-one reference docs", () => {
     expect(refFiles.sort()).toEqual([
       "act.md",
       "adjudication.md",
@@ -223,6 +223,7 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "prd.md",
       "rendered.md",
       "rgaa-automation.md",
+      "rgaa-review.md",
       "runbook.md",
       "scale.md",
       "standards.md",

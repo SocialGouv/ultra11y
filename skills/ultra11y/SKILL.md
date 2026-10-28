@@ -123,6 +123,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/focus-and-logic.md` | The focus/keyboard criteria you own, and how to reason about them |
 | `references/criteria.md` | The 55 criteria: level, automatability class, engine rules, pack mapping (generated) |
 | `references/rgaa-automation.md` | RGAA 4.1.2: generated 106-criterion / 258-test matrix, decisive rules, candidate signals and silence policy |
+| `references/rgaa-review.md` | RGAA 4.1.2 criterion by criterion: what the engine can be trusted for, what was fixed against the golden grids, and the known limits |
 | `references/act.md` | What the engine is measured to catch — and what it demonstrably does not (generated) |
 
 | Running the tool | |
