@@ -495,9 +495,12 @@ describe("scan --storage-state + an EXPLICIT docker runtime is an unsupported co
     expect(r.code).toBe(2);
   });
 
-  it("--runtime local --storage-state is unaffected by the new gate (fails later for an unrelated reason, never exit 2)", async () => {
+  // Where no browser starts this fails fast (exit 1); where one does — the launcher now falls
+  // back on an installed Google Chrome, which CI runners carry — the scan really runs, so the
+  // test gets a real scan's time budget. Either way the gate under test never answers 2.
+  it("--runtime local --storage-state is unaffected by the new gate (fails later for an unrelated reason, never exit 2)", { timeout: 90_000 }, async () => {
     const r = await run(["scan", "http://example.com", "--runtime", "local", "--storage-state", join(tmpdir(), "auth.json")]);
-    expect(r.code).not.toBe(2); // no local Playwright resolvable in this sandbox → exit 1, not the docker gate
+    expect(r.code).not.toBe(2);
   });
 });
 
