@@ -6,6 +6,8 @@
 [![node](https://img.shields.io/node/v/ultra11y)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/ultra11y)](LICENSE)
 
+**Documentation (in French): [socialgouv.github.io/ultra11y](https://socialgouv.github.io/ultra11y/)** — what the tool does, what it cannot check, criterion-by-criterion RGAA coverage and how it is tested, with every number generated from the code.
+
 ### Add to your coding agent
 
 Two lines, and the accessibility review runs **by itself** before every commit, push and

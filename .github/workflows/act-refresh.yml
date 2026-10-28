@@ -53,15 +53,18 @@ jobs:
       - name: Regenerate the published conformance matrix
         run: pnpm run build:act
 
+      - name: Regenerate the documentation site numbers
+        run: pnpm run build:site
+
       - name: Detect a change
         id: detect
         run: |
           set -euo pipefail
-          if git diff --quiet -- scripts/vendor/act-testcases.json skills/ultra11y/references/act.md; then
+          if git diff --quiet -- scripts/vendor/act-testcases.json skills/ultra11y/references/act.md site; then
             echo "corpus and matrix unchanged"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            git --no-pager diff --stat -- scripts/vendor/act-testcases.json skills/ultra11y/references/act.md
+            git --no-pager diff --stat -- scripts/vendor/act-testcases.json skills/ultra11y/references/act.md site
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -101,7 +104,7 @@ jobs:
         if: steps.detect.outputs.changed == 'true'
         run: |
           SUMMARY=$(sed -E 's/\x1b\[[0-9;]*m//g' /tmp/test-output.log | grep -E "Test Files|Tests" | tail -2 || true)
-          git add scripts/vendor/act-testcases.json skills/ultra11y/references/act.md
+          git add scripts/vendor/act-testcases.json skills/ultra11y/references/act.md site
           git commit \
             -m "chore(act): refresh the vendored W3C ACT test corpus" \
             -m "automated refresh, all gates green" \

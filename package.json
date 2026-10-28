@@ -2,6 +2,7 @@
   "name": "ultra11y",
   "version": "5.45.1",
   "description": "Audit HTML/CSS/JSX against WCAG 2.2 AA and produce a dated compliance report, or author/review accessible markup (native-HTML-first). A skills.sh agent skill: an install-free static engine (bundled, no npm install) plus the agent's judgment, with check/verify gates against hallucinated non-conformities, and pluggable in-repo standards packs (RGAA France first; Section 508 & EN 301 549 next).",
+  "homepage": "https://socialgouv.github.io/ultra11y/",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "bin": {
@@ -67,6 +68,8 @@
     "build:act:refresh": "node scripts/build-act-corpus.mjs --refresh",
     "build:adjudication": "node scripts/build-adjudication.mjs && UPDATE_ADJUDICATION_MD=1 vitest run tests/adjudication-md-sync.test.ts",
     "check:adjudication": "node scripts/build-adjudication.mjs --check",
+    "build:site": "node scripts/build-site.mjs",
+    "check:site": "node scripts/build-site.mjs --check",
     "demo": "node scripts/ultra11y.mjs audit tests/fixtures/non-conforming/bad.html --out /tmp/ultra11y-demo --json > /dev/null && node scripts/ultra11y.mjs report --in /tmp/ultra11y-demo/audit-latest.json --out /tmp/ultra11y-demo && node scripts/ultra11y.mjs check --report /tmp/ultra11y-demo/wcag-*.md && node scripts/ultra11y.mjs criteria --list",
     "release": "semantic-release",
     "build:icons": "node scripts/build-extension-icons.mjs"
