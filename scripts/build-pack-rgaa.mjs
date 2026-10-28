@@ -171,6 +171,11 @@ const JUDGMENT_CRITERIA = {
   "4.10": "« contrôlable par l’utilisateur » — l’arrêt/le réglage du son se constate au rendu, 1.4.2 ne prouve que l’absence d’autoplay détectable.",
   "8.4": "« le code de langue est-il pertinent ? » — 3.1.1 ne vérifie que la présence et la validité syntaxique de `lang`, pas sa cohérence avec la langue réelle du contenu.",
   "8.6": "« ce titre est-il pertinent ? » — 2.4.2 ne vérifie que la présence d’un `<title>` non vide.",
+  // Its tests are « static » because list-structure can PROVE a malformed list — but what they
+  // ask about is « les informations regroupées VISUELLEMENT sous forme de liste », and the list
+  // that fails them is the one drawn with no list markup at all. An absence of <ul> is not an
+  // absence of lists, so a clean or empty pass must never close 9.3 on its own.
+  "9.3": "« les informations regroupées visuellement sous forme de liste » — un regroupement visuel se constate à la lecture ; l’absence de <ul>/<ol>/<dl> ne prouve pas l’absence de liste.",
   "13.3": "« version accessible du document en téléchargement » — aucune règle moteur ne peut ouvrir le document ; les CS mappés ne portent que sur la page.",
   "13.4": "« cette version offre-t-elle la même information ? » — comparaison de deux documents, hors de portée d’un audit de la page.",
 };

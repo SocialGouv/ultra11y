@@ -108,13 +108,7 @@ const SHAPES = ["source", "capture", "rendered"] as const;
 const gap = (page: string, shapes: readonly string[], ids: string[], kind: "verdict" | "evidence", why: string): [string, string][] =>
   shapes.flatMap((shape) => ids.map((id): [string, string] => [`${page} ${shape} ${id} ${kind}`, why]));
 const KNOWN_GAPS = new Map<string, string>([
-  ...gap("non-conforme", SHAPES, ["9.3"], "verdict", "`lists` sees <ul>/<ol>/<dl> only: a <br>-built bullet list proves no list absent"),
-  ...gap("non-conforme", SHAPES, ["13.3"], "verdict", "`downloadDocs` knows pdf/doc/xls only: an .odt is « nothing to download »"),
-  ...gap("non-conforme", SHAPES, ["13.3"], "evidence", "same: the .odt link is not harvested"),
-  ...gap("conforme", SHAPES, ["13.3", "13.4"], "verdict", "same: the .odt link is not harvested"),
-  ...gap("conforme", SHAPES, ["13.3", "13.4"], "evidence", "same: the .odt link is not harvested"),
   ...gap("conforme", SHAPES, ["6.2"], "verdict", "link-empty-name ignores an <svg role=img aria-label> inside the link"),
-  ...gap("conforme", SHAPES, ["13.11"], "verdict", "2.5.2 closes on « no down-event handler », which is not « no pointer action »"),
   ...gap("non-conforme", SHAPES, ["7.5"], "evidence", "`liveRegions` harvests marked-up regions only: an unmarked status target is invisible"),
   ...gap("non-conforme", ["source"], ["8.1"], "evidence", "`doctype` harvests nothing when a source file has no doctype"),
   ...gap("non-conforme", ["source", "capture"], ["10.4", "10.11", "13.9"], "evidence", "`readingOrder` stands in for zoom, reflow and orientation"),
@@ -123,7 +117,7 @@ const KNOWN_GAPS = new Map<string, string>([
   ...gap("conforme", SHAPES, ["10.9", "10.10"], "evidence", "`sensoryText` harvests only the instructions that fail"),
   ...gap("conforme", SHAPES, ["3.2"], "evidence", "`colourPairs` reads inline colours only"),
   ...gap("conforme", ["source", "capture"], ["3.3"], "evidence", "`colourPairs` reads inline colours only"),
-  ...gap("conforme", SHAPES, ["13.10", "13.11", "13.12"], "evidence", "`pointerHandlers` skips native controls and addEventListener gestures"),
+  ...gap("conforme", SHAPES, ["13.10", "13.12"], "evidence", "`pointerHandlers` skips native controls and addEventListener gestures"),
 ]);
 
 const observed = new Set<string>();

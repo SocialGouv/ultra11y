@@ -323,8 +323,9 @@ function residualReason(automatability: string, sc?: string): string {
 const SUBJECT_NOUNS: Record<string, string> = {
   images: "no image element (<img>, <svg>, <picture>, <object>, <input type=image> or role=img)",
   tables: "no <table>, and no element with a table role",
-  lists: "no list (<ul>, <ol>, <dl> or a list role)",
-  links: "no link",
+  lists: "no list (<ul>, <ol>, <dl>, a list role, or text drawn as a list with bullets or numerals)",
+  links: "no link (<a href> or role=link)",
+  buttons: "no button (<button>, <input type=submit|reset|button|image> or role=button)",
   controls: "no form control (native, ARIA or contenteditable)",
   autocomplete: "no field carrying user information that autocomplete applies to",
   errors: "no error message and no field marked invalid",
@@ -337,7 +338,7 @@ const SUBJECT_NOUNS: Record<string, string> = {
   timers: "no time limit, timer or auto-refresh",
   motion: "no moving, blinking, auto-updating or media content",
   contextChange: "no control that changes context on its own",
-  downloadDocs: "no downloadable document",
+  downloadDocs: "no downloadable document (no link to a pdf, doc(x), xls(x), ppt(x), odt, ods, odp, rtf, csv or epub file, and no download link)",
   stickies: "no fixed or sticky positioned element",
 };
 

@@ -212,7 +212,12 @@ const PRESENTATIONAL_MARKUP_ATTRS = new Set([
   "vspace",
 ]);
 
-const DOWNLOAD_HREF = /\.(pdf|docx?|xlsx?)(?:[?#]|$)/i;
+// « Document bureautique en téléchargement » — every office and publication format, not just the
+// three the first version knew. An .odt programme or a .pptx deck is exactly the document 13.3
+// asks about, and missing its extension published « nothing to download » over it. Kept in step
+// with the formats the pack's own download-link rule recognises (scripts/build-pack-rgaa.mjs),
+// minus archives and media, which are not office documents.
+const DOWNLOAD_HREF = /\.(pdf|docx?|dotx?|xlsx?|xlsm|pptx?|ppsx?|odt|ods|odp|odg|rtf|csv|epub)(?:[?#]|$)/i;
 const STATUS_CLASS = /(error|status|message|alert|notif|toast|feedback|live)/i;
 const TEMPORAL_MEDIA_VALUE = /(?:^|[/.?=&_-])(?:audio|video|player|podcast|mp[34]|webm|ogg|ogv|wav|m4a|mov|avi|mpeg)(?:$|[/.?=&_-])/i;
 const ROUTER_IMPORT =
@@ -225,6 +230,69 @@ const FOREIGN_LEXICON =
   /\b(?:the|and|with|your|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)\b/i;
 
 const CONTROL_TAGS = ["input", "select", "textarea"] as const;
+// The rest of the glossary's « champ de saisie de formulaire »: the native output elements it
+// names, and the ARIA roles that stand in for a field. A form built of ARIA widgets is still a
+// form, and a criterion about its labels is not « non applicable » because none is an <input>.
+const FIELD_TAGS = new Set(["datalist", "output", "progress", "meter"]);
+const FIELD_ROLES = new Set(["textbox", "searchbox", "combobox", "listbox", "checkbox", "radio", "switch", "slider", "spinbutton", "progressbar", "option"]);
+const roleOf = (e: El): string => (attr(e, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
+/** A form field in the RGAA glossary's sense, native or not. */
+function isFormField(e: El): boolean {
+  if ((CONTROL_TAGS as readonly string[]).includes(e.tag) || FIELD_TAGS.has(e.tag) || FIELD_ROLES.has(roleOf(e))) return true;
+  const editable = attr(e, "contenteditable");
+  return editable !== undefined && editable.trim().toLowerCase() !== "false";
+}
+// « Bouton (formulaire) »: the three HTML button forms the glossary lists, and role="button".
+const BUTTON_INPUT_TYPES = new Set(["submit", "reset", "button", "image"]);
+function isButton(e: El): boolean {
+  if (e.tag === "button") return true;
+  if (e.tag === "input") return BUTTON_INPUT_TYPES.has((attr(e, "type") ?? "").trim().toLowerCase());
+  return roleOf(e) === "button";
+}
+// A text run that READS as a list: two or more lines opening on a bullet or a numeral. RGAA
+// 9.3.1 asks about « les informations regroupées visuellement sous forme de liste », and the
+// list that fails it is precisely the one with no <ul> — drawn with « • » and <br>, or with one
+// paragraph per item.
+const BULLET_LINE = /^\s*(?:[•·▪◦‣●○■□➢➤►–—*-]|\d{1,2}[.)])\s+\S/;
+function looksLikeList(e: El): boolean {
+  if (["ul", "ol", "dl", "li", "script", "style", "pre", "code"].includes(e.tag)) return false;
+  if (ancestors(e).some((a) => a.tag === "li" || a.tag === "pre")) return false;
+  // Items split by <br> inside one element.
+  let lines = 0;
+  let run = "";
+  const flush = () => {
+    if (BULLET_LINE.test(run)) lines++;
+    run = "";
+  };
+  for (const c of e.children) {
+    if (c.type === "text") run += c.data;
+    else if (c.type === "element" && c.tag === "br") flush();
+    else if (c.type === "element") run += textContent(c);
+  }
+  flush();
+  return lines >= 2;
+}
+/** Consecutive sibling paragraphs/divs that each open on a bullet — one anchor per run. */
+function bulletParagraphRuns(doc: Doc): El[] {
+  const out: El[] = [];
+  for (const parent of doc.elements) {
+    if (["ul", "ol", "dl"].includes(parent.tag)) continue;
+    let start: El | undefined;
+    let count = 0;
+    const kids = parent.children.filter((c): c is El => c.type === "element");
+    for (const k of [...kids, undefined]) {
+      const bullet = k !== undefined && (k.tag === "p" || k.tag === "div") && BULLET_LINE.test(textContent(k));
+      if (bullet) {
+        if (!count) start = k;
+        count++;
+      } else {
+        if (count >= 2 && start) out.push(start);
+        count = 0;
+      }
+    }
+  }
+  return out;
+}
 const INTERACTIVE_TAGS = ["a", "button", "input", "select", "textarea", "summary", "details", "label"];
 
 /** An object/embed is ambiguous until its declared type or resource says what it carries.
@@ -275,28 +343,44 @@ export const SUBJECTS: Record<string, Subject> = {
   images: (docs) =>
     docs.flatMap((d) =>
       elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas")
+        // RGAA 1.1.3 is about nothing else: an image button is an image.
+        .concat(elementsByTag(d, "input").filter((e) => (attr(e, "type") ?? "").trim().toLowerCase() === "image"))
         .concat(d.elements.filter((e) => attr(e, "role") === "img"))
         .filter((e, i, a) => a.indexOf(e) === i)
-        .map((e) =>
-          h(
+        .map((e) => {
+          // The other mechanisms the RGAA tests name, when present — an image's verdict turns
+          // on title, aria-labelledby, aria-hidden and its caption as much as on alt.
+          const extra = ["title", "aria-labelledby", "aria-hidden", "role", "aria-describedby", "longdesc"]
+            .filter((a) => attr(e, a) !== undefined)
+            .map((a) => ` ${a}="${(attr(e, a) ?? "").slice(0, 60)}"`)
+            .join("");
+          const figure = ancestors(e).some((a) => a.tag === "figure");
+          return h(
             d,
             e,
-            `<${e.tag}> alt="${attr(e, "alt") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" src="${(attr(e, "src") ?? "").slice(0, 80)}"`,
+            `<${e.tag}${e.tag === "input" ? ' type="image"' : ""}> alt="${attr(e, "alt") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}"${extra} src="${(attr(e, "src") ?? "").slice(0, 80)}"${figure ? " (inside <figure>)" : ""}`,
             `image|${e.tag}|${attr(e, "alt") ?? ""}|${attr(e, "aria-label") ?? ""}|${attr(e, "src") ?? ""}`,
-          ),
-        ),
+          );
+        }),
     ),
 
   // Links: text + destination + the heading they are read under. Class = (text, href).
   links: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, "a")
-        .filter((e) => attr(e, "href") !== undefined)
+      // The glossary's « lien »: <a href>, and an element with role="link" whose navigation a
+      // script handles.
+      d.elements
+        .filter((e) => (e.tag === "a" && attr(e, "href") !== undefined) || roleOf(e) === "link")
         .map((e) => {
           const href = attr(e, "href") ?? "";
           const dl = DOWNLOAD_HREF.exec(href);
           const note = dl ? ` download-format=${dl[1]!.toLowerCase()} (naming the format, e.g. "(PDF)", is a recommendation — not an NC)` : "";
-          return h(d, e, `text="${t(e)}" href="${href}" under="${nearestHeading(d, e) ?? ""}"${note}`, `link|${t(e)}|${href}`);
+          const named = ["aria-label", "aria-labelledby", "title"]
+            .filter((a) => attr(e, a) !== undefined)
+            .map((a) => ` ${a}="${(attr(e, a) ?? "").slice(0, 60)}"`)
+            .join("");
+          const role = e.tag === "a" ? "" : ` role="link" on <${e.tag}>`;
+          return h(d, e, `text="${t(e)}"${named}${role} href="${href}" under="${nearestHeading(d, e) ?? ""}"${note}`, `link|${t(e)}|${href}`);
         }),
     ),
 
@@ -327,15 +411,32 @@ export const SUBJECTS: Record<string, Subject> = {
   // Form controls and the label/placeholder/instruction attached to them.
   controls: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, ...CONTROL_TAGS).map((e) =>
-        h(
+      d.elements.filter(isFormField).map((e) => {
+        const native = (CONTROL_TAGS as readonly string[]).includes(e.tag) || FIELD_TAGS.has(e.tag);
+        return h(
           d,
           e,
-          `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" required=${attr(e, "required") !== undefined} describedby="${attr(e, "aria-describedby") ?? ""}"`,
-          `control|${e.tag}|${attr(e, "type") ?? ""}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
+          `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${native ? "" : ` role="${roleOf(e)}"`}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}" title="${attr(e, "title") ?? ""}" required=${attr(e, "required") !== undefined || attr(e, "aria-required") === "true"} describedby="${attr(e, "aria-describedby") ?? ""}"`,
+          `control|${e.tag}|${attr(e, "type") ?? roleOf(e)}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
           labelElementTokens(d, e),
-        ),
-      ),
+        );
+      }),
+    ),
+
+  // Buttons — the subject of RGAA 11.9 (« l'intitulé de chaque bouton est-il pertinent ? »),
+  // which used to read `controls` and so was never shown a single button.
+  buttons: (docs) =>
+    docs.flatMap((d) =>
+      d.elements.filter(isButton).map((e) => {
+        const name = e.tag === "input" ? (attr(e, "value") ?? attr(e, "alt") ?? "") : t(e, 60);
+        const form = ancestors(e).some((a) => a.tag === "form") || attr(e, "form") !== undefined;
+        return h(
+          d,
+          e,
+          `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${e.tag === "button" || e.tag === "input" ? "" : ' role="button"'}> label="${name}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}" title="${attr(e, "title") ?? ""}"${form ? " (in a form)" : " (outside any form: RGAA 7.1 rather than 11.9, unless it submits one)"}`,
+          `button|${e.tag}|${name}|${attr(e, "aria-label") ?? ""}`,
+        );
+      }),
     ),
 
   // The `autocomplete` token a field carries — the subject of "identify input purpose".
@@ -388,26 +489,49 @@ export const SUBJECTS: Record<string, Subject> = {
   // Tables, with the parts that decide whether they are data or layout.
   tables: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, "table").map((e) => {
-        const caption = elementsByTag(d, "caption").find((c) => ancestors(c)[0] === e);
-        const ths = elementsByTag(d, "th").filter((x) => ancestors(x).includes(e));
-        return h(
-          d,
-          e,
-          `<table> caption="${caption ? t(caption, 40) : ""}" role="${attr(e, "role") ?? ""}" th=${ths.length} summary="${attr(e, "summary") ?? ""}" — data table or layout?`,
-          `table|${caption ? t(caption, 40) : ""}|${ths.length}|${attr(e, "role") ?? ""}`,
-        );
-      }),
+      // <table>, and the ARIA tables 5.6/5.7 name outright (role="columnheader"/"rowheader").
+      d.elements
+        .filter((e) => e.tag === "table" || ["table", "grid", "treegrid"].includes(roleOf(e)))
+        .map((e) => {
+          const caption = elementsByTag(d, "caption").find((c) => ancestors(c)[0] === e);
+          const inside = (x: El) => ancestors(x).includes(e);
+          const ths = d.elements.filter((x) => inside(x) && (x.tag === "th" || ["columnheader", "rowheader"].includes(roleOf(x))));
+          const scoped = ths.filter((x) => attr(x, "scope") !== undefined).length;
+          const ids = ths.filter((x) => attr(x, "id") !== undefined).length;
+          const headers = d.elements.filter((x) => inside(x) && attr(x, "headers") !== undefined).length;
+          const named = attr(e, "aria-label") ?? attr(e, "aria-labelledby") ?? attr(e, "title") ?? "";
+          return h(
+            d,
+            e,
+            `<${e.tag}${e.tag === "table" ? "" : ` role="${roleOf(e)}"`}> caption="${caption ? t(caption, 40) : ""}" name="${named.slice(0, 40)}" role="${attr(e, "role") ?? ""}" th=${ths.length} (scope=${scoped}, id=${ids}) cells-with-headers=${headers} summary="${attr(e, "summary") ?? ""}" describedby="${attr(e, "aria-describedby") ?? ""}" — data table or layout?`,
+            `table|${caption ? t(caption, 40) : ""}|${ths.length}|${attr(e, "role") ?? ""}`,
+          );
+        }),
     ),
 
   // Lists and definition lists, for the technique-consistency question.
   lists: (docs) =>
-    docs.flatMap((d) =>
-      elementsByTag(d, "ul", "ol", "dl").map((e) => {
-        const items = e.children.filter((c): c is El => c.type === "element").length;
-        return h(d, e, `<${e.tag}> items=${items} first="${t(e, 40)}"`, `list|${e.tag}|${items}|${t(e, 40)}`);
-      }),
-    ),
+    docs.flatMap((d) => [
+      ...d.elements
+        .filter((e) => ["ul", "ol", "dl"].includes(e.tag) || roleOf(e) === "list")
+        .map((e) => {
+          const items = e.children.filter((c): c is El => c.type === "element").length;
+          const kind = ["ul", "ol", "dl"].includes(e.tag) ? `<${e.tag}>` : `<${e.tag} role="list">`;
+          return h(d, e, `${kind} items=${items} first="${t(e, 40)}"`, `list|${e.tag}|${items}|${t(e, 40)}`);
+        }),
+      // …and the list drawn without list markup, which is the one 9.3.1 fails on.
+      ...d.elements
+        .filter(looksLikeList)
+        .concat(bulletParagraphRuns(d))
+        .map((e) =>
+          h(
+            d,
+            e,
+            `<${e.tag}> reads as a list (lines opening on a bullet or a numeral) but is not marked up as one: "${t(e, 60)}" — RGAA 9.3.1/9.3.2`,
+            `fakelist|${t(e, 60)}`,
+          ),
+        ),
+    ]),
 
   // Landmarks and the navigation structure that lets a user bypass repeated blocks.
   landmarks: (docs) =>
@@ -704,13 +828,48 @@ export const SUBJECTS: Record<string, Subject> = {
       ),
     ]),
 
+  // RGAA 13.11 — « les actions déclenchées au moyen d'un dispositif de pointage sur un point
+  // unique de l'écran ». Its population is EVERY single-pointer action, and a page whose actions
+  // all fire on click conforms rather than being « non applicable »: the WCAG 2.5.2 predicate it
+  // maps onto only proves the absence of DOWN-event handlers. So it lists the scripted handlers
+  // and the native controls an action hangs on, which is what the adjudicator rules C from.
+  pointerActions: (docs) =>
+    docs.flatMap((d) => [
+      ...d.elements
+        .filter((e) => Object.keys(e.attribs).some((k) => /^on(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)$/i.test(k)))
+        .map((e) => {
+          const events = Object.keys(e.attribs)
+            .filter((k) => /^on(?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)$/i.test(k))
+            .map((k) => k.toLowerCase());
+          const down = events.some((k) => /down|start/.test(k));
+          return h(
+            d,
+            e,
+            `<${e.tag}> ${events.join(",")} "${t(e, 40)}" — ${down ? "fires on the DOWN event: is it abortable or undoable?" : "fires on release"}`,
+            `pointer|${e.tag}|${events.join(",")}|${t(e, 40)}`,
+          );
+        }),
+      ...linesOf(d, /addEventListener\(\s*["'](?:click|dblclick|mousedown|mouseup|pointerdown|pointerup|touchstart|touchend)["']/).map((l) =>
+        hAt(d, l.line, "listener", `pointer listener — does the action fire on release, or can it be aborted/undone? ${l.text}`, `pointerlistener|${l.text}`),
+      ),
+      ...d.elements
+        .filter((e) => isButton(e) && !Object.keys(e.attribs).some((k) => /^on/i.test(k)))
+        .slice(0, 1)
+        .map((e) => h(d, e, `native <${e.tag}> activation fires on release (click)`, `pointer|native|${e.tag}`)),
+    ]),
+
   // Single-character keyboard shortcuts.
   shortcuts: (docs) =>
-    docs.flatMap((d) =>
-      linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map((l) =>
+    docs.flatMap((d) => [
+      ...linesOf(d, /\b(?:key|code|charCode)\s*===?\s*["'][a-zA-Z0-9]["']/).map((l) =>
         hAt(d, l.line, "shortcut", `single-character key comparison: ${l.text}`, `shortcut|${l.text}`),
       ),
-    ),
+      // `accesskey` is a single-character shortcut the browser binds itself — and the thing this
+      // subject's « not applicable » sentence already claimed to have looked for.
+      ...d.elements
+        .filter((e) => attr(e, "accesskey") !== undefined)
+        .map((e) => h(d, e, `accesskey="${attr(e, "accesskey")}" on <${e.tag}> "${t(e, 40)}"`, `accesskey|${attr(e, "accesskey")}`)),
+    ]),
 
   // Instructions that lean on a sensory characteristic alone.
   sensoryText: (docs) =>
@@ -990,7 +1149,9 @@ export const SUBJECTS: Record<string, Subject> = {
   downloadDocs: (docs) =>
     docs.flatMap((d) =>
       elementsByTag(d, "a")
-        .filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? ""))
+        // A `download` link is a download whatever its URL says: an extensionless
+        // `/telecharger?id=3` is still a document handed to the user.
+        .filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? "") || (attr(e, "download") !== undefined && attr(e, "href") !== undefined))
         .map((e) =>
           h(
             d,
@@ -1259,7 +1420,10 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "11.6": ["controls", "landmarks"],
     "11.7": ["controls", "landmarks"],
     "11.8": ["controls"],
-    "11.9": ["controls"],
+    // « Bouton (formulaire) » — the buttons, which `controls` never held.
+    // Fields stay listed beside the buttons so an audit recorded before `buttons` existed (whose
+    // subjectsSeen cannot contain it) is never read as « no button anywhere ».
+    "11.9": ["buttons", "controls"],
     "11.10": ["controls", "errors"],
     "11.11": ["errors", "controls"],
     "11.12": ["controls", "errors"],
@@ -1325,7 +1489,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "13.8": ["motion", "timers"],
     "13.9": ["readingOrder"],
     "13.10": ["pointerHandlers"],
-    "13.11": ["pointerHandlers"],
+    "13.11": ["pointerActions", "pointerHandlers"],
   },
 };
 
@@ -1414,6 +1578,7 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   "errors",
   "frames",
   "downloadDocs",
+  "buttons",
   "newWindow",
   "contextChange",
   "scriptAlternatives",
@@ -1421,6 +1586,13 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   // `<html>` element is always there; the attribute is what this subject looks for.
   "declaredLang",
 ]);
+
+/** Subjects whose PRESENCE is recorded in `scope.subjectsSeen` although their absence proves
+ *  nothing. Presence alone is what a pack criterion needs to refuse an absence it would only
+ *  INHERIT from its WCAG mapping (derive.ts `ownSubjectSeen`): RGAA 13.11 maps onto WCAG 2.5.2,
+ *  whose predicate closes on « no down-event handler » — and a page full of click actions is
+ *  then published « non applicable » for a criterion whose population is exactly those actions. */
+export const PRESENCE_SUBJECTS: ReadonlySet<string> = new Set(["pointerActions"]);
 
 /** The subjects that decide a success criterion. Empty ⇒ the criterion has none declared,
  *  which `tests/harvest-coverage.test.ts` refuses for any criterion the engine hands over. */
@@ -1467,7 +1639,7 @@ export function subjectsAbsent(ids: string[], seen: ReadonlySet<string>): boolea
  *  the first few documents this costs almost nothing. */
 export function subjectsPresentIn(doc: Doc, skip: ReadonlySet<string>): string[] {
   const out: string[] = [];
-  for (const id of EXISTENCE_SUBJECTS) {
+  for (const id of [...EXISTENCE_SUBJECTS, ...PRESENCE_SUBJECTS]) {
     if (skip.has(id)) continue;
     const run = SUBJECTS[id];
     if (!run) continue;

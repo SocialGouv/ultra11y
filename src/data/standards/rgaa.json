@@ -3514,6 +3514,7 @@
       "appliesTo": {
         "ruleIds": ["axe:definition-list", "axe:dlitem", "axe:list", "axe:listitem", "list-structure"]
       },
+      "judgment": true,
       "automation": {
         "tests": {
           "1": "static",
