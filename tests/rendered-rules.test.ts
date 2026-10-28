@@ -338,6 +338,17 @@ describe("a focus indicator removed with nothing put back (WCAG 2.4.7 → RGAA 1
     expect(ids(page, { css })).toContain("rendered-focus-not-visible");
   });
 
+  // A skip link's target takes focus programmatically and is never reached by Tab: RGAA 10.7 is
+  // about the focus a keyboard user moves. Measured on the documentation site: a majeur NC on
+  // every page for `main:focus { outline: none }` over `<main tabindex="-1">`.
+  it("ignores a reset on a skip-link target that Tab never reaches", () => {
+    const skip = PAGE('<a href="#contenu">Aller au contenu</a><main id="contenu" tabindex="-1"><p><a href="/x">link</a></p></main>');
+    const css = cssDigest([{ selector: "main:focus", decls: { outline: "none" } }]);
+    expect(ids(skip, { css })).not.toContain("rendered-focus-not-visible");
+    const tabbable = PAGE('<main id="contenu" tabindex="0"><p><a href="/x">link</a></p></main>');
+    expect(ids(tabbable, { css })).toContain("rendered-focus-not-visible");
+  });
+
   it("accepts a reset that replaces the indicator elsewhere", () => {
     const css = cssDigest([
       { selector: "*:focus", decls: { outline: "none" } },
