@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -205,5 +205,55 @@ describe("guardrails", () => {
     await errorText("ultra11y_audit", { cwd: "/nope/not/here" });
     await ok("ultra11y_audit", { cwd: PROJECT });
     expect(process.cwd()).toBe(before);
+  });
+});
+
+// `ultra11y_init` writes a gate that RUNS. Its `fail_on` was advertised as error | warning |
+// notice and cast straight into the `bloquant | majeur | mineur` table the hook writer reads,
+// so every generated pre-commit hook and workflow carried `--fail-on undefined` — a gate the
+// CLI refuses on its first invocation. The tool now speaks the CLI's own vocabulary and keeps
+// the old trio as aliases; what matters is the token that lands in the generated file.
+describe("ultra11y_init fail_on reaches the generated gate as a token the CLI accepts", () => {
+  const project = (): string => {
+    const dir = mkdtempSync(join(tmpdir(), "u11y-mcp-init-"));
+    temps.push(dir);
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", version: "1.0.0" }));
+    return dir;
+  };
+  const hookOf = async (args: Record<string, unknown>): Promise<string> => {
+    const dir = project();
+    const res = JSON.parse((await callTool("ultra11y_init", { cwd: dir, hook: true, ...args }, { allowWrite: true })).text) as { written: string[] };
+    const hook = res.written.find((p) => p.endsWith("pre-commit"));
+    expect(hook, "the hook path is reported as written").toBeDefined();
+    return readFileSync(hook!, "utf8");
+  };
+
+  it.each([
+    ["blocking", "blocking"],
+    ["major", "major"],
+    ["minor", "minor"],
+    ["bloquant", "blocking"],
+    ["error", "blocking"],
+    ["warning", "major"],
+    ["notice", "minor"],
+  ])("fail_on %s writes --fail-on %s", async (given, written) => {
+    const hook = await hookOf({ fail_on: given });
+    expect(hook).toContain(`--fail-on ${written}`);
+    expect(hook).not.toContain("undefined");
+  });
+
+  it("defaults to blocking, and the CI workflow it returns carries the same token", async () => {
+    const dir = project();
+    const res = JSON.parse((await callTool("ultra11y_init", { cwd: dir, hook: true, ci: true }, { allowWrite: true })).text) as {
+      written: string[];
+      ci_workflow: string;
+    };
+    expect(readFileSync(res.written.find((p) => p.endsWith("pre-commit"))!, "utf8")).toContain("--fail-on blocking");
+    expect(res.ci_workflow).toContain("fail-on: blocking");
+    expect(res.ci_workflow).not.toContain("undefined");
+  });
+
+  it("refuses an unknown severity, naming the accepted tokens", async () => {
+    await expect(callTool("ultra11y_init", { cwd: project(), hook: true, fail_on: "severe" }, { allowWrite: true })).rejects.toThrow(/blocking, major, minor/);
   });
 });

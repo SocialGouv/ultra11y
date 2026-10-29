@@ -74159,12 +74159,14 @@ function handleFix(args2, cwd) {
     process.chdir(prev);
   }
 }
+var FAIL_ON_ALIASES = { error: "blocking", warning: "major", notice: "minor" };
+var FAIL_ON_TOKENS = "blocking, major, minor (or bloquant, majeur, mineur; error/warning/notice as aliases)";
 function handleInit(args2, cwd) {
-  const failOnRaw = str2(args2.fail_on) ?? "error";
-  if (!["error", "warning", "notice"].includes(failOnRaw)) {
-    throw new ToolError(`\`fail_on\` must be one of: error, warning, notice (got "${failOnRaw}")`);
+  const failOnRaw = str2(args2.fail_on) ?? "blocking";
+  const failOn = parseFailOn(FAIL_ON_ALIASES[failOnRaw] ?? failOnRaw);
+  if (failOn === null) {
+    throw new ToolError(`\`fail_on\` must be one of: ${FAIL_ON_TOKENS} (got "${failOnRaw}")`);
   }
-  const failOn = failOnRaw;
   const enginePath = resolve15("scripts/ultra11y.mjs");
   const written = [];
   if (bool(args2.hook)) written.push(writeHook(cwd, enginePath, failOn));
@@ -74651,7 +74653,14 @@ var WRITE_TOOLS = [
         hook: { type: "boolean", description: "Install the git pre-commit hook." },
         ci: { type: "boolean", description: "Install the CI workflow." },
         baseline: { type: "boolean", description: "Record the current findings as the accepted baseline." },
-        fail_on: { type: "string", enum: ["error", "warning", "notice"], description: "Severity that fails the gate." }
+        fail_on: {
+          type: "string",
+          // The CLI's own `--fail-on` vocabulary (English or French), which is what the
+          // generated hook and workflow carry. The axe-style trio is kept as aliases:
+          // error ⇒ blocking, warning ⇒ major, notice ⇒ minor.
+          enum: ["blocking", "major", "minor", "bloquant", "majeur", "mineur", "error", "warning", "notice"],
+          description: "Severity that fails the gate: blocking | major | minor (default blocking). error/warning/notice are accepted as aliases of the three."
+        }
       },
       required: ["cwd"]
     }

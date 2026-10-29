@@ -5,6 +5,7 @@ import { buildAdjudicationWorklist, formatAdjudication } from "../adjudicate.js"
 import { checkReport } from "../check.js";
 import { runFix, fixSummary } from "../fix.js";
 import { writeHook, ciWorkflow } from "../init.js";
+import { parseFailOn } from "../baseline.js";
 import { runPackCheck } from "../pack.js";
 import { prdUnits, partitionUnits } from "../prd.js";
 import { renderReport, renderPackReport, withReportAnnexes } from "../report.js";
@@ -504,12 +505,18 @@ function handleFix(args: Record<string, unknown>, cwd: string): unknown {
   }
 }
 
+/** The axe-style severities this tool once advertised, as aliases of the engine's own. They
+ *  used to be cast straight into the `bloquant | majeur | mineur` table the hook and workflow
+ *  writers read, so every generated gate said `--fail-on undefined` and refused to run. */
+const FAIL_ON_ALIASES: Record<string, string> = { error: "blocking", warning: "major", notice: "minor" };
+const FAIL_ON_TOKENS = "blocking, major, minor (or bloquant, majeur, mineur; error/warning/notice as aliases)";
+
 function handleInit(args: Record<string, unknown>, cwd: string): unknown {
-  const failOnRaw = str(args.fail_on) ?? "error";
-  if (!["error", "warning", "notice"].includes(failOnRaw)) {
-    throw new ToolError(`\`fail_on\` must be one of: error, warning, notice (got "${failOnRaw}")`);
+  const failOnRaw = str(args.fail_on) ?? "blocking";
+  const failOn = parseFailOn(FAIL_ON_ALIASES[failOnRaw] ?? failOnRaw);
+  if (failOn === null) {
+    throw new ToolError(`\`fail_on\` must be one of: ${FAIL_ON_TOKENS} (got "${failOnRaw}")`);
   }
-  const failOn = failOnRaw as Parameters<typeof writeHook>[2];
   const enginePath = resolve("scripts/ultra11y.mjs");
   const written: string[] = [];
   if (bool(args.hook)) written.push(writeHook(cwd, enginePath, failOn));
