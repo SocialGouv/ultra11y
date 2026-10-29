@@ -336,7 +336,14 @@ export const WRITE_TOOLS: ToolDecl[] = [
         hook: { type: "boolean", description: "Install the git pre-commit hook." },
         ci: { type: "boolean", description: "Install the CI workflow." },
         baseline: { type: "boolean", description: "Record the current findings as the accepted baseline." },
-        fail_on: { type: "string", enum: ["error", "warning", "notice"], description: "Severity that fails the gate." },
+        fail_on: {
+          type: "string",
+          // The CLI's own `--fail-on` vocabulary (English or French), which is what the
+          // generated hook and workflow carry. The axe-style trio is kept as aliases:
+          // error ⇒ blocking, warning ⇒ major, notice ⇒ minor.
+          enum: ["blocking", "major", "minor", "bloquant", "majeur", "mineur", "error", "warning", "notice"],
+          description: "Severity that fails the gate: blocking | major | minor (default blocking). error/warning/notice are accepted as aliases of the three.",
+        },
       },
       required: ["cwd"],
     },
