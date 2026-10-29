@@ -119,6 +119,22 @@ const canonicalFile = (file: string): string => {
   return at >= 0 ? posix.slice(at) : posix;
 };
 
+/** The path a COMMITTED ledger carries for a page capture: its published
+ *  `.ultra11y/pages/<id>/…` identity, whatever absolute `--cwd` the browser wrote it through.
+ *
+ *  A ledger travels — reviewed in a pull request, replayed on another machine — and the
+ *  harvester hands out the paths it was given. Recorded as such, one ledger carried 196
+ *  `/home/runner/work/<repo>/<repo>/.ultra11y/pages/…/dom.html` citations: readable by
+ *  nobody, and all of them captures. `canonicalFile` is already the identity every reader
+ *  keys on (`anchorKey`, `evidenceFilesOf`, `reanchor`, `pruneLedger`), so writing it is a
+ *  change of spelling, not of identity. Ordinary source files are left exactly as harvested:
+ *  the readers compare them lexically, and a spelling that differs from the harvest's (a
+ *  root-relative store against an absolute harvest) would stale, un-anchor and un-prune
+ *  valid verdicts — a root-aware identity on both sides is its own change. */
+export function portableFile(file: string): string {
+  return canonicalFile(file.replace(/\\/g, "/"));
+}
+
 /** The line-independent identity of one piece of evidence: what the agent actually read. */
 const anchorKey = (e: { file: string; selector?: string; snippet?: string }) => {
   const file = canonicalFile(e.file);
@@ -350,8 +366,15 @@ export function writeLedger(path: string, ledger: VerdictLedger): void {
  *  reach the ledger, or the next replay would launder it back in. */
 export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>, date: string): LedgerEntry[] {
   const out: LedgerEntry[] = [];
+  // Every path the entry persists goes through `portableFile`: the ledger is a committed,
+  // reviewed artefact, and the machine that recorded it is not the one that replays it.
+  // Only a string file is respelled. The fold validates a finding's `file` for an NC alone;
+  // findings an LLM attached to a C/NA/manual item reach here unvalidated, and the ledger
+  // recorded them as they came — a write must not crash on what it never checked.
+  const portable = <T extends { file?: unknown }>(xs: T[]): T[] => xs.map((x) => (typeof x.file === "string" ? { ...x, file: portableFile(x.file) } : x));
   for (const it of adj.items) {
     if (!accepted.has(it.criteriaId) || it.verdict === null) continue;
+    const citations = (it.citations ?? []).map(readCitation).filter((c): c is Evidence => c !== null);
     out.push({
       criteriaId: it.criteriaId,
       verdict: it.verdict,
@@ -359,9 +382,9 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
       ...(it.reason ? { reason: it.reason } : {}),
       // Normalised here too: a citation may have arrived as a bare "file:line" string, and a
       // ledger entry has to hold the object form so a replay can re-anchor and re-ground it.
-      ...(it.citations?.length ? { citations: it.citations.map(readCitation).filter((c): c is Evidence => c !== null) } : {}),
-      ...(it.findings?.length ? { findings: it.findings } : {}),
-      ...(it.recommendations?.length ? { recommendations: it.recommendations } : {}),
+      ...(citations.length ? { citations: portable(citations) } : {}),
+      ...(it.findings?.length ? { findings: portable(it.findings) } : {}),
+      ...(it.recommendations?.length ? { recommendations: portable(it.recommendations) } : {}),
       evidenceFingerprint: evidenceFingerprint(it.evidence),
       evidenceAnchors: evidenceAnchorsOf(it.evidence),
       evidenceFiles: evidenceFilesOf(it.evidence),

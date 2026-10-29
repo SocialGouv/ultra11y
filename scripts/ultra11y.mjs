@@ -66581,6 +66581,9 @@ var canonicalFile2 = (file) => {
   const at = posix3.lastIndexOf(marker);
   return at >= 0 ? posix3.slice(at) : posix3;
 };
+function portableFile(file) {
+  return canonicalFile2(file.replace(/\\/g, "/"));
+}
 var anchorKey2 = (e) => {
   const file = canonicalFile2(e.file);
   let snippet2 = norm3(e.snippet ?? "");
@@ -66685,8 +66688,10 @@ function writeLedger(path, ledger) {
 }
 function entriesFrom(adj, accepted, date) {
   const out2 = [];
+  const portable = (xs) => xs.map((x) => typeof x.file === "string" ? { ...x, file: portableFile(x.file) } : x);
   for (const it of adj.items) {
     if (!accepted.has(it.criteriaId) || it.verdict === null) continue;
+    const citations = (it.citations ?? []).map(readCitation).filter((c2) => c2 !== null);
     out2.push({
       criteriaId: it.criteriaId,
       verdict: it.verdict,
@@ -66694,9 +66699,9 @@ function entriesFrom(adj, accepted, date) {
       ...it.reason ? { reason: it.reason } : {},
       // Normalised here too: a citation may have arrived as a bare "file:line" string, and a
       // ledger entry has to hold the object form so a replay can re-anchor and re-ground it.
-      ...it.citations?.length ? { citations: it.citations.map(readCitation).filter((c2) => c2 !== null) } : {},
-      ...it.findings?.length ? { findings: it.findings } : {},
-      ...it.recommendations?.length ? { recommendations: it.recommendations } : {},
+      ...citations.length ? { citations: portable(citations) } : {},
+      ...it.findings?.length ? { findings: portable(it.findings) } : {},
+      ...it.recommendations?.length ? { recommendations: portable(it.recommendations) } : {},
       evidenceFingerprint: evidenceFingerprint(it.evidence),
       evidenceAnchors: evidenceAnchorsOf(it.evidence),
       evidenceFiles: evidenceFilesOf(it.evidence),
