@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.49.0](https://github.com/SocialGouv/ultra11y/compare/v5.48.0...v5.49.0) (2026-10-29)
+
+
+### Bug Fixes
+
+* **standards:** re-stamp a vendored source only when its data changed ([#77](https://github.com/SocialGouv/ultra11y/issues/77)) ([e3e9d97](https://github.com/SocialGouv/ultra11y/commit/e3e9d97773d673545282aa7e4afca5d83ef225bc))
+
+
+### Features
+
+* **scan:** launch an explicit browser with --browser-path / ULTRA11Y_BROWSER_PATH ([#76](https://github.com/SocialGouv/ultra11y/issues/76)) ([9590579](https://github.com/SocialGouv/ultra11y/commit/9590579e06e3d2b732a9e7a7ca3811ca3070c7fc))
+
 # [5.48.0](https://github.com/SocialGouv/ultra11y/compare/v5.47.1...v5.48.0) (2026-10-28)
 
 

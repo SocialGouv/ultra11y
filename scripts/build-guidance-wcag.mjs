@@ -31,6 +31,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { withPreviousStamp } from "./vendor-stamp.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const VENDOR = join(root, "scripts", "vendor", "wcag-2.2-techniques.json");
@@ -246,7 +247,7 @@ async function refresh() {
     criteria,
   };
   mkdirSync(dirname(VENDOR), { recursive: true });
-  writeFileSync(VENDOR, JSON.stringify(out, null, 2) + "\n");
+  writeFileSync(VENDOR, JSON.stringify(withPreviousStamp(VENDOR, out), null, 2) + "\n");
   const withGood = Object.values(criteria).filter((x) => x.good).length;
   const withBad = Object.values(criteria).filter((x) => x.bad).length;
   const withBrief = Object.values(criteria).filter((x) => x.brief).length;
