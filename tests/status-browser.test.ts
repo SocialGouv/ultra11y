@@ -90,3 +90,68 @@ describe("status --browser", () => {
     expect(j.browser, "the browser block is opt-in — asking costs a resolve").toBeUndefined();
   });
 });
+
+// `--browser-path` / `ULTRA11Y_BROWSER_PATH`: the doctor answers about the executable the
+// caller named — the one `scan` will launch — not about the binary Playwright would pick.
+// The GitHub Action and an orchestrator that ships a distribution's Chromium branch on this.
+describe("status --browser with an explicit executable", () => {
+  const named = (): { dir: string; bin: string } => {
+    const dir = bareProject();
+    const bin = join(dir, "chromium");
+    writeFileSync(bin, "#!/bin/sh\n");
+    return { dir, bin };
+  };
+
+  it("says ok and names the executable when the file is there", async () => {
+    const { dir, bin } = named();
+    const j = JSON.parse((await run(["status", "--browser", "--cwd", dir, "--browser-path", bin, "--json"])).out) as {
+      browser: { ok: boolean; executable?: string };
+    };
+    expect(j.browser.ok).toBe(true);
+    expect(j.browser.executable).toBe(bin);
+  });
+
+  it("says no — naming the path and the flag — when the file is not there", async () => {
+    const dir = bareProject();
+    const missing = join(dir, "no-such-chromium");
+    const { code, out } = await run(["status", "--browser", "--cwd", dir, "--browser-path", missing, "--json"]);
+    expect(code).toBe(0);
+    const j = JSON.parse(out) as { browser: { ok: boolean; reason?: string; executable?: string } };
+    expect(j.browser.ok).toBe(false);
+    expect(j.browser.reason).toContain(missing);
+    expect(j.browser.reason).toMatch(/--browser-path/);
+    expect(j.browser.executable).toBe(missing);
+  });
+
+  it("reads ULTRA11Y_BROWSER_PATH when no flag is passed, and lets the flag win", async () => {
+    const { dir, bin } = named();
+    const other = join(dir, "other-chromium");
+    writeFileSync(other, "#!/bin/sh\n");
+    const prev = process.env.ULTRA11Y_BROWSER_PATH;
+    process.env.ULTRA11Y_BROWSER_PATH = bin;
+    try {
+      const viaEnv = JSON.parse((await run(["status", "--browser", "--cwd", dir, "--json"])).out) as { browser: { ok: boolean; executable?: string } };
+      expect(viaEnv.browser.ok).toBe(true);
+      expect(viaEnv.browser.executable).toBe(bin);
+      const viaFlag = JSON.parse((await run(["status", "--browser", "--cwd", dir, "--browser-path", other, "--json"])).out) as {
+        browser: { executable?: string };
+      };
+      expect(viaFlag.browser.executable).toBe(other);
+    } finally {
+      if (prev === undefined) delete process.env.ULTRA11Y_BROWSER_PATH;
+      else process.env.ULTRA11Y_BROWSER_PATH = prev;
+    }
+  });
+
+  it("is a recognised value flag — never warned as unknown, never a positional", async () => {
+    const { dir, bin } = named();
+    const errs: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => void errs.push(a.join(" ")));
+    try {
+      await run(["status", "--browser", "--cwd", dir, "--browser-path", bin, "--json"]);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(errs.join("\n")).not.toMatch(/unknown flag/);
+  });
+});

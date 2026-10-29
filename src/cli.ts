@@ -510,6 +510,9 @@ Options:
   --docker           scan: alias of --runtime docker (built on first use)
   --cwd <dir>        scan: --runtime local resolves @playwright/test + @axe-core/playwright
                      (and the browser) from here (e.g. --cwd packages/app)
+  --browser-path <file>  scan / status --browser: launch THIS browser executable (e.g. a
+                     distribution's /usr/bin/chromium) instead of the one Playwright resolves.
+                     Explicit: never replaced by a fallback. Env: ULTRA11Y_BROWSER_PATH
   --storage-state <file>  scan: --runtime local — Playwright storageState JSON for
                      authenticated pages (e.g. test-results/.auth/user.json)
   --no-interact      scan: --runtime local — disable the STATEFUL probes (fill inputs,
@@ -673,6 +676,9 @@ const VALUE_FLAGS = new Set([
   "guidance",
   "runtime",
   "cwd",
+  // `scan` / `status --browser`: an explicit browser executable (a distribution's Chromium),
+  // launched as given and never replaced by Playwright's fallbacks. Env: ULTRA11Y_BROWSER_PATH.
+  "browser-path",
   "storage-state",
   "captures",
   "run",
@@ -2024,6 +2030,16 @@ function reportInstall(results: ReturnType<typeof installForTargets>, verb: stri
   return failed ? 1 : 0;
 }
 
+/** The browser executable the caller named, if any: `--browser-path` first, then the
+ *  `ULTRA11Y_BROWSER_PATH` environment variable — the form a runner image or an orchestrator
+ *  sets once for every engine call. Read in ONE place so `status --browser` and `scan` answer
+ *  from the same choice; `scan-local.ts` only ever sees the resolved value. */
+export function browserPathOf(flags: Record<string, string | boolean>, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  if (typeof flags["browser-path"] === "string" && flags["browser-path"]) return flags["browser-path"] as string;
+  const fromEnv = env.ULTRA11Y_BROWSER_PATH;
+  return typeof fromEnv === "string" && fromEnv.trim() ? fromEnv.trim() : undefined;
+}
+
 /** `status` — the doctor. Answers "is the automatic review actually going to fire?", which
  *  is otherwise invisible until a commit that should have been stopped goes through. */
 function cmdStatus(p: ParsedArgs): number {
@@ -2036,7 +2052,10 @@ function cmdStatus(p: ParsedArgs): number {
   // Opt-in, because resolving two packages and stat-ing a browser binary is work the harness
   // doctor has no reason to do. Exit code stays 0 either way: this is a QUESTION, and a doctor
   // that exits non-zero is one nobody can put in an `if`.
-  const browser = p.flags.browser === true ? localTierStatus(typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : ".") : undefined;
+  const browser =
+    p.flags.browser === true
+      ? localTierStatus(typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : ".", { browserPath: browserPathOf(p.flags) })
+      : undefined;
   if (p.flags.json === true) {
     console.log(JSON.stringify({ version: VERSION, targets: rows, ...(browser ? { browser } : {}) }, null, 2));
     return 0;
@@ -4138,6 +4157,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   // Playwright (no Docker) when it resolves from --cwd, else falls back to Docker.
   const cwd = typeof p.flags.cwd === "string" && p.flags.cwd ? (p.flags.cwd as string) : process.cwd();
   const storageState = typeof p.flags["storage-state"] === "string" && p.flags["storage-state"] ? (p.flags["storage-state"] as string) : undefined;
+  const browserPath = browserPathOf(p.flags);
   const runtimeFlag =
     typeof p.flags.runtime === "string" && p.flags.runtime
       ? (p.flags.runtime as string)
@@ -4153,12 +4173,12 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   let useLocal: boolean;
   if (runtimeFlag === "local") useLocal = true;
   else if (runtimeFlag === "docker") useLocal = false;
-  else if (localAvailable(cwd)) useLocal = true;
+  else if (localAvailable(cwd, { browserPath })) useLocal = true;
   else if (dockerAvailable()) {
     useLocal = false;
     // A silent degrade is indistinguishable from a working fallback — name what was
     // missing, so the one line a reader gets answers "what do I install".
-    const s = localTierStatus(cwd);
+    const s = localTierStatus(cwd, { browserPath });
     console.error(
       lang === "fr"
         ? `ultra11y scan : tier local indisponible${s.ok ? "" : ` (${s.reason})`} — bascule sur Docker. Passez --runtime local pour en faire une erreur.`
@@ -4273,7 +4293,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   try {
     if (useSample && sampleConfig) {
       dynamic = useLocal
-        ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot })
+        ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
         : runSampleScan(sampleConfig.pages, undefined, snapshotRoot);
     } else if (sitemap || crawl) {
       const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : undefined;
@@ -4284,7 +4304,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       // dropping the cap.
       const onPage = (url: string, n: number): void => console.error(`ultra11y scan: page ${n} — ${url}`);
       dynamic = useLocal
-        ? await runCrawlScanLocal({ sitemap, crawl, depth, max, onPage, cwd, storageState, lang, interact, interactClicks, snapshotRoot })
+        ? await runCrawlScanLocal({ sitemap, crawl, depth, max, onPage, cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
         : await runCrawlScan({ sitemap, crawl, depth, max, onPage, snapshotRoot });
     } else {
       const targets = p.positionals.filter((a) => a !== "-");
@@ -4295,8 +4315,8 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       if (useLocal) {
         dynamic =
           targets.length === 1
-            ? await runScanLocal({ target: targets[0]!, cwd, storageState, lang, interact, interactClicks, snapshotRoot })
-            : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks, snapshotRoot });
+            ? await runScanLocal({ target: targets[0]!, cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
+            : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
       } else {
         dynamic = targets.length === 1 ? runScan({ target: targets[0]!, snapshotRoot }) : runScanMany(targets, undefined, snapshotRoot);
       }
