@@ -3525,7 +3525,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
       );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
-    const fresh = entriesFrom(adj, accepted, r.audit.date);
+    const fresh = entriesFrom(adj, accepted, r.audit.date, cwd ?? process.cwd());
     writeLedger(ledgerOut, mergeLedger(readLedger(ledgerOut), adj.standard, fresh));
     if (!p.flags.json)
       console.log(
@@ -4002,7 +4002,7 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
       );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
-    const fresh = entriesFrom(adj, accepted, r.audit.date);
+    const fresh = entriesFrom(adj, accepted, r.audit.date, cwd ?? process.cwd());
     writeLedger(ledgerOut, mergeLedger(readLedger(ledgerOut), adj.standard, fresh));
     console.log(
       lang === "fr"

@@ -27,8 +27,8 @@
 // selector and the normalised snippet.
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
 import { type AdjudicationFile, type AdjudicationItem, type AgentFinding, buildAdjudicationWorklist, type Evidence, readCitation } from "./adjudicate.js";
 import { PAGES_DIR } from "./snapshot.js";
@@ -118,6 +118,34 @@ const canonicalFile = (file: string): string => {
   const at = posix.lastIndexOf(marker);
   return at >= 0 ? posix.slice(at) : posix;
 };
+
+/** The path a COMMITTED ledger carries for a file: a capture by its published
+ *  `.ultra11y/pages/<id>/…` identity (`canonicalFile`), an ordinary source file relative to
+ *  the audited root, anything outside that root as it came.
+ *
+ *  A ledger travels — reviewed in a pull request, replayed on another machine — and the
+ *  engine's harvester hands out the paths it was given, absolute when `--cwd` or the inputs
+ *  were. Recorded as such, one ledger carried 196 `/home/runner/work/<repo>/<repo>/…` paths:
+ *  readable by nobody, and resolved by `replayLedger` only through the re-anchoring that
+ *  `canonicalFile` affords. The replay already keys everything on canonical paths and grounds
+ *  a citation with `resolve(cwd, file)`, so a relative path is what it wants to read back. */
+export function portableFile(file: string, root?: string): string {
+  const posix = file.replace(/\\/g, "/");
+  const canonical = canonicalFile(posix);
+  if (canonical !== posix) return canonical;
+  if (!root) return file;
+  const roots = new Set([resolve(root)]);
+  try {
+    roots.add(realpathSync(root));
+  } catch {
+    // A root that is not on disk relativises by its spelling alone.
+  }
+  for (const r of roots) {
+    const prefix = `${r.replace(/\\/g, "/").replace(/\/+$/, "")}/`;
+    if (posix.startsWith(prefix)) return posix.slice(prefix.length);
+  }
+  return file;
+}
 
 /** The line-independent identity of one piece of evidence: what the agent actually read. */
 const anchorKey = (e: { file: string; selector?: string; snippet?: string }) => {
@@ -348,10 +376,14 @@ export function writeLedger(path: string, ledger: VerdictLedger): void {
  *
  *  `applied` names the criteria whose verdict the fold ACCEPTED — a refused one must never
  *  reach the ledger, or the next replay would launder it back in. */
-export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>, date: string): LedgerEntry[] {
+export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>, date: string, root?: string): LedgerEntry[] {
   const out: LedgerEntry[] = [];
+  // Every path the entry persists goes through `portableFile`: the ledger is a committed,
+  // reviewed artefact, and the machine that recorded it is not the one that replays it.
+  const portable = <T extends { file: string }>(xs: T[]): T[] => xs.map((x) => ({ ...x, file: portableFile(x.file, root) }));
   for (const it of adj.items) {
     if (!accepted.has(it.criteriaId) || it.verdict === null) continue;
+    const citations = (it.citations ?? []).map(readCitation).filter((c): c is Evidence => c !== null);
     out.push({
       criteriaId: it.criteriaId,
       verdict: it.verdict,
@@ -359,12 +391,12 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
       ...(it.reason ? { reason: it.reason } : {}),
       // Normalised here too: a citation may have arrived as a bare "file:line" string, and a
       // ledger entry has to hold the object form so a replay can re-anchor and re-ground it.
-      ...(it.citations?.length ? { citations: it.citations.map(readCitation).filter((c): c is Evidence => c !== null) } : {}),
-      ...(it.findings?.length ? { findings: it.findings } : {}),
-      ...(it.recommendations?.length ? { recommendations: it.recommendations } : {}),
+      ...(citations.length ? { citations: portable(citations) } : {}),
+      ...(it.findings?.length ? { findings: portable(it.findings) } : {}),
+      ...(it.recommendations?.length ? { recommendations: portable(it.recommendations) } : {}),
       evidenceFingerprint: evidenceFingerprint(it.evidence),
       evidenceAnchors: evidenceAnchorsOf(it.evidence),
-      evidenceFiles: evidenceFilesOf(it.evidence),
+      evidenceFiles: [...new Set(evidenceFilesOf(it.evidence).map((f) => portableFile(f, root)))].sort(),
       evidenceCount: it.evidence.length,
       date,
       decidedBy: "agent",
