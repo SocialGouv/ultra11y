@@ -137,16 +137,51 @@ function resolvesRuntime(cwd: string, spec: string): boolean {
 /** Why the LOCAL tier is (un)usable from `cwd` — the one line a reader of a
  *  `runtime: auto` log gets before the Docker fallback takes over. A silent degrade is
  *  indistinguishable from a working fallback, so the reason must NAME what to install. */
-export type LocalTierStatus = { ok: true } | { ok: false; reason: string };
+export type LocalTierStatus = { ok: true; executable?: string } | { ok: false; reason: string; executable?: string };
+
+/** An explicit browser executable for the local tier — `scan --browser-path`,
+ *  `status --browser --browser-path`, or `ULTRA11Y_BROWSER_PATH`.
+ *
+ *  Playwright resolves its pinned headless shell, then its full Chromium build, then Google
+ *  Chrome at the vendor's install path. A distribution's Chromium — `/usr/bin/chromium` on
+ *  Debian, which is what a sandboxed runner image ships — is on none of those paths, so a
+ *  caller that already has a browser was told to download a second one. The path is an
+ *  EXPLICIT choice: it is launched as given and never replaced by a fallback, and a status
+ *  probe names it rather than the binary Playwright would have wanted. */
+export interface BrowserChoice {
+  browserPath?: string;
+}
+
+const BROWSER_PATH_SOURCES = "--browser-path / ULTRA11Y_BROWSER_PATH";
 
 /** The same probe as `localAvailable`, keeping the reason instead of collapsing it to a
  *  boolean. Drives the `runtime: auto` decision AND the message printed when it degrades
  *  to Docker. */
-export function localTierStatus(cwd: string): LocalTierStatus {
+export function localTierStatus(cwd: string, choice: BrowserChoice = {}): LocalTierStatus {
   for (const spec of [PW_SPEC, AXE_SPEC]) {
     if (!resolvesRuntime(cwd, spec)) {
       return { ok: false, reason: `${spec} resolves neither from ${cwd} nor from ultra11y itself` };
     }
+  }
+  if (choice.browserPath) {
+    // An explicit executable replaces Playwright's own resolution entirely: the only question
+    // left is whether the file is there. Playwright still drives it, hence the package check
+    // above stays. One `stat`, no launch — same budget as the default probe.
+    const executable = choice.browserPath;
+    let isFile = false;
+    try {
+      isFile = statSync(executable).isFile();
+    } catch {
+      isFile = false;
+    }
+    if (!isFile) {
+      return {
+        ok: false,
+        executable,
+        reason: `no browser binary at ${executable} (${BROWSER_PATH_SOURCES}) — install a browser there, or drop the path to let Playwright resolve its own`,
+      };
+    }
+    return { ok: true, executable };
   }
   try {
     const pw = requireRuntime(cwd, PW_SPEC) as { chromium?: { executablePath?: () => string } };
@@ -184,8 +219,8 @@ export function localTierStatus(cwd: string): LocalTierStatus {
  *  local` tests and the action's own crawl job switched themselves on in jobs that install no
  *  browser, and failed rather than degrading. `executablePath()` is a pure path computation, so
  *  this stays cheap: no launch, no download, one `stat`. */
-export function localAvailable(cwd: string): boolean {
-  return localTierStatus(cwd).ok;
+export function localAvailable(cwd: string, choice: BrowserChoice = {}): boolean {
+  return localTierStatus(cwd, choice).ok;
 }
 
 /** Load Playwright `chromium` + the `AxeBuilder` class from the target project. */
@@ -254,8 +289,27 @@ const MISSING_BROWSER = /Executable doesn'?t exist|playwright install|browserTyp
  *  the bundled full Chromium (`channel: "chromium"`), then the installed Google Chrome
  *  (`channel: "chrome"`), and say on stderr which one ran. Only when all three fail is it an
  *  error — and the error names the Playwright install that was resolved. */
-export async function launchChromium(chromium: Any, cwd = ".", warn: (msg: string) => void = (m) => console.error(m)): Promise<Any> {
+export async function launchChromium(
+  chromium: Any,
+  cwd = ".",
+  warn: (msg: string) => void = (m) => console.error(m),
+  choice: BrowserChoice = {},
+): Promise<Any> {
   const args = ["--no-sandbox", "--disable-dev-shm-usage"];
+  if (choice.browserPath) {
+    // The caller named the browser. Launch THAT one and nothing else: a fallback onto a
+    // channel would silently audit with a browser the caller did not choose, and the error
+    // that explains the refusal has to name the path the caller can fix.
+    try {
+      return await chromium.launch({ args, executablePath: choice.browserPath });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `Could not launch the browser at ${choice.browserPath} (${BROWSER_PATH_SOURCES}): ${msg.split("\n")[0]}. ` +
+          "An explicit browser is never replaced by another — fix the path, or drop it to let Playwright resolve its own.",
+      );
+    }
+  }
   let first: unknown;
   try {
     return await chromium.launch({ args });
@@ -853,6 +907,8 @@ export interface LocalScanOpts {
   interactClicks?: boolean;
   /** Repo root under which to persist `.ultra11y/pages/<id>/`. Unset ⇒ no snapshot. */
   snapshotRoot?: string;
+  /** Launch this browser executable instead of the one Playwright resolves — see BrowserChoice. */
+  browserPath?: string;
 }
 
 /** Run the dynamic tier locally over a single URL/file (no Docker). */
@@ -865,7 +921,7 @@ export async function runScanLocal(opts: LocalScanOpts): Promise<DynamicResult> 
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
-  const browser = await launchChromium(chromium, opts.cwd);
+  const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   try {
     const out = await runOnPage(browser, AxeBuilder, opts.target, isFile, {
       storageState: opts.storageState,
@@ -889,6 +945,8 @@ export interface LocalManyOpts {
   interactClicks?: boolean; // see LocalScanOpts.interactClicks
   /** Repo root under which to persist `.ultra11y/pages/<id>/`. Unset ⇒ no snapshot. */
   snapshotRoot?: string;
+  /** Launch this browser executable instead of the one Playwright resolves — see BrowserChoice. */
+  browserPath?: string;
 }
 
 /** Run the local dynamic tier over many URLs (one browser, one context per page). */
@@ -896,7 +954,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
-  const browser = await launchChromium(chromium, opts.cwd);
+  const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
   // Kept so the run-level coverage stamp can be built from what each page ACTUALLY measured
@@ -992,7 +1050,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
-  const browser = await launchChromium(chromium, opts.cwd);
+  const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
   // Kept so the run-level coverage stamp can be built from what each page ACTUALLY measured

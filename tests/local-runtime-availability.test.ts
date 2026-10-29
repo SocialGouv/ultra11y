@@ -156,3 +156,86 @@ describe("launchChromium", () => {
     await expect(launchChromium(boom, ".", () => {})).rejects.toThrow(/has been closed/);
   });
 });
+
+// AN EXPLICIT BROWSER — `scan --browser-path`, `status --browser --browser-path`,
+// `ULTRA11Y_BROWSER_PATH`.
+//
+// Playwright resolves its pinned headless shell, its full Chromium, then Google Chrome at the
+// vendor's path. A distribution's Chromium (`/usr/bin/chromium` on Debian — what a sandboxed
+// runner image ships) is on none of them, and the launch fallback above cannot reach it either:
+// the caller was told to download a second browser to use the one it had. The path is an
+// explicit choice, so the two halves below are the contract: the probe answers about THAT file,
+// and the launch starts THAT file and nothing else.
+describe("an explicit browser executable (BrowserChoice)", () => {
+  it("makes the tier available on the named binary, whatever Playwright's own would be", () => {
+    // The pinned binary is absent (project(false)) and that no longer matters: the file the
+    // caller named is there, so the tier is usable — and the status says WHICH executable.
+    const root = project(false);
+    const named = join(root, "distro-chromium");
+    writeFileSync(named, "#!/bin/sh\n");
+    const s = localTierStatus(root, { browserPath: named });
+    expect(s.ok).toBe(true);
+    expect(s.executable).toBe(named);
+    expect(localAvailable(root, { browserPath: named })).toBe(true);
+  });
+
+  it("refuses a named binary that is not on disk, naming the path and the flag", () => {
+    // The opposite half: a present pinned browser (project(true)) must NOT rescue a wrong
+    // explicit path — the answer is about the caller's choice, never about a substitute.
+    const root = project(true);
+    const missing = join(root, "no-such-chromium");
+    const s = localTierStatus(root, { browserPath: missing });
+    expect(s.ok).toBe(false);
+    if (!s.ok) {
+      expect(s.reason).toContain(missing);
+      expect(s.reason).toMatch(/--browser-path/);
+      expect(s.executable).toBe(missing);
+    }
+    expect(localAvailable(root, { browserPath: missing })).toBe(false);
+  });
+
+  it("still needs the two packages: a browser alone is not a tier", () => {
+    const bare = mkdtempSync(join(tmpdir(), "u11y-bp-bare-"));
+    writeFileSync(join(bare, "package.json"), JSON.stringify({ name: "p", version: "1.0.0" }));
+    const named = join(bare, "chromium");
+    writeFileSync(named, "#!/bin/sh\n");
+    // Both packages resolve from ultra11y's own install here, so the tier IS usable on the
+    // named binary — the assertion that matters is that the answer never mentions the pinned
+    // binary Playwright would have wanted.
+    const s = localTierStatus(bare, { browserPath: named });
+    expect(s.ok).toBe(true);
+    expect(s.executable).toBe(named);
+  });
+
+  it("launches the named executable once, and never falls back on a channel", async () => {
+    const launches: { channel?: string; executablePath?: string }[] = [];
+    const chromium = {
+      launch: async (opts: { channel?: string; executablePath?: string }) => {
+        launches.push(opts);
+        return { browser: opts.executablePath ?? opts.channel ?? "default" };
+      },
+    };
+    const warned: string[] = [];
+    expect(await launchChromium(chromium, ".", (m) => warned.push(m), { browserPath: "/usr/bin/chromium" })).toEqual({ browser: "/usr/bin/chromium" });
+    expect(launches).toEqual([{ args: ["--no-sandbox", "--disable-dev-shm-usage"], executablePath: "/usr/bin/chromium" }]);
+    expect(warned).toEqual([]);
+  });
+
+  it("reports a failed explicit launch on the path the caller can fix, without trying another browser", async () => {
+    // Even a "missing browser" failure — the exact signature the default launch falls back
+    // on — stays an error here: a fallback would audit with a browser the caller did not
+    // choose, and say so only on stderr.
+    const calls: unknown[] = [];
+    const chromium = {
+      launch: async (opts: unknown) => {
+        calls.push(opts);
+        throw new Error("browserType.launch: Executable doesn't exist at /usr/bin/chromium");
+      },
+    };
+    const err = await launchChromium(chromium, ".", () => {}, { browserPath: "/usr/bin/chromium" }).catch((e: Error) => e);
+    expect(String(err)).toContain("/usr/bin/chromium");
+    expect(String(err)).toMatch(/--browser-path/);
+    expect(String(err)).toMatch(/never replaced/);
+    expect(calls).toHaveLength(1);
+  });
+});
