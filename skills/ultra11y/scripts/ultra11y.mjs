@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync9, writeFileSync as writeFileSync21, mkdirSync as mkdirSync18, existsSync as existsSync40, readFileSync as readFileSync35, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
-import { join as join53, relative as relative6, resolve as resolve18, sep as sep7, dirname as dirname20 } from "path";
+import { realpathSync as realpathSync8, writeFileSync as writeFileSync21, mkdirSync as mkdirSync18, existsSync as existsSync40, readFileSync as readFileSync35, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
+import { join as join53, relative as relative6, resolve as resolve17, sep as sep7, dirname as dirname20 } from "path";
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
@@ -66568,8 +66568,8 @@ function pruneRefuted(audit2, standard, items, lang = "en", untried = []) {
 
 // src/ledger.ts
 import { createHash as createHash6 } from "crypto";
-import { existsSync as existsSync24, mkdirSync as mkdirSync10, readFileSync as readFileSync21, realpathSync as realpathSync3, writeFileSync as writeFileSync11 } from "fs";
-import { dirname as dirname13, join as join35, resolve as resolve12 } from "path";
+import { existsSync as existsSync24, mkdirSync as mkdirSync10, readFileSync as readFileSync21, writeFileSync as writeFileSync11 } from "fs";
+import { dirname as dirname13, join as join35 } from "path";
 var LEDGER_DIR = ".ultra11y/verdicts";
 function ledgerPath(standard, root = ".") {
   return join35(root, LEDGER_DIR, `${standard}.json`);
@@ -66581,21 +66581,8 @@ var canonicalFile2 = (file) => {
   const at = posix3.lastIndexOf(marker);
   return at >= 0 ? posix3.slice(at) : posix3;
 };
-function portableFile(file, root) {
-  const posix3 = file.replace(/\\/g, "/");
-  const canonical = canonicalFile2(posix3);
-  if (canonical !== posix3) return canonical;
-  if (!root) return file;
-  const roots = /* @__PURE__ */ new Set([resolve12(root)]);
-  try {
-    roots.add(realpathSync3(root));
-  } catch {
-  }
-  for (const r of roots) {
-    const prefix2 = `${r.replace(/\\/g, "/").replace(/\/+$/, "")}/`;
-    if (posix3.startsWith(prefix2)) return posix3.slice(prefix2.length);
-  }
-  return file;
+function portableFile(file) {
+  return canonicalFile2(file.replace(/\\/g, "/"));
 }
 var anchorKey2 = (e) => {
   const file = canonicalFile2(e.file);
@@ -66699,9 +66686,9 @@ function writeLedger(path, ledger) {
   writeFileSync11(path, `${JSON.stringify(sorted, null, 2)}
 `);
 }
-function entriesFrom(adj, accepted, date, root) {
+function entriesFrom(adj, accepted, date) {
   const out2 = [];
-  const portable = (xs) => xs.map((x) => ({ ...x, file: portableFile(x.file, root) }));
+  const portable = (xs) => xs.map((x) => ({ ...x, file: portableFile(x.file) }));
   for (const it of adj.items) {
     if (!accepted.has(it.criteriaId) || it.verdict === null) continue;
     const citations = (it.citations ?? []).map(readCitation).filter((c2) => c2 !== null);
@@ -66717,7 +66704,7 @@ function entriesFrom(adj, accepted, date, root) {
       ...it.recommendations?.length ? { recommendations: portable(it.recommendations) } : {},
       evidenceFingerprint: evidenceFingerprint(it.evidence),
       evidenceAnchors: evidenceAnchorsOf(it.evidence),
-      evidenceFiles: [...new Set(evidenceFilesOf(it.evidence).map((f) => portableFile(f, root)))].sort(),
+      evidenceFiles: evidenceFilesOf(it.evidence),
       evidenceCount: it.evidence.length,
       date,
       decidedBy: "agent"
@@ -67114,7 +67101,7 @@ var DEFAULT_CLI_MODEL = "claude-haiku-4-5-20251001";
 var EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
 var DEFAULT_TIMEOUT_MS2 = 10 * 6e4;
 function realSpawn(argv, input, timeoutMs) {
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve18, reject) => {
     const child = spawn2(argv[0], argv.slice(1), { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
@@ -67135,7 +67122,7 @@ function realSpawn(argv, input, timeoutMs) {
     });
     child.on("close", (code2) => {
       clearTimeout(timer);
-      resolve19({ code: code2, stdout, stderr, timedOut });
+      resolve18({ code: code2, stdout, stderr, timedOut });
     });
     child.stdin.end(input);
   });
@@ -67311,7 +67298,7 @@ var MAX_ATTEMPTS3 = 4;
 var CODEX_EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh"];
 var DEFAULT_CODEX_TIMEOUT_MS = 10 * 6e4;
 function realSpawn2(argv, input, timeoutMs) {
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve18, reject) => {
     const child = spawn3(argv[0], argv.slice(1), { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
@@ -67332,7 +67319,7 @@ function realSpawn2(argv, input, timeoutMs) {
     });
     child.on("close", (code2) => {
       clearTimeout(timer);
-      resolve19({ code: code2, stdout, stderr, timedOut });
+      resolve18({ code: code2, stdout, stderr, timedOut });
     });
     child.stdin.end(input);
   });
@@ -67451,7 +67438,7 @@ WORKLIST
 
 ${worklist}`;
 }
-var sleep3 = (ms) => ms <= 0 ? Promise.resolve() : new Promise((resolve19) => setTimeout(resolve19, ms));
+var sleep3 = (ms) => ms <= 0 ? Promise.resolve() : new Promise((resolve18) => setTimeout(resolve18, ms));
 function transient(message) {
   return /429|rate.?limit|overload|temporar|try again|service unavailable|\b5\d\d\b/i.test(message);
 }
@@ -67514,7 +67501,7 @@ async function refuteBatchCodex(items, prompt, opts, lang = "en") {
 import { execFileSync as execFileSync6 } from "child_process";
 import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync13, existsSync as existsSync28, statSync as statSync14, readdirSync as readdirSync6, rmSync as rmSync5, readFileSync as readFileSync23 } from "fs";
 import { tmpdir as tmpdir3 } from "os";
-import { join as join38, resolve as resolve13 } from "path";
+import { join as join38, resolve as resolve12 } from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
 
 // src/crawl.ts
@@ -68000,7 +67987,7 @@ function runRunner(target, isFile, tag, snapshot = true) {
   const hostTarget = target;
   const args2 = ["run", "--rm"];
   if (!snapshot) args2.push("-e", "ULTRA11Y_SNAPSHOT=0");
-  if (isFile) args2.push("-v", `${resolve13(target)}:${MOUNT}:ro`);
+  if (isFile) args2.push("-v", `${resolve12(target)}:${MOUNT}:ro`);
   else {
     const gw = loopbackToHostGateway(target);
     if (gw.addHost && process.platform === "linux") {
@@ -68390,9 +68377,9 @@ function mergeSnapshotAudit(base, snap) {
 }
 
 // src/scan-local.ts
-import { existsSync as existsSync29, realpathSync as realpathSync4, statSync as statSync15 } from "fs";
+import { existsSync as existsSync29, realpathSync as realpathSync3, statSync as statSync15 } from "fs";
 import { createRequire } from "module";
-import { dirname as dirname15, join as join39, resolve as resolve14 } from "path";
+import { dirname as dirname15, join as join39, resolve as resolve13 } from "path";
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 function localTestedScs(interact) {
@@ -68407,7 +68394,7 @@ function measuredScs(outs, interact) {
 var PW_SPEC = "@playwright/test";
 var AXE_SPEC = "@axe-core/playwright";
 function resolveAnchors(cwd) {
-  return [resolve14(cwd, "package.json"), import.meta.url];
+  return [resolve13(cwd, "package.json"), import.meta.url];
 }
 function requireRuntime(cwd, spec) {
   let last;
@@ -68494,9 +68481,9 @@ function resolvedPlaywright(cwd) {
 }
 var realDir = (dir) => {
   try {
-    return realpathSync4(dir);
+    return realpathSync3(dir);
   } catch {
-    return resolve14(dir);
+    return resolve13(dir);
   }
 };
 var MISSING_BROWSER = /Executable doesn'?t exist|playwright install|browserType\.launch/i;
@@ -68522,7 +68509,7 @@ async function launchChromium(chromium, cwd = ".", warn = (m) => console.error(m
   const msg = first instanceof Error ? first.message : String(first);
   const pw = resolvedPlaywright(cwd);
   const which = pw ? `${PW_SPEC}${pw.version ? `@${pw.version}` : ""} resolved at ${pw.path}` : `${PW_SPEC} (resolution path unknown)`;
-  const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve14(cwd)) : false;
+  const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve13(cwd)) : false;
   const cliJs = pw ? join39(dirname15(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
   throw new Error(
     `Could not launch Chromium: the browser for ${which} is not installed, and no installed Google Chrome was found either. Install the browser for THAT Playwright \u2014 \`node ${cliJs} install chromium\`${own ? " (this is ultra11y's own Playwright, not the audited project's)" : ""} \u2014 or install Google Chrome, or use --runtime docker. (${msg.split("\n")[0]})`
@@ -68709,7 +68696,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
   const page = await context.newPage();
   const empty = [];
   try {
-    const url = isFile ? "file://" + resolve14(target) : target;
+    const url = isFile ? "file://" + resolve13(target) : target;
     const response = await page.goto(url, { waitUntil: "load", timeout: 45e3 });
     await page.waitForLoadState("networkidle", { timeout: 8e3 }).catch(() => {
     });
@@ -68976,7 +68963,7 @@ async function runSampleScanLocal(pages, opts) {
         });
         continue;
       }
-      const requestedUrl = isFile ? "file://" + resolve14(page.url) : page.url;
+      const requestedUrl = isFile ? "file://" + resolve13(page.url) : page.url;
       const landedUrl = out2.landedUrl ?? out2.url;
       if (!landedOnRequestedPage(requestedUrl, landedUrl)) {
         redirected.push({ id: page.id, name: page.name, requested: page.url, landed: landedUrl, reason: "redirect" });
@@ -69514,7 +69501,7 @@ function fixSummary(r, lang = "fr", write = false, standard = CORE2) {
 }
 
 // src/init.ts
-import { writeFileSync as writeFileSync15, mkdirSync as mkdirSync11, chmodSync as chmodSync2, realpathSync as realpathSync5 } from "fs";
+import { writeFileSync as writeFileSync15, mkdirSync as mkdirSync11, chmodSync as chmodSync2, realpathSync as realpathSync4 } from "fs";
 import { execFileSync as execFileSync7 } from "child_process";
 import { join as join40, relative as relative5, sep as sep4 } from "path";
 var EN_SEV = { bloquant: "blocking", majeur: "major", mineur: "minor" };
@@ -69528,7 +69515,7 @@ function repoRoot() {
 function resolveEnginePath(root) {
   const argv1 = process.argv[1] ?? "scripts/ultra11y.mjs";
   try {
-    const abs = realpathSync5(argv1);
+    const abs = realpathSync4(argv1);
     return abs.startsWith(root + sep4) ? relative5(root, abs) : abs;
   } catch {
     return argv1;
@@ -69842,7 +69829,7 @@ import { existsSync as existsSync33, readFileSync as readFileSync27 } from "fs";
 import { join as join43 } from "path";
 
 // src/install/paths.ts
-import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync32, mkdirSync as mkdirSync13, readFileSync as readFileSync26, realpathSync as realpathSync6, statSync as statSync16 } from "fs";
+import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync32, mkdirSync as mkdirSync13, readFileSync as readFileSync26, realpathSync as realpathSync5, statSync as statSync16 } from "fs";
 import { homedir as homedir2 } from "os";
 import { dirname as dirname17, join as join42 } from "path";
 function codexHome() {
@@ -69864,7 +69851,7 @@ function installedCliCommand() {
   const argv1 = process.argv[1];
   let source = null;
   try {
-    if (argv1) source = realpathSync6(argv1);
+    if (argv1) source = realpathSync5(argv1);
   } catch {
   }
   const ephemeral = !source || /[/\\](?:_npx|\.npm[/\\]_npx|npm-cache|Temp|tmp)[/\\]/.test(source);
@@ -69879,7 +69866,7 @@ function installedCliCommand() {
 function packageRoot() {
   let dir;
   try {
-    dir = dirname17(realpathSync6(process.argv[1] ?? ""));
+    dir = dirname17(realpathSync5(process.argv[1] ?? ""));
   } catch {
     return null;
   }
@@ -72667,10 +72654,10 @@ function startDevServer(opts) {
     }
     res.writeHead(404, { "content-type": "text/plain" }).end("not found");
   });
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve18, reject) => {
     server.once("error", reject);
     server.listen(opts.port, "127.0.0.1", () => {
-      resolve19({
+      resolve18({
         port: server.address().port,
         close: () => new Promise((r) => server.close(() => r()))
       });
@@ -72959,7 +72946,7 @@ function e2eSetupPlan(runners, paths, lang = "en") {
 
 // src/orchestrate.ts
 import { existsSync as existsSync37, mkdirSync as mkdirSync17, readFileSync as readFileSync32, rmSync as rmSync9, writeFileSync as writeFileSync20 } from "fs";
-import { join as join50, resolve as resolve15 } from "path";
+import { join as join50, resolve as resolve14 } from "path";
 
 // src/orchestrate-templates.ts
 import { join as join49 } from "path";
@@ -73243,7 +73230,7 @@ var PHASES = ["adjudicate", "verify-report"];
 var SMALL_WORKLIST = 3;
 var BATCH_SIZE2 = 8;
 function listPhases(runDir, engineAbs) {
-  const run2 = resolve15(runDir);
+  const run2 = resolve14(runDir);
   const adjPath = join50(run2, "ADJUDICATE.todo.json");
   let adjIds = [];
   let adjReady = false;
@@ -73299,7 +73286,7 @@ function unrenderedInRun(run2) {
   }
 }
 function orchestrateRun(runDir, engineAbs, opts = {}) {
-  const run2 = resolve15(runDir);
+  const run2 = resolve14(runDir);
   if (!existsSync37(run2)) {
     return { exitCode: 2, written: [], notices: [], errors: [`run dir not found: ${run2}`], phases: [] };
   }
@@ -73371,8 +73358,8 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
 import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
-import { existsSync as existsSync38, readFileSync as readFileSync33, realpathSync as realpathSync7, statSync as statSync18 } from "fs";
-import { isAbsolute as isAbsolute4, join as join51, resolve as resolve16, sep as sep5 } from "path";
+import { existsSync as existsSync38, readFileSync as readFileSync33, realpathSync as realpathSync6, statSync as statSync18 } from "fs";
+import { isAbsolute as isAbsolute4, join as join51, resolve as resolve15, sep as sep5 } from "path";
 
 // src/criteria-view.ts
 var CriteriaLookupError = class extends Error {
@@ -73855,7 +73842,7 @@ function positive(v, key2) {
 function requiredCwd(args2, defaults) {
   const cwd = str2(args2.cwd) ?? defaults.defaultCwd;
   if (!cwd) throw new ToolError("`cwd` is required: an absolute path to the project root.");
-  const abs = resolve16(cwd);
+  const abs = resolve15(cwd);
   if (!existsSync38(abs)) throw new ToolError(`project root not found: ${abs}`);
   if (!statSync18(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
   return abs;
@@ -74183,7 +74170,7 @@ function handleInit(args2, cwd) {
     throw new ToolError(`\`fail_on\` must be one of: error, warning, notice (got "${failOnRaw}")`);
   }
   const failOn = failOnRaw;
-  const enginePath = resolve16("scripts/ultra11y.mjs");
+  const enginePath = resolve15("scripts/ultra11y.mjs");
   const written = [];
   if (bool(args2.hook)) written.push(writeHook(cwd, enginePath, failOn));
   if (bool(args2.ci)) written.push(join51(cwd, ".github/workflows/a11y.yml"));
@@ -74281,11 +74268,11 @@ function handleRead(args2, cwd) {
   const target = isAbsolute4(raw) ? raw : join51(cwd, raw);
   let real;
   try {
-    real = realpathSync7(target);
+    real = realpathSync6(target);
   } catch {
     throw new ToolError(`no such file: ${raw}`);
   }
-  const root = realpathSync7(cwd);
+  const root = realpathSync6(cwd);
   if (real !== root && !real.startsWith(root + sep5)) {
     throw new ToolError(`path is outside the project: ${raw}. Use your own file tool for anything else.`);
   }
@@ -74947,14 +74934,14 @@ function str3(v) {
 var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
-import { existsSync as existsSync39, readdirSync as readdirSync7, readFileSync as readFileSync34, realpathSync as realpathSync8, statSync as statSync19 } from "fs";
-import { basename as basename4, dirname as dirname19, join as join52, resolve as resolve17, sep as sep6 } from "path";
+import { existsSync as existsSync39, readdirSync as readdirSync7, readFileSync as readFileSync34, realpathSync as realpathSync7, statSync as statSync19 } from "fs";
+import { basename as basename4, dirname as dirname19, join as join52, resolve as resolve16, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 var SKILL_NAME = "ultra11y";
 var URI_SCHEME = "skill://";
 function resolveSkillRoot(moduleDir) {
   const here = moduleDir ?? dirname19(fileURLToPath4(import.meta.url));
-  const candidates2 = [resolve17(here, ".."), resolve17(here, "..", "skills", SKILL_NAME), resolve17(here, "..", "..", "skills", SKILL_NAME)];
+  const candidates2 = [resolve16(here, ".."), resolve16(here, "..", "skills", SKILL_NAME), resolve16(here, "..", "..", "skills", SKILL_NAME)];
   return candidates2.find((dir) => existsSync39(join52(dir, "SKILL.md")));
 }
 function listResources(moduleDir) {
@@ -74977,11 +74964,11 @@ function readResource(uri, moduleDir) {
   if (!root) throw new ResourceError("no skill payload found next to this build \u2014 nothing to read");
   const rel2 = uri.slice(URI_SCHEME.length);
   if (!rel2) throw new ResourceError("empty resource path");
-  const target = resolve17(root, rel2);
-  const rootReal = realpathSync8(root);
+  const target = resolve16(root, rel2);
+  const rootReal = realpathSync7(root);
   let targetReal;
   try {
-    targetReal = realpathSync8(target);
+    targetReal = realpathSync7(target);
   } catch {
     throw new ResourceError(`no such resource: ${uri}`);
   }
@@ -75389,14 +75376,14 @@ function startHttpServer(opts = {}) {
   server.requestTimeout = 0;
   server.headersTimeout = 6e4;
   server.keepAliveTimeout = 12e4;
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve18, reject) => {
     server.once("error", reject);
     server.listen(opts.port ?? 0, bind, () => {
       server.removeListener("error", reject);
       const addr2 = server.address();
       const port = typeof addr2 === "object" && addr2 ? addr2.port : opts.port ?? 0;
       const host = bind.includes(":") ? `[${bind}]` : bind;
-      resolve19({
+      resolve18({
         server,
         port,
         url: `http://${host}:${port}${MCP_PATH}`,
@@ -75505,7 +75492,7 @@ function sendJson(res, status, body3, origin, extra = {}) {
 }
 var DRAIN_LIMIT = MAX_BODY_BYTES * 8;
 function readBody2(req) {
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve18, reject) => {
     const chunks = [];
     let size = 0;
     let over = false;
@@ -75529,7 +75516,7 @@ function readBody2(req) {
     });
     req.on("end", () => {
       if (over) reject(new Error("too large"));
-      else resolve19(Buffer.concat(chunks).toString("utf8"));
+      else resolve18(Buffer.concat(chunks).toString("utf8"));
     });
     req.on("error", reject);
     req.on("aborted", () => reject(new Error("client aborted the request")));
@@ -76564,9 +76551,9 @@ async function cmdDev(p) {
   }
   console.error(fr ? `ultra11y dev : tableau de bord sur http://127.0.0.1:${server.port}` : `ultra11y dev: dashboard on http://127.0.0.1:${server.port}`);
   console.error(fr ? "Boucle locale uniquement (l'outil \xE9crit des fichiers). Ctrl-C pour arr\xEAter." : "Loopback only (the tool writes files). Ctrl-C to stop.");
-  await new Promise((resolve19) => {
+  await new Promise((resolve18) => {
     const stop2 = () => {
-      void server.close().then(resolve19);
+      void server.close().then(resolve18);
     };
     process.once("SIGINT", stop2);
     process.once("SIGTERM", stop2);
@@ -77380,7 +77367,7 @@ function depsAt(root) {
 function engineRefFor(root) {
   let ref = process.argv[1] ?? "scripts/ultra11y.mjs";
   try {
-    const abs = realpathSync9(ref);
+    const abs = realpathSync8(ref);
     ref = abs.startsWith(root + sep7) ? relative6(root, abs) : abs;
   } catch {
   }
@@ -78085,7 +78072,7 @@ function applyAdjudicationFile(p, adj, lang) {
       );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
-    const fresh = entriesFrom(adj, accepted, r.audit.date, cwd ?? process.cwd());
+    const fresh = entriesFrom(adj, accepted, r.audit.date);
     writeLedger(ledgerOut, mergeLedger(readLedger(ledgerOut), adj.standard, fresh));
     if (!p.flags.json)
       console.log(
@@ -78409,7 +78396,7 @@ async function cmdJudge(p) {
       );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
-    const fresh = entriesFrom(adj, accepted, r.audit.date, cwd ?? process.cwd());
+    const fresh = entriesFrom(adj, accepted, r.audit.date);
     writeLedger(ledgerOut, mergeLedger(readLedger(ledgerOut), adj.standard, fresh));
     console.log(
       lang === "fr" ? `\u2713 ${fresh.length} verdict(s) enregistr\xE9(s) au registre \u2192 ${ledgerOut}` : `\u2713 ${fresh.length} verdict(s) recorded in the ledger \u2192 ${ledgerOut}`
@@ -78476,7 +78463,7 @@ Iterated over ${rounds} round(s) to a fixpoint \u2014 ${totalWritten} file(s) wr
 }
 function scanSnapshotRoot(flags2) {
   if (flags2["no-snapshot"] === true) return void 0;
-  return typeof flags2.root === "string" && flags2.root ? resolve18(flags2.root) : process.cwd();
+  return typeof flags2.root === "string" && flags2.root ? resolve17(flags2.root) : process.cwd();
 }
 async function cmdScan(p) {
   const standard = stdOf(p, "scan");
@@ -79056,7 +79043,7 @@ function cmdOrchestrate(p) {
     );
     return 2;
   }
-  const engineAbs = realpathSync9(fileURLToPath5(import.meta.url));
+  const engineAbs = realpathSync8(fileURLToPath5(import.meta.url));
   if (p.flags.list === true) {
     if (!existsSync40(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
@@ -79141,7 +79128,7 @@ async function main(argv) {
     if (typeof v === "string" && v && !allowed.includes(v)) console.error(`ultra11y: --${flag} "${v}" is not one of ${allowed.join("|")} \u2014 using the default.`);
   }
   const packList = typeof p.flags.pack === "string" ? p.flags.pack.split(",").map((s) => s.trim()).filter(Boolean) : [];
-  const configRoot = p.command === "mcp" && typeof p.flags.cwd === "string" && p.flags.cwd ? resolve18(p.flags.cwd) : process.cwd();
+  const configRoot = p.command === "mcp" && typeof p.flags.cwd === "string" && p.flags.cwd ? resolve17(p.flags.cwd) : process.cwd();
   const loaded2 = loadRuntimeStandards(configRoot, packList, (m) => console.error(m), p.flags.override === true);
   if (loaded2.errors.length) {
     for (const e of loaded2.errors) console.error(`ultra11y: ${e}`);
@@ -79207,7 +79194,7 @@ function isInvokedDirectly() {
   if (argv1 === void 0) return false;
   const modulePath = fileURLToPath5(import.meta.url);
   try {
-    if (realpathSync9(argv1) === realpathSync9(modulePath)) return true;
+    if (realpathSync8(argv1) === realpathSync8(modulePath)) return true;
   } catch {
   }
   return import.meta.url === pathToFileURL3(argv1).href;

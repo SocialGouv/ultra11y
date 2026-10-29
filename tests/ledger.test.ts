@@ -494,57 +494,62 @@ describe("the ledger on disk", () => {
   });
 });
 
-// A COMMITTED LEDGER CARRIES PORTABLE PATHS.
+// A COMMITTED LEDGER CARRIES PORTABLE CAPTURE PATHS.
 //
 // The harvester hands out the paths it was given — absolute when `--cwd` or the inputs were —
 // and `entriesFrom` recorded them as such. One ledger committed from a CI runner carried 196
 // `/home/runner/work/<repo>/<repo>/.ultra11y/pages/…/dom.html` citations: readable by nobody,
-// replayable only through the canonical re-anchoring. The replay keys everything on canonical
-// paths and grounds a citation with `resolve(cwd, file)`, so a relative path is exactly what
-// it reads back.
+// all of them captures. `canonicalFile` is already the identity every reader keys on, so the
+// store now spells captures that way. Ordinary source files stay exactly as harvested: the
+// readers compare them lexically against today's harvest, and a store spelled differently
+// would stale, un-anchor and un-prune valid verdicts.
 describe("portableFile", () => {
   it("names a capture by its published .ultra11y/pages identity, wherever it was written", () => {
-    expect(portableFile(`/home/runner/work/x/x/${PAGES_DIR}/accueil/dom.html`, "/somewhere/else")).toBe(`${PAGES_DIR}/accueil/dom.html`);
     expect(portableFile(`/home/runner/work/x/x/${PAGES_DIR}/accueil/dom.html`)).toBe(`${PAGES_DIR}/accueil/dom.html`);
+    expect(portableFile(`C:\\runner\\x\\${PAGES_DIR}\\accueil\\dom.html`)).toBe(`${PAGES_DIR}/accueil/dom.html`);
   });
 
-  it("makes an ordinary source file relative to the audited root, and leaves the rest alone", () => {
-    const root = mkdtempSync(join(tmpdir(), "u11y-portable-"));
-    expect(portableFile(join(root, "src", "a.html"), root)).toBe("src/a.html");
-    expect(portableFile("/elsewhere/b.html", root)).toBe("/elsewhere/b.html");
-    expect(portableFile("src/a.html", root)).toBe("src/a.html");
-    expect(portableFile(join(root, "src", "a.html"))).toBe(join(root, "src", "a.html"));
+  it("leaves an ordinary source file exactly as harvested", () => {
+    expect(portableFile("/home/runner/work/x/x/src/a.html")).toBe("/home/runner/work/x/x/src/a.html");
+    expect(portableFile("src/a.html")).toBe("src/a.html");
   });
 });
 
-describe("entriesFrom writes portable paths", () => {
-  it("records every citation, finding and evidence file relative to the root, and replays them there", () => {
-    const f = page("portable.html");
+describe("entriesFrom writes portable capture paths", () => {
+  const snapshot = (root: string): string => {
+    const path = join(root, PAGES_DIR, "accueil", "dom.html");
+    mkdirSync(join(root, PAGES_DIR, "accueil"), { recursive: true });
+    writeFileSync(path, `<!-- ultra11y:capture v="1" page="accueil" url="https://example.test/" -->\n${PAGE_HTML}`);
+    return path;
+  };
+
+  it("records a capture's citations, findings and evidence files by their published identity, and replays them", () => {
+    const root = mkdtempSync(join(tmpdir(), "u11y-ledger-portable-"));
+    const f = snapshot(root);
     const audit = auditOf(f);
-    const adj = file(adjudicate(buildAdjudicationWorklist(audit)));
-    const r = applyAdjudication(audit, adj, { cwd: process.cwd() });
+    const adj = file(adjudicate(buildAdjudicationWorklist(audit, { cwd: root })));
+    const r = applyAdjudication(audit, adj, { cwd: root });
     const accepted = new Set(adj.items.map((i) => i.criteriaId).filter((id) => !r.rejectedCriteria.includes(id)));
-    const entries = entriesFrom(adj, accepted, audit.date, dir);
+    const entries = entriesFrom(adj, accepted, audit.date);
     expect(entries.length).toBeGreaterThan(0);
     const files = entries.flatMap((e) => [...(e.citations ?? []).map((c) => c.file), ...(e.findings ?? []).map((x) => x.file), ...(e.evidenceFiles ?? [])]);
     expect(files.length).toBeGreaterThan(0);
     expect(
       files.filter((p) => p.startsWith("/")),
-      "no absolute path survives in a committed ledger",
+      "no absolute capture path survives in a committed ledger",
     ).toEqual([]);
-    expect(new Set(files)).toEqual(new Set(["portable.html"]));
+    expect(new Set(files)).toEqual(new Set([`${PAGES_DIR}/accueil/dom.html`]));
 
-    // The round trip: the same ledger, replayed from that root, holds and grounds.
+    // The round trip: the same ledger replayed from that root holds and grounds.
     const ledger = mergeLedger(undefined, "wcag", entries);
-    const rp = replayLedger(auditOf(f), ledger, { cwd: dir });
-    const applied = applyAdjudication(auditOf(f), rp.adj, { cwd: dir, residualReasons: rp.residualReasons });
+    const rp = replayLedger(auditOf(f), ledger, { cwd: root });
+    const applied = applyAdjudication(auditOf(f), rp.adj, { cwd: root, residualReasons: rp.residualReasons });
     expect(rp.stale).toEqual([]);
     expect(applied.rejected).toBe(0);
-    // The ledger also records the deliberate `manual` verdicts; only the cleared ones fold.
     expect(applied.applied).toBe(entries.filter((e) => e.verdict !== "manual").length);
   });
 
-  it("keeps the recorded paths when no root is given — only captures are canonicalised", () => {
+  it("keeps an ordinary source file as harvested", () => {
     const f = page("as-given.html");
     const audit = auditOf(f);
     const adj = file(adjudicate(buildAdjudicationWorklist(audit)));
