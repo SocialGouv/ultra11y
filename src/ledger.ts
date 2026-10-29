@@ -368,7 +368,10 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
   const out: LedgerEntry[] = [];
   // Every path the entry persists goes through `portableFile`: the ledger is a committed,
   // reviewed artefact, and the machine that recorded it is not the one that replays it.
-  const portable = <T extends { file: string }>(xs: T[]): T[] => xs.map((x) => ({ ...x, file: portableFile(x.file) }));
+  // Only a string file is respelled. The fold validates a finding's `file` for an NC alone;
+  // findings an LLM attached to a C/NA/manual item reach here unvalidated, and the ledger
+  // recorded them as they came — a write must not crash on what it never checked.
+  const portable = <T extends { file?: unknown }>(xs: T[]): T[] => xs.map((x) => (typeof x.file === "string" ? { ...x, file: portableFile(x.file) } : x));
   for (const it of adj.items) {
     if (!accepted.has(it.criteriaId) || it.verdict === null) continue;
     const citations = (it.citations ?? []).map(readCitation).filter((c): c is Evidence => c !== null);

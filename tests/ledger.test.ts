@@ -21,6 +21,9 @@ import { PAGES_DIR } from "../src/snapshot.js";
 
 const dir = mkdtempSync(join(tmpdir(), "u11y-ledger-"));
 
+/** The shape `entriesFrom` persists for a finding — only its presence matters below. */
+type AgentFindingLike = AdjudicationItem["findings"][number];
+
 const PAGE_HTML = `<!doctype html>
 <html lang="en">
 <head><title>Shop</title></head>
@@ -547,6 +550,24 @@ describe("entriesFrom writes portable capture paths", () => {
     expect(rp.stale).toEqual([]);
     expect(applied.rejected).toBe(0);
     expect(applied.applied).toBe(entries.filter((e) => e.verdict !== "manual").length);
+  });
+
+  it("writes an accepted item whose extra finding has no file, as the fold left it", () => {
+    // The fold validates a finding's `file` for an NC alone; an LLM may attach a finding to a
+    // C item, which the fold ignores and the ledger records as it came. The write must not
+    // crash on a field nobody checked.
+    const f = page("loose-finding.html");
+    const audit = auditOf(f);
+    const items = adjudicate(buildAdjudicationWorklist(audit)).map((i) =>
+      i.verdict === "C" ? { ...i, findings: [{ criteriaId: i.criteriaId, line: 1, message: "noted", normativeRef: "x" } as unknown as AgentFindingLike] } : i,
+    );
+    const adj = file(items);
+    const r = applyAdjudication(audit, adj, { cwd: process.cwd() });
+    const accepted = new Set(adj.items.map((i) => i.criteriaId).filter((id) => !r.rejectedCriteria.includes(id)));
+    const entries = entriesFrom(adj, accepted, audit.date);
+    const loose = entries.find((e) => e.verdict === "C" && e.findings?.length);
+    expect(loose, "the C item with the loose finding is recorded").toBeDefined();
+    expect(loose?.findings?.[0]).not.toHaveProperty("file");
   });
 
   it("keeps an ordinary source file as harvested", () => {
