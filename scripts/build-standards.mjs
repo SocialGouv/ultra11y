@@ -20,6 +20,7 @@ import { writeFileSync, readFileSync, readdirSync, existsSync, mkdirSync } from 
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sameButForTheDate, withPreviousStamp } from "./vendor-stamp.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(root, "src", "data");
@@ -228,7 +229,8 @@ async function deriveUniverse() {
     criteria,
   };
   mkdirSync(dirname(VENDOR_UNIVERSE), { recursive: true });
-  writeFileSync(VENDOR_UNIVERSE, JSON.stringify(universe, null, 2) + "\n");
+  // The dated provenance sentence is the stamp here: kept as committed when the universe is unchanged.
+  writeFileSync(VENDOR_UNIVERSE, JSON.stringify(withPreviousStamp(VENDOR_UNIVERSE, universe, { stamp: "provenance", sameStamp: sameButForTheDate }), null, 2) + "\n");
   console.log(`build-standards --refresh-universe: ${criteria.length} SCs (all levels) derived → ${VENDOR_UNIVERSE}`);
   return universe;
 }
@@ -414,7 +416,7 @@ async function deriveFr() {
     glossary,
   };
   mkdirSync(dirname(VENDOR_FR), { recursive: true });
-  writeFileSync(VENDOR_FR, JSON.stringify(out, null, 2) + "\n");
+  writeFileSync(VENDOR_FR, JSON.stringify(withPreviousStamp(VENDOR_FR, out), null, 2) + "\n");
   console.log(
     `build-standards --refresh-fr: ${Object.keys(criteria).length} SC + ${Object.keys(guidelines).length} guideline + ${Object.keys(principles).length} principle French titles, ` +
       `${Object.keys(criteriaText).length} SC bodies, ${Object.keys(glossary).length} glossary terms → ${VENDOR_FR}`,
@@ -608,7 +610,7 @@ async function deriveText() {
     glossary,
   };
   mkdirSync(dirname(VENDOR_TEXT), { recursive: true });
-  writeFileSync(VENDOR_TEXT, JSON.stringify(out, null, 2) + "\n");
+  writeFileSync(VENDOR_TEXT, JSON.stringify(withPreviousStamp(VENDOR_TEXT, out), null, 2) + "\n");
   console.log(`build-standards --refresh-text: ${Object.keys(criteria).length} SC texts + ${Object.keys(glossary).length} glossary terms → ${VENDOR_TEXT}`);
   return out;
 }
