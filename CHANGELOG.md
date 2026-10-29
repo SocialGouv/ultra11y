@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.49.1](https://github.com/SocialGouv/ultra11y/compare/v5.49.0...v5.49.1) (2026-10-29)
+
+
+### Bug Fixes
+
+* **ledger:** record citations and evidence files as paths a committed ledger can carry ([#80](https://github.com/SocialGouv/ultra11y/issues/80)) ([c91dbd8](https://github.com/SocialGouv/ultra11y/commit/c91dbd8b3b4cc808206deed83bdebb1792a6fbd9)), closes [#85](https://github.com/SocialGouv/ultra11y/issues/85)
+* **mcp:** ultra11y_init writes a --fail-on token the CLI accepts ([#78](https://github.com/SocialGouv/ultra11y/issues/78)) ([fe85d32](https://github.com/SocialGouv/ultra11y/commit/fe85d3234274990a6539b953f0a69bb2adaccace))
+
 # [5.49.0](https://github.com/SocialGouv/ultra11y/compare/v5.48.0...v5.49.0) (2026-10-29)
 
 

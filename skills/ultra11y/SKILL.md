@@ -3,7 +3,7 @@ name: ultra11y
 description: "Use to AUDIT a site, repository, or page against RGAA 4.1.2, the French State's accessibility standard (référentiel de l'État), on a WCAG 2.2 AA core (other country standards as packs); produce a dated conformance report, criterion grid, PRD backlog, or tickets; AUTHOR accessible markup; fix accessibility; or wire a repo gate and rendered-DOM capture pipeline. The bundled install-free engine runs 95 static checks tied to success criteria, while the agent adjudicates judgment criteria and routes rendering criteria to browser scans; check/verify reject invented non-conformities and never declare conforming what was not verified. Use `review-a11y` instead for a review scoped only to a diff, branch, or PR."
 license: MIT
 metadata:
-  version: 5.49.0
+  version: 5.49.1
 ---
 
 # ultra11y — audit WCAG 2.2 AA and write accessible markup
