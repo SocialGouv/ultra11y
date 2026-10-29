@@ -66688,7 +66688,7 @@ function writeLedger(path, ledger) {
 }
 function entriesFrom(adj, accepted, date) {
   const out2 = [];
-  const portable = (xs) => xs.map((x) => ({ ...x, file: portableFile(x.file) }));
+  const portable = (xs) => xs.map((x) => typeof x.file === "string" ? { ...x, file: portableFile(x.file) } : x);
   for (const it of adj.items) {
     if (!accepted.has(it.criteriaId) || it.verdict === null) continue;
     const citations = (it.citations ?? []).map(readCitation).filter((c2) => c2 !== null);
