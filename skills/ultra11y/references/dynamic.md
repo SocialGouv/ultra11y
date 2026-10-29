@@ -14,6 +14,12 @@ content on hover (1.4.13), target size (2.5.8). The dynamic tier decides them by
   Dockerfile embedded in the bundle). No host deps beyond Docker. Axe + 320px reflow only.
 - **`--runtime auto`** (default): local if Playwright resolves **and** a browser binary is on
   disk, else Docker, else an actionable error.
+- **`--browser-path <file>`** (or `ULTRA11Y_BROWSER_PATH`): launch **this** executable with the
+  local runtime instead of the browser Playwright resolves — a distribution's Chromium
+  (`/usr/bin/chromium` on Debian, what a sandboxed runner image ships), which Playwright's own
+  resolution and its Google Chrome fallback never find. It is an explicit choice: the engine
+  launches that file and nothing else, and `status --browser --browser-path <file>` answers
+  about that file (`ok` + `executable`, or a reason naming the path).
 
 ## Prerequisites
 
@@ -45,6 +51,10 @@ node scripts/ultra11y.mjs scan https://example.com --json
 
 # explicit local runtime, resolving deps + browser from a project (e.g. a monorepo package)
 node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd packages/app --json
+
+# a browser already on the machine (a distribution's Chromium), never downloaded by Playwright
+node scripts/ultra11y.mjs status --browser --cwd . --browser-path /usr/bin/chromium --json
+node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd . --browser-path /usr/bin/chromium --json
 
 # authenticated pages: pass a Playwright storageState JSON (cookies/localStorage)
 node scripts/ultra11y.mjs scan http://localhost:3000/dashboard --runtime local \

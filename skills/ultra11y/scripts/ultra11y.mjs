@@ -68417,11 +68417,29 @@ function resolvesRuntime(cwd, spec) {
     }
   });
 }
-function localTierStatus(cwd) {
+var BROWSER_PATH_SOURCES = "--browser-path / ULTRA11Y_BROWSER_PATH";
+function localTierStatus(cwd, choice = {}) {
   for (const spec of [PW_SPEC, AXE_SPEC]) {
     if (!resolvesRuntime(cwd, spec)) {
       return { ok: false, reason: `${spec} resolves neither from ${cwd} nor from ultra11y itself` };
     }
+  }
+  if (choice.browserPath) {
+    const executable = choice.browserPath;
+    let isFile = false;
+    try {
+      isFile = statSync15(executable).isFile();
+    } catch {
+      isFile = false;
+    }
+    if (!isFile) {
+      return {
+        ok: false,
+        executable,
+        reason: `no browser binary at ${executable} (${BROWSER_PATH_SOURCES}) \u2014 install a browser there, or drop the path to let Playwright resolve its own`
+      };
+    }
+    return { ok: true, executable };
   }
   try {
     const pw = requireRuntime(cwd, PW_SPEC);
@@ -68439,8 +68457,8 @@ function localTierStatus(cwd) {
     return { ok: false, reason: `${PW_SPEC} failed to load: ${e.message.split("\n")[0]}` };
   }
 }
-function localAvailable(cwd) {
-  return localTierStatus(cwd).ok;
+function localAvailable(cwd, choice = {}) {
+  return localTierStatus(cwd, choice).ok;
 }
 function resolveLocalDeps(cwd) {
   let chromium;
@@ -68487,8 +68505,18 @@ var realDir = (dir) => {
   }
 };
 var MISSING_BROWSER = /Executable doesn'?t exist|playwright install|browserType\.launch/i;
-async function launchChromium(chromium, cwd = ".", warn = (m) => console.error(m)) {
+async function launchChromium(chromium, cwd = ".", warn = (m) => console.error(m), choice = {}) {
   const args2 = ["--no-sandbox", "--disable-dev-shm-usage"];
+  if (choice.browserPath) {
+    try {
+      return await chromium.launch({ args: args2, executablePath: choice.browserPath });
+    } catch (e) {
+      const msg2 = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `Could not launch the browser at ${choice.browserPath} (${BROWSER_PATH_SOURCES}): ${msg2.split("\n")[0]}. An explicit browser is never replaced by another \u2014 fix the path, or drop it to let Playwright resolve its own.`
+      );
+    }
+  }
   let first;
   try {
     return await chromium.launch({ args: args2 });
@@ -68854,7 +68882,7 @@ async function runScanLocal(opts) {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
-  const browser = await launchChromium(chromium, opts.cwd);
+  const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   try {
     const out2 = await runOnPage(browser, AxeBuilder, opts.target, isFile, {
       storageState: opts.storageState,
@@ -68873,7 +68901,7 @@ async function runScanManyLocal(urls, opts) {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
-  const browser = await launchChromium(chromium, opts.cwd);
+  const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   const findings = [];
   const snapshots = [];
   const outs = [];
@@ -68934,7 +68962,7 @@ async function runSampleScanLocal(pages, opts) {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
-  const browser = await launchChromium(chromium, opts.cwd);
+  const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   const findings = [];
   const snapshots = [];
   const outs = [];
@@ -75909,6 +75937,9 @@ Options:
   --docker           scan: alias of --runtime docker (built on first use)
   --cwd <dir>        scan: --runtime local resolves @playwright/test + @axe-core/playwright
                      (and the browser) from here (e.g. --cwd packages/app)
+  --browser-path <file>  scan / status --browser: launch THIS browser executable (e.g. a
+                     distribution's /usr/bin/chromium) instead of the one Playwright resolves.
+                     Explicit: never replaced by a fallback. Env: ULTRA11Y_BROWSER_PATH
   --storage-state <file>  scan: --runtime local \u2014 Playwright storageState JSON for
                      authenticated pages (e.g. test-results/.auth/user.json)
   --no-interact      scan: --runtime local \u2014 disable the STATEFUL probes (fill inputs,
@@ -76068,6 +76099,9 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "guidance",
   "runtime",
   "cwd",
+  // `scan` / `status --browser`: an explicit browser executable (a distribution's Chromium),
+  // launched as given and never replaced by Playwright's fallbacks. Env: ULTRA11Y_BROWSER_PATH.
+  "browser-path",
   "storage-state",
   "captures",
   "run",
@@ -77013,9 +77047,14 @@ function reportInstall(results, verb) {
   }
   return failed2 ? 1 : 0;
 }
+function browserPathOf(flags2, env = process.env) {
+  if (typeof flags2["browser-path"] === "string" && flags2["browser-path"]) return flags2["browser-path"];
+  const fromEnv = env.ULTRA11Y_BROWSER_PATH;
+  return typeof fromEnv === "string" && fromEnv.trim() ? fromEnv.trim() : void 0;
+}
 function cmdStatus(p) {
   const rows = statusReport({ project: p.flags.project === true });
-  const browser = p.flags.browser === true ? localTierStatus(typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : ".") : void 0;
+  const browser = p.flags.browser === true ? localTierStatus(typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : ".", { browserPath: browserPathOf(p.flags) }) : void 0;
   if (p.flags.json === true) {
     console.log(JSON.stringify({ version: VERSION, targets: rows, ...browser ? { browser } : {} }, null, 2));
     return 0;
@@ -78486,6 +78525,7 @@ async function cmdScan(p) {
   }
   const cwd = typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : process.cwd();
   const storageState = typeof p.flags["storage-state"] === "string" && p.flags["storage-state"] ? p.flags["storage-state"] : void 0;
+  const browserPath = browserPathOf(p.flags);
   const runtimeFlag = typeof p.flags.runtime === "string" && p.flags.runtime ? p.flags.runtime : p.flags.local === true ? "local" : p.flags.docker === true ? "docker" : "auto";
   if (!["auto", "local", "docker"].includes(runtimeFlag)) {
     console.error(`ultra11y scan: --runtime must be local, docker, or auto (got "${runtimeFlag}").`);
@@ -78494,10 +78534,10 @@ async function cmdScan(p) {
   let useLocal;
   if (runtimeFlag === "local") useLocal = true;
   else if (runtimeFlag === "docker") useLocal = false;
-  else if (localAvailable(cwd)) useLocal = true;
+  else if (localAvailable(cwd, { browserPath })) useLocal = true;
   else if (dockerAvailable()) {
     useLocal = false;
-    const s = localTierStatus(cwd);
+    const s = localTierStatus(cwd, { browserPath });
     console.error(
       lang === "fr" ? `ultra11y scan : tier local indisponible${s.ok ? "" : ` (${s.reason})`} \u2014 bascule sur Docker. Passez --runtime local pour en faire une erreur.` : `ultra11y scan: local tier unavailable${s.ok ? "" : ` (${s.reason})`} \u2014 falling back to Docker. Pass --runtime local to make this an error instead.`
     );
@@ -78553,12 +78593,12 @@ async function cmdScan(p) {
   let dynamic;
   try {
     if (useSample && sampleConfig) {
-      dynamic = useLocal ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot }) : runSampleScan(sampleConfig.pages, void 0, snapshotRoot);
+      dynamic = useLocal ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath }) : runSampleScan(sampleConfig.pages, void 0, snapshotRoot);
     } else if (sitemap || crawl) {
       const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : void 0;
       const max = typeof p.flags.max === "string" ? Number(p.flags.max) : void 0;
       const onPage = (url, n) => console.error(`ultra11y scan: page ${n} \u2014 ${url}`);
-      dynamic = useLocal ? await runCrawlScanLocal({ sitemap, crawl, depth, max, onPage, cwd, storageState, lang, interact, interactClicks, snapshotRoot }) : await runCrawlScan({ sitemap, crawl, depth, max, onPage, snapshotRoot });
+      dynamic = useLocal ? await runCrawlScanLocal({ sitemap, crawl, depth, max, onPage, cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath }) : await runCrawlScan({ sitemap, crawl, depth, max, onPage, snapshotRoot });
     } else {
       const targets = p.positionals.filter((a) => a !== "-");
       if (targets.length === 0) {
@@ -78566,7 +78606,7 @@ async function cmdScan(p) {
         return 2;
       }
       if (useLocal) {
-        dynamic = targets.length === 1 ? await runScanLocal({ target: targets[0], cwd, storageState, lang, interact, interactClicks, snapshotRoot }) : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks, snapshotRoot });
+        dynamic = targets.length === 1 ? await runScanLocal({ target: targets[0], cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath }) : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
       } else {
         dynamic = targets.length === 1 ? runScan({ target: targets[0], snapshotRoot }) : runScanMany(targets, void 0, snapshotRoot);
       }
@@ -79213,6 +79253,7 @@ if (isInvokedDirectly()) {
 export {
   COMMANDS,
   REMOVED_FLAGS,
+  browserPathOf,
   main,
   parseArgs,
   scanSnapshotRoot
