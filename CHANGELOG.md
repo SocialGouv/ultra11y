@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.53.0](https://github.com/SocialGouv/ultra11y/compare/v5.52.0...v5.53.0) (2026-11-02)
+
+
+### Features
+
+* **orchestrate:** a generic orchestration manifest of the adjudication loop ([#95](https://github.com/SocialGouv/ultra11y/issues/95)) ([fbc3a9c](https://github.com/SocialGouv/ultra11y/commit/fbc3a9c46484f0e190bdabfa636c40ddb7b578d8))
+
 # [5.52.0](https://github.com/SocialGouv/ultra11y/compare/v5.51.2...v5.52.0) (2026-11-02)
 
 
