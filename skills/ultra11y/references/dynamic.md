@@ -248,19 +248,38 @@ where Playwright resolves from, not where snapshots land).
 
 ### …and the PDF documents those pages link to
 
-After the pages are recorded, `scan` downloads the **same-origin PDF links** of each captured page
-(a link whose path ends in `.pdf`, or that declares `type="application/pdf"`, resolved against the
-page URL and its `<base>`) into `.ultra11y/documents/<sha256>.pdf`, beside a `<sha256>.json`
-sidecar naming the URL and **every page that links it**. Bounded: at most 20 documents per run
-(`--max-pdf <n>`), 20 MiB each, and only bytes starting with `%PDF-` are kept — a link answering
-with a login page is reported « not a PDF », never audited as one. Third-party links are never
-requested. `--no-pdf` opts out. Each refusal is printed with its reason.
+After the pages are recorded, `scan` downloads the **same-origin document candidates** of each
+captured page (resolved against the page URL and its `<base>`) into
+`.ultra11y/documents/<sha256>.pdf`, beside a `<sha256>.json` sidecar (`kind: "ultra11y-document"`,
+`v: 1`, the URL and **every page that links it** — the reader ignores any other `.json`). A link is
+a candidate when:
+
+- its path ends in `.pdf`, or it declares `type="application/pdf"`;
+- it is an `<a download>`;
+- its visible text, `aria-label` or `title` names the format (`PDF` as a word: « Télécharger (PDF) »);
+- its path or query names it as a token (`/api/declaration-pdf?year=2026`, `?format=pdf` — not `/pdfs/`).
+
+A candidate is a document only once the response proves it: `Content-Type: application/pdf` or
+a `%PDF-` header. Anything else — a login page, a CSV behind `download` — is reported « not a
+PDF » with the response type, never audited. Bounded: at most 20 documents per run
+(`--max-pdf <n>`), 20 MiB each. Third-party links are never requested, and **every redirect hop
+is checked before it is followed** — same origin, or the http→https upgrade of it, at most 5
+hops — so a redirect to another host (a metadata address, an intranet) is refused unrequested.
+A local page's documents are read from its own directory only (a regular file, symlinks resolved).
+A bad link is one refusal, never the end of the scan. `--no-pdf` opts out. Each refusal is
+printed with its reason.
+
+**Behind a login.** With `--storage-state <file>` (or a sample page's own `storageState`), the
+cookies of that session file that match the document URL — domain (host-only or `.domain`),
+path, `secure` (https, or a loopback host), expiry — go on the request, as the browser sent them
+for the page. They are sent to the audited origin only and written nowhere. The Playwright
+fixture downloads through the test's own request context instead (`references/e2e.md`).
 
 The snapshot audit then reads them with the engine's own zero-dependency PDF reader
 (`src/parse/pdf.ts`), and a later `audit` re-ingests `.ultra11y/documents/*.pdf` offline. Every
 document finding is attributed to the pages linking the document — under RGAA, candidate evidence
-for 13.3 on those pages (`references/rgaa-review.md`). No credential is ever sent: an
-authenticated document is out of reach of the download and stays to be judged by hand.
+for 13.3 on those pages (`references/rgaa-review.md`). Without a session, an authenticated
+document answers its login page, is refused « not a PDF », and stays to be judged by hand.
 
 ### …and what it MEASURED, not only what it saw
 

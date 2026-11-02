@@ -1045,7 +1045,8 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
  *  (some pages public, some authenticated) is scanned with the right session per page; the
  *  clicks-off policy (clicksAllowed) is re-evaluated per page from its effective
  *  storageState. Findings keep their sample-page provenance; the sample is recorded on the
- *  result. SECURITY: storageState is only ever passed to Playwright as a path — never read. */
+ *  result. SECURITY: storageState is only ever passed to Playwright as a path — never read here
+ *  (the document download reads its matching cookies, src/documents.ts). */
 export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpts): Promise<DynamicResult> {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;

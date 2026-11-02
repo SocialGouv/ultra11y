@@ -16,10 +16,25 @@
 // to `.ultra11y/pages/<id>/` (DOM + computed styles + boxes + stylesheets + screenshot), so
 // the same page re-audits offline with no browser: that is how CI decides the rendering
 // criteria without booting the app, and how the report speaks page by page. Commit it.
-import { readFileSync } from "node:fs";
+//
+// The documents the page links to are the other durable half: downloaded through the page's own
+// request context — the test's session, so a document behind the login is reached — into
+// `.ultra11y/documents/<sha256>.pdf` with the sidecar `scan` writes, so `audit` reads them too.
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { COLLECT_SNAPSHOT } from "../collector.js";
+import {
+  DOCUMENT_MAX_BYTES,
+  DOCUMENT_MAX_COUNT,
+  DOCUMENT_TIMEOUT_MS,
+  type DocFetcher,
+  type LinkFacts,
+  documentCandidate,
+  fetchDocument,
+  recordDocumentPages,
+  storeDocument,
+} from "../document-store.js";
 import { runLiveProbes } from "../probes.js";
 import { type AuditLike, type CheckOptions, type ProbeTuning, auditSnapshot, buildPayload, gate, stayedOnPage, writePagesReport } from "./core.js";
 
@@ -38,12 +53,118 @@ interface PlaywrightPage {
   waitForTimeout?(ms: number): Promise<void>;
   keyboard?: { press(key: string): Promise<void> };
   mouse?: { move(x: number, y: number): Promise<void> };
+  // Used only by the document download, so optional too: a page object without a context still
+  // records exactly as before, and simply downloads nothing.
+  context?(): { request?: PlaywrightRequest };
+}
+
+/** Playwright's APIRequestContext, to exactly what the document download uses. */
+interface PlaywrightRequest {
+  get(
+    url: string,
+    opts: { timeout?: number; maxRedirects?: number; failOnStatusCode?: boolean },
+  ): Promise<{ status(): number; headers(): Record<string, string>; body(): Promise<Buffer>; dispose?(): Promise<void> }>;
 }
 
 export interface PlaywrightCheckOptions extends CheckOptions {
   /** Also write the per-page report once this page is recorded. Off by default: a report
    *  per checked page would be wasteful in a suite; turn it on in a final test. */
   report?: boolean | { out?: string; standard?: string; lang?: string };
+  /** Download the same-origin PDF documents this page links to (on by default, as in `scan`;
+   *  `false` is `--no-pdf`). A candidate — a `.pdf` path, `download`, a text / `aria-label` /
+   *  `title` or a route naming PDF — is fetched with the page's own request context, so the
+   *  test's session goes with it, and kept only when the response is `application/pdf` or
+   *  starts `%PDF-`. Stored in `.ultra11y/documents/<sha256>.pdf` with a sidecar naming the URL
+   *  and every page linking it; `audit` re-reads them. Never fails the test: a refusal is
+   *  printed with its reason. */
+  pdf?: boolean;
+  /** Most documents downloaded per test worker (default 20, each capped at 20 MiB) — `--max-pdf`. */
+  maxPdf?: number;
+}
+
+/** The page's links, read by the browser: `a.href` is already resolved (its `<base>` included). */
+const LINKS_SCRIPT = `(() => Array.from(document.querySelectorAll("a[href]"), (a) => ({
+  href: a.href,
+  download: a.hasAttribute("download"),
+  type: a.getAttribute("type") || "",
+  text: (a.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 500),
+  ariaLabel: a.getAttribute("aria-label") || "",
+  title: a.getAttribute("title") || "",
+})))()`;
+
+// Per test worker: the documents already stored (root + URL → file), so a header link on every
+// page is fetched once and only its sidecar grows; and how many have been, against the cap.
+const storedDocuments = new Map<string, string>();
+
+/** Playwright's request context as a one-hop fetcher: redirects are followed by
+ *  `fetchDocument`, which refuses a hop off the origin before it is requested. */
+function requestFetcher(request: PlaywrightRequest): DocFetcher {
+  return async (url) => {
+    const res = await request.get(url, { timeout: DOCUMENT_TIMEOUT_MS, maxRedirects: 0, failOnStatusCode: false });
+    const headers = res.headers();
+    return {
+      status: res.status(),
+      header: (name) => headers[name.toLowerCase()],
+      discard: async () => {
+        await res.dispose?.();
+      },
+      // The request context buffers the whole body; the declared length is checked first, and a
+      // body over the bound is still never kept.
+      body: async (maxBytes) => {
+        const bytes = await res.body();
+        await res.dispose?.();
+        return bytes.length > maxBytes ? undefined : bytes;
+      },
+    };
+  };
+}
+
+/** Download the documents a recorded page links to. Returns the files it holds for this page. */
+export async function downloadPageDocuments(page: PlaywrightPage, pageId: string, opts: { maxPdf?: number; root?: string } = {}): Promise<string[]> {
+  const request = page.context?.()?.request;
+  if (!request) return [];
+  const root = opts.root ?? process.cwd();
+  const max = opts.maxPdf ?? DOCUMENT_MAX_COUNT;
+  let pageUrl: URL;
+  try {
+    pageUrl = new URL(page.url());
+  } catch {
+    return [];
+  }
+  if (pageUrl.protocol !== "http:" && pageUrl.protocol !== "https:") return [];
+  const links = ((await page.evaluate(LINKS_SCRIPT)) as LinkFacts[] | null) ?? [];
+  const candidates = [...new Set(links.map((l) => documentCandidate(l, pageUrl)).filter((u): u is string => !!u))].sort();
+  const files: string[] = [];
+  const inRoot = (url: string) => `${root}\n${url}`;
+  let attempts = 0;
+  for (const url of candidates) {
+    const known = storedDocuments.get(inRoot(url));
+    if (known && existsSync(known)) {
+      recordDocumentPages(known, url, [pageId]);
+      files.push(known);
+      continue;
+    }
+    const held = [...storedDocuments.keys()].filter((k) => k.startsWith(`${root}\n`)).length;
+    if (held >= max || attempts >= max) {
+      console.warn(`ultra11y: document not downloaded — ${url}: document cap reached (${max}).`);
+      continue;
+    }
+    attempts++;
+    // One bad link is one warning, never the rest of the page's documents.
+    try {
+      const r = await fetchDocument(url, requestFetcher(request), { maxBytes: DOCUMENT_MAX_BYTES });
+      if ("reason" in r) {
+        console.warn(`ultra11y: document not downloaded — ${url}: ${r.reason}.`);
+        continue;
+      }
+      const file = storeDocument(root, url, r.bytes, [pageId]);
+      storedDocuments.set(inRoot(url), file);
+      files.push(file);
+    } catch (e) {
+      console.warn(`ultra11y: document not downloaded — ${url}: failed: ${e instanceof Error ? e.message : String(e)}.`);
+    }
+  }
+  return files;
 }
 
 /** Read the three shapes `probes` accepts — `true`, a list of criteria, or an options object —
@@ -199,6 +320,15 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
 
   const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe);
   const result = auditSnapshot(payload);
+  // After the snapshot (the page is recorded whatever happens here) and before the report (which
+  // re-audits .ultra11y and so reads the documents too). Never fatal, like the probes.
+  if (opts.pdf !== false) {
+    try {
+      await downloadPageDocuments(page, String(payload.meta.id), { ...(opts.maxPdf !== undefined ? { maxPdf: opts.maxPdf } : {}) });
+    } catch (e) {
+      console.warn(`ultra11y: the document download failed on this page — ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded.`);
+    }
+  }
   if (opts.report) writePagesReport(typeof opts.report === "object" ? opts.report : {});
   gate(result, String(payload.meta.name), opts.failOn);
   return result;
