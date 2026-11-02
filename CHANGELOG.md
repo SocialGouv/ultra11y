@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.55.0](https://github.com/SocialGouv/ultra11y/compare/v5.54.4...v5.55.0) (2026-11-02)
+
+
+### Features
+
+* **pdf:** audit downloadable PDF documents as RGAA 13.3 evidence ([#98](https://github.com/SocialGouv/ultra11y/issues/98)) ([5e81f38](https://github.com/SocialGouv/ultra11y/commit/5e81f38e56e3a76bfcd3a85d5f48434f265b31d7))
+
 ## [5.54.4](https://github.com/SocialGouv/ultra11y/compare/v5.54.3...v5.54.4) (2026-11-02)
 
 
