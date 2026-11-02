@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.56.0](https://github.com/SocialGouv/ultra11y/compare/v5.55.5...v5.56.0) (2026-11-02)
+
+
+### Features
+
+* **pdf:** reach real-world documents — route links, behind a login, from the Playwright fixture, in the HTML report ([#119](https://github.com/SocialGouv/ultra11y/issues/119)) ([7ec6dec](https://github.com/SocialGouv/ultra11y/commit/7ec6decc5cbb7aaaf5615f4cf18cfc4f22c12f4c))
+
 ## [5.55.5](https://github.com/SocialGouv/ultra11y/compare/v5.55.4...v5.55.5) (2026-11-02)
 
 
