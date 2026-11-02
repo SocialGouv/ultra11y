@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.51.0](https://github.com/SocialGouv/ultra11y/compare/v5.50.1...v5.51.0) (2026-11-02)
+
+
+### Features
+
+* **verify:** a read-only counter-review summary that keeps contested engine decisions unresolved ([#92](https://github.com/SocialGouv/ultra11y/issues/92)) ([6b0709b](https://github.com/SocialGouv/ultra11y/commit/6b0709bb40ef6925e30820c38d8b0990498bb637))
+
 ## [5.50.1](https://github.com/SocialGouv/ultra11y/compare/v5.50.0...v5.50.1) (2026-11-02)
 
 
