@@ -287,7 +287,8 @@ function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScop
   // verdict is scope-wide, so it shows on every page including ones its citations have
   // nothing to do with. That is what makes a complete page grid reachable at all, and it is
   // labelled as a scope-wide decision where it is rendered.
-  if (c.decidedBy === "agent" || c.decidedBy === "scan") return c.status;
+  // A named human auditor's ruling is the same kind of recorded verdict.
+  if (c.decidedBy === "agent" || c.decidedBy === "human" || c.decidedBy === "scan") return c.status;
 
   // 3. SILENCE ONLY DECIDES WHAT THE ENGINE CAN DECIDE.
   //
@@ -405,6 +406,8 @@ const L = {
     notAuditedNote:
       "Une page marquée « non audité » a bien un instantané, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformité — relancez l'audit en incluant `.ultra11y/pages`.",
     agentMark: "`C*` : conformité tranchée par l'agent IA à partir des évidences citées (gaté), et non prouvée par le moteur déterministe.",
+    humanMark:
+      "`C†` : conformité tranchée par un auditeur humain nommé à partir des évidences citées (même gate que l'agent), et non prouvée par le moteur déterministe.",
     originNote: (o: string) => `Les colonnes sont les URL des pages, relatives à \`${o}\`.`,
   },
   en: {
@@ -424,6 +427,7 @@ const L = {
     notAuditedNote:
       'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming — re-run the audit with `.ultra11y/pages` in scope.',
     agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
+    humanMark: "`C†`: conformity ruled by a named human auditor from the evidence they cited (the agent's gate), not proven by the deterministic engine.",
     originNote: (o: string) => `Columns are the pages' URLs, relative to \`${o}\`.`,
   },
 } as const;
@@ -445,6 +449,18 @@ export function formatRate(rate: number | null, decided: number, total: number):
  *  and this legend. One string, four readers. */
 export function agentMarkNote(lang: Lang): string {
   return L[lang].agentMark;
+}
+
+/** The same honesty rule for a conformity a NAMED HUMAN auditor ruled (`decidedBy: "human"`):
+ *  a judgement too, and a different author — so a different mark, `†`, never the AI's `*`. */
+export function humanMarkNote(lang: Lang): string {
+  return L[lang].humanMark;
+}
+
+/** The mark a ruled conformity carries after its `C`: `*` for the agent, `†` for a human. */
+export function ruledMark(decidedBy: string | undefined, status: Status): string {
+  if (status !== "C") return "";
+  return decidedBy === "agent" ? "*" : decidedBy === "human" ? "†" : "";
 }
 
 /** Honesty rule 2, as one sentence: a page with no snapshot cannot earn conformity by
@@ -534,6 +550,9 @@ export interface PageGridModel {
   rows: PageGridRow[];
   /** rowId → pageId → status. Absent ⇒ `manual`; the renderer, not the model, picks the mark. */
   status: Map<string, Map<string, Status>>;
+  /** The `rowId|pageId` cells a named human auditor ruled (`decidedBy: "human"`), so the grid
+   *  can mark them apart from the engine's and the agent's. */
+  human: Set<string>;
 }
 
 /** A view of the audit restricted to ONE page: the same shape, with this page's criterion
@@ -575,6 +594,7 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
  *  local re-derivation. */
 export function pageGridModel(result: AuditResult, derived: PageResult[], standard: StandardId, lang: Lang): PageGridModel {
   const status = new Map<string, Map<string, Status>>(); // rowId → pageId → status
+  const human = new Set<string>();
   const put = (rowId: string, pageId: string, s: Status): void => {
     const m = status.get(rowId) ?? new Map<string, Status>();
     m.set(pageId, s);
@@ -585,8 +605,12 @@ export function pageGridModel(result: AuditResult, derived: PageResult[], standa
     const rows = [...result.criteria]
       .sort((a, b) => compareSC(a.id, b.id))
       .map((c) => ({ id: c.id, label: `${c.id} ${scTitle(c.id, lang) ?? ""}`.trim(), group: c.guideline }));
-    for (const p of derived) for (const c of p.criteria) put(c.id, p.id, c.status);
-    return { rows, status };
+    for (const p of derived)
+      for (const c of p.criteria) {
+        put(c.id, p.id, c.status);
+        if (c.decidedBy === "human") human.add(`${c.id}|${p.id}`);
+      }
+    return { rows, status, human };
   }
 
   const pack = loadPack(standard);
@@ -595,9 +619,10 @@ export function pageGridModel(result: AuditResult, derived: PageResult[], standa
     for (const pc of derivePackResults(pageView(result, p), standard, p.id)) {
       const criterion = pack.criteria.find((row) => row.id === pc.id);
       put(pc.id, p.id, isProvisionalJudgmentInapplicable(pc, criterion) ? "manual" : pc.status);
+      if (pc.decidedBy === "human") human.add(`${pc.id}|${p.id}`);
     }
   }
-  return { rows, status };
+  return { rows, status, human };
 }
 
 /** The pages a scan REFUSED to record, named in the deliverable.
@@ -684,20 +709,27 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
   // announced « 89 % (9/55) », while the same page's own dossier said 47/106. Same command,
   // same page, two denominators; and this grid is what `comment-kind: pages` pastes onto a
   // pull request, so the wrong one was the one people read.
-  const { rows, status } = pageGridModel(result, derived, standard, lang);
+  const { rows, status, human } = pageGridModel(result, derived, standard, lang);
   out.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id))}**`).join(" | ")} |`);
   out.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
 
   let group = "";
+  let humanRuled = false;
   for (const row of rows) {
     if (row.group !== group) {
       group = row.group;
       out.push(`| **${group}** | ${derived.map(() => "").join(" | ")} |`);
     }
-    const cells = derived.map((p) => MARK[status.get(row.id)?.get(p.id) ?? "manual"]);
+    const cells = derived.map((p) => {
+      const st = status.get(row.id)?.get(p.id) ?? "manual";
+      const mark = human.has(`${row.id}|${p.id}`) ? ruledMark("human", st) : "";
+      if (mark) humanRuled = true;
+      return `${MARK[st]}${mark}`;
+    });
     out.push(`| ${row.label} | ${cells.join(" | ")} |`);
   }
   out.push("");
+  if (humanRuled) out.push(`> ${humanMarkNote(lang)}`, "");
 
   const orphans = unattributedFindings(result);
   if (orphans.length) out.push(`> ${s.unattributed(orphans.length)}`, "");

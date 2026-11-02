@@ -2897,8 +2897,8 @@ function cmdCheck(p: ParsedArgs): number {
       const pv = decided.provenance;
       console.log(
         lang === "fr"
-          ? `  ${pv.total} critères — ${pv.engine} moteur, ${pv.scan} mesure (scan), ${pv.agent} agent, ${pv.declared} déclaré(s) indécidable(s), ${pv.undecided} sans verdict.`
-          : `  ${pv.total} criteria — ${pv.engine} engine, ${pv.scan} measured (scan), ${pv.agent} agent, ${pv.declared} declared undecidable, ${pv.undecided} with no verdict.`,
+          ? `  ${pv.total} critères — ${pv.engine} moteur, ${pv.scan} mesure (scan), ${pv.agent} agent, ${pv.human ? `${pv.human} auditeur humain, ` : ""}${pv.declared} déclaré(s) indécidable(s), ${pv.undecided} sans verdict.`
+          : `  ${pv.total} criteria — ${pv.engine} engine, ${pv.scan} measured (scan), ${pv.agent} agent, ${pv.human ? `${pv.human} human auditor, ` : ""}${pv.declared} declared undecidable, ${pv.undecided} with no verdict.`,
       );
     }
     if (covered?.ok) {
@@ -3292,6 +3292,14 @@ function applyPrune(p: ParsedArgs, standard: StandardId, items: VerifyItem[], la
         lang === "fr"
           ? `⚠ ${pruned.skippedEngine} verdict(s) réfuté(s) visent une décision du moteur — non modifiés : un critère que le moteur tranche est recalculé à chaque run, et un faux positif se corrige dans la règle.`
           : `⚠ ${pruned.skippedEngine} refuted verdict(s) name an ENGINE decision — left untouched: a criterion the engine decides is recomputed every run, and a false positive is fixed in the rule.`,
+      );
+    // A named human auditor's verdict is not overturned by the automatic trial: the auditor is
+    // the second reader. Said, so the refutation is visibly handled rather than dropped.
+    if (pruned.skippedHuman)
+      console.error(
+        lang === "fr"
+          ? `⚠ ${pruned.skippedHuman} verdict(s) réfuté(s) visent une décision d'un auditeur humain nommé — non modifiés : l'auditeur est le second lecteur ; soumettez-lui la contre-expertise.`
+          : `⚠ ${pruned.skippedHuman} refuted verdict(s) name a named human auditor's decision — left untouched: the auditor is the second reader; put the refutation to them.`,
       );
   }
   return pruned;

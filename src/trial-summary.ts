@@ -157,7 +157,9 @@ export function buildTrialSummary(input: TrialSummaryInput): TrialSummary {
   // Run on the audit the trial was held against, so it is the same decision `--prune` took.
   const untriedForPrune = r.failures.filter((f) => !["refuted", "unsupported"].includes(norm(f.verdict) ?? ""));
   const dry = pruneRefuted(audit, standard, verdicts, input.lang, untriedForPrune);
-  const contested = new Set(dry.skippedEngineClaims);
+  // A withdrawal the prune leaves standing is CONTESTED, whoever decided it: the engine, or a
+  // named human auditor (`decidedBy: "human"`, never overturned by the automatic trial).
+  const contested = new Set([...dry.skippedEngineClaims, ...dry.skippedHumanClaims]);
   const foreign = new Set(foreignItems);
   const withdrawnAgent = verdicts.filter((it) => !foreign.has(it) && !contested.has(it) && ["refuted", "unsupported"].includes(norm(it.verdict) ?? ""));
   const applied: TrialEntry[] = [];

@@ -25,7 +25,7 @@
 // this module pure and testable.
 import { prdUnits } from "./prd.js";
 import { renderAuditorUnit, type AuditorCropLookup } from "./auditor.js";
-import { agentMarkNote, basisLabel, formatRate, pageView, unattributedFindings } from "./pages.js";
+import { agentMarkNote, basisLabel, formatRate, humanMarkNote, pageView, ruledMark, unattributedFindings } from "./pages.js";
 import {
   CORE,
   type StandardId,
@@ -37,7 +37,7 @@ import {
   themeName,
   titlePlain,
 } from "./standards/index.js";
-import type { AuditResult, Lang, PageResult, Status } from "./types.js";
+import type { AuditResult, DecidedBy, Lang, PageResult, Status } from "./types.js";
 import { compareSC, scTitle } from "./wcag.js";
 
 /** Marks a file as a PER-PAGE report rather than a conformance report. `check` keys on it to
@@ -189,7 +189,7 @@ export interface PageCriterionRow {
   // grid so a sheet says WHAT has to be checked for every criterion, not only for the ones
   // that happened to trigger a non-conformity.
   tests: string[];
-  decidedBy?: "engine" | "agent" | "scan";
+  decidedBy?: DecidedBy;
   /** Conforming because nothing of its kind is on this page — see INAPPLICABLE_STATUS. */
   inapplicable?: boolean;
 }
@@ -354,12 +354,13 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
       group = row.group;
       out.push(withTests ? `| **${group}** | | |` : `| **${group}** | |`);
     }
-    const mark = row.decidedBy === "agent" && row.status === "C" ? `${MARK[row.status]}*` : MARK[row.status];
+    const mark = `${MARK[row.status]}${ruledMark(row.decidedBy, row.status)}`;
     if (withTests) out.push(`| ${row.label} | ${row.tests.map((t) => `\`${t}\``).join(" ")} | ${mark} |`);
     else out.push(`| ${row.label} | ${mark} |`);
   }
   out.push("", `> ${s.manualWarn}`, "");
   if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out.push(`> ${agentMarkNote(lang)}`, "");
+  if (rows.some((r) => r.decidedBy === "human" && r.status === "C")) out.push(`> ${humanMarkNote(lang)}`, "");
 
   // The non-conformities, rendered by the ONE auditor block (invariant 2). Feeding
   // `prdUnits` the page view is what scopes them to this page without a second grouping.

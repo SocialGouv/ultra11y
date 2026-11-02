@@ -30,10 +30,18 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
-import { type AdjudicationFile, type AdjudicationItem, type AgentFinding, buildAdjudicationWorklist, type Evidence, readCitation } from "./adjudicate.js";
+import {
+  type AdjudicationFile,
+  type AdjudicationItem,
+  type AgentFinding,
+  auditorOf,
+  buildAdjudicationWorklist,
+  type Evidence,
+  readCitation,
+} from "./adjudicate.js";
 import { PAGES_DIR } from "./snapshot.js";
 import { CORE, type StandardId } from "./standards/index.js";
-import type { AuditResult } from "./types.js";
+import type { AuditResult, Auditor } from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
 import { repoRelative } from "./util.js";
 import type { VerifyItem } from "./verify.js";
@@ -94,9 +102,10 @@ export interface LedgerEntry {
   evidenceFiles?: string[];
   /** ISO date the verdict was recorded. */
   date: string;
-  /** Who ruled. Only ever "agent": the engine's own verdicts are recomputed every run and
-   *  have no business in a ledger. */
-  decidedBy: "agent";
+  /** Who ruled: "agent", or "human" — a named auditor (`auditor`). Never the engine: its own
+   *  verdicts are recomputed every run and have no business in a ledger. */
+  decidedBy: "agent" | "human";
+  auditor?: Auditor;
 }
 
 export interface VerdictLedger {
@@ -417,10 +426,16 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
       evidenceFiles: evidenceFilesOf(it.evidence, root),
       evidenceCount: it.evidence.length,
       date,
-      decidedBy: "agent",
+      ...whoRuled(it),
     });
   }
   return out;
+}
+
+/** A human verdict keeps its named auditor through the ledger; anything else is the agent's. */
+function whoRuled(x: { decidedBy?: string; auditor?: unknown }): { decidedBy: "agent" | "human"; auditor?: Auditor } {
+  const auditor = x.decidedBy === "human" ? auditorOf(x) : undefined;
+  return auditor ? { decidedBy: "human", auditor } : { decidedBy: "agent" };
 }
 
 /** Merge fresh entries over an existing ledger — same criterion, newest wins. A refresh pass
@@ -578,7 +593,8 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
       findings: reanchor(e.findings, it.evidence, currentFiles, root) ?? [],
       ...(e.citations ? { citations: reanchor(e.citations, it.evidence, currentFiles, root) ?? [] } : {}),
       ...(e.recommendations ? { recommendations: reanchor(e.recommendations, it.evidence, currentFiles, root) ?? [] } : {}),
-      decidedBy: "agent",
+      // Who ruled travels with the decision; the fold re-checks the auditor's name.
+      ...whoRuled(e),
     });
   }
 

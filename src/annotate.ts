@@ -108,7 +108,7 @@ const S = {
     files: "fichiers",
     coverage: (decided: number, total: number) => `${decided}/${total} critères tranchés dans ce run`,
     remaining: (n: number) => `${n} à compléter par scan ou adjudication`,
-    provenance: { engine: "moteur", scan: "scan", agent: "agent" },
+    provenance: { engine: "moteur", scan: "scan", agent: "agent", human: "auditeur" },
     none: "✅ Aucune non-conformité détectée par le moteur statique.",
     findings: "Non-conformités",
     severity: "Sévérité",
@@ -202,7 +202,7 @@ const S = {
     files: "files",
     coverage: (decided: number, total: number) => `${decided}/${total} criteria decided in this run`,
     remaining: (n: number) => `${n} still to complete by scan or adjudication`,
-    provenance: { engine: "engine", scan: "scan", agent: "agent" },
+    provenance: { engine: "engine", scan: "scan", agent: "agent", human: "auditor" },
     none: "✅ No non-conformity detected by the static engine.",
     findings: "Non-conformities",
     severity: "Severity",
@@ -431,9 +431,10 @@ export function runCoverage(result: AuditResult, standard: StandardId, lang: Lan
     engine: decidedRows.filter((r) => !r.decidedBy || r.decidedBy === "engine").length,
     scan: decidedRows.filter((r) => r.decidedBy === "scan").length,
     agent: decidedRows.filter((r) => r.decidedBy === "agent").length,
+    human: decidedRows.filter((r) => r.decidedBy === "human").length,
   };
   const s = S[lang];
-  const provenance = (["engine", "scan", "agent"] as const).filter((key) => by[key] > 0).map((key) => `${by[key]} ${s.provenance[key]}`);
+  const provenance = (["engine", "scan", "agent", "human"] as const).filter((key) => by[key] > 0).map((key) => `${by[key]} ${s.provenance[key]}`);
   const remaining = Math.max(0, total - decided);
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
   return {

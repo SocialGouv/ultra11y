@@ -80,6 +80,12 @@ export interface PruneResult {
   /** The claims behind `skippedEngine`, so a caller can name each contested engine decision
    *  rather than only count them (`verify --summary`, src/trial-summary.ts). */
   skippedEngineClaims: VerifyItem[];
+  /** Withdrawn claims left untouched because a NAMED HUMAN auditor ruled them
+   *  (`decidedBy: "human"`). The auditor is the second reader: a refuter does not overturn
+   *  them, and the caller says so rather than counting them as engine verdicts. */
+  skippedHuman: number;
+  /** The claims behind `skippedHuman`. */
+  skippedHumanClaims: VerifyItem[];
 }
 
 /** Is this record still a clearing claim (C, or an NA folded to C)? An untried conformity on a
@@ -143,11 +149,14 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
   // on the fixture: `--standard rgaa` with no adjudication, one engine non-conformity refuted,
   // and the step printed « 0 deleted, 0 back to to assess » and no warning at all.
   const acted = new Set<string>();
+  // Criteria a named human auditor ruled: never pruned by the automatic trial.
+  const human = new Set<string>();
 
   /** Shared between the pack layer and the core layer: they carry different record types but
    *  the decision is identical, and writing it twice is how the two drift. */
   const prune = (rec: { id: string; decidedBy?: string; status?: string; findings: Finding[] }, setOpen: (why: string) => void) => {
     const isAgent = rec.decidedBy === "agent";
+    if (rec.decidedBy === "human") human.add(rec.id);
     const drop = removedNc.get(rec.id);
     if (drop?.size) {
       if (isAgent) {
@@ -210,7 +219,9 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
 
   // Everything the trial withdrew that this pass did not act on — counted here rather than
   // inside the loops, so the case where there is no record to iterate at all is counted too.
-  const skippedEngineClaims = withdrawn.filter((it) => !acted.has(it.criteriaId));
+  const skippedHumanClaims = withdrawn.filter((it) => human.has(it.criteriaId));
+  const skippedHuman = skippedHumanClaims.length;
+  const skippedEngineClaims = withdrawn.filter((it) => !acted.has(it.criteriaId) && !human.has(it.criteriaId));
   const skippedEngine = skippedEngineClaims.length;
 
   // The flat list mirrors the criteria, and only them: an anchor the criteria refused to drop
@@ -220,5 +231,15 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
   // recomputing is only needed — and only correct — when the core itself changed.
   if (isCore(standard)) recomputeTallies(next);
 
-  return { audit: next, removedFindings, reopenedCriteria, clearedConformities, untriedConformities, skippedEngine, skippedEngineClaims };
+  return {
+    audit: next,
+    removedFindings,
+    reopenedCriteria,
+    clearedConformities,
+    untriedConformities,
+    skippedEngine,
+    skippedEngineClaims,
+    skippedHuman,
+    skippedHumanClaims,
+  };
 }

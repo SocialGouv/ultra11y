@@ -415,7 +415,10 @@ function agentConformities(md: string): number {
       .slice(1, line.endsWith("|") ? -1 : undefined)
       .split("|")
       .map((cell) => cell.trim());
-    if (cells.length === 4 && (cells[1] === "C" || cells[1] === "NA") && (cells[3] === "AI" || cells[3] === "IA")) count++;
+    // A named human auditor's ruling (« auditeur (Jeanne Dupont) ») is a judgement too, and
+    // stays out of the automatic rate for the same reason.
+    if (cells.length === 4 && (cells[1] === "C" || cells[1] === "NA") && (cells[3] === "AI" || cells[3] === "IA" || /^audit(?:eur|or)\b/.test(cells[3]!)))
+      count++;
   }
   return count;
 }
@@ -615,7 +618,7 @@ export interface DecidedResult {
    *  decided never appears in either. The split says it directly, and it is the number worth
    *  watching between runs — every criterion that moves from `agent` to `engine` or `scan` is
    *  one the pass no longer pays a model to read. */
-  provenance: { total: number; engine: number; scan: number; agent: number; declared: number; undecided: number };
+  provenance: { total: number; engine: number; scan: number; agent: number; human: number; declared: number; undecided: number };
 }
 
 export function isUndecidedFile(v: unknown): v is UndecidedFile {
@@ -742,6 +745,7 @@ export function checkDecided(
     engine: settled.filter((r) => r.decidedBy === undefined || r.decidedBy === "engine").length,
     scan: settled.filter((r) => r.decidedBy === "scan").length,
     agent: settled.filter((r) => r.decidedBy === "agent").length,
+    human: settled.filter((r) => r.decidedBy === "human").length,
     declared: allowed.length,
     undecided: undecided.length,
   };

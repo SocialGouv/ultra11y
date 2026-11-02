@@ -153,6 +153,7 @@ export function packAuditDocument(input: AuditResult | PackAuditResult, packKey:
       findings: d.findings.map((f) => packFinding(f, [d.id])),
       ...(provisionalNa ? { justification: provisionalNaReason } : d.justification ? { justification: d.justification } : {}),
       ...(d.decidedBy && !provisionalNa ? { decidedBy: d.decidedBy } : {}),
+      ...(d.auditor && !provisionalNa ? { auditor: d.auditor } : {}),
       ...(d.inapplicable && !provisionalNa ? { inapplicable: true } : {}),
       ...(pc?.automation ? { automation: pc.automation } : {}),
     };
