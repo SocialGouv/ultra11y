@@ -195,9 +195,22 @@ nothing.
    ├─ ultra11y_criteria { standard:"rgaa", sc }    → the numbered tests you rule against
    ├─ ultra11y_glossary { standard:"rgaa", term }  → what its terms normatively mean
    └─ ultra11y_guidance { standard:"rgaa", ... }   → the fix to recommend
+   └─ ultra11y_fold { adjudication, write, ledger } → land your verdicts (needs --allow-write)
 6. ultra11y_report   { standard: "rgaa" }          → the dated deliverable
 7. ultra11y_check    { standard: "rgaa" }          → nothing claimed beyond the evidence
 ```
+
+`ultra11y_fold` is `verify --apply` over MCP. Send the worklist back with your verdicts —
+decisions only (`criteriaId`, `verdict`, `justification`, `citations`, `findings`, `reason`);
+the server re-derives the evidence from the audit (`audit_file`, or a fresh audit of `globs`)
+and applies the same gate: a `C` cites the evidence it cleared, an `NC` carries groundable
+findings. Partial by default — a refused verdict stays « to assess » and is named in
+`rejectedCriteria` with its reason in `issues`; `strict: true` lands nothing if anything is
+refused. It is a dry run unless `write: true`, which writes `<out>/audit-latest.json` (default
+the project root, like the CLI); `ledger: true` also merges the **accepted** verdicts into
+`.ultra11y/verdicts/<standard>.json`, never a refused one. A verdict a named human auditor
+ruled carries `decidedBy: "human"` and `auditor: { name, organisation? }` and folds the same
+way (see `references/verify.md`).
 
 Steps 2 and 5 are the ones that make it a rule engine rather than a linter. Skipping step 2
 means auditing without knowing that 92 criteria carry judgment tests and **104 of 106** still need adjudication to earn C;

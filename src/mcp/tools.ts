@@ -283,9 +283,43 @@ export const TOOLS: ToolDecl[] = [
   },
 ];
 
-// Registered only when the server is started with --allow-write. All three
+// Registered only when the server is started with --allow-write. All of them
 // change the USER'S project, and `scan` additionally drives a real browser.
 export const WRITE_TOOLS: ToolDecl[] = [
+  {
+    name: "ultra11y_fold",
+    title: "Fold an adjudication into the audit",
+    description:
+      "WRITES TO THE PROJECT (with write:true): land the verdicts you wrote on the ultra11y_adjudicate worklist — the counterpart of `verify --apply`. " +
+      "Send the decisions only (criteriaId, verdict, justification, citations, findings, reason): the server re-derives the evidence and applies the " +
+      "SAME gate — a C must cite the evidence it cleared, an NC must carry groundable findings. Partial by default: a refused verdict stays « to assess » " +
+      "and is listed in rejectedCriteria with its reason; strict:true lands nothing if anything is refused. Dry-run by default (the gate's verdict, " +
+      "nothing written); write:true writes <out>/audit-latest.json, and ledger:true records the ACCEPTED verdicts in the verdict ledger.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: cwdProp,
+        adjudication: {
+          type: "object",
+          description: "The filled adjudication: { kind: 'adjudication', standard, items: [...] }, as ultra11y_adjudicate's worklist with your verdicts.",
+        },
+        adjudication_file: { type: "string", description: "Absolute path to an adjudication JSON file to fold instead." },
+        audit_file: {
+          type: "string",
+          description:
+            "Absolute path (or relative to cwd) to the audit JSON to fold into, like `--in`. Default: audit the project now, as ultra11y_adjudicate did.",
+        },
+        globs: globsProp,
+        standard: { type: "string", description: "Must match the adjudication's own standard when given." },
+        strict: { type: "boolean", description: "All-or-nothing: a single refused verdict discards the whole fold." },
+        write: { type: "boolean", description: "Actually write the folded audit (default: dry-run, returns the gate's verdict)." },
+        out: { type: "string", description: "Directory, relative to cwd, for audit-latest.json. Default: the project root, as `verify --apply`." },
+        ledger: { type: "boolean", description: "With write:true, also record the accepted verdicts in .ultra11y/verdicts/<standard>.json." },
+        lang: langProp,
+      },
+      required: ["cwd"],
+    },
+  },
   {
     name: "ultra11y_fix",
     title: "Apply safe accessibility codemods",
@@ -468,6 +502,8 @@ export const TOOL_META: Record<string, { write?: boolean; destructive?: boolean;
   // Rewrites source files. Not destructive in the delete sense, and it verifies
   // its own work — but it is the user's code.
   ultra11y_fix: { write: true, destructive: false, idempotent: true, openWorld: false },
+  // Writes the folded audit and, on request, merges the accepted verdicts into the ledger.
+  ultra11y_fold: { write: true, destructive: false, idempotent: true, openWorld: false },
   // Fetches a URL and may pull a Docker image.
   ultra11y_scan: { write: true, destructive: false, idempotent: false, openWorld: true },
   ultra11y_init: { write: true, destructive: false, idempotent: true, openWorld: false },

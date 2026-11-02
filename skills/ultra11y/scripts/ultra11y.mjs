@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync8, writeFileSync as writeFileSync21, mkdirSync as mkdirSync18, existsSync as existsSync40, readFileSync as readFileSync36, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
+import { realpathSync as realpathSync8, writeFileSync as writeFileSync22, mkdirSync as mkdirSync19, existsSync as existsSync40, readFileSync as readFileSync36, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
 import { join as join53, relative as relative6, resolve as resolve18, sep as sep7, dirname as dirname20 } from "path";
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
@@ -74063,7 +74063,7 @@ ${xs.map(line).join("\n")}` : t3.none;
 import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
-import { existsSync as existsSync38, readFileSync as readFileSync34, realpathSync as realpathSync6, statSync as statSync18 } from "fs";
+import { existsSync as existsSync38, mkdirSync as mkdirSync18, readFileSync as readFileSync34, realpathSync as realpathSync6, statSync as statSync18, writeFileSync as writeFileSync21 } from "fs";
 import { isAbsolute as isAbsolute5, join as join51, resolve as resolve16, sep as sep5 } from "path";
 
 // src/criteria-view.ts
@@ -74522,7 +74522,7 @@ var ToolError = class extends Error {
 var MAX_READ_LINES = 2e3;
 var MAX_READ_BYTES = 8 * 1024 * 1024;
 var DEFAULT_GLOBS = ["**/*.html", "**/*.htm", "**/*.jsx", "**/*.tsx", "**/*.vue", "**/*.svelte"];
-var WRITE_TOOL_NAMES = /* @__PURE__ */ new Set(["ultra11y_fix", "ultra11y_scan", "ultra11y_init"]);
+var WRITE_TOOL_NAMES = /* @__PURE__ */ new Set(["ultra11y_fix", "ultra11y_fold", "ultra11y_scan", "ultra11y_init"]);
 var REFERENCE_TOOL_NAMES = /* @__PURE__ */ new Set(["ultra11y_criteria", "ultra11y_standards", "ultra11y_glossary", "ultra11y_guidance", "ultra11y_method"]);
 function str2(v) {
   return typeof v === "string" && v.trim() !== "" ? v : void 0;
@@ -74641,6 +74641,8 @@ async function dispatch(name2, args2, cwd) {
       return handleRead(args2, cwd);
     case "ultra11y_fix":
       return handleFix(args2, cwd);
+    case "ultra11y_fold":
+      return handleFold(args2, cwd);
     case "ultra11y_init":
       return handleInit(args2, cwd);
     case "ultra11y_scan":
@@ -74868,6 +74870,88 @@ function handleFix(args2, cwd) {
   } finally {
     process.chdir(prev);
   }
+}
+function handleFold(args2, cwd) {
+  const adj = adjudicationArg(args2);
+  standardOf({ standard: adj.standard });
+  const asked = str2(args2.standard);
+  if (asked !== void 0 && standardOf(args2) !== adj.standard) {
+    throw new ToolError(`\`standard\` is "${asked}" but the adjudication is for "${adj.standard}" \u2014 fold it under its own standard.`);
+  }
+  const lang = langOf(args2);
+  const auditFile = str2(args2.audit_file);
+  let base;
+  if (auditFile) {
+    const path = resolve16(cwd, auditFile);
+    try {
+      base = unwrapAudit(JSON.parse(readFileSync34(path, "utf8")));
+    } catch {
+      throw new ToolError(`\`audit_file\` not found or not valid JSON: ${path}`);
+    }
+  } else base = audit(args2, cwd);
+  hydrateAdjudication(adj, base, { cwd });
+  const strict = bool(args2.strict);
+  const r = applyAdjudication(base, adj, { cwd, strict });
+  const summary = {
+    cwd,
+    standard: adj.standard,
+    ok: r.ok,
+    applied: r.applied,
+    stillManual: r.stillManual,
+    rejected: r.rejected,
+    rejectedCriteria: r.rejectedCriteria,
+    issues: r.issues,
+    conformancePct: r.audit.conformancePct,
+    grounding: r.grounding
+  };
+  const landed = !(!r.ok && (strict || r.applied + r.stillManual === 0));
+  if (!bool(args2.write) || !landed) {
+    return {
+      ...summary,
+      written: false,
+      next: landed ? "Dry run: nothing was written. Re-call with write:true (and ledger:true to record the accepted verdicts) to land them." : "Nothing landed. Fix the refused verdicts listed in issues \u2014 cite the evidence a C cleared, ground every NC finding \u2014 and fold again."
+    };
+  }
+  const outDir = resolve16(cwd, str2(args2.out) ?? ".");
+  mkdirSync18(outDir, { recursive: true });
+  const auditPath = join51(outDir, "audit-latest.json");
+  writeFileSync21(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
+`);
+  let ledger;
+  if (bool(args2.ledger)) {
+    const path = ledgerPath(adj.standard, cwd);
+    const refused = new Set(r.rejectedCriteria);
+    const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
+    const fresh = entriesFrom(adj, accepted, r.audit.date, cwd);
+    writeLedger(path, mergeLedger(readLedger(path), adj.standard, fresh));
+    const blind = unreadableCaptures(r.audit, cwd);
+    ledger = {
+      path,
+      recorded: fresh.length,
+      ...blind.length ? { warning: `written without the snapshots of ${blind.length} page(s) this audit says it read \u2014 these verdicts will be dropped as stale on replay` } : {}
+    };
+  }
+  return { ...summary, written: true, auditPath, ...ledger ? { ledger } : {} };
+}
+function adjudicationArg(args2) {
+  const inline = args2.adjudication;
+  const file = str2(args2.adjudication_file);
+  if (inline !== void 0 && file) throw new ToolError("pass `adjudication` or `adjudication_file`, not both.");
+  let v = inline;
+  if (file) {
+    if (!isAbsolute5(file)) throw new ToolError("`adjudication_file` must be an absolute path.");
+    try {
+      v = JSON.parse(readFileSync34(file, "utf8"));
+    } catch {
+      throw new ToolError(`\`adjudication_file\` not found or not valid JSON: ${file}`);
+    }
+  }
+  if (v === void 0) throw new ToolError("`adjudication` is required \u2014 the filled ultra11y_adjudicate worklist (or `adjudication_file`).");
+  const a = v;
+  if (!a || typeof a !== "object" || a.kind !== "adjudication" || !Array.isArray(a.items) || typeof a.standard !== "string") {
+    throw new ToolError("not an adjudication: expected { kind: 'adjudication', standard, items: [...] }.");
+  }
+  return a;
 }
 var FAIL_ON_ALIASES = { error: "blocking", warning: "major", notice: "minor" };
 var FAIL_ON_TOKENS = "blocking, major, minor (or bloquant, majeur, mineur; error/warning/notice as aliases)";
@@ -75322,6 +75406,34 @@ var TOOLS2 = [
 ];
 var WRITE_TOOLS = [
   {
+    name: "ultra11y_fold",
+    title: "Fold an adjudication into the audit",
+    description: "WRITES TO THE PROJECT (with write:true): land the verdicts you wrote on the ultra11y_adjudicate worklist \u2014 the counterpart of `verify --apply`. Send the decisions only (criteriaId, verdict, justification, citations, findings, reason): the server re-derives the evidence and applies the SAME gate \u2014 a C must cite the evidence it cleared, an NC must carry groundable findings. Partial by default: a refused verdict stays \xAB to assess \xBB and is listed in rejectedCriteria with its reason; strict:true lands nothing if anything is refused. Dry-run by default (the gate's verdict, nothing written); write:true writes <out>/audit-latest.json, and ledger:true records the ACCEPTED verdicts in the verdict ledger.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: cwdProp,
+        adjudication: {
+          type: "object",
+          description: "The filled adjudication: { kind: 'adjudication', standard, items: [...] }, as ultra11y_adjudicate's worklist with your verdicts."
+        },
+        adjudication_file: { type: "string", description: "Absolute path to an adjudication JSON file to fold instead." },
+        audit_file: {
+          type: "string",
+          description: "Absolute path (or relative to cwd) to the audit JSON to fold into, like `--in`. Default: audit the project now, as ultra11y_adjudicate did."
+        },
+        globs: globsProp,
+        standard: { type: "string", description: "Must match the adjudication's own standard when given." },
+        strict: { type: "boolean", description: "All-or-nothing: a single refused verdict discards the whole fold." },
+        write: { type: "boolean", description: "Actually write the folded audit (default: dry-run, returns the gate's verdict)." },
+        out: { type: "string", description: "Directory, relative to cwd, for audit-latest.json. Default: the project root, as `verify --apply`." },
+        ledger: { type: "boolean", description: "With write:true, also record the accepted verdicts in .ultra11y/verdicts/<standard>.json." },
+        lang: langProp
+      },
+      required: ["cwd"]
+    }
+  },
+  {
     name: "ultra11y_fix",
     title: "Apply safe accessibility codemods",
     description: "WRITES TO THE PROJECT: apply the mechanical fixes \u2014 the ones with exactly one correct answer, like a missing lang attribute or a button with no accessible name. Dry-run by default; with write:true it re-audits afterwards and refuses to keep a change that introduced a new non-conformity. It never invents alt text: that is a judgment call and it leaves a TODO for you.",
@@ -75472,6 +75584,8 @@ var TOOL_META2 = {
   // Rewrites source files. Not destructive in the delete sense, and it verifies
   // its own work — but it is the user's code.
   ultra11y_fix: { write: true, destructive: false, idempotent: true, openWorld: false },
+  // Writes the folded audit and, on request, merges the accepted verdicts into the ledger.
+  ultra11y_fold: { write: true, destructive: false, idempotent: true, openWorld: false },
   // Fetches a URL and may pull a Docker image.
   ultra11y_scan: { write: true, destructive: false, idempotent: false, openWorld: true },
   ultra11y_init: { write: true, destructive: false, idempotent: true, openWorld: false }
@@ -77170,8 +77284,8 @@ async function cmdAudit(p) {
     const asFile = out2.toLowerCase().endsWith(".json");
     const target = asFile ? out2 : join53(out2, "audit-latest.json");
     try {
-      mkdirSync18(asFile ? dirname20(out2) : out2, { recursive: true });
-      writeFileSync21(target, JSON.stringify(document, null, 2) + "\n");
+      mkdirSync19(asFile ? dirname20(out2) : out2, { recursive: true });
+      writeFileSync22(target, JSON.stringify(document, null, 2) + "\n");
       console.error(lang === "fr" ? `\u2192 audit \xE9crit dans ${target}` : `\u2192 audit written to ${target}`);
     } catch {
     }
@@ -77247,8 +77361,8 @@ async function cmdDev(p) {
     const dir = join53(root, ".ultra11y", "next");
     const rel2 = ".ultra11y/next/overlay.jsx";
     try {
-      mkdirSync18(dir, { recursive: true });
-      writeFileSync21(join53(dir, "overlay.jsx"), nextOverlayComponent(port));
+      mkdirSync19(dir, { recursive: true });
+      writeFileSync22(join53(dir, "overlay.jsx"), nextOverlayComponent(port));
     } catch (e) {
       console.error(`ultra11y dev: could not write ${rel2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -77389,7 +77503,7 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
     }
   }
   doc.sample = v.sample;
-  writeFileSync21(file, `${JSON.stringify(doc, null, 2)}
+  writeFileSync22(file, `${JSON.stringify(doc, null, 2)}
 `);
   if (!p.flags.json)
     console.log(
@@ -77444,8 +77558,8 @@ async function cmdPages(p) {
     console.log(json);
     const outDir2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "";
     if (outDir2) {
-      mkdirSync18(outDir2, { recursive: true });
-      writeFileSync21(join53(outDir2, "pages.json"), `${json}
+      mkdirSync19(outDir2, { recursive: true });
+      writeFileSync22(join53(outDir2, "pages.json"), `${json}
 `);
     }
     return 0;
@@ -77490,7 +77604,7 @@ async function cmdPages(p) {
     for (const pg of derived) {
       const src = shotOf(pg.id);
       if (!existsSync40(src)) continue;
-      mkdirSync18(assets, { recursive: true });
+      mkdirSync19(assets, { recursive: true });
       copyFileSync4(src, join53(assets, `${pg.id}.png`));
       m.set(pg.id, `./assets/${pg.id}.png`);
     }
@@ -77508,7 +77622,7 @@ async function cmdPages(p) {
     console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsRelative(".") }));
     return 0;
   }
-  mkdirSync18(outDir, { recursive: true });
+  mkdirSync19(outDir, { recursive: true });
   const manifest = wantEvidence ? writeEvidence(result, { outDir, ...evidenceCapsOf(p) }) : void 0;
   const cropFor = manifest ? (f) => {
     const c2 = manifest.crops.get(findingId(f));
@@ -77527,7 +77641,7 @@ async function cmdPages(p) {
   };
   if (!split) {
     const file = join53(outDir, `pages-${result.date}.md`);
-    writeFileSync21(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
+    writeFileSync22(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
 `);
     const html2 = wantHtml ? emitHtml(result, {
       outDir,
@@ -77546,11 +77660,11 @@ async function cmdPages(p) {
   const sheet = (id) => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    writeFileSync21(join53(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
+    writeFileSync22(join53(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
 `);
   }
   const index = join53(outDir, "index.md");
-  writeFileSync21(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
+  writeFileSync22(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
 `);
   const html = wantHtml ? emitHtml(result, {
     outDir,
@@ -77687,9 +77801,9 @@ function cmdInit(p) {
   if (want.baseline) {
     const inputs = p.positionals.length ? p.positionals : ["."];
     const result = runAudit({ inputs, onWarn: (m) => console.error(m) });
-    mkdirSync18(join53(root, "audits"), { recursive: true });
+    mkdirSync19(join53(root, "audits"), { recursive: true });
     const bp = join53(root, "audits", "baseline.json");
-    writeFileSync21(bp, JSON.stringify(result, null, 2) + "\n");
+    writeFileSync22(bp, JSON.stringify(result, null, 2) + "\n");
     wrote.push(bp);
   }
   if (want.hook) wrote.push(writeHook(root, engineRel, failOn, legacy ? "baseline" : "staged"));
@@ -78000,7 +78114,7 @@ async function cmdTickets(p) {
   const ticketsOut = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : void 0;
   let setPath;
   if (ticketsOut) {
-    mkdirSync18(ticketsOut, { recursive: true });
+    mkdirSync19(ticketsOut, { recursive: true });
     setPath = join53(ticketsOut, `issues-${result.date}.json`);
     const payload = {
       tool: "ultra11y",
@@ -78012,7 +78126,7 @@ async function cmdTickets(p) {
       count: plan.tickets.length,
       issues: plan.tickets
     };
-    writeFileSync21(setPath, `${JSON.stringify(payload, null, 2)}
+    writeFileSync22(setPath, `${JSON.stringify(payload, null, 2)}
 `);
     if (!json) console.log(setPath);
   }
@@ -78139,14 +78253,14 @@ function cmdRender(p) {
     const dir = join53(root, ".ultra11y", "e2e");
     const paths = {};
     try {
-      mkdirSync18(dir, { recursive: true });
+      mkdirSync19(dir, { recursive: true });
       if (runners.includes("playwright")) {
-        writeFileSync21(join53(dir, "playwright.mjs"), playwrightFixture(engineRef));
+        writeFileSync22(join53(dir, "playwright.mjs"), playwrightFixture(engineRef));
         paths.playwright = ".ultra11y/e2e/playwright.mjs";
       }
       if (runners.includes("cypress")) {
-        writeFileSync21(join53(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
-        writeFileSync21(join53(dir, "cypress-commands.mjs"), cypressCommands());
+        writeFileSync22(join53(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
+        writeFileSync22(join53(dir, "cypress-commands.mjs"), cypressCommands());
         paths.cypressPlugin = ".ultra11y/e2e/cypress-plugin.mjs";
         paths.cypressCommands = ".ultra11y/e2e/cypress-commands.mjs";
       }
@@ -78161,7 +78275,7 @@ function cmdRender(p) {
   if (p.flags.scaffold === true) {
     const out2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "ultra11y-render.tsx";
     try {
-      writeFileSync21(out2, ssrHarness());
+      writeFileSync22(out2, ssrHarness());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -78177,8 +78291,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const rel2 = ".ultra11y/capture-setup.mjs";
     const out2 = join53(root, rel2);
     try {
-      mkdirSync18(dirname20(out2), { recursive: true });
-      writeFileSync21(out2, captureSetup());
+      mkdirSync19(dirname20(out2), { recursive: true });
+      writeFileSync22(out2, captureSetup());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -78249,8 +78363,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
         continue;
       }
       try {
-        mkdirSync18(outDir, { recursive: true });
-        writeFileSync21(join53(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
+        mkdirSync19(outDir, { recursive: true });
+        writeFileSync22(join53(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
 ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
         attributed++;
       } catch {
@@ -78580,9 +78694,9 @@ function cmdVerifySummary(p) {
     return 0;
   }
   const out2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : ".";
-  mkdirSync18(out2, { recursive: true });
+  mkdirSync19(out2, { recursive: true });
   const mdPath = join53(out2, "TRIAL.md");
-  writeFileSync21(mdPath, formatTrialSummary(summary, lang));
+  writeFileSync22(mdPath, formatTrialSummary(summary, lang));
   console.log(
     summary.validated ? lang === "fr" ? `\u2713 Bilan de contre-expertise \u2192 ${mdPath} \u2014 gate s\xE9mantique vert.` : `\u2713 Counter-review summary \u2192 ${mdPath} \u2014 semantic gate green.` : lang === "fr" ? `Bilan de contre-expertise \u2192 ${mdPath} \u2014 audit NON valid\xE9 (gate ${summary.gate.ok ? "vert" : "en \xE9chec"}, ${summary.contestedEngine.length} d\xE9cision(s) moteur contest\xE9e(s), ${summary.untried.length} jamais mise(s) \xE0 l'\xE9preuve, ${summary.foreign.length} \xE9trang\xE8re(s)).` : `Counter-review summary \u2192 ${mdPath} \u2014 audit NOT validated (gate ${summary.gate.ok ? "green" : "failing"}, ${summary.contestedEngine.length} contested engine decision(s), ${summary.untried.length} never tried, ${summary.foreign.length} foreign).`
   );
@@ -78624,8 +78738,8 @@ function applyPrune(p, standard, items, lang, untried = []) {
     ledgerRepair = pruneLedger(ledger, items, pruned.reopenedCriteria, pruned.clearedConformities, root);
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
-  mkdirSync18(out2, { recursive: true });
-  writeFileSync21(join53(out2, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
+  mkdirSync19(out2, { recursive: true });
+  writeFileSync22(join53(out2, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
   if (ledgerFile && ledgerRepair) {
     writeLedger(ledgerFile, ledgerRepair.ledger);
     if (!p.flags.json)
@@ -78866,9 +78980,9 @@ function replayLedgerFile(p, ledger, lang) {
     return 1;
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
-  mkdirSync18(out2, { recursive: true });
+  mkdirSync19(out2, { recursive: true });
   const auditPath = join53(out2, "audit-latest.json");
-  writeFileSync21(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, standard, lang), null, 2)}
+  writeFileSync22(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, standard, lang), null, 2)}
 `);
   if (p.flags.json)
     console.log(
@@ -78945,9 +79059,9 @@ function applyAdjudicationFile(p, adj, lang) {
     for (const i2 of r.issues) console.error(`  \u2717 ${i2}`);
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
-  mkdirSync18(out2, { recursive: true });
+  mkdirSync19(out2, { recursive: true });
   const auditPath = join53(out2, "audit-latest.json");
-  writeFileSync21(auditPath, JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2) + "\n");
+  writeFileSync22(auditPath, JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2) + "\n");
   const ledgerOut = ledgerTarget(p, adj.standard);
   if (ledgerOut) {
     const blind = unreadableCaptures(r.audit);
@@ -79084,7 +79198,7 @@ async function cmdRefute(p, todoPath) {
           `ultra11y judge: batch #${batch.map((item) => item.n).join(", #")} (${batch.map((item) => item.criteriaId).join(", ")}) \u2014 ${e instanceof Error ? e.message : String(e)}`
         );
       }
-      writeFileSync21(todoPath, JSON.stringify(items, null, 2) + "\n");
+      writeFileSync22(todoPath, JSON.stringify(items, null, 2) + "\n");
     }
   };
   await Promise.all(Array.from({ length: Math.min(lanes, queue.length) }, worker));
@@ -79199,7 +79313,7 @@ async function cmdJudge(p) {
         { cwd }
       );
       if (partial.applied > 0)
-        writeFileSync21(join53(outDir, "audit-latest.json"), `${JSON.stringify(auditDocumentFor(partial.audit, standard, lang), null, 2)}
+        writeFileSync22(join53(outDir, "audit-latest.json"), `${JSON.stringify(auditDocumentFor(partial.audit, standard, lang), null, 2)}
 `);
     } catch {
     }
@@ -79268,9 +79382,9 @@ async function cmdJudge(p) {
     for (const i2 of r.issues.slice(0, 40)) console.error(`  \u2717 ${i2}`);
     if (r.issues.length > 40) console.error(`  \u2026 +${r.issues.length - 40}`);
   }
-  mkdirSync18(out2, { recursive: true });
+  mkdirSync19(out2, { recursive: true });
   const auditPath = join53(out2, "audit-latest.json");
-  writeFileSync21(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
+  writeFileSync22(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
 `);
   const ledgerOut = ledgerTarget(p, adj.standard);
   if (ledgerOut) {
@@ -79528,9 +79642,9 @@ async function cmdScan(p) {
         attributePages(merged, scope);
       }
     }
-    mkdirSync18(out2, { recursive: true });
+    mkdirSync19(out2, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);
-    writeFileSync21(join53(out2, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
+    writeFileSync22(join53(out2, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
     if (p.flags.json)
       console.log(
         JSON.stringify(
@@ -79788,9 +79902,9 @@ async function cmdImport(p) {
       return 1;
     }
     if (outDir) {
-      mkdirSync18(outDir, { recursive: true });
+      mkdirSync19(outDir, { recursive: true });
       const rawFile = join53(outDir, `external-${adapterId}-${arg}.raw.json`);
-      writeFileSync21(rawFile, rawText.endsWith("\n") ? rawText : `${rawText}
+      writeFileSync22(rawFile, rawText.endsWith("\n") ? rawText : `${rawText}
 `);
       if (!p.flags.json) console.log(rawFile);
     }
@@ -79824,9 +79938,9 @@ async function cmdImport(p) {
     return 0;
   }
   if (outDir) {
-    mkdirSync18(outDir, { recursive: true });
+    mkdirSync19(outDir, { recursive: true });
     const file = join53(outDir, "external-latest.json");
-    writeFileSync21(file, `${JSON.stringify(audit2, null, 2)}
+    writeFileSync22(file, `${JSON.stringify(audit2, null, 2)}
 `);
     console.log(file);
   } else {

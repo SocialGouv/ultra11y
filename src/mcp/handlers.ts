@@ -1,7 +1,9 @@
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve, sep } from "node:path";
 import { runAudit } from "../audit.js";
-import { buildAdjudicationWorklist, formatAdjudication } from "../adjudicate.js";
+import { type AdjudicationFile, applyAdjudication, buildAdjudicationWorklist, formatAdjudication, hydrateAdjudication } from "../adjudicate.js";
+import { entriesFrom, ledgerPath, mergeLedger, readLedger, unreadableCaptures, writeLedger } from "../ledger.js";
+import { auditDocumentFor, unwrapAudit } from "../standards/document.js";
 import { checkReport } from "../check.js";
 import { runFix, fixSummary } from "../fix.js";
 import { writeHook, ciWorkflow } from "../init.js";
@@ -56,7 +58,7 @@ const MAX_READ_BYTES = 8 * 1024 * 1024;
 // a broad one.
 const DEFAULT_GLOBS = ["**/*.html", "**/*.htm", "**/*.jsx", "**/*.tsx", "**/*.vue", "**/*.svelte"];
 
-const WRITE_TOOL_NAMES = new Set(["ultra11y_fix", "ultra11y_scan", "ultra11y_init"]);
+const WRITE_TOOL_NAMES = new Set(["ultra11y_fix", "ultra11y_fold", "ultra11y_scan", "ultra11y_init"]);
 
 // Tools that answer from the vendored standard alone — no project tree to walk, so `cwd`
 // is optional rather than required.
@@ -227,6 +229,8 @@ async function dispatch(name: string, args: Record<string, unknown>, cwd: string
       return handleRead(args, cwd);
     case "ultra11y_fix":
       return handleFix(args, cwd);
+    case "ultra11y_fold":
+      return handleFold(args, cwd);
     case "ultra11y_init":
       return handleInit(args, cwd);
     case "ultra11y_scan":
@@ -503,6 +507,104 @@ function handleFix(args: Record<string, unknown>, cwd: string): unknown {
   } finally {
     process.chdir(prev);
   }
+}
+
+/** `ultra11y_fold` — `verify --apply <adjudication> --in <audit>` over MCP, with the same
+ *  library calls in the same order (src/cli.ts `applyAdjudicationFile`): hydrate a verdicts-only
+ *  file from the audit, fold it through the one gate, then — only on `write` — persist the
+ *  audit and, on `ledger`, merge the ACCEPTED verdicts into the ledger. A refused verdict never
+ *  reaches the ledger: the next replay would launder it back in. */
+function handleFold(args: Record<string, unknown>, cwd: string): unknown {
+  const adj = adjudicationArg(args);
+  // The adjudication names its standard; it must be one this project knows.
+  standardOf({ standard: adj.standard });
+  const asked = str(args.standard);
+  if (asked !== undefined && standardOf(args) !== adj.standard) {
+    throw new ToolError(`\`standard\` is "${asked}" but the adjudication is for "${adj.standard}" — fold it under its own standard.`);
+  }
+  const lang = langOf(args);
+  const auditFile = str(args.audit_file);
+  let base: AuditResult;
+  if (auditFile) {
+    const path = resolve(cwd, auditFile);
+    try {
+      base = unwrapAudit(JSON.parse(readFileSync(path, "utf8"))) as AuditResult;
+    } catch {
+      throw new ToolError(`\`audit_file\` not found or not valid JSON: ${path}`);
+    }
+  } else base = audit(args, cwd);
+
+  hydrateAdjudication(adj, base, { cwd });
+  const strict = bool(args.strict);
+  const r = applyAdjudication(base, adj, { cwd, strict });
+  const summary = {
+    cwd,
+    standard: adj.standard,
+    ok: r.ok,
+    applied: r.applied,
+    stillManual: r.stillManual,
+    rejected: r.rejected,
+    rejectedCriteria: r.rejectedCriteria,
+    issues: r.issues,
+    conformancePct: r.audit.conformancePct,
+    grounding: r.grounding,
+  };
+  // The CLI's rule: strict refuses on any issue, partial only when NOTHING landed.
+  const landed = !(!r.ok && (strict || r.applied + r.stillManual === 0));
+  if (!bool(args.write) || !landed) {
+    return {
+      ...summary,
+      written: false,
+      next: landed
+        ? "Dry run: nothing was written. Re-call with write:true (and ledger:true to record the accepted verdicts) to land them."
+        : "Nothing landed. Fix the refused verdicts listed in issues — cite the evidence a C cleared, ground every NC finding — and fold again.",
+    };
+  }
+  const outDir = resolve(cwd, str(args.out) ?? ".");
+  mkdirSync(outDir, { recursive: true });
+  const auditPath = join(outDir, "audit-latest.json");
+  writeFileSync(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}\n`);
+  let ledger: { path: string; recorded: number; warning?: string } | undefined;
+  if (bool(args.ledger)) {
+    const path = ledgerPath(adj.standard, cwd);
+    const refused = new Set(r.rejectedCriteria);
+    const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
+    const fresh = entriesFrom(adj, accepted, r.audit.date, cwd);
+    writeLedger(path, mergeLedger(readLedger(path), adj.standard, fresh));
+    // Same warning as the CLI: a ledger recorded without the captures is stale on replay.
+    const blind = unreadableCaptures(r.audit, cwd);
+    ledger = {
+      path,
+      recorded: fresh.length,
+      ...(blind.length
+        ? { warning: `written without the snapshots of ${blind.length} page(s) this audit says it read — these verdicts will be dropped as stale on replay` }
+        : {}),
+    };
+  }
+  return { ...summary, written: true, auditPath, ...(ledger ? { ledger } : {}) };
+}
+
+/** The adjudication to fold: inline, or a file the caller named. Only `kind: "adjudication"`
+ *  is a fold — a ledger is replayed, not folded, and an array is the NC-verdicts worklist. */
+function adjudicationArg(args: Record<string, unknown>): AdjudicationFile {
+  const inline = args.adjudication;
+  const file = str(args.adjudication_file);
+  if (inline !== undefined && file) throw new ToolError("pass `adjudication` or `adjudication_file`, not both.");
+  let v: unknown = inline;
+  if (file) {
+    if (!isAbsolute(file)) throw new ToolError("`adjudication_file` must be an absolute path.");
+    try {
+      v = JSON.parse(readFileSync(file, "utf8"));
+    } catch {
+      throw new ToolError(`\`adjudication_file\` not found or not valid JSON: ${file}`);
+    }
+  }
+  if (v === undefined) throw new ToolError("`adjudication` is required — the filled ultra11y_adjudicate worklist (or `adjudication_file`).");
+  const a = v as Partial<AdjudicationFile> | null;
+  if (!a || typeof a !== "object" || a.kind !== "adjudication" || !Array.isArray(a.items) || typeof a.standard !== "string") {
+    throw new ToolError("not an adjudication: expected { kind: 'adjudication', standard, items: [...] }.");
+  }
+  return a as AdjudicationFile;
 }
 
 /** The axe-style severities this tool once advertised, as aliases of the engine's own. They
