@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.57.0](https://github.com/SocialGouv/ultra11y/compare/v5.56.2...v5.57.0) (2026-11-02)
+
+
+### Features
+
+* **opencode:** one plugin file gates and registers skills on both OpenCode 1.x and 2.x ([#126](https://github.com/SocialGouv/ultra11y/issues/126)) ([364ab67](https://github.com/SocialGouv/ultra11y/commit/364ab67b2af2f0b9fb839c35ee80b73542a1f56d))
+
 ## [5.56.2](https://github.com/SocialGouv/ultra11y/compare/v5.56.1...v5.56.2) (2026-11-02)
 
 
