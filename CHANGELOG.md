@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.54.0](https://github.com/SocialGouv/ultra11y/compare/v5.53.0...v5.54.0) (2026-11-02)
+
+
+### Features
+
+* **mcp:** ultra11y_fold — apply an adjudication over MCP as verify --apply does ([#102](https://github.com/SocialGouv/ultra11y/issues/102)) ([a706e98](https://github.com/SocialGouv/ultra11y/commit/a706e98d35fbe99bf3d1e0c57d2fe9e9be3dfe54))
+
 # [5.53.0](https://github.com/SocialGouv/ultra11y/compare/v5.52.0...v5.53.0) (2026-11-02)
 
 
