@@ -135,4 +135,15 @@ describe("cross-file suppressors for id-ref rules (audit --graph)", () => {
   it("does NOT flag cross-prop-drilled-name-lost when the control already has a literal name", () => {
     expect(has(graph, "cross-prop-drilled-name-lost", "uses-literal.tsx")).toBe(false);
   });
+
+  // #133 — egapro's SelectedFilesTable passes `title` on to its <caption>: the name is read, not lost.
+  const drilled = graph.filter((f) => f.ruleId === "cross-prop-drilled-name-lost" && f.file.endsWith("uses-captioned.tsx"));
+  it("does NOT flag cross-prop-drilled-name-lost when the component reads the passed prop (destructured or props.X)", () => {
+    expect(drilled.some((f) => f.line === 6)).toBe(false);
+    expect(drilled.some((f) => f.line === 7)).toBe(false);
+  });
+
+  it("still flags it when the component reads its props but never the passed name", () => {
+    expect(drilled.map((f) => f.line)).toEqual([8]);
+  });
 });

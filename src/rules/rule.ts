@@ -2,7 +2,7 @@
 // Kept dependency-light (no value import of the registry) to avoid cycles.
 import type { Doc, El } from "../parse/html.js";
 import type { Finding, Severity } from "../types.js";
-import { snippet, textContent, elementsByTag } from "../parse/html.js";
+import { snippet, textContent, elementsByTag, boundAttr } from "../parse/html.js";
 import { MSG_CATALOG, type MsgParams } from "../messages.js";
 
 // A build-time / runtime content-injection placeholder left in a framework SHELL
@@ -125,4 +125,41 @@ export function toFinding(doc: Doc, ruleId: string, def: Severity, rf: RuleFindi
     // a normative finding stays byte-identical (no `advisory: false` noise in the JSON).
     ...((rf.advisory ?? ruleAdvisory) ? { advisory: true } : {}),
   };
+}
+
+// Router link components that render a native <a href> (Next's `Link`, React Router's
+// `Link`/`NavLink`…): a pointer handler on one sits on a link, keyboard-operable by nature.
+const LINK_MODULE = /^(?:next\/link|react-router(?:-dom)?|@remix-run\/react|gatsby|@tanstack\/[\w-]*router)$/;
+const LINK_EXPORTS = new Set(["Link", "NavLink"]);
+const linkCache = new WeakMap<Doc, Set<string>>();
+
+/** The local names this file binds to a router link component, read from its imports. */
+function routerLinkLocals(doc: Doc): Set<string> {
+  const hit = linkCache.get(doc);
+  if (hit) return hit;
+  const out = new Set<string>();
+  for (const m of doc.source.matchAll(/(?:^|[\n;])\s*import\s+(?!type\b)([^;'"]*?)\s+from\s+["']([^"']+)["']/g)) {
+    const clause = m[1] ?? "";
+    const mod = m[2] ?? "";
+    if (!LINK_MODULE.test(mod)) continue;
+    const def = /^\s*([A-Za-z_$][\w$]*)\s*(?:,|$)/.exec(clause)?.[1];
+    if (def && mod === "next/link") out.add(def);
+    for (const spec of (/\{([^}]*)\}/.exec(clause)?.[1] ?? "").split(",")) {
+      const [imported, local] = spec
+        .replace(/^\s*type\s+/, "")
+        .trim()
+        .split(/\s+as\s+/);
+      if (imported && LINK_EXPORTS.has(imported.trim())) out.add((local ?? imported).trim());
+    }
+  }
+  linkCache.set(doc, out);
+  return out;
+}
+
+/** Does this element render a native link — a router link component given a destination?
+ *  A component of unknown origin proves nothing and stays non-native. */
+export function rendersNativeLink(doc: Doc, el: El): boolean {
+  const dest = (name: string): boolean => (boundAttr(el, name) ?? "").trim() !== "";
+  if (doc.kind !== "jsx-ast" && doc.kind !== "jsx-lossy") return false;
+  return routerLinkLocals(doc).has(el.tag) && (dest("href") || dest("to"));
 }

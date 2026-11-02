@@ -40359,6 +40359,32 @@ function toFinding(doc, ruleId, def, rf, ruleAdvisory) {
     ...rf.advisory ?? ruleAdvisory ? { advisory: true } : {}
   };
 }
+var LINK_MODULE = /^(?:next\/link|react-router(?:-dom)?|@remix-run\/react|gatsby|@tanstack\/[\w-]*router)$/;
+var LINK_EXPORTS = /* @__PURE__ */ new Set(["Link", "NavLink"]);
+var linkCache = /* @__PURE__ */ new WeakMap();
+function routerLinkLocals(doc) {
+  const hit = linkCache.get(doc);
+  if (hit) return hit;
+  const out2 = /* @__PURE__ */ new Set();
+  for (const m of doc.source.matchAll(/(?:^|[\n;])\s*import\s+(?!type\b)([^;'"]*?)\s+from\s+["']([^"']+)["']/g)) {
+    const clause = m[1] ?? "";
+    const mod = m[2] ?? "";
+    if (!LINK_MODULE.test(mod)) continue;
+    const def = /^\s*([A-Za-z_$][\w$]*)\s*(?:,|$)/.exec(clause)?.[1];
+    if (def && mod === "next/link") out2.add(def);
+    for (const spec of (/\{([^}]*)\}/.exec(clause)?.[1] ?? "").split(",")) {
+      const [imported, local] = spec.replace(/^\s*type\s+/, "").trim().split(/\s+as\s+/);
+      if (imported && LINK_EXPORTS.has(imported.trim())) out2.add((local ?? imported).trim());
+    }
+  }
+  linkCache.set(doc, out2);
+  return out2;
+}
+function rendersNativeLink(doc, el) {
+  const dest = (name2) => (boundAttr(el, name2) ?? "").trim() !== "";
+  if (doc.kind !== "jsx-ast" && doc.kind !== "jsx-lossy") return false;
+  return routerLinkLocals(doc).has(el.tag) && (dest("href") || dest("to"));
+}
 
 // src/rules/rendered.ts
 import { readFileSync as readFileSync15 } from "fs";
@@ -49619,7 +49645,8 @@ var SUBJECTS = {
   // Pointer, touch, gesture and drag handlers — everything a keyboard may not reach.
   pointerHandlers: (docs) => docs.flatMap((d) => [
     ...d.elements.filter(
-      (e) => !INTERACTIVE_TAGS.includes(e.tag) && Object.keys(e.attribs).some((k) => /^on(click|mousedown|mouseup|mouseenter|pointerdown|touchstart)$/i.test(k))
+      (e) => !INTERACTIVE_TAGS.includes(e.tag) && !rendersNativeLink(d, e) && // Next's <Link href> IS an <a href> (#133)
+      Object.keys(e.attribs).some((k) => /^on(click|mousedown|mouseup|mouseenter|pointerdown|touchstart)$/i.test(k))
     ).map((e) => h(d, e, `<${e.tag}> carries a pointer handler but is not natively interactive \u2014 keyboard equivalent?`, `clickable|${e.tag}|${t(e, 40)}`)),
     ...linesOf(d, /\bon(?:MouseDown|PointerDown|TouchStart)\s*=/).map(
       (l) => hAt(d, l.line, "handler", `down-event handler (action must not fire on DOWN, or must be abortable): ${l.text}`, `downevent|${l.text}`)
@@ -52440,6 +52467,12 @@ var emptyHeading = {
   }
 };
 var DL_ALLOWED = /* @__PURE__ */ new Set(["dt", "dd", "div", "script", "template", "slot", "#fragment"]);
+function groupParentUnknown(doc, el) {
+  if (doc.kind !== "jsx-ast" && doc.kind !== "jsx-lossy" && doc.kind !== "sfc") return false;
+  let p = el.parent;
+  while (p && (p.tag === "div" || p.tag === "#fragment")) p = p.parent;
+  return p === null || doc.kind === "sfc" && p.tag === "template" && p.parent === null;
+}
 var dlStructure = {
   id: "dl-structure",
   criteria: ["1.3.1"],
@@ -52459,6 +52492,7 @@ var dlStructure = {
       if (el.tag !== "dt" && el.tag !== "dd") continue;
       const chain = ancestors(el);
       if (chain.some((a) => a.tag === "dl" || !isIntrinsic(a.tag))) continue;
+      if (groupParentUnknown(doc, el)) continue;
       out2.push({ criteriaId: "1.3.1", el, msgId: "dl-structure.orphan", params: { tag: el.tag } });
     }
     return out2;
@@ -54723,10 +54757,14 @@ var crossPropDrilledNameLost = {
     const findings = [];
     for (const el of doc.elements) {
       if (!isComponentUsage(el)) continue;
-      const passed = NAME_PROPS_PASSED.find((p) => (attr(el, p) ?? "").trim() !== "");
-      if (!passed) continue;
+      const given = NAME_PROPS_PASSED.filter((p) => (attr(el, p) ?? "").trim() !== "");
+      if (!given.length) continue;
       const def = resolveUsage(graph, doc.file, el.tag);
       if (!def?.hasControl || def.acceptsName || def.controlHasName) continue;
+      const reads = def.readsProps;
+      if (!reads) continue;
+      const passed = given.find((p) => !reads.includes(p));
+      if (!passed) continue;
       findings.push({
         criteriaId: "4.1.2",
         el,
@@ -55009,6 +55047,62 @@ function findControl(fnNode) {
 function posOf(node) {
   return { line: node.loc?.start.line ?? 1, col: (node.loc?.start.column ?? 0) + 1 };
 }
+function referencedNames(body3) {
+  const skip = /* @__PURE__ */ new Set();
+  const out2 = [];
+  walkAst(body3, (n) => {
+    if ((n.type === "MemberExpression" || n.type === "OptionalMemberExpression") && !n.computed) {
+      const prop = asNode(n.property);
+      if (prop) skip.add(prop);
+    } else if ((n.type === "ObjectProperty" || n.type === "ObjectMethod") && !n.computed && !n.shorthand) {
+      const key2 = asNode(n.key);
+      if (key2) skip.add(key2);
+    } else if (n.type === "Identifier" && !skip.has(n)) out2.push(n);
+  });
+  return out2;
+}
+function identName(n) {
+  return n?.type === "Identifier" && typeof n.name === "string" ? n.name : "";
+}
+function readsProps(fnNode) {
+  let param = asNodes(fnNode.params)[0];
+  if (!param) return [];
+  if (param.type === "AssignmentPattern") param = asNode(param.left);
+  const refs = referencedNames(fnNode.body);
+  if (param?.type === "ObjectPattern") {
+    const used2 = [];
+    for (const prop of asNodes(param.properties)) {
+      if (prop.type === "RestElement") {
+        const rest = identName(asNode(prop.argument));
+        if (!rest || refs.some((r) => r.name === rest)) return null;
+        continue;
+      }
+      const key2 = asNode(prop.key);
+      const keyName = identName(key2) || (key2?.type === "StringLiteral" && typeof key2.value === "string" ? key2.value : "");
+      if (prop.type !== "ObjectProperty" || prop.computed || !keyName) return null;
+      let value = asNode(prop.value);
+      if (value?.type === "AssignmentPattern") value = asNode(value.left);
+      const local = identName(value);
+      if (!local) return null;
+      if (refs.some((r) => r.name === local)) used2.push(keyName);
+    }
+    return used2;
+  }
+  const whole = identName(param);
+  if (!whole) return null;
+  const used = [];
+  const members = /* @__PURE__ */ new Set();
+  walkAst(fnNode.body, (n) => {
+    if (n.type !== "MemberExpression" && n.type !== "OptionalMemberExpression" || n.computed) return;
+    const obj2 = asNode(n.object);
+    const prop = identName(asNode(n.property));
+    if (obj2 && identName(obj2) === whole && prop) {
+      members.add(obj2);
+      used.push(prop);
+    }
+  });
+  return refs.some((r) => r.name === whole && !members.has(r)) ? null : used;
+}
 function analyzeComponent(name2, file, fnNode) {
   const control = findControl(fnNode);
   if (!control) {
@@ -55035,7 +55129,19 @@ function analyzeComponent(name2, file, fnNode) {
   const acceptsName = spreadsProps || forwardsAria || acceptsNameViaChildren;
   const controlHasName = literalAriaName || forwardsAria || hasLiteralText(control);
   const rendersIconOnlyControl = hasIconChild2(control) && !hasLiteralText(control) && !literalAriaName && !forwardsAria;
-  return { name: name2, file, line, col, hasControl: true, rendersIconOnlyControl, acceptsName, controlHasName, spreadsProps, forwardsAria };
+  return {
+    name: name2,
+    file,
+    line,
+    col,
+    hasControl: true,
+    rendersIconOnlyControl,
+    acceptsName,
+    controlHasName,
+    spreadsProps,
+    forwardsAria,
+    readsProps: readsProps(fnNode)
+  };
 }
 function pascalCaseBasename(posix3) {
   const base = (posix3.split("/").pop() ?? posix3).replace(/\.[^.]+$/, "");

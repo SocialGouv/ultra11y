@@ -162,3 +162,35 @@ describe("h1-missing — component-composed pages (JSX)", () => {
     expect(findOf(page("<h2>Sous-titre</h2>"), "h1-missing")).toHaveLength(1);
   });
 });
+
+// #133 — egapro's CompanyEditModal: `<dl><InfoRow … /></dl>`, InfoRow returning
+// `<div><dt/><dd/></div>`. The <dt>/<dd> sit at the root of a component's return: the
+// caller supplies their parent, here a <dl>.
+describe("dl-structure — a <dt>/<dd> group a component returns (#133)", () => {
+  const infoRow = `function InfoRow({ label, value }) {
+  return (
+    <div className="row">
+      <dt>{label}</dt>
+      <dd><strong>{value}</strong></dd>
+    </div>
+  );
+}
+export function Modal() {
+  return <dl><InfoRow label="SIREN" value="1" /></dl>;
+}`;
+  it("is silent on a <div>/fragment group at the root of a returned JSX expression", () => {
+    expect(findOf(infoRow, "dl-structure", "CompanyEditModal.tsx")).toHaveLength(0);
+    expect(findOf(`function Row() { return (<><dt>A</dt><dd>B</dd></>); }`, "dl-structure", "Row.tsx")).toHaveLength(0);
+  });
+  it("still flags a <dt>/<dd> whose own markup puts them outside a <dl> (JSX)", () => {
+    const src = `function Card() { return (<section><div><dt>A</dt><dd>B</dd></div></section>); }`;
+    expect(findOf(src, "dl-structure", "Card.tsx").map((f) => f.ruleId)).toEqual(["dl-structure", "dl-structure"]);
+  });
+  it("reads a Vue SFC's root <template> as the component's return", () => {
+    expect(findOf(`<template><div><dt>A</dt><dd>B</dd></div></template>`, "dl-structure", "Row.vue")).toHaveLength(0);
+    expect(findOf(`<template><section><dt>A</dt></section></template>`, "dl-structure", "Card.vue")).toHaveLength(1);
+  });
+  it("still flags a bare group in HTML, where no caller can supply the <dl>", () => {
+    expect(findOf(page("<div><dt>A</dt><dd>B</dd></div>"), "dl-structure")).toHaveLength(2);
+  });
+});
