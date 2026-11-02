@@ -381,8 +381,14 @@ for (const major of [1, 2] as const) {
         });
         expect(ids).toEqual(expect.arrayContaining(["ultra11y", "review-a11y"]));
         if (major === 2) {
-          const plugins = data(await srv.call("GET", "/api/plugin")) as Array<{ id: string; state: { status: string } }>;
-          expect(plugins.find((p) => p.id === "ultra11y")?.state.status).toBe("active");
+          // OpenCode 2 marks a plugin active once setup() has RETURNED, after the skills it
+          // registers already show — so the status is polled, never read once (#138).
+          const status = await until("the plugin to report active", async () => {
+            const plugins = data(await srv.call("GET", "/api/plugin")) as Array<{ id: string; state: { status: string } }>;
+            const s = plugins.find((p) => p.id === "ultra11y")?.state.status;
+            return s === "active" ? s : null;
+          });
+          expect(status).toBe("active");
         }
         expect(srv.log()).not.toMatch(/failed to load plugin/i);
 
@@ -419,8 +425,14 @@ for (const major of [1, 2] as const) {
           return s.includes("ultra11y") && s.includes("review-a11y");
         });
         if (major === 2) {
-          const plugins = data(await srv.call("GET", "/api/plugin")) as Array<{ id: string; state: { status: string } }>;
-          expect(plugins.find((p) => p.id === "ultra11y")?.state.status).toBe("active");
+          // OpenCode 2 marks a plugin active once setup() has RETURNED, after the skills it
+          // registers already show — so the status is polled, never read once (#138).
+          const status = await until("the plugin to report active", async () => {
+            const plugins = data(await srv.call("GET", "/api/plugin")) as Array<{ id: string; state: { status: string } }>;
+            const s = plugins.find((p) => p.id === "ultra11y")?.state.status;
+            return s === "active" ? s : null;
+          });
+          expect(status).toBe("active");
         }
         expect(srv.log()).not.toMatch(/failed to load plugin/i);
       } finally {
