@@ -87,6 +87,34 @@ the raw pipeline above when your orchestrator is *not* GitHub Actions, or when y
 step 3 out across subagents rather than walk the eco path. Either way steps 1, 2, 4, 5 and 6
 stay deterministic, and only step 3 involves a model.
 
+## The loop as data — `orchestrate --manifest`
+
+Rather than re-deriving the step graph above from this page, read it from the engine:
+
+```sh
+$ENGINE orchestrate --run "$RUN" --manifest --json
+```
+
+It prints (and writes nothing) `{ kind: "ultra11y-orchestration-manifest", schemaVersion: 1, run,
+engine, standard?, placeholders[], phases[], steps[] }`. Each step carries:
+
+- `id`, `kind` (`engine` | `judgment`), `title`, and `next` (the id of the following step, `null`
+  at the end); the `gate` step adds `onFailure: "fix"`, and `fix` loops back to `audit`;
+- `inputs[]` / `outputs[]` — the absolute files it reads and writes, so what a step writes is
+  literally what the next one reads;
+- engine steps: `command` (one shell line) and `argv` (`["node", <engine>, …]`), plus `exit` —
+  what `0`, `1` and `2` mean for that step (the table below, per step);
+- judgment steps: `role` (`adjudicator` | `refuter`), `contract` (the dispatch contract
+  `orchestrate` writes under `orchestration/agents/`), `worklist`, `items`, `batches` (the item ids
+  one subagent handles each) and `schema` (the structured fragment a batch returns when fanned
+  out; the sequential path fills the worklist in place);
+- `ready` — every real input exists now (placeholders are yours to substitute).
+
+`placeholders[]` names the tokens a caller substitutes: `<globs>` (what to audit) and, until a trial
+worklist has been generated, `<report.md>` (the report the `report` step writes). Every command
+carries the run's context: `--in`, `--standard` and the conformity source the trial list was built
+with. The Claude Code `RUNBOOK.md` is rendered from this same manifest, so the two cannot drift.
+
 ## The adjudication contract
 
 `ADJUDICATE.todo.json` declares what may be written into it, so the filler never has to read

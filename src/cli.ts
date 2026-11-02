@@ -130,7 +130,7 @@ import { resolveStandard, getPack, isCore, findingsForStandard, type StandardId 
 import { auditDocumentFor, packAuditDocument, unwrapAudit } from "./standards/document.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
-import { listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
+import { buildManifest, listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
 import { buildTrialSummary, formatTrialSummary } from "./trial-summary.js";
 import { readStdin, readText } from "./util.js";
 import { runStdioServer } from "./mcp/stdio.js";
@@ -171,6 +171,7 @@ Usage:
   ultra11y verify   --apply <VERIFY.todo.json> --report <md> --in <audit.json> --out <dir> --prune   (APPLY the trial: delete refuted non-conformities, send refuted conformities back to « à évaluer »)
   ultra11y verify   --summary --verdicts <VERIFY.todo.json> --report <md> --in <audit.json> [--pruned <audit.json>] [--out <dir>] [--json]   (read-only bilan of the trial → TRIAL.md: confirmed, withdrawn/applied, contested engine decisions, coverage, gate)
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
+  ultra11y orchestrate --run <dir> --manifest [--json]   (the loop as data: each step's command/argv, inputs, outputs, exit contract, next step — for any orchestrator)
   ultra11y fix      <globs… | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
   ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate manual criteria — api needs ANTHROPIC_API_KEY; claude/codex reuse their CLI login; cli aliases claude)
@@ -795,6 +796,8 @@ const BOOLEAN_FLAGS = new Set([
   "clean",
   "sample",
   "eco",
+  // `orchestrate --manifest`: print the loop's step graph as JSON (src/orchestrate.ts buildManifest).
+  "manifest",
   "help",
   "version",
   "allow-remote",
@@ -5177,6 +5180,16 @@ function cmdOrchestrate(p: ParsedArgs): number {
       return 2;
     }
     console.log(JSON.stringify({ phases: listPhases(runFlag, engineAbs) }, null, 2));
+    return 0;
+  }
+  // --manifest: the loop as data for an orchestrator that is not Claude Code (#82) — every step's
+  // command, inputs/outputs, exit contract and successor. Read-only and always JSON.
+  if (p.flags.manifest === true) {
+    if (!existsSync(runFlag)) {
+      console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
+      return 2;
+    }
+    console.log(JSON.stringify(buildManifest(runFlag, engineAbs), null, 2));
     return 0;
   }
   const res = orchestrateRun(runFlag, engineAbs, {

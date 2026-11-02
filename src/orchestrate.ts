@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join, resolve } from "node:path";
 import { unrenderedResidual, type AdjudicationFile, type AdjudicationItem } from "./adjudicate.js";
 import type { AuditResult } from "./types.js";
-import { agentContracts, phaseWorkflowScript, runbookMd } from "./orchestrate-templates.js";
+import { agentContracts, phaseSpec, phaseWorkflowScript, runbookMd, toBatches } from "./orchestrate-templates.js";
 import { readVerifyContext, type VerifyItem } from "./verify.js";
 
 // ---------------------------------------------------------------------------
@@ -63,15 +63,49 @@ function runStandard(run: string): string | undefined {
  *  `report` is the report the list was generated from once there is one (recorded beside it),
  *  the `<report.md>` placeholder before. `flags` holds no engine path, so the contracts — which
  *  name the engine through the injected `ENGINE` constant — can reuse it verbatim. */
-export function verifyRunContext(runDir: string): { report: string; flags: string; standard?: string } {
+export function verifyRunContext(runDir: string): { report: string; flags: string; flagArgs: string[]; standard?: string } {
   const run = resolve(runDir);
   const ctx = readVerifyContext(run);
   const standard = runStandard(run);
-  const flags = [`--in ${ctx?.in ?? join(run, "audit-latest.json")}`];
-  if (standard) flags.push(`--standard ${standard}`);
-  if (ctx?.conformities.source === "file") flags.push(`--conformities ${ctx.conformities.path}`);
-  if (ctx?.conformities.source === "disabled") flags.push("--no-conformities");
-  return { report: ctx && ctx.report !== "-" ? ctx.report : "<report.md>", flags: flags.join(" "), ...(standard ? { standard } : {}) };
+  const flagArgs = ["--in", ctx?.in ?? join(run, "audit-latest.json")];
+  if (standard) flagArgs.push("--standard", standard);
+  if (ctx?.conformities.source === "file") flagArgs.push("--conformities", ctx.conformities.path);
+  if (ctx?.conformities.source === "disabled") flagArgs.push("--no-conformities");
+  return {
+    report: ctx && ctx.report !== "-" ? ctx.report : REPORT_PLACEHOLDER,
+    flags: flagArgs.join(" "),
+    flagArgs,
+    ...(standard ? { standard } : {}),
+  };
+}
+
+/** Tokens a caller substitutes before running a step: they name inputs only the caller knows. */
+export const GLOBS_PLACEHOLDER = "<globs>";
+export const REPORT_PLACEHOLDER = "<report.md>";
+
+export type EngineStepId = "audit" | "adjudicate-worklist" | "adjudicate-fold" | "report" | "verify-worklist" | "verify-fold" | "gate" | "fix";
+
+/** EVERY ENGINE COMMAND OF THE LOOP, BUILT ONCE (#82) — as argv after `node <engine>`. The
+ *  phase table, the manifest and (through the manifest) the RUNBOOK and the workflow's fold
+ *  comment all render from here, so no two of them can ever disagree on a flag. */
+function engineArgs(run: string): Record<EngineStepId, string[]> {
+  const audit = join(run, "audit-latest.json");
+  const v = verifyRunContext(run);
+  return {
+    audit: ["audit", GLOBS_PLACEHOLDER, "--graph", "--out", run],
+    "adjudicate-worklist": ["verify", "--manual", "--in", audit, "--out", run],
+    "adjudicate-fold": ["verify", "--apply", join(run, "ADJUDICATE.todo.json"), "--in", audit, "--out", run],
+    report: ["report", "--in", audit, "--out", run],
+    "verify-worklist": ["verify", "--report", v.report, ...v.flagArgs, "--out", run],
+    "verify-fold": ["verify", "--apply", join(run, "VERIFY.todo.json"), "--report", v.report, ...v.flagArgs],
+    gate: ["check", "--report", v.report, ...(v.standard ? ["--standard", v.standard] : []), "--semantic", "--verdicts", join(run, "VERIFY.todo.json")],
+    fix: ["fix", GLOBS_PLACEHOLDER, "--write", "--iterate"],
+  };
+}
+
+/** One shell line for an engine step. The glob placeholder is quoted: the shell must not expand it. */
+export function renderCommand(engineAbs: string, args: string[]): string {
+  return `node ${engineAbs} ${args.map((a) => (a === GLOBS_PLACEHOLDER ? `"${a}"` : a)).join(" ")}`;
 }
 
 export function listPhases(runDir: string, engineAbs: string): PhaseInfo[] {
@@ -107,7 +141,7 @@ export function listPhases(runDir: string, engineAbs: string): PhaseInfo[] {
     }
   }
 
-  const vctx = verifyRunContext(run);
+  const args = engineArgs(run);
   return [
     {
       name: "adjudicate",
@@ -115,8 +149,8 @@ export function listPhases(runDir: string, engineAbs: string): PhaseInfo[] {
       worklist: adjPath,
       items: adjIds.length,
       ids: adjIds,
-      prerequisite: `node ${engineAbs} verify --manual --in ${join(run, "audit-latest.json")} --out ${run}`,
-      apply: `node ${engineAbs} verify --apply ${adjPath} --in ${join(run, "audit-latest.json")} --out ${run}`,
+      prerequisite: renderCommand(engineAbs, args["adjudicate-worklist"]),
+      apply: renderCommand(engineAbs, args["adjudicate-fold"]),
     },
     {
       name: "verify-report",
@@ -124,10 +158,189 @@ export function listPhases(runDir: string, engineAbs: string): PhaseInfo[] {
       worklist: verPath,
       items: verIds.length,
       ids: verIds,
-      prerequisite: `node ${engineAbs} verify --report ${vctx.report} ${vctx.flags} --out ${run}`,
-      apply: `node ${engineAbs} verify --apply ${verPath} --report ${vctx.report} ${vctx.flags}`,
+      prerequisite: renderCommand(engineAbs, args["verify-worklist"]),
+      apply: renderCommand(engineAbs, args["verify-fold"]),
     },
   ];
+}
+
+/** One step of the loop, as data (#82). An `engine` step is a command with an exit-code
+ *  contract; a `judgment` step is the model's work: a role, its contract, the worklist it fills
+ *  and the batches a fan-out dispatches. */
+export interface ManifestStep {
+  id: string;
+  kind: "engine" | "judgment";
+  title: string;
+  /** Engine steps: the shell line, and the same as argv (`["node", <engine>, …]`). */
+  command?: string;
+  argv?: string[];
+  /** Files (or placeholders) the step reads, and the files it writes. */
+  inputs: string[];
+  outputs: string[];
+  /** Engine steps: what each exit code means for the caller. */
+  exit?: Record<string, string>;
+  /** Judgment steps. */
+  role?: "adjudicator" | "refuter";
+  contract?: string;
+  worklist?: string;
+  items?: number;
+  batches?: string[][];
+  /** The structured fragment one batch returns (fan-out); the sequential path fills the worklist in place. */
+  schema?: unknown;
+  /** Every input that is a real file exists now (placeholders are the caller's to substitute). */
+  ready: boolean;
+  /** The step that comes next, or null at the end of the loop. */
+  next: string | null;
+  /** Where to go when this step exits non-zero, when that is not simply « stop ». */
+  onFailure?: string;
+}
+
+export interface OrchestrationManifest {
+  kind: "ultra11y-orchestration-manifest";
+  schemaVersion: 1;
+  run: string;
+  engine: string;
+  standard?: string;
+  placeholders: Array<{ token: string; meaning: string }>;
+  phases: PhaseInfo[];
+  steps: ManifestStep[];
+}
+
+const EXIT_USAGE = "usage / bad input (missing or unreadable file, unknown flag value)";
+
+/** THE ADJUDICATION LOOP AS DATA (#82) — what an orchestrator that is not Claude Code (a bot, a
+ *  CI job, another agent harness) drives instead of re-deriving the graph from the prose. The
+ *  RUNBOOK is rendered from it (`runbookMd`), so the data and the prose are one source. */
+export function buildManifest(runDir: string, engineAbs: string, batchSize = BATCH_SIZE): OrchestrationManifest {
+  const run = resolve(runDir);
+  const args = engineArgs(run);
+  const phases = listPhases(run, engineAbs);
+  const v = verifyRunContext(run);
+  const audit = join(run, "audit-latest.json");
+  const adjTodo = join(run, "ADJUDICATE.todo.json");
+  const verTodo = join(run, "VERIFY.todo.json");
+  const placeholder = (f: string) => f === GLOBS_PLACEHOLDER || f === REPORT_PLACEHOLDER;
+  const ready = (inputs: string[]) => inputs.every((f) => placeholder(f) || existsSync(f));
+  const engine = (id: EngineStepId, title: string, inputs: string[], outputs: string[], exit: Record<string, string>, next: string | null): ManifestStep => ({
+    id,
+    kind: "engine",
+    title,
+    command: renderCommand(engineAbs, args[id]),
+    argv: ["node", engineAbs, ...args[id]],
+    inputs,
+    outputs,
+    exit,
+    ready: ready(inputs),
+    next,
+  });
+  const judgment = (id: string, ph: PhaseInfo, role: "adjudicator" | "refuter", title: string, inputs: string[], next: string): ManifestStep => ({
+    id,
+    kind: "judgment",
+    title,
+    role,
+    contract: join(run, "orchestration", "agents", `${role}.md`),
+    worklist: ph.worklist,
+    items: ph.items,
+    batches: toBatches(ph.ids, batchSize),
+    schema: phaseSpec(ph.name).schema,
+    inputs,
+    outputs: [ph.worklist],
+    ready: ph.ready && ph.items > 0,
+    next,
+  });
+  const [adj, ver] = phases as [PhaseInfo, PhaseInfo];
+  const verAudit = v.flagArgs[v.flagArgs.indexOf("--in") + 1]!;
+  return {
+    kind: "ultra11y-orchestration-manifest",
+    schemaVersion: 1,
+    run,
+    engine: engineAbs,
+    ...(v.standard ? { standard: v.standard } : {}),
+    placeholders: [
+      { token: GLOBS_PLACEHOLDER, meaning: "the files to audit — a glob the shell must not expand, or explicit paths" },
+      { token: REPORT_PLACEHOLDER, meaning: `the Markdown report the \`report\` step writes into ${run} (<standard>-<date>.md)` },
+    ].filter((p) => p.token === GLOBS_PLACEHOLDER || v.report === REPORT_PLACEHOLDER),
+    phases,
+    steps: [
+      engine(
+        "audit",
+        "Audit — the deterministic finding set",
+        [GLOBS_PLACEHOLDER],
+        [audit],
+        { "0": "audit written (no --fail-on, or clean)", "1": "findings at or above --fail-on", "2": EXIT_USAGE },
+        "adjudicate-worklist",
+      ),
+      engine(
+        "adjudicate-worklist",
+        "Adjudication worklist — the criteria the engine could not decide",
+        [audit],
+        [adjTodo, join(run, "ADJUDICATE.md"), join(run, "ADJUDICATE.verdicts.json"), join(run, "adjudicate")],
+        { "0": "worklist written (possibly empty: nothing to adjudicate)", "2": EXIT_USAGE },
+        "adjudicate",
+      ),
+      judgment(
+        "adjudicate",
+        adj,
+        "adjudicator",
+        "Adjudicate — fill every item's verdict (C/NC/NA/manual)",
+        [adjTodo, join(run, "adjudicate")],
+        "adjudicate-fold",
+      ),
+      engine(
+        "adjudicate-fold",
+        "Fold — the fail-closed gate on the adjudication",
+        [adjTodo, audit],
+        [audit],
+        {
+          "0": "at least one verdict landed (refusals, if any, named in rejectedCriteria[] / issues[])",
+          "1": "nothing landed, or --strict and a refusal",
+          "2": EXIT_USAGE,
+        },
+        "report",
+      ),
+      engine(
+        "report",
+        "Report — deterministic rendering of the adjudicated audit",
+        [audit],
+        [REPORT_PLACEHOLDER],
+        { "0": "report written", "2": EXIT_USAGE },
+        "verify-worklist",
+      ),
+      engine(
+        "verify-worklist",
+        "Trial worklist — the report's non-conformities and the audit's claimed conformities",
+        [v.report, verAudit],
+        [verTodo, join(run, "VERIFY.md"), join(run, "VERIFY.context.json")],
+        { "0": "worklist written", "2": EXIT_USAGE },
+        "verify",
+      ),
+      judgment("verify", ver, "refuter", "Verify — rule every claim supported/partial/refuted/unsupported", [verTodo], "verify-fold"),
+      engine(
+        "verify-fold",
+        "Apply the trial — coverage and grounding gate",
+        [verTodo, v.report, verAudit],
+        [],
+        {
+          "0": "every claim on trial supported or partial, and grounded in source",
+          "1": "a claim refuted, unsupported, unadjudicated, missing or ungrounded",
+          "2": EXIT_USAGE,
+        },
+        "gate",
+      ),
+      {
+        ...engine(
+          "gate",
+          "Gate — structural and semantic check of the report",
+          [v.report, verTodo],
+          [],
+          { "0": "report sound and semantic gate green — it may be presented", "1": "integrity or semantic failure — do not present it", "2": EXIT_USAGE },
+          null,
+        ),
+        onFailure: "fix",
+      },
+      engine("fix", "Fix & re-audit — then loop", [GLOBS_PLACEHOLDER], [], { "0": "fixes applied (or nothing to fix)", "2": EXIT_USAGE }, "audit"),
+    ],
+  };
 }
 
 export interface OrchestrateOptions {
@@ -243,7 +456,7 @@ export function orchestrateRun(runDir: string, engineAbs: string, opts: Orchestr
   }
 
   const rb = join(orchDir, "RUNBOOK.md");
-  writeFileSync(rb, runbookMd(phases, run, engineAbs, unrenderedInRun(run), verifyRunContext(run)));
+  writeFileSync(rb, runbookMd(buildManifest(run, engineAbs), unrenderedInRun(run)));
   written.push(rb);
 
   return { exitCode: 0, written, notices, errors: [], phases };
