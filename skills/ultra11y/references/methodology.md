@@ -68,7 +68,9 @@ lead, accessibility referent). It says where the site stands, what to fix and on
 never `file:line`, selectors, tool method or commands:
 
 - **Header** — date, the audited pages (or « source code only »), the headline rate (a pack
-  report: the standard's own conformity rate, validated ÷ applicable), the caveats that change
+  report: the standard's own conformity rate, validated ÷ applicable, and right under it, when
+  pages are in scope, the « taux moyen de conformité » — the mean of the per-page rates, each
+  computed the same way over its page), the caveats that change
   what a reader may conclude, and the link to the annex.
 - **Summary** — the level on the standard's published scale (`conformityLevels` in the pack;
   RGAA: non conforme < 50 % ≤ partiellement conforme < 100 % = totalement conforme), or a
