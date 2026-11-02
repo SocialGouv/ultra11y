@@ -125,8 +125,8 @@ describe("the page model", () => {
     expect(html).toContain("Périmètre réellement testé");
     expect(html).toContain("Aucune page rendue");
     expect(html).toContain("Grille exhaustive des critères");
-    expect(html).toContain("29 test(s) static");
-    expect(html).toContain("226 judgment");
+    expect(html).toContain("30 test(s) static");
+    expect(html).toContain("225 judgment");
     expect(html.match(/RGAA \d+\.\d+/g)?.length).toBeGreaterThanOrEqual(106);
     expect(html).not.toContain("[image porteuse d’information]");
   });

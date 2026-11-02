@@ -12,7 +12,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 1.1.1 | Non-text Content | A | judgment | img-alt-missing, canvas-fallback-missing, decorative-alt-misuse, decorative-marked-exposed, input-image-alt-missing, object-embed-no-name, chart-no-accessible-name | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.9, 4.7, 4.8, 4.9, 6.1, 6.2, 7.2, 10.2, 13.3, 13.4, 13.5, 13.6 |
+| 1.1.1 | Non-text Content | A | judgment | img-alt-missing, canvas-fallback-missing, decorative-alt-misuse, decorative-marked-exposed, input-image-alt-missing, object-embed-no-name, chart-no-accessible-name, figure-caption-unassociated | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.9, 4.7, 4.8, 4.9, 6.1, 6.2, 7.2, 10.2, 13.3, 13.4, 13.5, 13.6 |
 
 ## 1.2 Time-based Media
 

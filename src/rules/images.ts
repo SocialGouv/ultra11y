@@ -209,4 +209,56 @@ const chartNoAccessibleName: Rule = {
   },
 };
 
-export const imagesRules: Rule[] = [imgAltMissing, decorativeAltMisuse, canvasFallbackMissing, inputImageAltMissing, objectEmbedNoName, chartNoAccessibleName];
+// RGAA 1.9.1 — an image with a caption (`<img>`, `<input type="image">`, `role="img"`) sits in a
+// `<figure>` that carries `role="figure"` or `role="group"` AND an `aria-label` identical to its
+// `<figcaption>` (the criterion's technical note: assistive technologies still support
+// <figure> poorly, so the association must be explicit). WCAG asks none of this, so the rule
+// ships ADVISORY and the RGAA pack re-normativizes it through `overrides` — the
+// presentational-* pattern. egapro#4921 shipped three charts in a bare <figure>.
+// Conservative: literal role, label and caption only; a spread may carry both attributes.
+const FIGURE_ROLES = new Set(["figure", "group"]);
+const collapseWs = (s: string): string => s.replace(/\s+/g, " ").trim();
+// `:role` / `v-bind:aria-label`… — a framework binding, as opposed to the literal attribute
+// (`boundAttr` matches both, its prefix list starts with "").
+const frameworkBound = (el: El, name: string): boolean => [":", "v-bind:", "x-bind:", "bind:"].some((p) => `${p}${name}` in el.attribs);
+const isCaptionedImage = (d: El): boolean =>
+  d.tag === "img" || (d.tag === "input" && (attr(d, "type") ?? "").trim().toLowerCase() === "image") || (attr(d, "role") ?? "").trim().toLowerCase() === "img";
+
+const figureCaptionUnassociated: Rule = {
+  id: "figure-caption-unassociated",
+  criteria: ["1.1.1"],
+  severity: "majeur",
+  advisory: true,
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (el.tag !== "figure" || isHidden(el) || hasDynamicSpread(el)) continue;
+      const desc = descendants(el);
+      const caption = desc.find((d) => d.tag === "figcaption");
+      if (!caption || !desc.some((d) => d !== caption && isCaptionedImage(d) && !ancestors(d).includes(caption))) continue;
+      const captionText = collapseWs(textContent(caption));
+      if (!captionText || captionText.includes("{") || mayInjectContent(caption)) continue;
+      const role = attr(el, "role");
+      const label = attr(el, "aria-label");
+      // A bound value we cannot read proves nothing either way.
+      if ((role ?? "").includes("{") || (label ?? "").includes("{") || frameworkBound(el, "role") || frameworkBound(el, "aria-label")) continue;
+      const missing: string[] = [];
+      if (!FIGURE_ROLES.has((role ?? "").trim().toLowerCase())) missing.push("role");
+      if (label === undefined || !label.trim()) missing.push("aria-label");
+      else if (collapseWs(label) !== captionText) missing.push("aria-label-mismatch");
+      if (!missing.length) continue;
+      out.push({ criteriaId: "1.1.1", el, msgId: "figure-caption-unassociated", params: { caption: captionText, missing: missing.join(",") } });
+    }
+    return out;
+  },
+};
+
+export const imagesRules: Rule[] = [
+  figureCaptionUnassociated,
+  imgAltMissing,
+  decorativeAltMisuse,
+  canvasFallbackMissing,
+  inputImageAltMissing,
+  objectEmbedNoName,
+  chartNoAccessibleName,
+];

@@ -131,7 +131,8 @@ var wcag_default = {
         "decorative-marked-exposed",
         "input-image-alt-missing",
         "object-embed-no-name",
-        "chart-no-accessible-name"
+        "chart-no-accessible-name",
+        "figure-caption-unassociated"
       ],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html",
       techniques: [
@@ -39039,6 +39040,32 @@ var MSG_CATALOG = {
       en: () => `Add aria-label/title describing the content (and text fallback content inside <object>\u2026</object>), or aria-hidden="true" if decorative.`
     }
   },
+  "figure-caption-unassociated": {
+    message: {
+      fr: (p) => {
+        const m = String(p.missing).split(",");
+        const parts2 = [
+          m.includes("role") ? `pas de role="figure" ou "group"` : "",
+          m.includes("aria-label") ? "pas d'aria-label" : "",
+          m.includes("aria-label-mismatch") ? "un aria-label diff\xE9rent de la l\xE9gende" : ""
+        ].filter(Boolean);
+        return `<figure> l\xE9gend\xE9e (\xAB ${p.caption} \xBB) : ${parts2.join(", ")} \u2014 la l\xE9gende n'est pas reli\xE9e \xE0 l'image (test RGAA 1.9.1).`;
+      },
+      en: (p) => {
+        const m = String(p.missing).split(",");
+        const parts2 = [
+          m.includes("role") ? `no role="figure" or "group"` : "",
+          m.includes("aria-label") ? "no aria-label" : "",
+          m.includes("aria-label-mismatch") ? "an aria-label that differs from the caption" : ""
+        ].filter(Boolean);
+        return `Captioned <figure> ("${p.caption}"): ${parts2.join(", ")} \u2014 the caption is not tied to the image.`;
+      }
+    },
+    remediation: {
+      fr: (p) => `Ajoutez role="figure" et aria-label="${p.caption}" sur la balise <figure>, identique au contenu du <figcaption>.`,
+      en: (p) => `Add role="figure" and aria-label="${p.caption}" to the <figure>, identical to the <figcaption> content.`
+    }
+  },
   "chart-no-accessible-name": {
     message: {
       fr: (p) => `Graphique (<${p.tag}> ${p.cls}) sans nom accessible \u2014 alternative textuelle manquante.`,
@@ -41082,6 +41109,10 @@ var rgaa_default = {
     "presentational-spacing": {
       advisory: false,
       severity: "majeur"
+    },
+    "figure-caption-unassociated": {
+      advisory: false,
+      severity: "majeur"
     }
   },
   themes: [
@@ -41960,17 +41991,24 @@ var rgaa_default = {
       ],
       wcag: ["1.1.1", "4.1.2"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["figure-caption-unassociated"]
       },
       automation: {
         tests: {
-          "1": "judgment",
+          "1": "static",
           "2": "judgment",
           "3": "judgment",
           "4": "judgment",
           "5": "judgment"
         },
-        rules: []
+        rules: [
+          {
+            id: "figure-caption-unassociated",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -50101,7 +50139,46 @@ var chartNoAccessibleName = {
     return out2;
   }
 };
-var imagesRules = [imgAltMissing, decorativeAltMisuse, canvasFallbackMissing, inputImageAltMissing, objectEmbedNoName, chartNoAccessibleName];
+var FIGURE_ROLES = /* @__PURE__ */ new Set(["figure", "group"]);
+var collapseWs = (s) => s.replace(/\s+/g, " ").trim();
+var frameworkBound = (el, name2) => [":", "v-bind:", "x-bind:", "bind:"].some((p) => `${p}${name2}` in el.attribs);
+var isCaptionedImage = (d) => d.tag === "img" || d.tag === "input" && (attr(d, "type") ?? "").trim().toLowerCase() === "image" || (attr(d, "role") ?? "").trim().toLowerCase() === "img";
+var figureCaptionUnassociated = {
+  id: "figure-caption-unassociated",
+  criteria: ["1.1.1"],
+  severity: "majeur",
+  advisory: true,
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (el.tag !== "figure" || isHidden(el) || hasDynamicSpread(el)) continue;
+      const desc = descendants(el);
+      const caption = desc.find((d) => d.tag === "figcaption");
+      if (!caption || !desc.some((d) => d !== caption && isCaptionedImage(d) && !ancestors(d).includes(caption))) continue;
+      const captionText = collapseWs(textContent(caption));
+      if (!captionText || captionText.includes("{") || mayInjectContent(caption)) continue;
+      const role = attr(el, "role");
+      const label = attr(el, "aria-label");
+      if ((role ?? "").includes("{") || (label ?? "").includes("{") || frameworkBound(el, "role") || frameworkBound(el, "aria-label")) continue;
+      const missing = [];
+      if (!FIGURE_ROLES.has((role ?? "").trim().toLowerCase())) missing.push("role");
+      if (label === void 0 || !label.trim()) missing.push("aria-label");
+      else if (collapseWs(label) !== captionText) missing.push("aria-label-mismatch");
+      if (!missing.length) continue;
+      out2.push({ criteriaId: "1.1.1", el, msgId: "figure-caption-unassociated", params: { caption: captionText, missing: missing.join(",") } });
+    }
+    return out2;
+  }
+};
+var imagesRules = [
+  figureCaptionUnassociated,
+  imgAltMissing,
+  decorativeAltMisuse,
+  canvasFallbackMissing,
+  inputImageAltMissing,
+  objectEmbedNoName,
+  chartNoAccessibleName
+];
 
 // src/rules/frames.ts
 var iframeTitleMissing = {

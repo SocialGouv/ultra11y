@@ -639,7 +639,7 @@ const NEEDS_RENDERING = new Set([
 // icon-only-control-unnamed) appear under BOTH their SCs so registry's bidirectional
 // rule↔dataset cross-check holds.
 const RULE_SC_COVERAGE = {
-  "1.1.1": ["img-alt-missing", "canvas-fallback-missing", "decorative-alt-misuse", "decorative-marked-exposed", "input-image-alt-missing", "object-embed-no-name", "chart-no-accessible-name"],
+  "1.1.1": ["img-alt-missing", "canvas-fallback-missing", "decorative-alt-misuse", "decorative-marked-exposed", "input-image-alt-missing", "object-embed-no-name", "chart-no-accessible-name", "figure-caption-unassociated"],
   "1.2.2": ["media-no-track"],
   "1.3.1": [
     "fieldset-legend-missing", "data-table-no-headers", "table-caption-missing",

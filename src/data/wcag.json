@@ -110,7 +110,8 @@
         "decorative-marked-exposed",
         "input-image-alt-missing",
         "object-embed-no-name",
-        "chart-no-accessible-name"
+        "chart-no-accessible-name",
+        "figure-caption-unassociated"
       ],
       "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html",
       "techniques": [

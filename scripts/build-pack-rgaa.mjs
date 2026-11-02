@@ -126,7 +126,7 @@ const bareSc = (w) => String(w).trim().split(/\s+/)[0];
 const RULE_SC = {
   "aria-hidden-focusable": ["4.1.2"], "aria-invalid-no-description": ["3.3.1"], "aria-ref-missing-id": ["4.1.2"],
   "aria-required-children": ["4.1.2"], "autoplay-media": ["1.4.2", "2.2.2"], "blink-marquee": ["2.2.2"],
-  "button-empty-name": ["4.1.2"], "canvas-fallback-missing": ["1.1.1"], "chart-no-accessible-name": ["1.1.1"],
+  "button-empty-name": ["4.1.2"], "canvas-fallback-missing": ["1.1.1"], "chart-no-accessible-name": ["1.1.1"], "figure-caption-unassociated": ["1.1.1"],
   "clickable-noninteractive": ["4.1.2", "2.1.1"], "contrast-literal": ["1.4.3"], "control-label-missing": ["4.1.2"],
   "rendered-contrast": ["1.4.3"], "rendered-contrast-pixel": ["1.4.3"], "rendered-link-colour-only": ["1.4.1"],
   "rendered-nontext-contrast": ["1.4.11"], "rendered-focus-not-visible": ["2.4.7"], "rendered-orientation-lock": ["1.3.4"],
@@ -195,6 +195,9 @@ const RULE_TO_CRITERIA = {
   // Theme 1 — images (1.1 informative alt, 1.2 decorative)
   "img-alt-missing": ["1.1"], "input-image-alt-missing": ["1.1"], "object-embed-no-name": ["1.1"],
   "chart-no-accessible-name": ["1.1"], "canvas-fallback-missing": ["1.1"], "axe:image-alt": ["1.1"],
+  // RGAA 1.9.1: a captioned <figure> carries role="figure"|"group" and an aria-label identical to
+  // its <figcaption> (#97). Advisory in the WCAG core, re-normativized by `overrides` below.
+  "figure-caption-unassociated": ["1.9"],
   "axe:input-image-alt": ["1.1"], "axe:area-alt": ["1.1"], "axe:role-img-alt": ["1.1"], "axe:svg-img-alt": ["1.1"],
   "axe:object-alt": ["1.1"], "decorative-alt-misuse": ["1.2"], "axe:image-redundant-alt": ["1.2"],
   "decorative-marked-exposed": ["1.2"],
@@ -329,6 +332,7 @@ const RULE_TO_CRITERIA = {
 // `candidate` below. This deliberately small table contains only failures whose observation
 // itself exhausts the cited numbered test.
 const DECISIVE_RULE_TESTS = {
+  "1.9|figure-caption-unassociated": ["1"],
   "1.1|axe:area-alt": ["2"],
   "1.1|axe:input-image-alt": ["3"],
   "1.1|input-image-alt-missing": ["3"],
@@ -690,6 +694,8 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
   if (!presentational) throw new Error("build-pack-rgaa: RGAA 10.1 is missing from the referential");
   presentational.appliesTo = { ruleIds: [...new Set([...presentational.appliesTo.ruleIds, ...PRESENTATIONAL_RULE_IDS])].sort() };
   const overrides = Object.fromEntries(PRESENTATIONAL_RULE_IDS.map((id) => [id, { advisory: false, severity: "majeur" }]));
+  // Same reason, second use: WCAG never asks a <figure> for role + aria-label, RGAA 1.9.1 does.
+  overrides["figure-caption-unassociated"] = { advisory: false, severity: "majeur" };
 
   // ---- Test-level automation matrix -------------------------------------------------
   // Start fail-closed: every one of DINUM's 258 tests is a judgment until a rule is
