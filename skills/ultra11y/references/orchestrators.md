@@ -235,9 +235,11 @@ Read exit codes from the process, **not** from a pipeline — `cmd --json | head
   counted as `failed`.
 - Under a pack standard (`--standard rgaa`), `audit-latest.json` is a `pack-audit` document:
   its root `conformancePct` is the automatic pass rate for that standard, `core` is the WCAG
-  audit, and `report --json` and `verify --apply --json` echo the **core** rate. The
-  standard's own conformance rate (validated ÷ validated + NC + à évaluer, NA excluded) is
-  printed by the report; derive it from `criteria[]` if a number is needed in a pipeline.
+  audit, and `verify --apply --json` echoes the **core** rate. `report --json` says what the
+  report says: `conformancePct` is the standard's own conformance rate (validated ÷ validated
+  + NC + à évaluer, NA excluded; `null` when nothing is applicable), `conformance` its operands
+  (`validated`, `applicable`, `na`, `open`, `decided`, `total`), `automaticPct` / `automatic`
+  the annex's automatic rate, and `standard` the resolved key (`--standard RGAA` → `rgaa`).
 - `check --json` → `{ ok, issues[] }`.
 - `scan --merge --json` → the merged audit document, opened by a top-level `pages` summary:
   `{ sample, recorded[], refused: [{id, reason}] }` — the declared sample's size (`--sample`),

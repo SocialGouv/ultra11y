@@ -23,6 +23,7 @@ import {
   pageConformanceCell,
   writeReportFiles,
   packPartialAudit,
+  packReportRates,
   partialAuditBanner,
   ranBrowser,
   withReportAnnexes,
@@ -128,7 +129,7 @@ import { pageCriterionRows, pagesForStandard, renderPageDocument, renderPagesDoc
 import { crawlBound, crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
 import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
-import { resolveStandard, getPack, isCore, findingsForStandard, type StandardId } from "./standards/index.js";
+import { resolveStandard, getPack, isCore, loadPack, findingsForStandard, type StandardId } from "./standards/index.js";
 import { auditDocumentFor, packAuditDocument, unwrapAudit } from "./standards/document.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
@@ -2234,15 +2235,22 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
   const untested = isCore(standard) ? [] : packPartialAudit(result, standard);
   const partial = untested.length > 0;
   if (partial && !p.flags.json) console.error(`🚨 ${partialAuditBanner(lang, untested, { scanned: ranBrowser(result) })}`);
+  // The rate the document headlines, never another one (#116): a pack report prints its own
+  // conformity rate (validated ÷ applicable) over its own grid, not the WCAG core's
+  // `conformancePct`. Its operands travel with it — and `null`, not 100, when nothing is
+  // applicable, as the report itself refuses to print « 100 % (0 ÷ 0) ».
+  const rates = isCore(standard) ? undefined : packReportRates(result, loadPack(standard));
   if (p.flags.json)
     console.log(
       JSON.stringify(
         {
           path,
           annexPath,
-          conformancePct: result.conformancePct,
+          conformancePct: rates ? (rates.conformance.applicable === 0 ? null : rates.conformance.pct) : result.conformancePct,
+          ...(rates ? { conformance: rates.conformance, automaticPct: rates.automatic.pct, automatic: rates.automatic } : {}),
           date: result.date,
-          standard: typeof p.flags.standard === "string" ? p.flags.standard : "wcag",
+          // The resolved key (`--standard RGAA` → "rgaa"), never the raw flag.
+          standard,
           ...(html ? { htmlPath: html.index, htmlSinglePath: html.composite } : {}),
           ...(partial ? { partialAudit: true, untestedCriteria: untested } : {}),
         },

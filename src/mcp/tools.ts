@@ -303,17 +303,20 @@ export const WRITE_TOOLS: ToolDecl[] = [
           type: "object",
           description: "The filled adjudication: { kind: 'adjudication', standard, items: [...] }, as ultra11y_adjudicate's worklist with your verdicts.",
         },
-        adjudication_file: { type: "string", description: "Absolute path to an adjudication JSON file to fold instead." },
+        adjudication_file: { type: "string", description: "Absolute path, inside cwd, to an adjudication JSON file to fold instead." },
         audit_file: {
           type: "string",
           description:
-            "Absolute path (or relative to cwd) to the audit JSON to fold into, like `--in`. Default: audit the project now, as ultra11y_adjudicate did.",
+            "Absolute path (or relative to cwd), inside cwd, to the audit JSON to fold into, like `--in`. Default: audit the project now, as ultra11y_adjudicate did.",
         },
         globs: globsProp,
         standard: { type: "string", description: "Must match the adjudication's own standard when given." },
         strict: { type: "boolean", description: "All-or-nothing: a single refused verdict discards the whole fold." },
         write: { type: "boolean", description: "Actually write the folded audit (default: dry-run, returns the gate's verdict)." },
-        out: { type: "string", description: "Directory, relative to cwd, for audit-latest.json. Default: the project root, as `verify --apply`." },
+        out: {
+          type: "string",
+          description: "Directory, relative to cwd and inside it, for audit-latest.json. Default: the project root, as `verify --apply`.",
+        },
         ledger: { type: "boolean", description: "With write:true, also record the accepted verdicts in .ultra11y/verdicts/<standard>.json." },
         lang: langProp,
       },

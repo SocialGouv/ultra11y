@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, resolve, sep } from "node:path";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { runAudit } from "../audit.js";
 import { type AdjudicationFile, applyAdjudication, buildAdjudicationWorklist, formatAdjudication, hydrateAdjudication } from "../adjudicate.js";
 import { entriesFrom, ledgerPath, mergeLedger, readLedger, unreadableCaptures, writeLedger } from "../ledger.js";
@@ -515,7 +515,11 @@ function handleFix(args: Record<string, unknown>, cwd: string): unknown {
  *  audit and, on `ledger`, merge the ACCEPTED verdicts into the ledger. A refused verdict never
  *  reaches the ledger: the next replay would launder it back in. */
 function handleFold(args: Record<string, unknown>, cwd: string): unknown {
-  const adj = adjudicationArg(args);
+  // Every path the fold reads or writes stays inside the project, as ultra11y_read's does
+  // (#116) — checked before anything is read, so a dry run refuses it as a write would.
+  const outArg = str(args.out);
+  const outDir = outArg === undefined ? cwd : containedPath(outArg, cwd, "out");
+  const adj = adjudicationArg(args, cwd);
   // The adjudication names its standard; it must be one this project knows.
   standardOf({ standard: adj.standard });
   const asked = str(args.standard);
@@ -526,7 +530,7 @@ function handleFold(args: Record<string, unknown>, cwd: string): unknown {
   const auditFile = str(args.audit_file);
   let base: AuditResult;
   if (auditFile) {
-    const path = resolve(cwd, auditFile);
+    const path = containedPath(auditFile, cwd, "audit_file");
     try {
       base = unwrapAudit(JSON.parse(readFileSync(path, "utf8"))) as AuditResult;
     } catch {
@@ -560,7 +564,6 @@ function handleFold(args: Record<string, unknown>, cwd: string): unknown {
         : "Nothing landed. Fix the refused verdicts listed in issues — cite the evidence a C cleared, ground every NC finding — and fold again.",
     };
   }
-  const outDir = resolve(cwd, str(args.out) ?? ".");
   mkdirSync(outDir, { recursive: true });
   const auditPath = join(outDir, "audit-latest.json");
   writeFileSync(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}\n`);
@@ -584,17 +587,52 @@ function handleFold(args: Record<string, unknown>, cwd: string): unknown {
   return { ...summary, written: true, auditPath, ...(ledger ? { ledger } : {}) };
 }
 
+/** `raw`, resolved against the project root, refused unless it lands inside it. Containment
+ *  on the REALPATH, as ultra11y_read's: a symlink inside the project normalises cleanly as a
+ *  string and only escapes once the filesystem resolves it. A path that does not exist yet (an
+ *  `out` directory the fold will create) is held by its nearest existing ancestor; a dangling
+ *  symlink resolves to nowhere and is refused. Returns the path as the caller wrote it, resolved. */
+function containedPath(raw: string, cwd: string, field: string): string {
+  const refuse = (): never => {
+    throw new ToolError(`\`${field}\` is outside the project: ${raw}. The fold reads and writes inside its cwd only.`);
+  };
+  const target = resolve(cwd, raw);
+  let existing = target;
+  const rest: string[] = [];
+  for (;;) {
+    try {
+      lstatSync(existing);
+      break;
+    } catch {
+      const parent = dirname(existing);
+      if (parent === existing) break;
+      rest.unshift(basename(existing));
+      existing = parent;
+    }
+  }
+  let real: string;
+  try {
+    real = join(realpathSync(existing), ...rest);
+  } catch {
+    return refuse();
+  }
+  const root = realpathSync(cwd);
+  if (real !== root && !real.startsWith(root + sep)) refuse();
+  return target;
+}
+
 /** The adjudication to fold: inline, or a file the caller named. Only `kind: "adjudication"`
  *  is a fold — a ledger is replayed, not folded, and an array is the NC-verdicts worklist. */
-function adjudicationArg(args: Record<string, unknown>): AdjudicationFile {
+function adjudicationArg(args: Record<string, unknown>, cwd: string): AdjudicationFile {
   const inline = args.adjudication;
   const file = str(args.adjudication_file);
   if (inline !== undefined && file) throw new ToolError("pass `adjudication` or `adjudication_file`, not both.");
   let v: unknown = inline;
   if (file) {
     if (!isAbsolute(file)) throw new ToolError("`adjudication_file` must be an absolute path.");
+    const path = containedPath(file, cwd, "adjudication_file");
     try {
-      v = JSON.parse(readFileSync(file, "utf8"));
+      v = JSON.parse(readFileSync(path, "utf8"));
     } catch {
       throw new ToolError(`\`adjudication_file\` not found or not valid JSON: ${file}`);
     }
