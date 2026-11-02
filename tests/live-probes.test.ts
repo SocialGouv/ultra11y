@@ -101,6 +101,32 @@ describe("runLiveProbes", () => {
     expect(r.skipped?.find((s) => s.sc === "1.4.10")?.why).toMatch(/viewport is fixed/);
   });
 
+  it("measures the untouched page BEFORE injecting the spacing override, and skips 1.4.12 without it (#134)", async () => {
+    // The probe reports only what the override CHANGES, so the baseline has to be taken first;
+    // a baseline that failed leaves nothing to compare, and the criterion must read as
+    // unmeasured — never as a clean page.
+    const page = fakePage();
+    const base = page.evaluate;
+    page.evaluate = async (script: string) => {
+      if (script.includes("__u11ySpacingBase =")) page.log.push("spacing:baseline");
+      return base(script);
+    };
+    await runLiveProbes(page, { only: ["1.4.12"] });
+    expect(page.log.indexOf("spacing:baseline")).toBeGreaterThanOrEqual(0);
+    expect(page.log.indexOf("spacing:baseline")).toBeLessThan(page.log.indexOf("style:add"));
+
+    const broken = fakePage();
+    const inner = broken.evaluate;
+    broken.evaluate = async (script: string) => {
+      if (script.includes("__u11ySpacingBase =")) throw new Error("baseline failed");
+      return inner(script);
+    };
+    const r = await runLiveProbes(broken, { only: ["1.4.12"] });
+    expect(r.probed).not.toContain("1.4.12");
+    expect(r.skipped?.find((s) => s.sc === "1.4.12")?.why).toMatch(/baseline failed/);
+    expect(broken.log, "no override is injected when there is nothing to compare it with").not.toContain("style:add");
+  });
+
   it("keeps going when one probe throws — a measurement lost is not a page lost", async () => {
     // The guard that matters in a suite: a probe failing must cost its own criterion, never
     // the snapshot and never the caller's test.

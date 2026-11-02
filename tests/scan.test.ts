@@ -312,10 +312,37 @@ describe("mergeDynamic", () => {
     const merged = mergeDynamic(audit, dyn, "en");
     const reflow = merged.findings.find((f) => f.ruleId === "dyn-reflow");
     expect(reflow?.msg?.id).toBe("dyn-reflow");
-    expect(resolveMessage(reflow!, "fr")).toBe("Défilement horizontal à 320px de large — le contenu ne se redistribue pas (reflow).");
+    expect(resolveMessage(reflow!, "fr")).toBe("Défilement horizontal à 320px de large.");
     expect(resolveRemediation(reflow!, "fr")).toBe("Vérifié au rendu par axe-core ; corrigez l'élément cité.");
     // and re-resolves back to English too — it never gets stuck in one language
-    expect(resolveMessage(reflow!, "en")).toBe("Horizontal scrolling at 320px width — content does not reflow.");
+    expect(resolveMessage(reflow!, "en")).toBe("Horizontal scrolling at 320px width.");
+  });
+
+  // #134 — « horizontal scroll: YES » named nothing a developer could go and change. The probe
+  // now names the boxes wider than the viewport; the finding is anchored on the first and the
+  // sentence carries all of them, in either language, through a later re-render.
+  it("names the boxes that widen the page, anchors on the first, and keeps them through --lang", () => {
+    const out = {
+      ...sampleOut,
+      reflow: {
+        horizontalScroll: true,
+        widening: [
+          { selector: "body", html: "<body>", detail: "déborde de 880px à droite (largeur 1200px)" },
+          { selector: "div.fr-table__wrapper", html: '<div class="fr-table__wrapper">', detail: "son contenu déborde" },
+        ],
+      },
+    };
+    const dyn = toDynamicResult(out, "https://exemple.fr", "fr");
+    const f = dyn.findings.find((x) => x.engine === "reflow")!;
+    expect(f.selector).toBe("body");
+    expect(f.message).toBe("Défilement horizontal à 320px de large — la page est élargie par body, div.fr-table__wrapper.");
+    const merged = mergeDynamic(runAudit({ inputs: [`${FIX}conforming/good.html`] }), dyn, "fr");
+    const reflow = merged.findings.find((x) => x.ruleId === "dyn-reflow")!;
+    expect(resolveMessage(reflow, "en")).toBe("Horizontal scrolling at 320px width — the page is widened by body, div.fr-table__wrapper.");
+    // And no cause is ever stated when none was measured.
+    expect(toDynamicResult(sampleOut, "https://exemple.fr", "fr").findings.find((x) => x.engine === "reflow")?.message).toBe(
+      "Défilement horizontal à 320px de large.",
+    );
   });
 
   it("attaches a msg catalog id to axe findings whose MESSAGE passes through unchanged (axe never translates) but whose REMEDIATION is re-localizable", () => {

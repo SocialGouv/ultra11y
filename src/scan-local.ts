@@ -33,6 +33,7 @@ import {
   probeLiveRegion,
   REFLOW_PROBE,
   REFLOW_ZOOM_PROBE,
+  TEXT_SPACING_BASELINE_STEP,
   TEXT_SPACING_CSS,
   TEXT_SPACING_PROBE,
 } from "./probes.js";
@@ -609,6 +610,7 @@ export function probeSources(): Record<string, string> {
     REFLOW_PROBE,
     REFLOW_ZOOM_PROBE,
     TEXT_SPACING_PROBE,
+    TEXT_SPACING_BASELINE_STEP,
     "focusSetupExpr(document)": focusSetupExpr(),
     "focusSetupExpr(scoped)": focusSetupExpr('[data-u11y-dialog="dl0"]'),
     FOCUS_CHECK_PROBE,
@@ -825,7 +827,7 @@ async function runOnPage(
     // manufactured out of its own instrumentation failing.
     const reflow = await ran("1.4.10", { horizontalScroll: false }, async () => {
       await page.setViewportSize({ width: 320, height: 800 });
-      return (await page.evaluate(REFLOW_PROBE)) as { horizontalScroll: boolean };
+      return (await page.evaluate(REFLOW_PROBE)) as RunnerOutput["reflow"];
     });
     const inputOverflowReflow = filled
       ? await stressed("1.4.10", async () => (await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.reflow[l], CELL_SUFFIX[l]))) as ProbeHit[])
@@ -834,6 +836,8 @@ async function runOnPage(
     // Same reasoning: without the override applied, this probe measures the page's own
     // spacing, and its silence says nothing at all about 1.4.12.
     const textSpacing = await ran("1.4.12", [] as ProbeHit[], async () => {
+      // The untouched page first: only what the override CHANGES is reported.
+      await page.evaluate(TEXT_SPACING_BASELINE_STEP);
       await page.addStyleTag({ content: TEXT_SPACING_CSS });
       return (await page.evaluate(TEXT_SPACING_PROBE)) as ProbeHit[];
     });

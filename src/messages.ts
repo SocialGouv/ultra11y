@@ -1297,10 +1297,13 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
   // (set in mergeDynamic) so a LATER `report`/`prd --lang` re-render can still
   // resolve the OTHER language, instead of staying stuck in whatever language was
   // baked at merge/scan time.
+  // `widening` — the selectors of the boxes the probe found wider than the viewport. Absent on a
+  // finding recorded before the probe named causes, or by a producer that did not look: the sentence then states
+  // the scroll and nothing else, never a cause nobody measured.
   "dyn-reflow": {
     message: {
-      fr: () => `Défilement horizontal à 320px de large — le contenu ne se redistribue pas (reflow).`,
-      en: () => `Horizontal scrolling at 320px width — content does not reflow.`,
+      fr: (p) => `Défilement horizontal à 320px de large${p.widening ? ` — la page est élargie par ${String(p.widening)}` : ""}.`,
+      en: (p) => `Horizontal scrolling at 320px width${p.widening ? ` — the page is widened by ${String(p.widening)}` : ""}.`,
     },
     remediation: {
       fr: () => `Vérifié au rendu par axe-core ; corrigez l'élément cité.`,

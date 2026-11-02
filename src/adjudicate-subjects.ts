@@ -594,7 +594,12 @@ function measured(sc: string): Subject {
       const probes = s.probes;
       if (probes?.probed?.includes(sc)) {
         const issues = PROBE_KEYS[sc]?.flatMap((k) => ((probes as Record<string, unknown>)[k] as { detail: string }[] | undefined) ?? []) ?? [];
-        const scroll = sc === "1.4.10" && probes.reflow ? ` horizontal scroll at 320px: ${probes.reflow.horizontalScroll ? "YES" : "no"};` : "";
+        // The cause, when the probe named one: « YES » alone sent the reader bisecting the DOM.
+        const wide = (probes.reflow?.widening ?? []).map((w) => w.selector).filter(Boolean);
+        const scroll =
+          sc === "1.4.10" && probes.reflow
+            ? ` horizontal scroll at 320px: ${probes.reflow.horizontalScroll ? `YES${wide.length ? ` (widened by ${wide.join(", ")})` : ""}` : "no"};`
+            : "";
         out.push(
           hAt(
             d,

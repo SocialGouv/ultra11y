@@ -28,7 +28,8 @@ import {
   type SnapshotMeta,
   type SnapshotProbes,
 } from "./snapshot.js";
-import { PROBES_VERSION } from "./probes.js";
+import { resolveMessage } from "./messages.js";
+import { PROBES_VERSION, REFLOW_PROBE } from "./probes.js";
 import { today } from "./util.js";
 import { findingId } from "./baseline.js";
 
@@ -54,6 +55,7 @@ const target = process.argv[2];
 const isFile = target.startsWith("/work/");
 const SNAPSHOT = process.env.ULTRA11Y_SNAPSHOT !== "0";
 const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
+const REFLOW = ${JSON.stringify(REFLOW_PROBE)};
 const browser = await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 try {
   const page = await browser.newPage();
@@ -70,10 +72,9 @@ try {
   await page.addScriptTag({ content: axe.source });
   const axeRes = await page.evaluate(async () => await window.axe.run(document, { resultTypes: ["violations"] }));
   await page.setViewportSize({ width: 320, height: 800 });
-  const reflow = await page.evaluate(() => {
-    const el = document.scrollingElement || document.documentElement;
-    return { horizontalScroll: el.scrollWidth > el.clientWidth + 2 };
-  });
+  // The same probe the local runtime runs (src/probes.ts REFLOW_PROBE): it waits for the
+  // relayout and names the boxes that widen the page, instead of a bare yes/no.
+  const reflow = await page.evaluate(REFLOW);
   const violations = axeRes.violations.map((v) => ({
     id: v.id, impact: v.impact, help: v.help, tags: v.tags,
     nodes: v.nodes.slice(0, 10).map((n) => ({ target: n.target, html: (n.html || "").slice(0, 200) })),
@@ -172,10 +173,19 @@ export interface ProbeHit {
   detail: string;
 }
 
+/** The selectors of the boxes a 320px reflow probe found widening the page, as one phrase — or
+ *  undefined when the producer did not look (an older Docker image or snapshot) or found no
+ *  box to name. A cause is only ever stated when it was measured. */
+export function reflowWidening(reflow: { widening?: { selector: string }[] } | undefined): string | undefined {
+  const sels = (reflow?.widening ?? []).map((w) => w.selector).filter(Boolean);
+  return sels.length ? sels.join(", ") : undefined;
+}
+
 export interface RunnerOutput {
   url: string;
   violations: { id: string; impact: string | null; help: string; tags?: string[]; nodes: { target: string[]; html: string }[] }[];
-  reflow: { horizontalScroll: boolean };
+  /** `widening`: the outermost boxes wider than the viewport, when the producer looked. */
+  reflow: { horizontalScroll: boolean; widening?: ProbeHit[] };
   // Residual-criteria probes — populated ONLY by the local runtime (scan-local.ts);
   // the Docker RUNNER never sets them, so its RunnerOutput is unchanged. Optional so
   // every existing caller/test (which omits them) stays valid.
@@ -482,19 +492,21 @@ export function toDynamicResult(out: RunnerOutput, target: string, lang: Lang = 
     }
   }
   if (out.reflow?.horizontalScroll) {
+    // THE CAUSE, NOT JUST THE SYMPTOM: the probe names the boxes wider than the viewport, and
+    // the finding is anchored on the first of them — the element a developer has to change.
+    const widening = reflowWidening(out.reflow);
+    const first = out.reflow.widening?.[0];
     findings.push({
       criteriaId: "1.4.10",
       axeRule: "reflow",
       impact: "serious",
       severity: "majeur",
-      message:
-        lang === "fr"
-          ? "Défilement horizontal à 320px de large — le contenu ne se redistribue pas (reflow)."
-          : "Horizontal scrolling at 320px width — content does not reflow.",
-      selector: "document",
-      snippet: "",
+      message: resolveMessage({ message: "", msg: { id: "dyn-reflow", params: widening ? { widening } : {} } }, lang),
+      selector: first?.selector || "document",
+      snippet: first?.html ?? "",
       engine: "reflow",
       page,
+      ...(widening ? { widening } : {}),
     });
   }
   // Residual-criteria probes (local runtime). Each hit the probe OBSERVED becomes a
@@ -780,7 +792,10 @@ export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: L
     // own bilingual reflow prose; "dyn-remediation" covers axe-core + the residual
     // probes, whose MESSAGE is the engine's own text (never translated — passed
     // through verbatim via params.message) while the REMEDIATION is still ours.
-    const msg = df.engine === "reflow" ? { id: "dyn-reflow" } : { id: "dyn-remediation", params: { message: df.message } };
+    const msg: { id: string; params?: Record<string, string> } =
+      df.engine === "reflow"
+        ? { id: "dyn-reflow", ...(df.widening ? { params: { widening: df.widening } } : {}) }
+        : { id: "dyn-remediation", params: { message: df.message } };
     const file = df.page ?? dynamic.target;
     // Anchor at a real host file:line by locating the cited outerHTML in the source (R3).
     // selector + snippet are ALWAYS kept as the anchor of last resort; line stays 0 (never
