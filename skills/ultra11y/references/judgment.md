@@ -131,7 +131,10 @@ an anchor it was never shown is refused exactly as before.
 agent-claimed `C`/`NA` (`kind: "c"`, carrying its `citations[]`). `VERIFY.todo.json` is a bare
 JSON array (where `ADJUDICATE.todo.json` is an object with `items`); fill `verdict` and `note` in
 each entry. The conformity half is uncapped unless you pass `--max-verify`; pass
-`--max-verify 0` to lift the 40-item cap on non-conformities too. Rule each, opening the file at
+`--max-verify 0` to lift the 40-item cap on non-conformities too. Pass the same `--in` (and
+`--standard`) to the generation and to `--apply`: without it, and with no ledger in the directory,
+the list never sees the adjudicated conformities (the generation warns; `VERIFY.context.json`
+records the context so `--apply` can name a source mismatch instead of a cap). Rule each, opening the file at
 the cited line:
 - `supported` — the non-conformity is real and correctly tied;
 - `partial` — real but the criterion/wording is imprecise;

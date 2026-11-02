@@ -17,6 +17,15 @@ paths and the real item ids baked in:
 node scripts/ultra11y.mjs orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list]
 ```
 
+The `verify-report` commands it emits — generation, fold, the refuter's fold line and the
+semantic gate — all carry **one run context**: the run's audit (`--in <RUN>/audit-latest.json`,
+or the `--in` the list was generated with), its `--standard`, and the explicit conformity source
+the list was built from (`--conformities <file>` / `--no-conformities`), read back from
+`<RUN>/VERIFY.context.json`. Without `--in`, a directory with no ledger produces a list that tries
+the report's non-conformities and silently skips every conformity the adjudication cleared; the
+fold then counts them « missing ». Keep the same context on both sides — `--max-verify 0` cannot
+repair a list generated from another claim source, only regenerating it can.
+
 ## Route by harness
 
 | Your harness | How to run each judgment phase |

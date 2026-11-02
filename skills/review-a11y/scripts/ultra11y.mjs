@@ -64042,6 +64042,21 @@ function applyVerdicts(items, expected) {
     conformitiesUntried: untried.filter((f) => f.kind === "c")
   };
 }
+var VERIFY_CONTEXT_FILE = "VERIFY.context.json";
+function writeVerifyContext(outDir, ctx) {
+  mkdirSync8(outDir, { recursive: true });
+  const p = join32(outDir, VERIFY_CONTEXT_FILE);
+  writeFileSync9(p, JSON.stringify(ctx, null, 2) + "\n");
+  return p;
+}
+function readVerifyContext(dir) {
+  try {
+    const c2 = JSON.parse(readFileSync18(join32(dir, VERIFY_CONTEXT_FILE), "utf8"));
+    return c2 && c2.kind === "verify-context" && c2.conformities && c2.capped ? c2 : void 0;
+  } catch {
+    return void 0;
+  }
+}
 function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") {
   mkdirSync8(outDir, { recursive: true });
   const todoPath = join32(outDir, "VERIFY.todo.json");
@@ -73122,15 +73137,13 @@ var PHASE_SPECS = {
     role: "adjudicator",
     title: "Adjudicate",
     schema: ADJUDICATE_SCHEMA,
-    description: (n) => `Adjudicate the ${n} residual judgment criterion(ia) of an ultra11y audit (fan-out, fail-closed fold)`,
-    applyHint: (engine, worklist, run2) => `node ${engine} verify --apply ${worklist} --in ${join49(run2, "audit-latest.json")} --out ${run2}`
+    description: (n) => `Adjudicate the ${n} residual judgment criterion(ia) of an ultra11y audit (fan-out, fail-closed fold)`
   },
   "verify-report": {
     role: "refuter",
     title: "Verify",
     schema: VERIFY_SCHEMA,
-    description: (n) => `Adversarially verify the ${n} non-conformity claim(s) of an ultra11y report (skeptic fan-out)`,
-    applyHint: (engine, worklist) => `node ${engine} verify --apply ${worklist} --report <report.md>`
+    description: (n) => `Adversarially verify the ${n} non-conformity claim(s) of an ultra11y report (skeptic fan-out)`
   }
 };
 function phaseSpec(name2) {
@@ -73177,7 +73190,7 @@ function phaseWorkflowScript(ph, runAbs, engineAbs, batchSize) {
     ``,
     `// One-writer rule: this workflow only COLLECTS verdict fragments. The main agent folds`,
     `// them into WORKLIST (fill each item's fields from the matching fragment), then runs:`,
-    `//   ${spec.applyHint(engineAbs, ph.worklist, runAbs)}`,
+    `//   ${ph.apply}`,
     `return { phase: ${JSON.stringify(ph.name)}, worklist: WORKLIST, results: results.filter(Boolean) }`,
     ``
   ].join("\n");
@@ -73204,7 +73217,7 @@ Every item comes back with a verdict. Each one stands or falls on its own: a ref
 Do not edit any other file, do not touch the audited source, do not commit, and do not comment on any pull request.
 `;
 }
-function ecoRefuterContract(runAbs) {
+function ecoRefuterContract(runAbs, verify) {
   return `# Contract: refuter (sequential / --eco)
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
@@ -73222,12 +73235,13 @@ For EACH entry:
    When unsure, choose the HARSHER verdict \u2014 a false pass is worse than a false fail.
 3. \`note\` is REQUIRED \u2014 one line grounded in what you read (quote or paraphrase the decisive code).
 
-Then fold: \`ultra11y verify --apply ${join49(runAbs, "VERIFY.todo.json")} --report <the report .md>\`. Without a shell, leave the fold to whoever gave you the file.
+Then fold: \`ultra11y verify --apply ${join49(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
 `;
 }
 function agentContracts(runAbs, opts = {}) {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
-  if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs) };
+  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join49(runAbs, "audit-latest.json")}` };
+  if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs, verify) };
   return {
     adjudicator: `# Contract: adjudicator
 
@@ -73269,9 +73283,13 @@ Return (structured output): \`{ "verdicts": [{ "n", "verdict", "note" }] }\` \u2
 ${footer}`
   };
 }
-function runbookMd(phases, runAbs, engineAbs, unrendered = []) {
+function runbookMd(phases, runAbs, engineAbs, unrendered = [], verify = { report: "<report.md>", flags: `--in ${join49(runAbs, "audit-latest.json")}` }) {
   const status = phases.map((p) => `| ${p.name} | \`${p.worklist}\` | ${p.ready ? `ready (${p.items} item(s))` : "not ready"} | \`${p.prerequisite}\` |`).join("\n");
   const engine = `node ${engineAbs}`;
+  const vr = phases.find((p) => p.name === "verify-report");
+  const verifyGen = vr?.prerequisite ?? `${engine} verify --report ${verify.report} ${verify.flags} --out ${runAbs}`;
+  const verifyApply = vr?.apply ?? `${engine} verify --apply ${join49(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}`;
+  const std = verify.standard ? ` --standard ${verify.standard}` : "";
   const renderFirst = unrendered.length ? `
 > \u26A0\uFE0F **Render before you adjudicate.** ${unrendered.length} criterion(ia) in this run need a rendered page and
 > nothing has been snapshotted: no reading of the source can settle them, and every pass over them
@@ -73305,8 +73323,8 @@ ${status}
 1. **Audit** (if not done): \`${engine} audit "<globs>" --graph --out ${runAbs}\` \u2192 \`${join49(runAbs, "audit-latest.json")}\`.
 2. **Adjudicate the residual criteria** \u2014 \`${engine} verify --manual --in ${join49(runAbs, "audit-latest.json")} --out ${runAbs}\` writes \`${join49(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join49(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${engine} verify --apply ${join49(runAbs, "ADJUDICATE.todo.json")} --in ${join49(runAbs, "audit-latest.json")} --out ${runAbs}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`${engine} report --in ${join49(runAbs, "audit-latest.json")} --out ${runAbs}\`.
-4. **Verify the report's claims** \u2014 \`${engine} verify --report <the report .md> --out ${runAbs}\` writes \`${join49(runAbs, "VERIFY.todo.json")}\`. For EVERY entry, apply \`${join49(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${engine} verify --apply ${join49(runAbs, "VERIFY.todo.json")} --report <the report .md>\`.
-5. **Gate**: \`${engine} check --report <the report .md> --semantic\` must exit 0 before presenting anything.
+4. **Verify the report's claims** \u2014 \`${verifyGen}\` writes \`${join49(runAbs, "VERIFY.todo.json")}\` (and \`${join49(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join49(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${verifyApply}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
+5. **Gate**: \`${engine} check --report ${verify.report}${std} --semantic --verdicts ${join49(runAbs, "VERIFY.todo.json")}\` must exit 0 before presenting anything.
 6. **Fix & re-audit**: \`${engine} fix <globs> --write --iterate\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
 With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join49(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` \u2014 you stay the sole writer either way.
@@ -73317,6 +73335,28 @@ With subagents available, prefer the emitted workflows instead: \`orchestrate --
 var PHASES = ["adjudicate", "verify-report"];
 var SMALL_WORKLIST = 3;
 var BATCH_SIZE2 = 8;
+function runStandard(run2) {
+  const ctx = readVerifyContext(run2);
+  if (ctx?.standard) return ctx.standard;
+  for (const f of ["ADJUDICATE.todo.json", "audit-latest.json"]) {
+    try {
+      const std = JSON.parse(readFileSync32(join50(run2, f), "utf8")).standard;
+      if (typeof std === "string" && std) return std;
+    } catch {
+    }
+  }
+  return void 0;
+}
+function verifyRunContext(runDir) {
+  const run2 = resolve15(runDir);
+  const ctx = readVerifyContext(run2);
+  const standard = runStandard(run2);
+  const flags2 = [`--in ${ctx?.in ?? join50(run2, "audit-latest.json")}`];
+  if (standard) flags2.push(`--standard ${standard}`);
+  if (ctx?.conformities.source === "file") flags2.push(`--conformities ${ctx.conformities.path}`);
+  if (ctx?.conformities.source === "disabled") flags2.push("--no-conformities");
+  return { report: ctx && ctx.report !== "-" ? ctx.report : "<report.md>", flags: flags2.join(" "), ...standard ? { standard } : {} };
+}
 function listPhases(runDir, engineAbs) {
   const run2 = resolve15(runDir);
   const adjPath = join50(run2, "ADJUDICATE.todo.json");
@@ -73345,6 +73385,7 @@ function listPhases(runDir, engineAbs) {
     } catch {
     }
   }
+  const vctx = verifyRunContext(run2);
   return [
     {
       name: "adjudicate",
@@ -73352,7 +73393,8 @@ function listPhases(runDir, engineAbs) {
       worklist: adjPath,
       items: adjIds.length,
       ids: adjIds,
-      prerequisite: `node ${engineAbs} verify --manual --in ${join50(run2, "audit-latest.json")} --out ${run2}`
+      prerequisite: `node ${engineAbs} verify --manual --in ${join50(run2, "audit-latest.json")} --out ${run2}`,
+      apply: `node ${engineAbs} verify --apply ${adjPath} --in ${join50(run2, "audit-latest.json")} --out ${run2}`
     },
     {
       name: "verify-report",
@@ -73360,7 +73402,8 @@ function listPhases(runDir, engineAbs) {
       worklist: verPath,
       items: verIds.length,
       ids: verIds,
-      prerequisite: `node ${engineAbs} verify --report <report.md> --out ${run2}`
+      prerequisite: `node ${engineAbs} verify --report ${vctx.report} ${vctx.flags} --out ${run2}`,
+      apply: `node ${engineAbs} verify --apply ${verPath} --report ${vctx.report} ${vctx.flags}`
     }
   ];
 }
@@ -73408,7 +73451,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
   mkdirSync17(agentsDir, { recursive: true });
   const written = [];
   const notices = [];
-  for (const [name2, content] of Object.entries(agentContracts(run2, { eco: opts.eco === true }))) {
+  for (const [name2, content] of Object.entries(agentContracts(run2, { eco: opts.eco === true, verify: verifyRunContext(run2) }))) {
     const p = join50(agentsDir, `${name2}.md`);
     writeFileSync20(p, content);
     written.push(p);
@@ -73437,7 +73480,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
     }
   }
   const rb = join50(orchDir, "RUNBOOK.md");
-  writeFileSync20(rb, runbookMd(phases, run2, engineAbs, unrenderedInRun(run2)));
+  writeFileSync20(rb, runbookMd(phases, run2, engineAbs, unrenderedInRun(run2), verifyRunContext(run2)));
   written.push(rb);
   return { exitCode: 0, written, notices, errors: [], phases };
 }
@@ -77833,13 +77876,28 @@ function cmdVerify(p) {
     const repMd = readReportInput(applyReport, "verify");
     if (repMd === null) return 2;
     const expectedNc = buildWorklist(repMd, standard, Number.POSITIVE_INFINITY);
-    const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFor(p, standard, lang), expectedNc.length, Number.POSITIVE_INFINITY)];
+    const trial = conformityTrial(p, standard, lang);
+    const expected = [...expectedNc, ...buildConformityWorklist(trial.claims, expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items, expected);
+    const ctx = readVerifyContext(dirname20(resolve18(apply)));
+    const absentItems = r.failures.filter((f) => !items.includes(f));
+    const absentC = absentItems.filter((f) => f.kind === "c").length;
+    const sourceDiffers = ctx ? !sameConformitySource(ctx.conformities, trial.source) : absentC > 0 && !items.some((it) => it.kind === "c");
+    const capCould = ctx ? ctx.capped.nc + ctx.capped.c > 0 : !sourceDiffers;
+    const missingCause = r.missing ? capCould ? "cap" : sourceDiffers ? "source" : "other" : void 0;
     const passing = items.filter((it) => typeof it.verdict === "string" && ["supported", "partial"].includes(it.verdict.trim().toLowerCase()));
     const grounding = groundItems(verifyGroundingInputs(passing, trialAnchorFallbacks(p, standard, passing)));
     const pruned = p.flags.prune === true ? applyPrune(p, standard, items, lang, r.conformitiesUntried) : void 0;
     const ok = (pruned ? r.unadjudicated + r.invalid + r.missing === 0 : r.ok) && grounding.failed === 0;
-    if (p.flags.json) console.log(JSON.stringify({ ...r, ok, grounding, ...pruned ? { pruned } : {} }, null, 2));
+    const ncOnly = trial.source.source === "none" || trial.source.source === "disabled";
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          { ...r, ok, grounding, conformitySource: trial.source, ...missingCause ? { missingCause } : {}, ...pruned ? { pruned } : {} },
+          null,
+          2
+        )
+      );
     else if (ok)
       console.log(
         pruned ? lang === "fr" ? `\u2713 ${r.total} revendication(s) contre-expertis\xE9e(s), retraits appliqu\xE9s et verdicts conserv\xE9s ancr\xE9s dans la source${grounding.moved ? ` (${grounding.moved} d\xE9plac\xE9(s))` : ""}.` : `\u2713 ${r.total} claim(s) reviewed, withdrawals applied, and retained verdicts grounded in source${grounding.moved ? ` (${grounding.moved} moved)` : ""}.` : lang === "fr" ? `\u2713 ${r.total} revendication(s) v\xE9rifi\xE9e(s), toutes \xE9tay\xE9es et ancr\xE9es dans la source${grounding.moved ? ` (${grounding.moved} d\xE9plac\xE9e(s))` : ""}.` : `\u2713 ${r.total} claim(s) verified, all supported and grounded in source${grounding.moved ? ` (${grounding.moved} moved)` : ""}.`
@@ -77847,8 +77905,15 @@ function cmdVerify(p) {
     else {
       if (!r.ok)
         console.error(
-          lang === "fr" ? `\u2717 ${r.failures.length}/${r.total} en \xE9chec (refuted ${r.refuted}, unsupported ${r.unsupported}, non statu\xE9 ${r.unadjudicated}${r.missing ? `, absent(s) ${r.missing} \u2014 r\xE9g\xE9n\xE9rez la worklist avec --max-verify 0` : ""}${r.invalid ? `, invalide ${r.invalid}` : ""}).` : `\u2717 ${r.failures.length}/${r.total} failed (refuted ${r.refuted}, unsupported ${r.unsupported}, unadjudicated ${r.unadjudicated}${r.missing ? `, missing ${r.missing} \u2014 regenerate the worklist with --max-verify 0` : ""}${r.invalid ? `, invalid ${r.invalid}` : ""}).`
+          lang === "fr" ? `\u2717 ${r.failures.length}/${r.total} en \xE9chec (refuted ${r.refuted}, unsupported ${r.unsupported}, non statu\xE9 ${r.unadjudicated}${r.missing ? `, absent(s) ${r.missing}${capCould ? " \u2014 r\xE9g\xE9n\xE9rez la worklist avec --max-verify 0" : ""}` : ""}${r.invalid ? `, invalide ${r.invalid}` : ""}).` : `\u2717 ${r.failures.length}/${r.total} failed (refuted ${r.refuted}, unsupported ${r.unsupported}, unadjudicated ${r.unadjudicated}${r.missing ? `, missing ${r.missing}${capCould ? " \u2014 regenerate the worklist with --max-verify 0" : ""}` : ""}${r.invalid ? `, invalid ${r.invalid}` : ""}).`
         );
+      if (r.missing && !capCould) {
+        const regen = `verify --report ${applyReport} ${trialContextFlags(p, standard, trial.source)} --out <dir>`;
+        const was = ctx ? describeConformitySource(ctx.conformities, lang) : lang === "fr" ? "inconnue \u2014 la worklist ne porte aucune conformit\xE9" : "unknown \u2014 the worklist carries no conformity";
+        console.error(
+          sourceDiffers ? lang === "fr" ? `\u2717 Couverture : la worklist a \xE9t\xE9 g\xE9n\xE9r\xE9e avec une autre source de conformit\xE9s (${was}) que cette application (${describeConformitySource(trial.source, lang)}) \u2014 ${absentC} conformit\xE9(s) revendiqu\xE9e(s) n'y figurent pas. --max-verify 0 n'y changera rien : r\xE9g\xE9n\xE9rez-la avec \`${regen}\`, puis r\xE9appliquez avec ces m\xEAmes options.` : `\u2717 Coverage: the worklist was generated from another conformity source (${was}) than this apply (${describeConformitySource(trial.source, lang)}) \u2014 ${absentC} claimed conformity(ies) are not in it. --max-verify 0 will not fix that: regenerate it with \`${regen}\`, then apply with the same options.` : lang === "fr" ? `\u2717 Couverture : la worklist n'\xE9tait pas plafonn\xE9e \u2014 l'\xE9cart vient d'un autre rapport ou d'un autre audit que ceux de cette application. R\xE9g\xE9n\xE9rez-la avec \`${regen}\`.` : `\u2717 Coverage: the worklist was not capped \u2014 the gap comes from another report or audit than this apply's. Regenerate it with \`${regen}\`.`
+        );
+      }
       if (r.conformitiesRefused.length) {
         const ids = [...new Set(r.conformitiesRefused.map((f) => f.criteriaId))].join(", ");
         console.error(
@@ -77858,13 +77923,17 @@ function cmdVerify(p) {
       if (r.conformitiesUntried.length) {
         const ids = [...new Set(r.conformitiesUntried.map((f) => f.criteriaId))].join(", ");
         const absent = r.conformitiesUntried.some((f) => !items.includes(f));
-        const regen = absent ? lang === "fr" ? " R\xE9g\xE9n\xE9rez la worklist avec --max-verify 0." : " Regenerate the worklist with --max-verify 0." : "";
+        const regen = absent && capCould ? lang === "fr" ? " R\xE9g\xE9n\xE9rez la worklist avec --max-verify 0." : " Regenerate the worklist with --max-verify 0." : "";
         console.error(
           pruned ? lang === "fr" ? `\u2717 ${r.conformitiesUntried.length} conformit\xE9(s) revendiqu\xE9e(s) jamais mise(s) \xE0 l'\xE9preuve \u2014 renvoy\xE9e(s) \xE0 \xAB \xE0 \xE9valuer \xBB : ${ids}.${regen}` : `\u2717 ${r.conformitiesUntried.length} claimed conformity(ies) never tried \u2014 sent back to "to assess": ${ids}.${regen}` : lang === "fr" ? `\u2717 ${r.conformitiesUntried.length} conformit\xE9(s) revendiqu\xE9e(s) jamais mise(s) \xE0 l'\xE9preuve \u2014 la contre-expertise est incompl\xE8te : ${ids}.${regen}` : `\u2717 ${r.conformitiesUntried.length} claimed conformity(ies) never tried \u2014 the trial is incomplete: ${ids}.${regen}`
         );
       }
       for (const issue of grounding.issues) console.error(`\u2717 ${issue}`);
     }
+    if (ok && ncOnly && !p.flags.json)
+      console.error(
+        trial.source.source === "disabled" ? lang === "fr" ? "\u24D8 Contre-expertise des non-conformit\xE9s uniquement (--no-conformities) : les conformit\xE9s revendiqu\xE9es de l'audit n'ont pas \xE9t\xE9 mises \xE0 l'\xE9preuve." : "\u24D8 Trial of non-conformities only (--no-conformities): the audit's claimed conformities were not put on trial." : lang === "fr" ? "\u24D8 Contre-expertise des non-conformit\xE9s uniquement : aucune source de conformit\xE9s (ni --in, ni --conformities, ni ledger), les conformit\xE9s revendiqu\xE9es de l'audit n'ont pas \xE9t\xE9 mises \xE0 l'\xE9preuve. G\xE9n\xE9rez et appliquez avec --in <audit.json> pour les couvrir." : "\u24D8 Trial of non-conformities only: no conformity source (no --in, --conformities or ledger), so the audit's claimed conformities were not put on trial. Generate and apply with --in <audit.json> to cover them."
+      );
     return ok ? 0 : 1;
   }
   return cmdVerifyWorklist(p, lang);
@@ -77934,8 +78003,8 @@ function cmdVerifyWorklist(p, langIn) {
   lang = resolveLang(p.flags, { standard });
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
   if (p.flags.manual === true) {
-    const inFlag = p.flags.in;
-    if (typeof inFlag !== "string" || !inFlag) {
+    const inFlag2 = p.flags.in;
+    if (typeof inFlag2 !== "string" || !inFlag2) {
       console.error(
         lang === "fr" ? "ultra11y verify : --manual exige --in <audit.json> (l'audit dont les crit\xE8res r\xE9siduels sont \xE0 adjuger)." : "ultra11y verify: --manual requires --in <audit.json> (the audit whose residual criteria are adjudicated)."
       );
@@ -77943,9 +78012,9 @@ function cmdVerifyWorklist(p, langIn) {
     }
     let audit2;
     try {
-      audit2 = unwrapAudit(JSON.parse(readText(inFlag)));
+      audit2 = unwrapAudit(JSON.parse(readText(inFlag2)));
     } catch {
-      console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
+      console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag2}.`);
       return 2;
     }
     const adjItems = buildAdjudicationWorklist(audit2, { standard });
@@ -77955,7 +78024,7 @@ function cmdVerifyWorklist(p, langIn) {
     if (unrendered.length) {
       const ids = unrendered.join(" \xB7 ");
       console.error(
-        lang === "fr" ? `ultra11y verify : ${unrendered.length} crit\xE8re(s) exigent une page rendue et aucune page n'a \xE9t\xE9 instantan\xE9e \u2014 ils resteront \xAB \xE0 \xE9valuer \xBB quoi qu'il arrive. Lancez \`ultra11y scan <url> --merge ${inFlag}\` d'abord. Concern\xE9s : ${ids}` : `ultra11y verify: ${unrendered.length} criterion(ia) need a rendered page and no page was snapshotted \u2014 they will stay "to assess" whatever happens. Run \`ultra11y scan <url> --merge ${inFlag}\` first. Affected: ${ids}`
+        lang === "fr" ? `ultra11y verify : ${unrendered.length} crit\xE8re(s) exigent une page rendue et aucune page n'a \xE9t\xE9 instantan\xE9e \u2014 ils resteront \xAB \xE0 \xE9valuer \xBB quoi qu'il arrive. Lancez \`ultra11y scan <url> --merge ${inFlag2}\` d'abord. Concern\xE9s : ${ids}` : `ultra11y verify: ${unrendered.length} criterion(ia) need a rendered page and no page was snapshotted \u2014 they will stay "to assess" whatever happens. Run \`ultra11y scan <url> --merge ${inFlag2}\` first. Affected: ${ids}`
       );
     }
     if (adjItems.every((it) => it.evidence.length === 0)) {
@@ -78001,7 +78070,8 @@ function cmdVerifyWorklist(p, langIn) {
   if (repMd === null) return 2;
   const ncItems = buildWorklist(repMd, standard, max);
   const ncAll = Number.isFinite(max) ? buildWorklist(repMd, standard, Number.POSITIVE_INFINITY).length : ncItems.length;
-  const conformities = conformityClaimsFor(p, standard, lang);
+  const trial = conformityTrial(p, standard, lang);
+  const conformities = trial.claims;
   const cItems = buildConformityWorklist(conformities, ncItems.length, cMax);
   const cAll = Number.isFinite(cMax) ? buildConformityWorklist(conformities, 0, Number.POSITIVE_INFINITY).length : cItems.length;
   const items = [...ncItems, ...cItems];
@@ -78011,8 +78081,21 @@ function cmdVerifyWorklist(p, langIn) {
     console.error(
       lang === "fr" ? `\u26A0 Worklist plafonn\xE9e par --max-verify : ${[droppedNc ? `${droppedNc}/${ncAll} non-conformit\xE9(s)` : "", droppedC ? `${droppedC}/${cAll} conformit\xE9(s) revendiqu\xE9e(s)` : ""].filter(Boolean).join(" et ")} laiss\xE9e(s) hors du proc\xE8s. \`verify --apply\` les comptera absentes et \xE9chouera${droppedC ? ", et --prune renverra ces conformit\xE9s \xE0 \xAB \xE0 \xE9valuer \xBB" : ""}. Relancez avec --max-verify 0 pour tout mettre \xE0 l'\xE9preuve.` : `\u26A0 Worklist capped by --max-verify: ${[droppedNc ? `${droppedNc}/${ncAll} non-conformity(ies)` : "", droppedC ? `${droppedC}/${cAll} claimed conformity(ies)` : ""].filter(Boolean).join(" and ")} left out of the trial. \`verify --apply\` will count them missing and fail${droppedC ? ", and --prune will send those conformities back to \u201Cto assess\u201D" : ""}. Re-run with --max-verify 0 to try everything.`
     );
+  if (trial.source.source === "none")
+    console.error(
+      lang === "fr" ? "\u26A0 Aucune source de conformit\xE9s (ni --in, ni --conformities, ni ledger) : seules les non-conformit\xE9s du rapport sont mises \xE0 l'\xE9preuve. Passez --in <audit.json> (l'audit dont vient le rapport) pour y inclure les conformit\xE9s adjug\xE9es, ou --no-conformities pour l'exclure explicitement." : "\u26A0 No conformity source (no --in, --conformities or ledger): only the report's non-conformities are put on trial. Pass --in <audit.json> (the audit the report came from) to include the adjudicated conformities, or --no-conformities to opt out explicitly."
+    );
   const { todoPath, mdPath, count } = writeWorklist(items, out2, p.flags.semantic === true, standard, lang);
-  if (p.flags.json) console.log(JSON.stringify({ mdPath, todoPath, count, nc: ncItems.length, conformities: cItems.length, items }, null, 2));
+  const inFlag = p.flags.in;
+  const contextPath = writeVerifyContext(out2, {
+    kind: "verify-context",
+    standard,
+    report: rep === "-" ? rep : resolve18(rep),
+    ...typeof inFlag === "string" && inFlag && inFlag !== "-" ? { in: resolve18(inFlag) } : {},
+    conformities: trial.source,
+    capped: { nc: droppedNc, c: droppedC }
+  });
+  if (p.flags.json) console.log(JSON.stringify({ mdPath, todoPath, contextPath, count, nc: ncItems.length, conformities: cItems.length, items }, null, 2));
   else
     console.log(
       lang === "fr" ? `${ncItems.length} non-conformit\xE9(s)${cItems.length ? ` et ${cItems.length} conformit\xE9(s) revendiqu\xE9e(s)` : ""} \xE0 v\xE9rifier \u2192 ${mdPath}, ${todoPath}` : `${ncItems.length} non-conformity(ies)${cItems.length ? ` and ${cItems.length} claimed conformity(ies)` : ""} to verify \u2192 ${mdPath}, ${todoPath}`
@@ -78034,42 +78117,67 @@ function trialAnchorFallbacks(p, standard, passing) {
   const { citationDrift } = adjudicationLimits(cwd);
   return (it, cite) => evidenceFallback(evidence.get(it.criteriaId) ?? [], cite, citationDrift).fallback;
 }
-function conformityClaimsFor(p, standard, lang) {
-  if (p.flags.conformities === false || p.flags["no-conformities"] === true) return [];
+function conformityTrial(p, standard, lang) {
+  if (p.flags.conformities === false || p.flags["no-conformities"] === true) return { claims: [], source: { source: "disabled" } };
   const named3 = typeof p.flags.conformities === "string" && p.flags.conformities ? p.flags.conformities : void 0;
   if (!named3) {
     const inFlag = p.flags.in;
     if (typeof inFlag === "string" && inFlag && inFlag !== "-") {
       try {
         const audit2 = unwrapAudit(JSON.parse(readText(inFlag)));
-        if (Array.isArray(audit2.criteria)) return conformityClaimsFromAudit(audit2, standard);
+        if (Array.isArray(audit2.criteria)) return { claims: conformityClaimsFromAudit(audit2, standard), source: { source: "in", path: resolve18(inFlag) } };
       } catch {
       }
     }
   }
   const path = named3 ?? ledgerPath(standard);
+  const source = { source: named3 ? "file" : "ledger", path: resolve18(path) };
   if (!existsSync40(path)) {
     if (named3) {
       console.error(
         lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named3}.` : `ultra11y verify: --conformities file not found: ${named3}.`
       );
-      return [];
+      return { claims: [], source };
     }
-    return [];
+    return { claims: [], source: { source: "none" } };
   }
   try {
     const parsed = JSON.parse(readText(path));
-    if (parsed.entries) return parsed.entries;
-    if (parsed.items) return parsed.items;
+    if (parsed.entries) return { claims: parsed.entries, source };
+    if (parsed.items) return { claims: parsed.items, source };
     const audit2 = unwrapAudit(parsed);
-    return Array.isArray(audit2.criteria) ? conformityClaimsFromAudit(audit2, standard) : [];
+    return { claims: Array.isArray(audit2.criteria) ? conformityClaimsFromAudit(audit2, standard) : [], source };
   } catch {
     if (named3)
       console.error(
         lang === "fr" ? `ultra11y verify : le fichier --conformities n'est pas du JSON valide : ${named3}.` : `ultra11y verify: --conformities file is not valid JSON: ${named3}.`
       );
-    return [];
+    return { claims: [], source };
   }
+}
+var sameConformitySource = (a, b) => a.source === b.source && ("path" in a ? a.path : "") === ("path" in b ? b.path : "");
+function describeConformitySource(s, lang) {
+  const fr = lang === "fr";
+  switch (s.source) {
+    case "in":
+      return `--in ${s.path}`;
+    case "file":
+      return `--conformities ${s.path}`;
+    case "ledger":
+      return `ledger ${s.path}`;
+    case "disabled":
+      return "--no-conformities";
+    default:
+      return fr ? "aucune \u2014 ni --in, ni --conformities, ni ledger" : "none \u2014 no --in, --conformities or ledger";
+  }
+}
+function trialContextFlags(p, standard, source) {
+  const flags2 = [`--standard ${standard}`];
+  const inFlag = p.flags.in;
+  if (typeof inFlag === "string" && inFlag && inFlag !== "-") flags2.push(`--in ${inFlag}`);
+  if (source.source === "file") flags2.push(`--conformities ${source.path}`);
+  if (source.source === "disabled") flags2.push("--no-conformities");
+  return flags2.join(" ");
 }
 function ledgerTarget(p, standard) {
   const flag = p.flags.ledger;

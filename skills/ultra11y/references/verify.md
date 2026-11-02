@@ -47,7 +47,17 @@ non-conformities (default 40); the conformity half is uncapped unless `--max-ver
 because a trial cut short lets every claim past the cap keep counting as conforming. Whatever
 a cap drops is named on stderr and fails `--apply` as « missing »; `--max-verify 0` removes
 the cap. `VERIFY.todo.json` is a bare JSON array of entries (unlike `ADJUDICATE.todo.json`,
-an object with `items`). For each entry, open the cited code and assign a verdict in
+an object with `items`).
+
+**Generate and apply with the same context.** The claimed conformities come from `--in <audit.json>`
+(the audit the report came from), else `--conformities <file>`, else the standard's ledger in the
+current directory. With none of them only the non-conformities are tried — the generation warns,
+and a green `--apply` says it covered non-conformities only. The list's context is recorded beside
+it in `VERIFY.context.json` (audit, standard, conformity source, what a cap dropped), so when
+`--apply` finds claims « missing » it tells a cap (`--max-verify 0` fixes it) from a list built from
+another claim source (regenerate it with the apply's `--in`/`--standard`/`--conformities`; lifting
+a cap that never applied changes nothing). `--no-conformities` and `--max-verify` stay available,
+and make a partial trial. For each entry, open the cited code and assign a verdict in
 `VERIFY.todo.json`:
 
 - `supported` — the non-conformity is real;

@@ -58,8 +58,11 @@ import {
   applyVerdicts,
   VERIFY_MAX,
   type ConformityClaim,
+  type ConformitySource,
   type VerifyItem,
   verifyGroundingInputs,
+  readVerifyContext,
+  writeVerifyContext,
 } from "./verify.js";
 import { pruneRefuted, type PruneResult } from "./refute.js";
 import { groundItems } from "./grounding.js";
@@ -2983,8 +2986,21 @@ function cmdVerify(p: ParsedArgs): number {
     // worklist was written from, so a verdicts file that quietly dropped every conformity item
     // fails as `missing` rather than passing green over the half it did adjudicate.
     const expectedNc = buildWorklist(repMd, standard, Number.POSITIVE_INFINITY);
-    const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFor(p, standard, lang), expectedNc.length, Number.POSITIVE_INFINITY)];
+    const trial = conformityTrial(p, standard, lang);
+    const expected = [...expectedNc, ...buildConformityWorklist(trial.claims, expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items, expected);
+    // WHY IS SOMETHING MISSING? (#59) Two causes, two different remedies: a CAP left the claim
+    // out — `--max-verify 0` fixes it — or the list was generated from ANOTHER claim source
+    // (no `--in`, another audit, a ledger) — where lifting a cap that was never applied fixes
+    // nothing. The context recorded beside the list says which; a list written before it was
+    // recorded is read from its own content: one carrying no conformity at all, against an apply
+    // that expects some, was not capped into that shape by the default cap.
+    const ctx = readVerifyContext(dirname(resolve(apply)));
+    const absentItems = r.failures.filter((f) => !items.includes(f));
+    const absentC = absentItems.filter((f) => f.kind === "c").length;
+    const sourceDiffers = ctx ? !sameConformitySource(ctx.conformities, trial.source) : absentC > 0 && !items.some((it) => it.kind === "c");
+    const capCould = ctx ? ctx.capped.nc + ctx.capped.c > 0 : !sourceDiffers;
+    const missingCause = r.missing ? (capCould ? "cap" : sourceDiffers ? "source" : "other") : undefined;
     // Content-level grounding of every verdict that passed adjudication: the cited
     // file/line/snippet must still exist and match the source (see src/grounding.ts). A
     // RETAINED CONFORMITY IS GROUNDED THE WAY THE FOLD GROUNDED IT: a citation that is one of
@@ -3002,7 +3018,18 @@ function cmdVerify(p: ParsedArgs): number {
     // was tried there, and pruning cannot stand in for a trial that never ran.
     const pruned = p.flags.prune === true ? applyPrune(p, standard, items, lang, r.conformitiesUntried) : undefined;
     const ok = (pruned ? r.unadjudicated + r.invalid + r.missing === 0 : r.ok) && grounding.failed === 0;
-    if (p.flags.json) console.log(JSON.stringify({ ...r, ok, grounding, ...(pruned ? { pruned } : {}) }, null, 2));
+    // A PARTIAL TRIAL IS NOT A WHOLE ONE. With no conformity source (or one explicitly turned
+    // off) only the report's non-conformities were tried; a green exit must not read as covering
+    // the audit's conformities too.
+    const ncOnly = trial.source.source === "none" || trial.source.source === "disabled";
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          { ...r, ok, grounding, conformitySource: trial.source, ...(missingCause ? { missingCause } : {}), ...(pruned ? { pruned } : {}) },
+          null,
+          2,
+        ),
+      );
     else if (ok)
       console.log(
         pruned
@@ -3017,9 +3044,26 @@ function cmdVerify(p: ParsedArgs): number {
       if (!r.ok)
         console.error(
           lang === "fr"
-            ? `✗ ${r.failures.length}/${r.total} en échec (refuted ${r.refuted}, unsupported ${r.unsupported}, non statué ${r.unadjudicated}${r.missing ? `, absent(s) ${r.missing} — régénérez la worklist avec --max-verify 0` : ""}${r.invalid ? `, invalide ${r.invalid}` : ""}).`
-            : `✗ ${r.failures.length}/${r.total} failed (refuted ${r.refuted}, unsupported ${r.unsupported}, unadjudicated ${r.unadjudicated}${r.missing ? `, missing ${r.missing} — regenerate the worklist with --max-verify 0` : ""}${r.invalid ? `, invalid ${r.invalid}` : ""}).`,
+            ? `✗ ${r.failures.length}/${r.total} en échec (refuted ${r.refuted}, unsupported ${r.unsupported}, non statué ${r.unadjudicated}${r.missing ? `, absent(s) ${r.missing}${capCould ? " — régénérez la worklist avec --max-verify 0" : ""}` : ""}${r.invalid ? `, invalide ${r.invalid}` : ""}).`
+            : `✗ ${r.failures.length}/${r.total} failed (refuted ${r.refuted}, unsupported ${r.unsupported}, unadjudicated ${r.unadjudicated}${r.missing ? `, missing ${r.missing}${capCould ? " — regenerate the worklist with --max-verify 0" : ""}` : ""}${r.invalid ? `, invalid ${r.invalid}` : ""}).`,
         );
+      if (r.missing && !capCould) {
+        const regen = `verify --report ${applyReport} ${trialContextFlags(p, standard, trial.source)} --out <dir>`;
+        const was = ctx
+          ? describeConformitySource(ctx.conformities, lang)
+          : lang === "fr"
+            ? "inconnue — la worklist ne porte aucune conformité"
+            : "unknown — the worklist carries no conformity";
+        console.error(
+          sourceDiffers
+            ? lang === "fr"
+              ? `✗ Couverture : la worklist a été générée avec une autre source de conformités (${was}) que cette application (${describeConformitySource(trial.source, lang)}) — ${absentC} conformité(s) revendiquée(s) n'y figurent pas. --max-verify 0 n'y changera rien : régénérez-la avec \`${regen}\`, puis réappliquez avec ces mêmes options.`
+              : `✗ Coverage: the worklist was generated from another conformity source (${was}) than this apply (${describeConformitySource(trial.source, lang)}) — ${absentC} claimed conformity(ies) are not in it. --max-verify 0 will not fix that: regenerate it with \`${regen}\`, then apply with the same options.`
+            : lang === "fr"
+              ? `✗ Couverture : la worklist n'était pas plafonnée — l'écart vient d'un autre rapport ou d'un autre audit que ceux de cette application. Régénérez-la avec \`${regen}\`.`
+              : `✗ Coverage: the worklist was not capped — the gap comes from another report or audit than this apply's. Regenerate it with \`${regen}\`.`,
+        );
+      }
       // NAME THE REFUSED CONFORMITIES SEPARATELY, because the remedy is a different action.
       // A refuted non-conformity is deleted from the report. A refuted conformity sends its
       // criterion back to « à évaluer » — nobody has established it, which is not the same
@@ -3047,7 +3091,8 @@ function cmdVerify(p: ParsedArgs): number {
       if (r.conformitiesUntried.length) {
         const ids = [...new Set(r.conformitiesUntried.map((f) => f.criteriaId))].join(", ");
         const absent = r.conformitiesUntried.some((f) => !items.includes(f));
-        const regen = absent ? (lang === "fr" ? " Régénérez la worklist avec --max-verify 0." : " Regenerate the worklist with --max-verify 0.") : "";
+        const regen =
+          absent && capCould ? (lang === "fr" ? " Régénérez la worklist avec --max-verify 0." : " Regenerate the worklist with --max-verify 0.") : "";
         console.error(
           pruned
             ? lang === "fr"
@@ -3060,6 +3105,16 @@ function cmdVerify(p: ParsedArgs): number {
       }
       for (const issue of grounding.issues) console.error(`✗ ${issue}`);
     }
+    if (ok && ncOnly && !p.flags.json)
+      console.error(
+        trial.source.source === "disabled"
+          ? lang === "fr"
+            ? "ⓘ Contre-expertise des non-conformités uniquement (--no-conformities) : les conformités revendiquées de l'audit n'ont pas été mises à l'épreuve."
+            : "ⓘ Trial of non-conformities only (--no-conformities): the audit's claimed conformities were not put on trial."
+          : lang === "fr"
+            ? "ⓘ Contre-expertise des non-conformités uniquement : aucune source de conformités (ni --in, ni --conformities, ni ledger), les conformités revendiquées de l'audit n'ont pas été mises à l'épreuve. Générez et appliquez avec --in <audit.json> pour les couvrir."
+            : "ⓘ Trial of non-conformities only: no conformity source (no --in, --conformities or ledger), so the audit's claimed conformities were not put on trial. Generate and apply with --in <audit.json> to cover them.",
+      );
     return ok ? 0 : 1;
   }
 
@@ -3265,7 +3320,8 @@ function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
   if (repMd === null) return 2;
   const ncItems = buildWorklist(repMd, standard, max);
   const ncAll = Number.isFinite(max) ? buildWorklist(repMd, standard, Number.POSITIVE_INFINITY).length : ncItems.length;
-  const conformities = conformityClaimsFor(p, standard, lang);
+  const trial = conformityTrial(p, standard, lang);
+  const conformities = trial.claims;
   const cItems = buildConformityWorklist(conformities, ncItems.length, cMax);
   const cAll = Number.isFinite(cMax) ? buildConformityWorklist(conformities, 0, Number.POSITIVE_INFINITY).length : cItems.length;
   const items = [...ncItems, ...cItems];
@@ -3277,8 +3333,26 @@ function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
         ? `⚠ Worklist plafonnée par --max-verify : ${[droppedNc ? `${droppedNc}/${ncAll} non-conformité(s)` : "", droppedC ? `${droppedC}/${cAll} conformité(s) revendiquée(s)` : ""].filter(Boolean).join(" et ")} laissée(s) hors du procès. \`verify --apply\` les comptera absentes et échouera${droppedC ? ", et --prune renverra ces conformités à « à évaluer »" : ""}. Relancez avec --max-verify 0 pour tout mettre à l'épreuve.`
         : `⚠ Worklist capped by --max-verify: ${[droppedNc ? `${droppedNc}/${ncAll} non-conformity(ies)` : "", droppedC ? `${droppedC}/${cAll} claimed conformity(ies)` : ""].filter(Boolean).join(" and ")} left out of the trial. \`verify --apply\` will count them missing and fail${droppedC ? ", and --prune will send those conformities back to “to assess”" : ""}. Re-run with --max-verify 0 to try everything.`,
     );
+  // SAY IT WHILE IT IS STILL FREE TO FIX. With no conformity source the list tries the report's
+  // non-conformities and nothing else, and every conformity the adjudication cleared walks past
+  // the trial unseen — which `verify --apply` cannot notice either unless it is handed `--in`.
+  if (trial.source.source === "none")
+    console.error(
+      lang === "fr"
+        ? "⚠ Aucune source de conformités (ni --in, ni --conformities, ni ledger) : seules les non-conformités du rapport sont mises à l'épreuve. Passez --in <audit.json> (l'audit dont vient le rapport) pour y inclure les conformités adjugées, ou --no-conformities pour l'exclure explicitement."
+        : "⚠ No conformity source (no --in, --conformities or ledger): only the report's non-conformities are put on trial. Pass --in <audit.json> (the audit the report came from) to include the adjudicated conformities, or --no-conformities to opt out explicitly.",
+    );
   const { todoPath, mdPath, count } = writeWorklist(items, out, p.flags.semantic === true, standard, lang);
-  if (p.flags.json) console.log(JSON.stringify({ mdPath, todoPath, count, nc: ncItems.length, conformities: cItems.length, items }, null, 2));
+  const inFlag = p.flags.in;
+  const contextPath = writeVerifyContext(out, {
+    kind: "verify-context",
+    standard,
+    report: rep === "-" ? rep : resolve(rep),
+    ...(typeof inFlag === "string" && inFlag && inFlag !== "-" ? { in: resolve(inFlag) } : {}),
+    conformities: trial.source,
+    capped: { nc: droppedNc, c: droppedC },
+  });
+  if (p.flags.json) console.log(JSON.stringify({ mdPath, todoPath, contextPath, count, nc: ncItems.length, conformities: cItems.length, items }, null, 2));
   else
     console.log(
       lang === "fr"
@@ -3339,9 +3413,13 @@ function trialAnchorFallbacks(
  * It costs nothing when there is nothing to check: no ledger, or a ledger with no agent `C`,
  * and the worklist is exactly what it was. `--no-conformities` opts out; `--conformities <file>`
  * names a source other than the standard's default ledger.
+ *
+ * Returns WHERE the claims came from too — recorded beside the worklist and compared at apply
+ * time, so a coverage gap caused by a different claim source is named as that and not as a
+ * cap (#59).
  */
-function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): ConformityClaim[] {
-  if (p.flags.conformities === false || p.flags["no-conformities"] === true) return [];
+function conformityTrial(p: ParsedArgs, standard: StandardId, lang: Lang): { claims: ConformityClaim[]; source: ConformitySource } {
+  if (p.flags.conformities === false || p.flags["no-conformities"] === true) return { claims: [], source: { source: "disabled" } };
   const named = typeof p.flags.conformities === "string" && p.flags.conformities ? p.flags.conformities : undefined;
   // `--in` is the exact audit the report came from, so its current conformance claims outrank
   // a durable ledger that may describe the preceding run. This matters after prune +
@@ -3352,13 +3430,14 @@ function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): C
     if (typeof inFlag === "string" && inFlag && inFlag !== "-") {
       try {
         const audit = unwrapAudit(JSON.parse(readText(inFlag))) as AuditResult;
-        if (Array.isArray(audit.criteria)) return conformityClaimsFromAudit(audit, standard);
+        if (Array.isArray(audit.criteria)) return { claims: conformityClaimsFromAudit(audit, standard), source: { source: "in", path: resolve(inFlag) } };
       } catch {
         // The command that owns --in reports malformed input; the ledger remains a fallback.
       }
     }
   }
   const path = named ?? ledgerPath(standard);
+  const source: ConformitySource = { source: named ? "file" : "ledger", path: resolve(path) };
   if (!existsSync(path)) {
     // Loud when a path WAS named, because a typo there would otherwise verify nothing and
     // report success — and then stop, rather than quietly verifying a different source than
@@ -3367,16 +3446,16 @@ function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): C
       console.error(
         lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named}.` : `ultra11y verify: --conformities file not found: ${named}.`,
       );
-      return [];
+      return { claims: [], source };
     }
-    return [];
+    return { claims: [], source: { source: "none" } };
   }
   try {
     const parsed = JSON.parse(readText(path)) as { entries?: ConformityClaim[]; items?: ConformityClaim[]; criteria?: unknown[] };
-    if (parsed.entries) return parsed.entries;
-    if (parsed.items) return parsed.items;
+    if (parsed.entries) return { claims: parsed.entries, source };
+    if (parsed.items) return { claims: parsed.items, source };
     const audit = unwrapAudit(parsed) as AuditResult;
-    return Array.isArray(audit.criteria) ? conformityClaimsFromAudit(audit, standard) : [];
+    return { claims: Array.isArray(audit.criteria) ? conformityClaimsFromAudit(audit, standard) : [], source };
   } catch {
     if (named)
       console.error(
@@ -3384,8 +3463,38 @@ function conformityClaimsFor(p: ParsedArgs, standard: StandardId, lang: Lang): C
           ? `ultra11y verify : le fichier --conformities n'est pas du JSON valide : ${named}.`
           : `ultra11y verify: --conformities file is not valid JSON: ${named}.`,
       );
-    return [];
+    return { claims: [], source };
   }
+}
+
+const sameConformitySource = (a: ConformitySource, b: ConformitySource): boolean =>
+  a.source === b.source && ("path" in a ? a.path : "") === ("path" in b ? b.path : "");
+
+function describeConformitySource(s: ConformitySource, lang: Lang): string {
+  const fr = lang === "fr";
+  switch (s.source) {
+    case "in":
+      return `--in ${s.path}`;
+    case "file":
+      return `--conformities ${s.path}`;
+    case "ledger":
+      return `ledger ${s.path}`;
+    case "disabled":
+      return "--no-conformities";
+    default:
+      return fr ? "aucune — ni --in, ni --conformities, ni ledger" : "none — no --in, --conformities or ledger";
+  }
+}
+
+/** The `verify --report` flags that reproduce THIS invocation's claim context — what a
+ *  regenerated worklist must be built with to cover what this apply expects. */
+function trialContextFlags(p: ParsedArgs, standard: StandardId, source: ConformitySource): string {
+  const flags = [`--standard ${standard}`];
+  const inFlag = p.flags.in;
+  if (typeof inFlag === "string" && inFlag && inFlag !== "-") flags.push(`--in ${inFlag}`);
+  if (source.source === "file") flags.push(`--conformities ${source.path}`);
+  if (source.source === "disabled") flags.push("--no-conformities");
+  return flags.join(" ");
 }
 
 /** Where to record the verdicts a fold accepted. `--ledger <path>` names a file; `--ledger`
