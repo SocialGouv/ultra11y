@@ -32,6 +32,8 @@ function sourceOnly(): string {
 function withSnapshots(): string {
   const root = mkdtempSync(join(tmpdir(), "u11y-brief-snap-"));
   writeSnapshot(root, { meta: { v: SNAPSHOT_VERSION, id: "accueil", name: "Accueil", url: "https://x/" }, dom: DOM } as Parameters<typeof writeSnapshot>[1]);
+  // The digests the assertion below names: a brief lists only the capture files that exist (#131).
+  for (const f of ["styles.json", "boxes.json"]) writeFileSync(join(root, PAGES_DIR, "accueil", f), '{"v":1,"entries":[]}\n');
   return join(root, PAGES_DIR);
 }
 

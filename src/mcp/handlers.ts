@@ -391,7 +391,7 @@ function handleAdjudicate(args: Record<string, unknown>, cwd: string): unknown {
     standard,
     count: items.length,
     items,
-    worklist: formatAdjudication(items, langOf(args)),
+    worklist: formatAdjudication(items, langOf(args), CORE, { cwd }),
     next: "These are the criteria the engine cannot decide. Read each element's real context with ultra11y_read, then rule on it.",
   };
 }
