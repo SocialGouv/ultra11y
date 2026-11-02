@@ -29,6 +29,8 @@ function withSnapshots(): string {
     meta: { v: SNAPSHOT_VERSION, id: "aide", name: "Aide", url: "https://x/aide" },
     dom: DOM,
   } as Parameters<typeof writeSnapshot>[1]);
+  // The digests the assertions below name: a brief lists only the capture files that exist (#131).
+  for (const f of ["styles.json", "boxes.json"]) writeFileSync(join(root, PAGES_DIR, "aide", f), '{"v":1,"entries":[]}\n');
   return join(root, PAGES_DIR);
 }
 

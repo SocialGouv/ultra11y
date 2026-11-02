@@ -9,7 +9,7 @@
 // folds the verdicts back into the audit, FAIL-CLOSED: no null verdict, no unjustified
 // C/NA, no ungroundable NC, no reasonless manual, full coverage of the residual set. The
 // decisions are the AGENT's, statically, gated — not a deferral to a human.
-import { mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import type {
   AuditResult,
@@ -28,6 +28,7 @@ import { discover } from "./discover.js";
 import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
 import { isPdfPath, loadPdfDoc } from "./documents.js";
+import { runVeraPdf } from "./verapdf.js";
 import { attachSignals, PAGES_DIR, snapshotPageId } from "./snapshot.js";
 import { loadConfig } from "./config.js";
 import {
@@ -230,6 +231,13 @@ export interface AdjudicationContract {
   requires: Record<string, string>;
 }
 
+/** What a `recommendations[]` entry must look like — stated, because the gate refuses anything
+ *  else and the contract used to be silent on it: a senior adjudication of egapro had 6 criteria
+ *  refused for writing recommendations as sentences (#131). Any verdict may carry them; they
+ *  never change a status. */
+export const RECOMMENDATION_SHAPE =
+  "optional on any verdict, never changes a status: each entry is an OBJECT { file, line, message, selector?, snippet? } — `file`/`line` (and the `snippet`) copied from this criterion's own evidence, grounded against the source exactly like an NC finding but with no normativeRef; a bare sentence, or an object without `file`, is refused";
+
 /** The contract as written into every worklist. Derived from the same constants the gate
  *  validates against, so the two cannot drift. */
 export function adjudicationContract(): AdjudicationContract {
@@ -242,6 +250,7 @@ export function adjudicationContract(): AdjudicationContract {
       NC: "at least one groundable finding, each naming the `file` it was observed in (an NC with no location is refused as flatly as an uncited C — and a non-conformity that rests on an ABSENCE is still observed on an element of a page, so cite that element) and each citing a normativeRef that resolves against the active standard",
       manual: `a reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`,
       human: `decidedBy "human" (a human auditor's verdict, instead of the default "agent") requires auditor: { name, organisation? } — the same evidence gate applies, and the verdict is reported under the auditor's name`,
+      recommendations: RECOMMENDATION_SHAPE,
     },
   };
 }
@@ -1393,7 +1402,10 @@ export function applyAdjudication(
       else if (it.reason === "needs-rendered-dom" && it.evidence.some((e) => snapshotPageId(e.file) !== undefined))
         blame(
           it.criteriaId,
-          `criterion ${it.criteriaId}: "needs-rendered-dom", but this criterion's own evidence is anchored in a page capture — the rendered page is on disk under .ultra11y/pages/<id>/ (dom.html, styles.json, boxes.json, axtree.json, screen.png). Decide it from those files, or answer "undecidable" and say what the capture does not settle.`,
+          `criterion ${it.criteriaId}: "needs-rendered-dom", but this criterion's own evidence is anchored in a page capture — the rendered page is on disk under .ultra11y/pages/<id>/ (${captureFilesPresent(
+            it.evidence.map((e) => e.file),
+            opts.cwd,
+          ).join(", ")}). Decide it from those files, or answer "undecidable" and say what the capture does not settle.`,
         );
     } else {
       // Name the vocabulary in the rejection. The caller is usually a model that has just
@@ -1410,7 +1422,7 @@ export function applyAdjudication(
       if (typeof rec.file !== "string" || !rec.file.trim()) {
         blame(
           it.criteriaId,
-          `criterion ${it.criteriaId}: a recommendation must name the file it was observed in — copy a file and line from this criterion's own evidence, or drop the recommendation`,
+          `criterion ${it.criteriaId}: a recommendation must name the file it was observed in — write it as an object { file, line, message, selector?, snippet? } with a file and line copied from this criterion's own evidence, or drop the recommendation`,
         );
         continue;
       }
@@ -1740,6 +1752,99 @@ const residualRejectedReason = (why: string) => `Adjudication refused by the gat
  *  snapshot's markup does not swamp a model's context. */
 const SNIPPET_SHOWN = 200;
 
+/** The files a page capture may hold, in the order a reader opens them. Only `dom.html` and
+ *  `meta.json` are written for every capture; each other file exists only when its producer
+ *  supplied that digest (src/snapshot.ts `writeSnapshot`) — and `axtree.json` is written by no
+ *  capture path the engine ships. So a brief never names one from this list without having
+ *  found it on disk. */
+export const CAPTURE_FILES = ["dom.html", "styles.json", "boxes.json", "css.json", "probes.json", "axe.json", "axtree.json", "screen.png"] as const;
+export type CaptureFile = (typeof CAPTURE_FILES)[number];
+
+const CAPTURE_FILE_LABEL: Record<Lang, Record<CaptureFile, string>> = {
+  fr: {
+    "dom.html": "le DOM sérialisé par le navigateur",
+    "styles.json": "les styles calculés",
+    "boxes.json": "les boîtes et positions",
+    "css.json": "les règles CSS lues dans les feuilles de style",
+    "probes.json": "les mesures des sondes en direct",
+    "axe.json": "les résultats axe-core de la page",
+    "axtree.json": "l'arbre d'accessibilité",
+    "screen.png": "la capture d'écran",
+  },
+  en: {
+    "dom.html": "the DOM the browser serialized",
+    "styles.json": "computed styles",
+    "boxes.json": "boxes and positions",
+    "css.json": "the CSS rules read from the stylesheets",
+    "probes.json": "the live probes' measurements",
+    "axe.json": "axe-core's results on the page",
+    "axtree.json": "the accessibility tree",
+    "screen.png": "the screenshot",
+  },
+};
+
+/** Which capture files exist beside the snapshot evidence among `files`, in CAPTURE_FILES order
+ *  — the union over every capture directory those files point into. `dom.html` alone when none
+ *  can be read from here (the evidence itself names it), so the list is never empty and never
+ *  invents a file. */
+export function captureFilesPresent(files: Iterable<string>, cwd?: string): CaptureFile[] {
+  const dirs = new Set<string>();
+  for (const f of files) {
+    const m = /^(.*(?:^|\/)\.ultra11y\/pages\/[^/]+)\//.exec(f.replace(/\\/g, "/"));
+    if (m?.[1]) dirs.add(resolve(cwd ?? process.cwd(), m[1]));
+  }
+  const present = CAPTURE_FILES.filter((name) => [...dirs].some((d) => existsSync(join(d, name))));
+  return present.length ? present : ["dom.html"];
+}
+
+/** Rules of a failing PDF the brief names before it stops counting. */
+const VERAPDF_RULES_SHOWN = 6;
+
+/** veraPDF's PDF/UA-1 result for the brief's documents, labelled as an external tool's. Empty
+ *  when no veraPDF is installed (or `ULTRA11Y_VERAPDF=off`). */
+function veraPdfBlock(pdfs: string[], lang: Lang, cwd?: string): string[] {
+  const report = runVeraPdf(pdfs, { cwd });
+  if (!report) return [];
+  const fr = lang === "fr";
+  const name = `veraPDF${report.version ? ` ${report.version}` : ""}`;
+  const out = [
+    fr
+      ? `> **Validateur externe — ${name}, profil PDF/UA-1** — résultat d'un outil EXTERNE installé sur cette machine, pas un contrôle du moteur : il ne se cite pas (ce n'est pas une évidence) et ne tranche rien. PDF/UA-1 n'est pas le RGAA 13.3 : une version alternative accessible satisfait le critère quel que soit le PDF, et un PDF valide PDF/UA reste à juger. À lire à côté des contrôles du moteur ci-dessus, jamais à leur place.`
+      : `> **External validator — ${name}, PDF/UA-1 profile** — the result of an EXTERNAL tool installed on this machine, not an engine check: it is not citable (it is not evidence) and decides nothing. PDF/UA-1 is not RGAA 13.3: an accessible alternative version satisfies the criterion whatever the PDF is, and a PDF/UA-valid file still has to be judged. Read it beside the engine's checks above, never in their place.`,
+    "",
+  ];
+  for (const r of report.results) {
+    if (r.compliant === true)
+      out.push(
+        fr ? `- \`${r.file}\` — conforme au profil PDF/UA-1 selon veraPDF` : `- \`${r.file}\` — compliant with the PDF/UA-1 profile according to veraPDF`,
+      );
+    else if (r.compliant === false) {
+      const rules = r.failedRules
+        .slice(0, VERAPDF_RULES_SHOWN)
+        .map((x) => `\`${x.clause}-${x.testNumber}\` ${x.description.replace(/\s+/g, " ").slice(0, 90)}`)
+        .join(" ; ");
+      const more = r.failedRules.length > VERAPDF_RULES_SHOWN ? ` ; … +${r.failedRules.length - VERAPDF_RULES_SHOWN}` : "";
+      out.push(
+        fr
+          ? `- \`${r.file}\` — NON conforme au profil PDF/UA-1 selon veraPDF : ${r.failedRules.length} règle(s) en échec${rules ? ` — ${rules}${more}` : ""}`
+          : `- \`${r.file}\` — NOT compliant with the PDF/UA-1 profile according to veraPDF: ${r.failedRules.length} failed rule(s)${rules ? ` — ${rules}${more}` : ""}`,
+      );
+    } else
+      out.push(
+        fr
+          ? `- \`${r.file}\` — non validé par veraPDF (${r.error ?? "?"}) : aucun résultat externe`
+          : `- \`${r.file}\` — not validated by veraPDF (${r.error ?? "?"}): no external result`,
+      );
+  }
+  out.push("");
+  return out;
+}
+
+function listFiles(files: readonly CaptureFile[], labels: Record<CaptureFile, string>, and: string): string {
+  const parts = files.map((f) => `\`${f}\` (${labels[f]})`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} ${and} ${parts[parts.length - 1]}` : (parts[0] ?? "");
+}
+
 // ---- worklist file rendering ----
 const T = {
   fr: {
@@ -1752,7 +1857,7 @@ const T = {
       "- `NA` — non applicable (renseignez `justification` ; si des évidences sont présentées, citez-les aussi dans `citations[]` pour dire lesquelles sortent du périmètre) ;",
       "- `manual` — indécidable statiquement (renseignez `reason` : `needs-rendered-dom` → `scan`, ou `undecidable`).",
     ],
-    rule: "> Ne signalez une NC que si un test précis du référentiel actif échoue — citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative). Une simple préoccupation UX n'est ni l'un ni l'autre.\n>\n> Symétriquement, un `C` se cite comme une NC : il faut nommer dans `citations[]` les évidences levées. **Un critère présenté sans aucune évidence ne peut pas être `C`** — c'est `manual` (`undecidable`), ou `NA` si rien n'est concerné.",
+    rule: "> Ne signalez une NC que si un test précis du référentiel actif échoue — citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative) : chaque entrée est un objet `{ file, line, message, selector?, snippet? }` dont `file`/`line` sont recopiés depuis les évidences du critère — une phrase seule est refusée. Une simple préoccupation UX n'est ni l'un ni l'autre.\n>\n> Symétriquement, un `C` se cite comme une NC : il faut nommer dans `citations[]` les évidences levées. **Un critère présenté sans aucune évidence ne peut pas être `C`** — c'est `manual` (`undecidable`), ou `NA` si rien n'est concerné.",
     then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (échoue si un verdict manque sa justification, ses citations, son finding ou sa raison).",
     evidence: "Évidences",
     classes: "classes de contenu distinctes",
@@ -1761,8 +1866,8 @@ const T = {
     on: "sur",
     alsoAt: "aussi en",
     snippetLabel: "`snippet` à copier dans la citation",
-    renderedAvailable:
-      "**RENDU DISPONIBLE.** Cet audit a ingéré des captures de page : le rendu de la page est sur le disque, sous `.ultra11y/pages/<id>/` — `dom.html` (le DOM sérialisé par le navigateur), `styles.json` (les styles calculés), `boxes.json` (les boîtes et positions), `axtree.json` (l'arbre d'accessibilité) et `screen.png`. Un critère « à restituer » — information par la couleur, opérabilité clavier d'un script, geste au pointeur — se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. `needs-rendered-dom` reste la bonne réponse pour un critère dont aucune capture ne porte le sujet, et pour lui seul.",
+    renderedAvailable: (files: readonly CaptureFile[]): string =>
+      `**RENDU DISPONIBLE.** Cet audit a ingéré des captures de page : le rendu de la page est sur le disque, sous \`.ultra11y/pages/<id>/\` — ${listFiles(files, CAPTURE_FILE_LABEL.fr, "et")}. Un critère « à restituer » — information par la couleur, opérabilité clavier d'un script, geste au pointeur — se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. \`needs-rendered-dom\` reste la bonne réponse pour un critère dont aucune capture ne porte le sujet, et pour lui seul.`,
     nothingRendered: (ids: string[]): string =>
       `**AUCUN RENDU DANS CETTE PORTÉE.** ${ids.length} critère(s) exigent une page rendue, et aucune page n'a été instantanée ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule réponse honnête. Rendez AVANT d'adjuger — \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) — puis reconstruisez cette liste : la mesure en ferme la plupart sans modèle, donc sans facture. Concernés : ${ids.map((id) => `\`${id}\``).join(" · ")}`,
     briefContract:
@@ -1815,7 +1920,7 @@ const T = {
       "- `NA` — not applicable (fill `justification`; when evidence is presented, cite it too in `citations[]` to say which items are out of scope);",
       "- `manual` — not statically decidable (fill `reason`: `needs-rendered-dom` → `scan`, or `undecidable`).",
     ],
-    rule: "> Report NC only if a precise test of the active standard fails — cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** — record `manual` (`undecidable`), or `NA` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate — an uncited NA is put on trial by `verify`.",
+    rule: "> Report NC only if a precise test of the active standard fails — cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative): each entry is an object `{ file, line, message, selector?, snippet? }` whose `file`/`line` are copied from the criterion's own evidence — a bare sentence is refused. A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** — record `manual` (`undecidable`), or `NA` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate — an uncited NA is put on trial by `verify`.",
     then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification, citations, finding or reason).",
     evidence: "Evidence",
     classes: "distinct content classes",
@@ -1824,8 +1929,8 @@ const T = {
     on: "on",
     alsoAt: "also at",
     snippetLabel: "`snippet` to copy into the citation",
-    renderedAvailable:
-      "**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under `.ultra11y/pages/<id>/` — `dom.html` (the DOM the browser serialized), `styles.json` (computed styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree) and `screen.png`. A needs-rendering criterion — information by colour, keyboard operability of a script, a pointer gesture — is decided FROM THOSE FILES: read them as you would read the source. `needs-rendered-dom` stays the right answer for a criterion no capture carries the subject of, and for that alone.",
+    renderedAvailable: (files: readonly CaptureFile[]): string =>
+      `**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under \`.ultra11y/pages/<id>/\` — ${listFiles(files, CAPTURE_FILE_LABEL.en, "and")}. A needs-rendering criterion — information by colour, keyboard operability of a script, a pointer gesture — is decided FROM THOSE FILES: read them as you would read the source. \`needs-rendered-dom\` stays the right answer for a criterion no capture carries the subject of, and for that alone.`,
     nothingRendered: (ids: string[]): string =>
       `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating — \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) — then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids.map((id) => `\`${id}\``).join(" · ")}`,
     briefContract:
@@ -2135,8 +2240,20 @@ export function formatAdjudication(
   // Keyed on the items in hand, so it is correct on a one-criterion brief too: the gate refuses
   // `needs-rendered-dom` exactly when THAT criterion's own evidence is capture-anchored, and this
   // is the same predicate. Before, the note only ever reached the combined document.
+  //
+  // And it names only the files that are THERE (#131): every brief used to promise an
+  // `axtree.json` that no capture path writes, so the adjudicator went looking for a file that
+  // does not exist. What a capture holds depends on its producer.
   if (items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
-    out.push(`> ${s.renderedAvailable}`, "");
+    out.push(
+      `> ${s.renderedAvailable(
+        captureFilesPresent(
+          items.flatMap((it) => it.evidence.map((e) => e.file)),
+          opts.cwd,
+        ),
+      )}`,
+      "",
+    );
   }
   // AND WHEN THERE IS NONE, SAY SO — with the ids, and with the command that closes them.
   //
@@ -2215,6 +2332,11 @@ export function formatAdjudication(
       }
       out.push("");
     }
+    // AN EXTERNAL VALIDATOR'S RESULT, WHEN ONE IS INSTALLED — beside the engine's document
+    // checks, never in their place, and never as evidence (src/verapdf.ts). Absent veraPDF,
+    // nothing is printed and the brief is what it always was.
+    const pdfs = [...new Set(it.evidence.filter((e) => isPdfPath(e.file)).map((e) => e.file))];
+    if (pdfs.length) out.push(...veraPdfBlock(pdfs, lang, opts.cwd));
     const crit = pack ? getCriterion(pack, it.criteriaId) : undefined;
     // THE DECISION RULE — the standard's own first, WCAG's only as a labelled fallback.
     //

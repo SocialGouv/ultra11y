@@ -121,6 +121,13 @@ page that links it, and a conforming alternate version may exist. Under RGAA the
 rule id to **13.3** as candidate evidence, and the 13.3 brief lists each document with its checks,
 citable at the file's `%PDF-x.y` header line — the agent rules, with something to cite.
 
+**Optional: veraPDF.** When `verapdf` is on `PATH` (or `ULTRA11Y_VERAPDF=<path>`), the brief of a
+criterion that lists PDFs also carries veraPDF's PDF/UA-1 result per document, in a block
+labelled **external validator**: another tool's word, not evidence, not citable, deciding
+nothing — PDF/UA-1 is not RGAA 13.3 (an accessible alternative version satisfies it whatever the
+PDF is). A run that fails is printed as « not validated », never as compliant. Nothing is
+installed or required; `ULTRA11Y_VERAPDF=off` turns it off.
+
 ## Golden rules
 
 - **Never invent a non-conformity**: every `NC` must cite a real, resolvable element

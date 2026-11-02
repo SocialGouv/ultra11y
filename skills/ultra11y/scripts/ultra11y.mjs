@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync9, writeFileSync as writeFileSync23, mkdirSync as mkdirSync20, existsSync as existsSync42, readFileSync as readFileSync38, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
-import { join as join55, relative as relative7, resolve as resolve18, sep as sep7, dirname as dirname22 } from "path";
+import { realpathSync as realpathSync9, writeFileSync as writeFileSync23, mkdirSync as mkdirSync20, existsSync as existsSync44, readFileSync as readFileSync38, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
+import { join as join56, relative as relative7, resolve as resolve19, sep as sep7, dirname as dirname22 } from "path";
 import { fileURLToPath as fileURLToPath6, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
@@ -5811,8 +5811,8 @@ var FunctionBindErrors = {
   UnsupportedBind: "Binding should be performed on object property.",
   UnsupportedBindRHS: "The right-hand side of binding can not be super or import."
 };
-function defineHidden(obj, key2, value) {
-  Object.defineProperty(obj, key2, {
+function defineHidden(obj2, key2, value) {
+  Object.defineProperty(obj2, key2, {
     enumerable: false,
     configurable: true,
     value
@@ -22287,7 +22287,7 @@ async function Module2(moduleArg = {}) {
   var GOT = {};
   var currentModuleWeakSymbols = /* @__PURE__ */ new Set([]);
   var GOTHandler = {
-    get(obj, symName) {
+    get(obj2, symName) {
       var rtn = GOT[symName];
       if (!rtn) {
         rtn = GOT[symName] = new WebAssembly.Global({
@@ -22522,9 +22522,9 @@ async function Module2(moduleArg = {}) {
     return ret;
   }, "getMemory");
   var isInternalSym = /* @__PURE__ */ __name((symName) => ["__cpp_exception", "__c_longjmp", "__wasm_apply_data_relocs", "__dso_handle", "__tls_size", "__tls_align", "__set_stack_limits", "_emscripten_tls_init", "__wasm_init_tls", "__wasm_call_ctors", "__start_em_asm", "__stop_em_asm", "__start_em_js", "__stop_em_js"].includes(symName) || symName.startsWith("__em_js__"), "isInternalSym");
-  var uleb128EncodeWithLen = /* @__PURE__ */ __name((arr) => {
-    const n = arr.length;
-    return [n % 128 | 128, n >> 7, ...arr];
+  var uleb128EncodeWithLen = /* @__PURE__ */ __name((arr2) => {
+    const n = arr2.length;
+    return [n % 128 | 128, n >> 7, ...arr2];
   }, "uleb128EncodeWithLen");
   var wasmTypeCodes = {
     "i": 127,
@@ -26077,8 +26077,8 @@ function readName(node) {
 }
 function readReceiver(node) {
   if (!node || node.namedChildren.length === 0) return void 0;
-  const obj = node.childForFieldName("object") ?? node.childForFieldName("operand") ?? node.childForFieldName("value") ?? node.childForFieldName("path") ?? node.childForFieldName("expression") ?? node.childForFieldName("argument") ?? node.childForFieldName("receiver") ?? node.childForFieldName("table");
-  const name2 = obj ? readName(obj) : void 0;
+  const obj2 = node.childForFieldName("object") ?? node.childForFieldName("operand") ?? node.childForFieldName("value") ?? node.childForFieldName("path") ?? node.childForFieldName("expression") ?? node.childForFieldName("argument") ?? node.childForFieldName("receiver") ?? node.childForFieldName("table");
+  const name2 = obj2 ? readName(obj2) : void 0;
   return name2 && /^[A-Za-z_]\w*$/.test(name2) ? name2 : void 0;
 }
 function readTypeName(node) {
@@ -27573,8 +27573,8 @@ function extractAst(rel2, ext2, content, opts = {}) {
               const prop = left.childForFieldName("property");
               if (prop?.type === "property_identifier") {
                 name2 = prop.text;
-                const obj = left.text.slice(0, left.text.length - prop.text.length - 1);
-                exportedAssign = obj === "exports" || obj === "module.exports";
+                const obj2 = left.text.slice(0, left.text.length - prop.text.length - 1);
+                exportedAssign = obj2 === "exports" || obj2 === "module.exports";
               }
             } else if (left.type === "identifier") {
               name2 = left.text;
@@ -27598,8 +27598,8 @@ function extractAst(rel2, ext2, content, opts = {}) {
           } else if (left?.type === "member_expression" && right) {
             const prop = left.childForFieldName("property");
             if (prop?.type === "property_identifier") {
-              const obj = left.text.slice(0, left.text.length - prop.text.length - 1);
-              if (obj === "exports" || obj === "module.exports") {
+              const obj2 = left.text.slice(0, left.text.length - prop.text.length - 1);
+              if (obj2 === "exports" || obj2 === "module.exports") {
                 if (right.type === "identifier") exportedNames.add(right.text);
                 if (right.type !== "identifier" || right.text !== prop.text) {
                   emit2({
@@ -28342,9 +28342,9 @@ function scanRepo(root, opts = {}) {
   const languages = {};
   const docText = /* @__PURE__ */ new Map();
   const mtimes = /* @__PURE__ */ new Map();
-  const cache = opts.cache;
-  let allReused = cache !== void 0;
-  let cacheDirty = cache === void 0;
+  const cache2 = opts.cache;
+  let allReused = cache2 !== void 0;
+  let cacheDirty = cache2 === void 0;
   const it = keptFiles(root, opts);
   let step = it.next();
   for (; !step.done; step = it.next()) {
@@ -28404,7 +28404,7 @@ function scanRepo(root, opts = {}) {
     files.push(record);
   }
   files.sort(byKey((f) => f.rel));
-  if (cache !== void 0 && files.length !== cache.size) {
+  if (cache2 !== void 0 && files.length !== cache2.size) {
     allReused = false;
     cacheDirty = true;
   }
@@ -28628,10 +28628,10 @@ function toCacheMap(scan2) {
   for (const f of scan2.files) m.set(f.rel, { hash: f.hash, record: f, size: f.size, mtimeMs: scan2.mtimes.get(f.rel) });
   return m;
 }
-function needsGrammarWarm(walked, cache, fullHash = false) {
+function needsGrammarWarm(walked, cache2, fullHash = false) {
   const codeFiles = walked.files.filter((file) => classify(file.rel, file.ext) === "code");
   return fullHash && codeFiles.length > 0 || codeFiles.some((file) => {
-    const cached = cache.get(file.rel);
+    const cached = cache2.get(file.rel);
     return !cached || cached.size !== file.size || cached.mtimeMs !== file.mtimeMs;
   });
 }
@@ -29033,11 +29033,11 @@ function buildResolveContext(scan2) {
   const csharpNamespaces = /* @__PURE__ */ new Map();
   for (const f of scan2.files) {
     if (f.ext !== ".cs" || !f.pkg) continue;
-    let arr = csharpNamespaces.get(f.pkg);
-    if (!arr) csharpNamespaces.set(f.pkg, arr = []);
-    arr.push(f.rel);
+    let arr2 = csharpNamespaces.get(f.pkg);
+    if (!arr2) csharpNamespaces.set(f.pkg, arr2 = []);
+    arr2.push(f.rel);
   }
-  for (const arr of csharpNamespaces.values()) arr.sort(byStr);
+  for (const arr2 of csharpNamespaces.values()) arr2.sort(byStr);
   return {
     fileSet,
     dirSet,
@@ -29550,9 +29550,9 @@ function resolveCallEdges(scan2, importPairs) {
       const dedup = `${s.name} ${s.file}`;
       if (seen.has(dedup)) continue;
       seen.add(dedup);
-      let arr = defs.get(s.name);
-      if (!arr) defs.set(s.name, arr = []);
-      arr.push({ file: s.file, lang: s.lang });
+      let arr2 = defs.get(s.name);
+      if (!arr2) defs.set(s.name, arr2 = []);
+      arr2.push({ file: s.file, lang: s.lang });
     }
   }
   const agg = /* @__PURE__ */ new Map();
@@ -29610,9 +29610,9 @@ function typeDefs(scan2) {
       const dedup = `${s.name} ${s.file}`;
       if (seen.has(dedup)) continue;
       seen.add(dedup);
-      let arr = defs.get(s.name);
-      if (!arr) defs.set(s.name, arr = []);
-      arr.push({ name: s.name, file: s.file, kind: s.kind, lang: s.lang, line: s.line });
+      let arr2 = defs.get(s.name);
+      if (!arr2) defs.set(s.name, arr2 = []);
+      arr2.push({ name: s.name, file: s.file, kind: s.kind, lang: s.lang, line: s.line });
     }
   }
   return defs;
@@ -29662,8 +29662,8 @@ function buildTypeHierarchy(scan2, importPairs) {
   const resolved = resolveRelations(scan2, importPairs);
   const entries = /* @__PURE__ */ new Map();
   const keyOf2 = (name2, file) => `${name2}${SEP}${file}`;
-  for (const arr of defs.values()) {
-    for (const d of arr) {
+  for (const arr2 of defs.values()) {
+    for (const d of arr2) {
       entries.set(keyOf2(d.name, d.file), {
         name: d.name,
         file: d.file,
@@ -29801,9 +29801,9 @@ function buildSymbolIndex(scan2, refs = /* @__PURE__ */ new Map(), schemaVersion
   const defsByName = /* @__PURE__ */ new Map();
   for (const f of scan2.files) {
     for (const s of f.symbols) {
-      let arr = defsByName.get(s.name);
-      if (!arr) defsByName.set(s.name, arr = []);
-      arr.push({
+      let arr2 = defsByName.get(s.name);
+      if (!arr2) defsByName.set(s.name, arr2 = []);
+      arr2.push({
         file: s.file,
         line: s.line,
         ...s.endLine !== void 0 ? { endLine: s.endLine } : {},
@@ -29849,9 +29849,9 @@ function buildCallerIndex(scan2, importPairs, opts = {}) {
       if (!s.exported || REFERENCE_KINDS2.has(s.kind)) continue;
       if (seen.has(s.name)) continue;
       seen.add(s.name);
-      let arr = defs.get(s.name);
-      if (!arr) defs.set(s.name, arr = []);
-      arr.push(s);
+      let arr2 = defs.get(s.name);
+      if (!arr2) defs.set(s.name, arr2 = []);
+      arr2.push(s);
     }
   }
   const defsByFamily = /* @__PURE__ */ new Map();
@@ -29943,9 +29943,9 @@ function buildRawCallerIndex(scan2) {
       if (c2.receiver !== void 0) site.receiver = c2.receiver;
       const enc = enclosingAmong(symbols, c2.line);
       if (enc) site.enclosingSymbol = enc;
-      let arr = byName.get(c2.name);
-      if (!arr) byName.set(c2.name, arr = []);
-      arr.push(site);
+      let arr2 = byName.get(c2.name);
+      if (!arr2) byName.set(c2.name, arr2 = []);
+      arr2.push(site);
     }
   }
   const index = /* @__PURE__ */ new Map();
@@ -29997,9 +29997,9 @@ function buildSymbolGraph(scan2, importPairs) {
       const key2 = `${s.name} ${s.file}`;
       if (defSeen.has(key2)) continue;
       defSeen.add(key2);
-      let arr = defs.get(s.name);
-      if (!arr) defs.set(s.name, arr = []);
-      arr.push(s);
+      let arr2 = defs.get(s.name);
+      if (!arr2) defs.set(s.name, arr2 = []);
+      arr2.push(s);
     }
     perFile.set(f.rel, usable);
   }
@@ -30251,12 +30251,12 @@ function buildStemIndex(docs) {
       seen.add(term);
       const stem = stemOf(term);
       if (stem === term) continue;
-      let arr = index.get(stem);
-      if (!arr) index.set(stem, arr = []);
-      arr.push(term);
+      let arr2 = index.get(stem);
+      if (!arr2) index.set(stem, arr2 = []);
+      arr2.push(term);
     }
   }
-  for (const arr of index.values()) arr.sort(byStr);
+  for (const arr2 of index.values()) arr2.sort(byStr);
   return index;
 }
 function buildTrigramIndex(docs) {
@@ -32119,9 +32119,9 @@ var init_surprise = __esm({
     DEP_KINDS = /* @__PURE__ */ new Set(["import", "call", "use"]);
   }
 });
-function sortObject(obj) {
+function sortObject(obj2) {
   const out2 = {};
-  for (const k of Object.keys(obj).sort(byStr)) out2[k] = obj[k];
+  for (const k of Object.keys(obj2).sort(byStr)) out2[k] = obj2[k];
   return out2;
 }
 function renderGraphJson(graph) {
@@ -34878,9 +34878,9 @@ async function callTool(name2, args2, defaultRepo) {
       const entry2 = index.get(lookup2);
       return JSON.stringify(entry2 ?? { error: `no tracked callers for "${lookup2}"` }, null, 2);
     }
-    const obj = {};
-    for (const [k, v] of index) obj[k] = v;
-    return JSON.stringify(obj, null, 2);
+    const obj2 = {};
+    for (const [k, v] of index) obj2[k] = v;
+    return JSON.stringify(obj2, null, 2);
   }
   if (name2 === "workspaces") {
     const info2 = detectWorkspaces(repo);
@@ -35101,9 +35101,9 @@ async function callTool(name2, args2, defaultRepo) {
     const hierarchy = hierarchyFor(readScan());
     const wanted = str(args2.name);
     if (!wanted) {
-      const obj = {};
-      for (const [key2, entry22] of hierarchy) obj[key2] = entry22;
-      return JSON.stringify(obj, null, 2);
+      const obj2 = {};
+      for (const [key2, entry22] of hierarchy) obj2[key2] = entry22;
+      return JSON.stringify(obj2, null, 2);
     }
     const entry2 = hierarchy.get(wanted);
     if (!entry2) return JSON.stringify({ error: `no type named ${wanted}` }, null, 2);
@@ -36117,9 +36117,9 @@ function renderScip(scan2, opts = {}) {
       const symbolString = makeUnique(baseSymbol(f.rel, sym), sym.line, used);
       entries.push({ sym, symbolString });
       if (sym.exported && !REFERENCE_KINDS6.has(sym.kind)) {
-        let arr = defByName.get(sym.name);
-        if (!arr) defByName.set(sym.name, arr = []);
-        arr.push({ symbolString, family: familyOf2(sym.lang) });
+        let arr2 = defByName.get(sym.name);
+        if (!arr2) defByName.set(sym.name, arr2 = []);
+        arr2.push({ symbolString, family: familyOf2(sym.lang) });
       }
     }
     docDefs.set(f.rel, entries);
@@ -36233,11 +36233,11 @@ function dependentsOf(edges) {
   const map = /* @__PURE__ */ new Map();
   for (const e of edges) {
     if (e.dangling || !DEPENDS_KINDS.has(e.kind)) continue;
-    let arr = map.get(e.to);
-    if (!arr) map.set(e.to, arr = []);
-    arr.push(e);
+    let arr2 = map.get(e.to);
+    if (!arr2) map.set(e.to, arr2 = []);
+    arr2.push(e);
   }
-  for (const arr of map.values()) arr.sort((a, b) => byStr(a.from, b.from));
+  for (const arr2 of map.values()) arr2.sort((a, b) => byStr(a.from, b.from));
   dependentsMemo.set(edges, { length: edges.length, map });
   return map;
 }
@@ -36259,8 +36259,8 @@ function adjacencyOf(edges, kinds) {
     degree.set(e.from, (degree.get(e.from) ?? 0) + 1);
     degree.set(e.to, (degree.get(e.to) ?? 0) + 1);
   }
-  for (const arr of out2.values()) arr.sort((a, b) => byStr(a.to, b.to));
-  for (const arr of inn.values()) arr.sort((a, b) => byStr(a.from, b.from));
+  for (const arr2 of out2.values()) arr2.sort((a, b) => byStr(a.to, b.to));
+  for (const arr2 of inn.values()) arr2.sort((a, b) => byStr(a.from, b.from));
   const adj = { out: out2, inn, degree, threshold: hubThreshold([...degree.values()]) };
   entry2.views.set(viewKey, adj);
   return adj;
@@ -36409,12 +36409,12 @@ function computeDelta(graph, symbols, diff, depth = DEFAULT_DELTA_DEPTH) {
   if (symbols) {
     for (const [name2, entries] of Object.entries(symbols.defs)) {
       for (const d of entries) {
-        let arr = defsByFile.get(d.file);
-        if (!arr) defsByFile.set(d.file, arr = []);
-        arr.push({ name: name2, ...d });
+        let arr2 = defsByFile.get(d.file);
+        if (!arr2) defsByFile.set(d.file, arr2 = []);
+        arr2.push({ name: name2, ...d });
       }
     }
-    for (const arr of defsByFile.values()) arr.sort((a, b) => a.line - b.line || byStr(a.name, b.name));
+    for (const arr2 of defsByFile.values()) arr2.sort((a, b) => a.line - b.line || byStr(a.name, b.name));
   }
   const deleted = [];
   const unindexed = [];
@@ -36463,9 +36463,9 @@ function computeDelta(graph, symbols, diff, depth = DEFAULT_DELTA_DEPTH) {
   const byModule = /* @__PURE__ */ new Map();
   for (const c2 of changes) {
     if (c2.status === "deleted" || !c2.module) continue;
-    let arr = byModule.get(c2.module);
-    if (!arr) byModule.set(c2.module, arr = []);
-    arr.push(c2);
+    let arr2 = byModule.get(c2.module);
+    if (!arr2) byModule.set(c2.module, arr2 = []);
+    arr2.push(c2);
   }
   const nonTestCode = /* @__PURE__ */ new Set();
   for (const f of graph.files) {
@@ -37079,12 +37079,12 @@ async function runCli(rawArgv) {
     const outDir = flags2.out;
     mkdirSync3(outDir, { recursive: true });
     const cachePath = join22(outDir, "cache.json");
-    let cache;
+    let cache2;
     let meta2 = {};
     try {
       const parsed = JSON.parse(readFileSync13(cachePath, "utf8"));
       if (parsed.schemaVersion === SCHEMA_VERSION2 && parsed.extractorVersion === EXTRACTOR_VERSION) {
-        cache = new Map(Object.entries(parsed.files));
+        cache2 = new Map(Object.entries(parsed.files));
         meta2 = {
           engineVersion: parsed.engineVersion,
           commit: parsed.commit,
@@ -37098,7 +37098,7 @@ async function runCli(rawArgv) {
     await warmPresentGrammars();
     const scan2 = await scanRepoParallel(flags2.repo, {
       ...scanOptions(flags2, precomputedWalk),
-      cache,
+      cache: cache2,
       out: outDir,
       workers: flags2.workers
     });
@@ -37192,9 +37192,9 @@ async function runCli(rawArgv) {
   } else if (cmd === "callers") {
     const scan2 = await readScan();
     const index = buildCallerIndex(scan2, void 0, { recall: flags2.recall });
-    const obj = {};
-    for (const [name2, entry2] of index) obj[name2] = entry2;
-    emit(JSON.stringify(obj, null, 2) + "\n", flags2.out);
+    const obj2 = {};
+    for (const [name2, entry2] of index) obj2[name2] = entry2;
+    emit(JSON.stringify(obj2, null, 2) + "\n", flags2.out);
   } else if (cmd === "hierarchy") {
     const scan2 = await readScan();
     const hierarchy = buildTypeHierarchy(scan2, computeImportPairs(scan2));
@@ -37203,9 +37203,9 @@ async function runCli(rawArgv) {
       if (!entry2) throw new Error(`no type named ${flags2.positional}`);
       emit(JSON.stringify(entry2, null, 2) + "\n", flags2.out);
     } else {
-      const obj = {};
-      for (const [key2, entry2] of hierarchy) obj[key2] = entry2;
-      emit(JSON.stringify(obj, null, 2) + "\n", flags2.out);
+      const obj2 = {};
+      for (const [key2, entry2] of hierarchy) obj2[key2] = entry2;
+      emit(JSON.stringify(obj2, null, 2) + "\n", flags2.out);
     }
   } else if (cmd === "implementations") {
     if (!flags2.positional) throw new Error("implementations needs a type name: cli.mjs implementations <Name> --repo <dir>");
@@ -55322,15 +55322,15 @@ var Lexer = class {
     }
     if (c2 === 91) {
       this.pos++;
-      const arr = [];
+      const arr2 = [];
       for (; ; ) {
         this.skipWs();
         if (this.pos >= b.length) throw new PdfUnreadable("truncated", "unterminated array");
         if (b[this.pos] === 93) {
           this.pos++;
-          return arr;
+          return arr2;
         }
-        arr.push(this.parse(depth + 1));
+        arr2.push(this.parse(depth + 1));
       }
     }
     const tok = this.readToken();
@@ -55697,15 +55697,15 @@ var PdfDocument = class {
         }
       }
     }
-    const obj = this.parseIndirectAt(offset);
-    if (!(obj instanceof PdfStream) || nameOf2(obj.dict.get("Type")) !== "XRef")
+    const obj2 = this.parseIndirectAt(offset);
+    if (!(obj2 instanceof PdfStream) || nameOf2(obj2.dict.get("Type")) !== "XRef")
       throw new PdfUnreadable("malformed", "startxref points at neither a table nor an xref stream");
     this.xrefStream = true;
-    const data2 = this.decode(obj);
-    const w = obj.dict.get("W")?.map((x) => num2(x) ?? 0) ?? [];
+    const data2 = this.decode(obj2);
+    const w = obj2.dict.get("W")?.map((x) => num2(x) ?? 0) ?? [];
     if (w.length !== 3) throw new PdfUnreadable("malformed", "xref stream without /W");
-    const size = num2(obj.dict.get("Size")) ?? 0;
-    const index = (obj.dict.get("Index") ?? [0, size]).map((x) => num2(x) ?? 0);
+    const size = num2(obj2.dict.get("Size")) ?? 0;
+    const index = (obj2.dict.get("Index") ?? [0, size]).map((x) => num2(x) ?? 0);
     const rowLen = w[0] + w[1] + w[2];
     const field = (p2, n) => {
       let v = 0;
@@ -55728,7 +55728,7 @@ var PdfDocument = class {
         }
       }
     }
-    return obj.dict;
+    return obj2.dict;
   }
   /** The xref lied or is missing: rebuild it from every `N G obj` header in the file (last
    *  definition wins, as in an incremental update), and the trailer from the last `trailer`
@@ -56776,9 +56776,9 @@ function foldDoc(acc, doc, graph) {
   }
   for (const f of findings) {
     acc.allFindings.push(f);
-    const arr = acc.byCriterion.get(f.criteriaId) ?? [];
-    arr.push(f);
-    acc.byCriterion.set(f.criteriaId, arr);
+    const arr2 = acc.byCriterion.get(f.criteriaId) ?? [];
+    arr2.push(f);
+    acc.byCriterion.set(f.criteriaId, arr2);
   }
   for (const pack of listPacks()) {
     if (pack.rules?.length) acc.packFindings.push(...runPackRules(doc, pack));
@@ -57789,15 +57789,15 @@ var rgaa_default2 = {
         en: "Structure via headings"
       },
       summary: {
-        fr: "L'information est structur\xE9e par une hi\xE9rarchie de titres (h1\u2026h6) sans saut de niveau, avec un h1 unique.",
-        en: "Content is structured by a heading hierarchy (h1\u2026h6) with no skipped level and a single h1."
+        fr: `Chaque passage qui joue le r\xF4le d'un titre est balis\xE9 comme tel (h1\u2026h6, ou role="heading" avec aria-level), son contenu est pertinent et la hi\xE9rarchie reste coh\xE9rente. Un saut de niveau (un h3 juste apr\xE8s un h1) ou l'absence de h1 n'invalide pas le crit\xE8re (glossaire RGAA, \xAB Titre \xBB).`,
+        en: 'Every passage acting as a heading is marked up as one (h1\u2026h6, or role="heading" with aria-level), its text is relevant, and the hierarchy stays coherent. A skipped level (an h3 right after an h1) or a missing h1 does not fail the criterion (RGAA glossary, \xAB Titre \xBB).'
       },
       impact: "high",
       examples: [
         {
           lang: "html",
-          bad: "<h1>Titre</h1><h3>Sous-section</h3>",
-          good: "<h1>Titre</h1><h2>Sous-section</h2>"
+          bad: '<h1>Nos services</h1><p class="titre-section"><strong>D\xE9clarer en ligne</strong></p>',
+          good: "<h1>Nos services</h1><h2>D\xE9clarer en ligne</h2>"
         }
       ],
       reference: "https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#9.1"
@@ -67075,8 +67075,101 @@ function openPerPage(audit2, standard, lang) {
 }
 
 // src/adjudicate.ts
-import { mkdirSync as mkdirSync10, statSync as statSync14, writeFileSync as writeFileSync11 } from "fs";
-import { isAbsolute as isAbsolute4, join as join36, relative as relative5, resolve as resolve11 } from "path";
+import { existsSync as existsSync27, mkdirSync as mkdirSync10, statSync as statSync15, writeFileSync as writeFileSync11 } from "fs";
+import { isAbsolute as isAbsolute4, join as join37, relative as relative5, resolve as resolve12 } from "path";
+
+// src/verapdf.ts
+import { spawnSync as spawnSync2 } from "child_process";
+import { existsSync as existsSync26, statSync as statSync14 } from "fs";
+import { delimiter, join as join36, resolve as resolve11 } from "path";
+var OFF = /^(?:off|0|false|no)$/i;
+function veraPdfCommand(env = process.env) {
+  const pinned = env.ULTRA11Y_VERAPDF?.trim();
+  if (pinned) return OFF.test(pinned) ? void 0 : pinned;
+  const names = process.platform === "win32" ? ["verapdf.bat", "verapdf.exe", "verapdf"] : ["verapdf"];
+  for (const dir of (env.PATH ?? "").split(delimiter)) {
+    if (!dir) continue;
+    for (const n of names) {
+      const p = join36(dir, n);
+      try {
+        if (existsSync26(p) && statSync14(p).isFile()) return p;
+      } catch {
+      }
+    }
+  }
+  return void 0;
+}
+var obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : void 0;
+var arr = (v) => Array.isArray(v) ? v : [];
+function parseVeraPdfJson(stdout, files, absolute) {
+  let report;
+  try {
+    report = obj(obj(JSON.parse(stdout))?.report);
+  } catch {
+    report = void 0;
+  }
+  const results = /* @__PURE__ */ new Map();
+  const version = arr(obj(report?.buildInformation)?.releaseDetails).map(obj).find((d) => d?.id === "apps")?.version;
+  for (const job of arr(report?.jobs).map(obj)) {
+    const name2 = obj(job?.itemDetails)?.name;
+    const i2 = typeof name2 === "string" ? absolute.indexOf(resolve11(name2)) : -1;
+    if (i2 < 0) continue;
+    const file = files[i2];
+    const v = arr(job?.validationResult).map(obj)[0] ?? obj(job?.validationResult);
+    if (!v || typeof v.compliant !== "boolean") {
+      const why = obj(arr(job?.taskResult)[0])?.exceptionMessage ?? obj(job?.taskException)?.message ?? job?.jobEndStatus;
+      results.set(file, { file, failedRules: [], error: typeof why === "string" && why ? why : "not validated" });
+      continue;
+    }
+    const failedRules = arr(obj(v.details)?.ruleSummaries).map(obj).filter((r) => r !== void 0 && (r.status === "failed" || r.ruleStatus === "FAILED")).map((r) => ({
+      clause: String(r.clause ?? "?"),
+      testNumber: Number(r.testNumber ?? 0),
+      description: String(r.description ?? ""),
+      failedChecks: Number(r.failedChecks ?? 0)
+    }));
+    results.set(file, { file, compliant: v.compliant, ...typeof v.profileName === "string" ? { profile: v.profileName } : {}, failedRules });
+  }
+  return {
+    ...typeof version === "string" ? { version } : {},
+    results: files.map(
+      (file) => results.get(file) ?? { file, failedRules: [], error: report ? "absent from veraPDF's report" : "veraPDF produced no readable report" }
+    )
+  };
+}
+var cache = /* @__PURE__ */ new Map();
+function runVeraPdf(files, opts = {}) {
+  const command = veraPdfCommand(opts.env);
+  if (!command || !files.length) return void 0;
+  const absolute = files.map((f) => resolve11(opts.cwd ?? process.cwd(), f));
+  const key2 = JSON.stringify([
+    command,
+    absolute.map((p) => {
+      try {
+        const st = statSync14(p);
+        return `${p}|${st.size}|${st.mtimeMs}`;
+      } catch {
+        return `${p}|missing`;
+      }
+    })
+  ]);
+  if (cache.has(key2)) return cache.get(key2);
+  const run2 = spawnSync2(command, ["--flavour", "ua1", "--format", "json", ...absolute], {
+    encoding: "utf8",
+    timeout: opts.timeoutMs ?? 12e4,
+    maxBuffer: 64 * 1024 * 1024,
+    env: opts.env ? { ...process.env, ...opts.env } : process.env,
+    ...process.platform === "win32" ? { shell: true } : {}
+  });
+  let report;
+  if (run2.error || !run2.stdout?.trim()) {
+    const why = run2.error?.message ?? (run2.stderr?.trim().split("\n")[0] || `exit ${run2.status}`);
+    report = { command, results: files.map((file) => ({ file, failedRules: [], error: `veraPDF did not run: ${why}` })) };
+  } else {
+    report = { command, ...parseVeraPdfJson(run2.stdout, files, absolute) };
+  }
+  cache.set(key2, report);
+  return report;
+}
 
 // src/data/adjudication.json
 var adjudication_default = {
@@ -67874,6 +67967,7 @@ function adjudicationForWcagRefs(scs, lang) {
 var ADJUDICATE_MAX_EVIDENCE_CLASSES = 1200;
 var ALSO_AT_SHOWN = 8;
 var CITE_DRIFT_DEFAULT = 10;
+var RECOMMENDATION_SHAPE = "optional on any verdict, never changes a status: each entry is an OBJECT { file, line, message, selector?, snippet? } \u2014 `file`/`line` (and the `snippet`) copied from this criterion's own evidence, grounded against the source exactly like an NC finding but with no normativeRef; a bare sentence, or an object without `file`, is refused";
 function adjudicationContract() {
   return {
     verdicts: [...VERDICTS],
@@ -67883,7 +67977,8 @@ function adjudicationContract() {
       NA: "a non-empty justification, and citations[] whenever evidence was presented \u2014 a criterion whose subject exists NOWHERE in the audited scope is NA, never NC",
       NC: "at least one groundable finding, each naming the `file` it was observed in (an NC with no location is refused as flatly as an uncited C \u2014 and a non-conformity that rests on an ABSENCE is still observed on an element of a page, so cite that element) and each citing a normativeRef that resolves against the active standard",
       manual: `a reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`,
-      human: `decidedBy "human" (a human auditor's verdict, instead of the default "agent") requires auditor: { name, organisation? } \u2014 the same evidence gate applies, and the verdict is reported under the auditor's name`
+      human: `decidedBy "human" (a human auditor's verdict, instead of the default "agent") requires auditor: { name, organisation? } \u2014 the same evidence gate applies, and the verdict is reported under the auditor's name`,
+      recommendations: RECOMMENDATION_SHAPE
     }
   };
 }
@@ -67894,7 +67989,7 @@ function docsForAudit(audit2, cwd) {
   const docs = [];
   for (const f of files) {
     try {
-      const path = cwd ? resolve11(cwd, f) : f;
+      const path = cwd ? resolve12(cwd, f) : f;
       if (isPdfPath(f)) {
         docs.push(loadPdfDoc(path, f));
         continue;
@@ -68124,7 +68219,7 @@ function canonicalEvidenceFile(file) {
   const marker = `${PAGES_DIR}/`;
   const at = posix3.lastIndexOf(marker);
   if (at >= 0) return posix3.slice(at);
-  return /^https?:\/\//i.test(posix3) ? posix3 : resolve11(posix3).replace(/\\/g, "/");
+  return /^https?:\/\//i.test(posix3) ? posix3 : resolve12(posix3).replace(/\\/g, "/");
 }
 function worklistPath(file) {
   if (!isAbsolute4(file)) return file;
@@ -68143,12 +68238,12 @@ function relativizeItem(it) {
   };
 }
 function withinAuditInput(file, audit2, cwd) {
-  const target = resolve11(cwd ?? process.cwd(), file);
+  const target = resolve12(cwd ?? process.cwd(), file);
   for (const input of audit2.scope.inputs) {
     if (input === "-" || input === "<stdin>") continue;
-    const root = resolve11(cwd ?? process.cwd(), input);
+    const root = resolve12(cwd ?? process.cwd(), input);
     try {
-      if (statSync14(root).isDirectory()) {
+      if (statSync15(root).isDirectory()) {
         const rel2 = relative5(root, target);
         if (rel2 === "" || rel2 !== ".." && !rel2.startsWith("../") && !isAbsolute4(rel2)) return true;
       } else if (root === target) return true;
@@ -68471,7 +68566,10 @@ function applyAdjudication(audit2, adj, opts = {}) {
       else if (it.reason === "needs-rendered-dom" && it.evidence.some((e) => snapshotPageId(e.file) !== void 0))
         blame(
           it.criteriaId,
-          `criterion ${it.criteriaId}: "needs-rendered-dom", but this criterion's own evidence is anchored in a page capture \u2014 the rendered page is on disk under .ultra11y/pages/<id>/ (dom.html, styles.json, boxes.json, axtree.json, screen.png). Decide it from those files, or answer "undecidable" and say what the capture does not settle.`
+          `criterion ${it.criteriaId}: "needs-rendered-dom", but this criterion's own evidence is anchored in a page capture \u2014 the rendered page is on disk under .ultra11y/pages/<id>/ (${captureFilesPresent(
+            it.evidence.map((e) => e.file),
+            opts.cwd
+          ).join(", ")}). Decide it from those files, or answer "undecidable" and say what the capture does not settle.`
         );
     } else {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unknown verdict "${String(v)}" \u2014 expected one of ${VERDICTS.join(" | ")}`);
@@ -68480,7 +68578,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
       if (typeof rec.file !== "string" || !rec.file.trim()) {
         blame(
           it.criteriaId,
-          `criterion ${it.criteriaId}: a recommendation must name the file it was observed in \u2014 copy a file and line from this criterion's own evidence, or drop the recommendation`
+          `criterion ${it.criteriaId}: a recommendation must name the file it was observed in \u2014 write it as an object { file, line, message, selector?, snippet? } with a file and line copied from this criterion's own evidence, or drop the recommendation`
         );
         continue;
       }
@@ -68686,6 +68784,71 @@ var residualScanReason = () => "Rendering criterion \u2014 decide on the rendere
 var residualUndecidableReason = () => "Left as an explicit residual risk (not decidable from the available evidence).";
 var residualRejectedReason = (why) => `Adjudication refused by the gate \u2014 ${why.replace(/^criterion \S+: /, "")}. Re-adjudicate this criterion.`;
 var SNIPPET_SHOWN = 200;
+var CAPTURE_FILES = ["dom.html", "styles.json", "boxes.json", "css.json", "probes.json", "axe.json", "axtree.json", "screen.png"];
+var CAPTURE_FILE_LABEL = {
+  fr: {
+    "dom.html": "le DOM s\xE9rialis\xE9 par le navigateur",
+    "styles.json": "les styles calcul\xE9s",
+    "boxes.json": "les bo\xEEtes et positions",
+    "css.json": "les r\xE8gles CSS lues dans les feuilles de style",
+    "probes.json": "les mesures des sondes en direct",
+    "axe.json": "les r\xE9sultats axe-core de la page",
+    "axtree.json": "l'arbre d'accessibilit\xE9",
+    "screen.png": "la capture d'\xE9cran"
+  },
+  en: {
+    "dom.html": "the DOM the browser serialized",
+    "styles.json": "computed styles",
+    "boxes.json": "boxes and positions",
+    "css.json": "the CSS rules read from the stylesheets",
+    "probes.json": "the live probes' measurements",
+    "axe.json": "axe-core's results on the page",
+    "axtree.json": "the accessibility tree",
+    "screen.png": "the screenshot"
+  }
+};
+function captureFilesPresent(files, cwd) {
+  const dirs = /* @__PURE__ */ new Set();
+  for (const f of files) {
+    const m = /^(.*(?:^|\/)\.ultra11y\/pages\/[^/]+)\//.exec(f.replace(/\\/g, "/"));
+    if (m?.[1]) dirs.add(resolve12(cwd ?? process.cwd(), m[1]));
+  }
+  const present = CAPTURE_FILES.filter((name2) => [...dirs].some((d) => existsSync27(join37(d, name2))));
+  return present.length ? present : ["dom.html"];
+}
+var VERAPDF_RULES_SHOWN = 6;
+function veraPdfBlock(pdfs, lang, cwd) {
+  const report = runVeraPdf(pdfs, { cwd });
+  if (!report) return [];
+  const fr = lang === "fr";
+  const name2 = `veraPDF${report.version ? ` ${report.version}` : ""}`;
+  const out2 = [
+    fr ? `> **Validateur externe \u2014 ${name2}, profil PDF/UA-1** \u2014 r\xE9sultat d'un outil EXTERNE install\xE9 sur cette machine, pas un contr\xF4le du moteur : il ne se cite pas (ce n'est pas une \xE9vidence) et ne tranche rien. PDF/UA-1 n'est pas le RGAA 13.3 : une version alternative accessible satisfait le crit\xE8re quel que soit le PDF, et un PDF valide PDF/UA reste \xE0 juger. \xC0 lire \xE0 c\xF4t\xE9 des contr\xF4les du moteur ci-dessus, jamais \xE0 leur place.` : `> **External validator \u2014 ${name2}, PDF/UA-1 profile** \u2014 the result of an EXTERNAL tool installed on this machine, not an engine check: it is not citable (it is not evidence) and decides nothing. PDF/UA-1 is not RGAA 13.3: an accessible alternative version satisfies the criterion whatever the PDF is, and a PDF/UA-valid file still has to be judged. Read it beside the engine's checks above, never in their place.`,
+    ""
+  ];
+  for (const r of report.results) {
+    if (r.compliant === true)
+      out2.push(
+        fr ? `- \`${r.file}\` \u2014 conforme au profil PDF/UA-1 selon veraPDF` : `- \`${r.file}\` \u2014 compliant with the PDF/UA-1 profile according to veraPDF`
+      );
+    else if (r.compliant === false) {
+      const rules = r.failedRules.slice(0, VERAPDF_RULES_SHOWN).map((x) => `\`${x.clause}-${x.testNumber}\` ${x.description.replace(/\s+/g, " ").slice(0, 90)}`).join(" ; ");
+      const more = r.failedRules.length > VERAPDF_RULES_SHOWN ? ` ; \u2026 +${r.failedRules.length - VERAPDF_RULES_SHOWN}` : "";
+      out2.push(
+        fr ? `- \`${r.file}\` \u2014 NON conforme au profil PDF/UA-1 selon veraPDF : ${r.failedRules.length} r\xE8gle(s) en \xE9chec${rules ? ` \u2014 ${rules}${more}` : ""}` : `- \`${r.file}\` \u2014 NOT compliant with the PDF/UA-1 profile according to veraPDF: ${r.failedRules.length} failed rule(s)${rules ? ` \u2014 ${rules}${more}` : ""}`
+      );
+    } else
+      out2.push(
+        fr ? `- \`${r.file}\` \u2014 non valid\xE9 par veraPDF (${r.error ?? "?"}) : aucun r\xE9sultat externe` : `- \`${r.file}\` \u2014 not validated by veraPDF (${r.error ?? "?"}): no external result`
+      );
+  }
+  out2.push("");
+  return out2;
+}
+function listFiles(files, labels, and) {
+  const parts2 = files.map((f) => `\`${f}\` (${labels[f]})`);
+  return parts2.length > 1 ? `${parts2.slice(0, -1).join(", ")} ${and} ${parts2[parts2.length - 1]}` : parts2[0] ?? "";
+}
 var T2 = {
   fr: {
     title: "# Adjudication des crit\xE8res \xE0 \xE9valuer (ultra11y)",
@@ -68696,7 +68859,7 @@ var T2 = {
       "- `NA` \u2014 non applicable (renseignez `justification` ; si des \xE9vidences sont pr\xE9sent\xE9es, citez-les aussi dans `citations[]` pour dire lesquelles sortent du p\xE9rim\xE8tre) ;",
       "- `manual` \u2014 ind\xE9cidable statiquement (renseignez `reason` : `needs-rendered-dom` \u2192 `scan`, ou `undecidable`)."
     ],
-    rule: "> Ne signalez une NC que si un test pr\xE9cis du r\xE9f\xE9rentiel actif \xE9choue \u2014 citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative). Une simple pr\xE9occupation UX n'est ni l'un ni l'autre.\n>\n> Sym\xE9triquement, un `C` se cite comme une NC : il faut nommer dans `citations[]` les \xE9vidences lev\xE9es. **Un crit\xE8re pr\xE9sent\xE9 sans aucune \xE9vidence ne peut pas \xEAtre `C`** \u2014 c'est `manual` (`undecidable`), ou `NA` si rien n'est concern\xE9.",
+    rule: "> Ne signalez une NC que si un test pr\xE9cis du r\xE9f\xE9rentiel actif \xE9choue \u2014 citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative) : chaque entr\xE9e est un objet `{ file, line, message, selector?, snippet? }` dont `file`/`line` sont recopi\xE9s depuis les \xE9vidences du crit\xE8re \u2014 une phrase seule est refus\xE9e. Une simple pr\xE9occupation UX n'est ni l'un ni l'autre.\n>\n> Sym\xE9triquement, un `C` se cite comme une NC : il faut nommer dans `citations[]` les \xE9vidences lev\xE9es. **Un crit\xE8re pr\xE9sent\xE9 sans aucune \xE9vidence ne peut pas \xEAtre `C`** \u2014 c'est `manual` (`undecidable`), ou `NA` si rien n'est concern\xE9.",
     then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (\xE9choue si un verdict manque sa justification, ses citations, son finding ou sa raison).",
     evidence: "\xC9vidences",
     classes: "classes de contenu distinctes",
@@ -68705,7 +68868,7 @@ var T2 = {
     on: "sur",
     alsoAt: "aussi en",
     snippetLabel: "`snippet` \xE0 copier dans la citation",
-    renderedAvailable: "**RENDU DISPONIBLE.** Cet audit a ing\xE9r\xE9 des captures de page : le rendu de la page est sur le disque, sous `.ultra11y/pages/<id>/` \u2014 `dom.html` (le DOM s\xE9rialis\xE9 par le navigateur), `styles.json` (les styles calcul\xE9s), `boxes.json` (les bo\xEEtes et positions), `axtree.json` (l'arbre d'accessibilit\xE9) et `screen.png`. Un crit\xE8re \xAB \xE0 restituer \xBB \u2014 information par la couleur, op\xE9rabilit\xE9 clavier d'un script, geste au pointeur \u2014 se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. `needs-rendered-dom` reste la bonne r\xE9ponse pour un crit\xE8re dont aucune capture ne porte le sujet, et pour lui seul.",
+    renderedAvailable: (files) => `**RENDU DISPONIBLE.** Cet audit a ing\xE9r\xE9 des captures de page : le rendu de la page est sur le disque, sous \`.ultra11y/pages/<id>/\` \u2014 ${listFiles(files, CAPTURE_FILE_LABEL.fr, "et")}. Un crit\xE8re \xAB \xE0 restituer \xBB \u2014 information par la couleur, op\xE9rabilit\xE9 clavier d'un script, geste au pointeur \u2014 se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. \`needs-rendered-dom\` reste la bonne r\xE9ponse pour un crit\xE8re dont aucune capture ne porte le sujet, et pour lui seul.`,
     nothingRendered: (ids2) => `**AUCUN RENDU DANS CETTE PORT\xC9E.** ${ids2.length} crit\xE8re(s) exigent une page rendue, et aucune page n'a \xE9t\xE9 instantan\xE9e ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule r\xE9ponse honn\xEAte. Rendez AVANT d'adjuger \u2014 \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) \u2014 puis reconstruisez cette liste : la mesure en ferme la plupart sans mod\xE8le, donc sans facture. Concern\xE9s : ${ids2.map((id) => `\`${id}\``).join(" \xB7 ")}`,
     briefContract: "> **CONTRAT DE VERDICT** \u2014 le pli est FERM\xC9 : un verdict auquel il manque son champ obligatoire est refus\xE9, et son crit\xE8re retourne \xAB \xE0 \xE9valuer \xBB en portant le refus. Renseignez le verdict de CE crit\xE8re, ici :",
     absenceRule: "> **UNE NC EN FORME D'ABSENCE S'ANCRE QUAND M\xCAME.** \xAB Il n'y a pas de second syst\xE8me de navigation \xBB, \xAB il n'y a pas de moteur de recherche \xBB, \xAB aucun message d'erreur ne sugg\xE8re le format attendu \xBB : une absence se CONSTATE quelque part. Citez l'\xE9l\xE9ment et la page o\xF9 vous l'avez constat\xE9e \u2014 le `<nav>`, le `<header>`, le formulaire \u2014 avec son `file`, sa `line` et son `snippet`. Une NC sans `file` est refus\xE9e aussi s\xFBrement qu'un `C` sans citations. Et si le sujet du crit\xE8re n'existe nulle part dans le p\xE9rim\xE8tre audit\xE9, le verdict n'est pas `NC` : c'est `NA`, avec sa justification.",
@@ -68750,7 +68913,7 @@ var T2 = {
       "- `NA` \u2014 not applicable (fill `justification`; when evidence is presented, cite it too in `citations[]` to say which items are out of scope);",
       "- `manual` \u2014 not statically decidable (fill `reason`: `needs-rendered-dom` \u2192 `scan`, or `undecidable`)."
     ],
-    rule: "> Report NC only if a precise test of the active standard fails \u2014 cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative). A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** \u2014 record `manual` (`undecidable`), or `NA` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate \u2014 an uncited NA is put on trial by `verify`.",
+    rule: "> Report NC only if a precise test of the active standard fails \u2014 cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative): each entry is an object `{ file, line, message, selector?, snippet? }` whose `file`/`line` are copied from the criterion's own evidence \u2014 a bare sentence is refused. A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** \u2014 record `manual` (`undecidable`), or `NA` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate \u2014 an uncited NA is put on trial by `verify`.",
     then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification, citations, finding or reason).",
     evidence: "Evidence",
     classes: "distinct content classes",
@@ -68759,7 +68922,7 @@ var T2 = {
     on: "on",
     alsoAt: "also at",
     snippetLabel: "`snippet` to copy into the citation",
-    renderedAvailable: "**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under `.ultra11y/pages/<id>/` \u2014 `dom.html` (the DOM the browser serialized), `styles.json` (computed styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree) and `screen.png`. A needs-rendering criterion \u2014 information by colour, keyboard operability of a script, a pointer gesture \u2014 is decided FROM THOSE FILES: read them as you would read the source. `needs-rendered-dom` stays the right answer for a criterion no capture carries the subject of, and for that alone.",
+    renderedAvailable: (files) => `**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under \`.ultra11y/pages/<id>/\` \u2014 ${listFiles(files, CAPTURE_FILE_LABEL.en, "and")}. A needs-rendering criterion \u2014 information by colour, keyboard operability of a script, a pointer gesture \u2014 is decided FROM THOSE FILES: read them as you would read the source. \`needs-rendered-dom\` stays the right answer for a criterion no capture carries the subject of, and for that alone.`,
     nothingRendered: (ids2) => `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids2.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating \u2014 \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) \u2014 then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids2.map((id) => `\`${id}\``).join(" \xB7 ")}`,
     briefContract: "> **VERDICT CONTRACT** \u2014 the fold is FAIL-CLOSED: a verdict missing its required field is refused, and its criterion goes back to \xAB to assess \xBB carrying the refusal. Record THIS criterion's verdict, here:",
     absenceRule: "> **AN NC SHAPED LIKE AN ABSENCE STILL HAS TO BE ANCHORED.** \xAB There is no second navigation system \xBB, \xAB there is no search engine \xBB, \xAB no error message suggests the expected format \xBB: an absence is OBSERVED somewhere. Cite the element and the page you observed it on \u2014 the `<nav>`, the `<header>`, the form \u2014 with its `file`, `line` and `snippet`. An NC with no `file` is refused exactly as surely as a `C` with no citations. And when the criterion's subject exists nowhere in the audited scope, the verdict is not `NC`: it is `NA`, with its justification.",
@@ -68859,7 +69022,15 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   const pack = isCore(standard) ? void 0 : loadPack(standard);
   const out2 = opts.contract === false ? [] : opts.preamble === false ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, ""] : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", s.then, ""];
   if (items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
-    out2.push(`> ${s.renderedAvailable}`, "");
+    out2.push(
+      `> ${s.renderedAvailable(
+        captureFilesPresent(
+          items.flatMap((it) => it.evidence.map((e) => e.file)),
+          opts.cwd
+        )
+      )}`,
+      ""
+    );
   }
   if (opts.unrendered?.length) {
     out2.push(`> ${s.nothingRendered(opts.unrendered)}`, "");
@@ -68908,6 +69079,8 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
       }
       out2.push("");
     }
+    const pdfs = [...new Set(it.evidence.filter((e) => isPdfPath(e.file)).map((e) => e.file))];
+    if (pdfs.length) out2.push(...veraPdfBlock(pdfs, lang, opts.cwd));
     const crit = pack ? getCriterion(pack, it.criteriaId) : void 0;
     if (pack) {
       if (!crit?.methodology || Object.keys(crit.methodology).length === 0) {
@@ -68981,8 +69154,8 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
 function writeAdjudication(items, outDir, opts) {
   mkdirSync10(outDir, { recursive: true });
   items = items.map(relativizeItem);
-  const todoPath = join36(outDir, "ADJUDICATE.todo.json");
-  const mdPath = join36(outDir, "ADJUDICATE.md");
+  const todoPath = join37(outDir, "ADJUDICATE.todo.json");
+  const mdPath = join37(outDir, "ADJUDICATE.md");
   const file = {
     tool: "ultra11y",
     kind: "adjudication",
@@ -69000,15 +69173,15 @@ function writeAdjudication(items, outDir, opts) {
       ...opts.web ? { web: true } : {}
     })
   );
-  const verdictsPath = join36(outDir, "ADJUDICATE.verdicts.json");
+  const verdictsPath = join37(outDir, "ADJUDICATE.verdicts.json");
   writeFileSync11(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
-  const itemsDir = join36(outDir, "adjudicate");
+  const itemsDir = join37(outDir, "adjudicate");
   mkdirSync10(itemsDir, { recursive: true });
   const unrendered = new Set(opts.unrendered ?? []);
   for (const it of items) {
     const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
     writeFileSync11(
-      join36(itemsDir, `${it.criteriaId}.md`),
+      join37(itemsDir, `${it.criteriaId}.md`),
       formatAdjudication([it], opts.lang ?? "en", opts.standard, {
         preamble: false,
         ...mine.length ? { unrendered: mine } : {},
@@ -69173,11 +69346,11 @@ function pruneRefuted(audit2, standard, items, lang = "en", untried = []) {
 
 // src/ledger.ts
 import { createHash as createHash7 } from "crypto";
-import { existsSync as existsSync26, mkdirSync as mkdirSync11, readFileSync as readFileSync24, writeFileSync as writeFileSync12 } from "fs";
-import { dirname as dirname14, isAbsolute as isAbsolute5, join as join37, resolve as resolve12 } from "path";
+import { existsSync as existsSync28, mkdirSync as mkdirSync11, readFileSync as readFileSync24, writeFileSync as writeFileSync12 } from "fs";
+import { dirname as dirname14, isAbsolute as isAbsolute5, join as join38, resolve as resolve13 } from "path";
 var LEDGER_DIR = ".ultra11y/verdicts";
 function ledgerPath(standard, root = ".") {
-  return join37(root, LEDGER_DIR, `${standard}.json`);
+  return join38(root, LEDGER_DIR, `${standard}.json`);
 }
 var norm3 = (s) => s.replace(/\s+/g, " ").trim();
 var canonicalFile2 = (file) => {
@@ -69189,7 +69362,7 @@ var canonicalFile2 = (file) => {
 function identityFile(file, root) {
   const canonical = canonicalFile2(file);
   if (root === void 0 || canonical.startsWith(`${PAGES_DIR}/`) || !isAbsolute5(canonical)) return canonical;
-  return repoRelative(canonical, resolve12(root));
+  return repoRelative(canonical, resolve13(root));
 }
 function portableFile(file, root) {
   return identityFile(file, root);
@@ -69248,7 +69421,7 @@ function verdictStillHolds(entry2, today2, opts) {
       `Ledger verdict is STALE \u2014 ${added.size} piece(s) of evidence are NEW since the verdict was recorded on ${entry2.date} (${was} item(s) then, ${today2.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`
     );
   }
-  const exists = opts.fileExists ?? ((f) => existsSync26(f));
+  const exists = opts.fileExists ?? ((f) => existsSync28(f));
   const contributing = /* @__PURE__ */ new Set([...evidenceFilesOf(today2), ...evidenceFilesOf(today2, root)]);
   const silent = (entry2.evidenceFiles ?? []).filter((f) => !contributing.has(f) && !contributing.has(identityFile(f, root)) && exists(f));
   if (silent.length > 0) {
@@ -69286,7 +69459,7 @@ function isLedger(v) {
   return !!o && typeof o === "object" && o.tool === "ultra11y" && o.kind === "verdict-ledger" && Array.isArray(o.entries);
 }
 function readLedger(path) {
-  if (!existsSync26(path)) return void 0;
+  if (!existsSync28(path)) return void 0;
   try {
     const parsed = JSON.parse(readFileSync24(path, "utf8"));
     return isLedger(parsed) ? parsed : void 0;
@@ -69295,7 +69468,7 @@ function readLedger(path) {
   }
 }
 function unreadableCaptures(audit2, cwd = ".") {
-  return (audit2.scope.pagesAudited ?? []).filter((id) => !existsSync26(join37(cwd, PAGES_DIR, id, "dom.html")));
+  return (audit2.scope.pagesAudited ?? []).filter((id) => !existsSync28(join38(cwd, PAGES_DIR, id, "dom.html")));
 }
 function writeLedger(path, ledger) {
   mkdirSync11(dirname14(path), { recursive: true });
@@ -69393,7 +69566,7 @@ function replayLedger(audit2, ledger, opts = {}) {
   const unreadable2 = (audit2.scope.pagesAudited ?? []).filter((id) => {
     const canonical = `${PAGES_DIR}/${id}/dom.html`;
     const fromInputs = currentFiles.get(canonical);
-    return !(fromInputs && existsSync26(fromInputs)) && !existsSync26(join37(root, canonical));
+    return !(fromInputs && existsSync28(fromInputs)) && !existsSync28(join38(root, canonical));
   });
   const harvestComplete = unreadable2.length === 0;
   for (const e of ledger.entries) if (!open.has(e.criteriaId)) obsolete.push(e.criteriaId);
@@ -69406,7 +69579,7 @@ function replayLedger(audit2, ledger, opts = {}) {
     }
     const held = verdictStillHolds(e, it.evidence, {
       harvestComplete,
-      fileExists: (f) => existsSync26(join37(root, f)),
+      fileExists: (f) => existsSync28(join38(root, f)),
       root
     });
     if (!held.holds) {
@@ -69439,8 +69612,8 @@ function replayLedger(audit2, ledger, opts = {}) {
 
 // src/agent-cli.ts
 import { spawn as spawn2 } from "child_process";
-import { existsSync as existsSync27 } from "fs";
-import { delimiter, join as join38 } from "path";
+import { existsSync as existsSync29 } from "fs";
+import { delimiter as delimiter2, join as join39 } from "path";
 
 // src/verdict-rules.ts
 var VERDICT_KINDS = `Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold, and its criterion goes back to \xAB to assess \xBB carrying the refusal):
@@ -69452,7 +69625,7 @@ var WORKLIST_RULE = `THE WORKLIST IS THE RESIDUAL. Return exactly one verdict fo
 var ABSENCE_RULE = `AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. \xAB No second navigation system \xBB, \xAB no search engine \xBB, \xAB no error message suggests the expected format \xBB \u2014 an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.
 
 AND CITE FROM THIS CRITERION'S OWN ANCHORS, NOT THE THING YOU ARE RULING OUT. An absence pulls you toward the element you are arguing ABOUT \u2014 the search form that is not a site search engine, the menu that is not a second navigation system \u2014 and that element is, precisely because it is off-topic, absent from what this criterion was harvested. A citation on one of the criterion's own anchors is vouched for by the harvest; one outside it has its snippet verified LITERALLY, character for character, and a retyping then fails. Cite the region you inspected \u2014 the \`header\`, the \`nav\`, the \`footer\` the brief listed \u2014 and say in the justification what you did not find in it.`;
-var CAPTURE_RULE = `THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\`, \`styles.json\`, \`boxes.json\`, \`axtree.json\` and \`screen.png\` are there to read. \`needs-rendered-dom\` is refused on such a criterion \u2014 decide it from those files, or answer \`undecidable\` and say what the capture does not settle.`;
+var CAPTURE_RULE = `THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\` is there to read, beside whichever digests its producer captured (\`styles.json\`, \`boxes.json\`, \`css.json\`, \`probes.json\`, \`screen.png\`\u2026) \u2014 the brief names the ones that exist, and only those. \`needs-rendered-dom\` is refused on such a criterion \u2014 decide it from those files, or answer \`undecidable\` and say what the capture does not settle.`;
 var NEVER_GUESS_RULE = `Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason \u2014 that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
 var SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce another \u2014 a verdict for a criterion nobody asked about is dropped, and under the fold it would otherwise overwrite what the deterministic engine already decided.`;
 var CONFORMITY_RULE = `A \`C\` WILL BE ATTACKED, exactly as an \`NC\` is. Every conformity you record goes into an adversarial worklist where a second reader opens your citations and asks whether they ESTABLISH the criterion or merely show that its subject exists \u2014 a present \`alt\` is not a relevant \`alt\`, a present \`<title>\` is not a title that describes the page. Cite the evidence that answers the criterion's own question, and when the evidence only proves presence, the honest verdict is \`manual\`.`;
@@ -69721,7 +69894,7 @@ var DEFAULT_CLI_MODEL = "claude-haiku-4-5-20251001";
 var EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"];
 var DEFAULT_TIMEOUT_MS2 = 10 * 6e4;
 function realSpawn(argv, input, timeoutMs) {
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve20, reject) => {
     const child = spawn2(argv[0], argv.slice(1), { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
@@ -69742,7 +69915,7 @@ function realSpawn(argv, input, timeoutMs) {
     });
     child.on("close", (code2) => {
       clearTimeout(timer);
-      resolve19({ code: code2, stdout, stderr, timedOut });
+      resolve20({ code: code2, stdout, stderr, timedOut });
     });
     child.stdin.end(input);
   });
@@ -69750,10 +69923,10 @@ function realSpawn(argv, input, timeoutMs) {
 function claudeBin() {
   const pinned = process.env.ULTRA11Y_CLAUDE_BIN?.trim();
   if (pinned) return [pinned];
-  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+  for (const dir of (process.env.PATH ?? "").split(delimiter2)) {
     if (!dir) continue;
-    const candidate = join38(dir, "claude");
-    if (existsSync27(candidate)) return [candidate];
+    const candidate = join39(dir, "claude");
+    if (existsSync29(candidate)) return [candidate];
   }
   return ["npx", "--yes", "@anthropic-ai/claude-code"];
 }
@@ -69911,14 +70084,14 @@ async function runCli2(argv, prompt, opts, extract) {
 
 // src/agent-codex.ts
 import { spawn as spawn3 } from "child_process";
-import { existsSync as existsSync28, mkdtempSync as mkdtempSync3, rmSync as rmSync4, writeFileSync as writeFileSync13 } from "fs";
+import { existsSync as existsSync30, mkdtempSync as mkdtempSync3, rmSync as rmSync4, writeFileSync as writeFileSync13 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { delimiter as delimiter2, dirname as dirname15, join as join39 } from "path";
+import { delimiter as delimiter3, dirname as dirname15, join as join40 } from "path";
 var MAX_ATTEMPTS3 = 4;
 var CODEX_EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh"];
 var DEFAULT_CODEX_TIMEOUT_MS = 10 * 6e4;
 function realSpawn2(argv, input, timeoutMs) {
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve20, reject) => {
     const child = spawn3(argv[0], argv.slice(1), { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
@@ -69939,7 +70112,7 @@ function realSpawn2(argv, input, timeoutMs) {
     });
     child.on("close", (code2) => {
       clearTimeout(timer);
-      resolve19({ code: code2, stdout, stderr, timedOut });
+      resolve20({ code: code2, stdout, stderr, timedOut });
     });
     child.stdin.end(input);
   });
@@ -69947,10 +70120,10 @@ function realSpawn2(argv, input, timeoutMs) {
 function codexBin() {
   const pinned = process.env.ULTRA11Y_CODEX_BIN?.trim();
   if (pinned) return [pinned];
-  for (const dir of (process.env.PATH ?? "").split(delimiter2)) {
+  for (const dir of (process.env.PATH ?? "").split(delimiter3)) {
     if (!dir) continue;
-    const candidate = join39(dir, "codex");
-    if (existsSync28(candidate)) return [candidate];
+    const candidate = join40(dir, "codex");
+    if (existsSync30(candidate)) return [candidate];
   }
   return ["npx", "--yes", "@openai/codex"];
 }
@@ -70058,14 +70231,14 @@ WORKLIST
 
 ${worklist}`;
 }
-var sleep3 = (ms) => ms <= 0 ? Promise.resolve() : new Promise((resolve19) => setTimeout(resolve19, ms));
+var sleep3 = (ms) => ms <= 0 ? Promise.resolve() : new Promise((resolve20) => setTimeout(resolve20, ms));
 function transient(message) {
   return /429|rate.?limit|overload|temporar|try again|service unavailable|\b5\d\d\b/i.test(message);
 }
 async function runCodex(schema, prompt, opts, extract) {
   const run2 = opts.spawnImpl ?? realSpawn2;
-  const dir = mkdtempSync3(join39(tmpdir2(), "ultra11y-codex-"));
-  const schemaPath = join39(dir, "schema.json");
+  const dir = mkdtempSync3(join40(tmpdir2(), "ultra11y-codex-"));
+  const schemaPath = join40(dir, "schema.json");
   writeFileSync13(schemaPath, `${JSON.stringify(schema)}
 `, { mode: 384 });
   let lastError = "";
@@ -70119,9 +70292,9 @@ async function refuteBatchCodex(items, prompt, opts, lang = "en") {
 
 // src/scan.ts
 import { execFileSync as execFileSync6 } from "child_process";
-import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync14, existsSync as existsSync30, statSync as statSync15, readdirSync as readdirSync7, rmSync as rmSync5, readFileSync as readFileSync25 } from "fs";
+import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync14, existsSync as existsSync32, statSync as statSync16, readdirSync as readdirSync7, rmSync as rmSync5, readFileSync as readFileSync25 } from "fs";
 import { tmpdir as tmpdir3 } from "os";
-import { join as join40, resolve as resolve13 } from "path";
+import { join as join41, resolve as resolve14 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 
 // src/crawl.ts
@@ -70227,7 +70400,7 @@ async function crawlUrls(start2, opts) {
 }
 
 // src/sample.ts
-import { existsSync as existsSync29 } from "fs";
+import { existsSync as existsSync31 } from "fs";
 function looksLikeTarget(u) {
   return /^https?:\/\//i.test(u) || /^(\.\.?[/\\]|[/\\])/.test(u) || /\.x?html?$/i.test(u);
 }
@@ -70263,7 +70436,7 @@ function validateSample(raw) {
     if (p.auth !== void 0 && typeof p.auth !== "boolean") err2(`sample.pages[${i2}].auth`, "auth must be a boolean");
     if (p.storageState !== void 0 && (typeof p.storageState !== "string" || p.storageState.trim() === "")) {
       err2(`sample.pages[${i2}].storageState`, "storageState must be a non-empty file path string");
-    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync29(p.storageState)) {
+    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync31(p.storageState)) {
       warn(
         `sample.pages[${i2}].storageState`,
         `storageState path not found: "${p.storageState}" (resolved from the current directory) \u2014 the scan will not be able to load this session`
@@ -70462,11 +70635,11 @@ function imageExists(tag) {
 }
 var CTX_PREFIX = "ultra11y-dyn-";
 function buildImage(tag = IMAGE_TAG) {
-  const ctx = mkdtempSync4(join40(tmpdir3(), CTX_PREFIX));
+  const ctx = mkdtempSync4(join41(tmpdir3(), CTX_PREFIX));
   try {
-    writeFileSync14(join40(ctx, "runner.mjs"), RUNNER);
-    writeFileSync14(join40(ctx, "package.json"), PKG);
-    writeFileSync14(join40(ctx, "Dockerfile"), DOCKERFILE);
+    writeFileSync14(join41(ctx, "runner.mjs"), RUNNER);
+    writeFileSync14(join41(ctx, "package.json"), PKG);
+    writeFileSync14(join41(ctx, "Dockerfile"), DOCKERFILE);
     execFileSync6("docker", ["build", "-t", tag, ctx], { stdio: "inherit", timeout: 9e5 });
   } finally {
     rmSync5(ctx, { recursive: true, force: true });
@@ -70477,7 +70650,7 @@ function cleanTempContexts() {
   const dir = tmpdir3();
   for (const name2 of readdirSync7(dir)) {
     if (!name2.startsWith(CTX_PREFIX)) continue;
-    rmSync5(join40(dir, name2), { recursive: true, force: true });
+    rmSync5(join41(dir, name2), { recursive: true, force: true });
     removed++;
   }
   return removed;
@@ -70607,7 +70780,7 @@ function runRunner(target, isFile, tag, snapshot = true) {
   const hostTarget = target;
   const args2 = ["run", "--rm"];
   if (!snapshot) args2.push("-e", "ULTRA11Y_SNAPSHOT=0");
-  if (isFile) args2.push("-v", `${resolve13(target)}:${MOUNT}:ro`);
+  if (isFile) args2.push("-v", `${resolve14(target)}:${MOUNT}:ro`);
   else {
     const gw = loopbackToHostGateway(target);
     if (gw.addHost && process.platform === "linux") {
@@ -70702,7 +70875,7 @@ function toDynamicResult(out2, target, lang = "en", engine = "axe-core@playwrigh
 var DOCKER_TESTED_SCS = ["1.4.10"];
 function runScan(opts) {
   const isUrl3 = /^https?:\/\//i.test(opts.target);
-  if (!isUrl3 && !existsSync30(opts.target)) {
+  if (!isUrl3 && !existsSync32(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
   if (!dockerAvailable()) {
@@ -70710,7 +70883,7 @@ function runScan(opts) {
   }
   const tag = opts.tag ?? IMAGE_TAG;
   if (!imageExists(tag)) buildImage(tag);
-  const isFile = !isUrl3 && existsSync30(opts.target) && statSync15(opts.target).isFile();
+  const isFile = !isUrl3 && existsSync32(opts.target) && statSync16(opts.target).isFile();
   const out2 = runRunner(opts.target, isFile, tag, Boolean(opts.snapshotRoot));
   const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, opts.target) : void 0;
   return { ...toDynamicResult(out2, opts.target), testedScs: [...DOCKER_TESTED_SCS], ...id ? { snapshots: [id] } : {} };
@@ -70800,7 +70973,7 @@ async function runCrawlScan(opts) {
 var sevRank = { bloquant: 3, majeur: 2, mineur: 1 };
 function resolveHostAnchor(file, snippet2) {
   const s = snippet2?.trim();
-  if (!s || !existsSync30(file)) return null;
+  if (!s || !existsSync32(file)) return null;
   let source;
   try {
     source = readFileSync25(file, "utf8");
@@ -71015,9 +71188,9 @@ function mergeSnapshotAudit(base, snap) {
 }
 
 // src/scan-local.ts
-import { existsSync as existsSync31, realpathSync as realpathSync4, statSync as statSync16 } from "fs";
+import { existsSync as existsSync33, realpathSync as realpathSync4, statSync as statSync17 } from "fs";
 import { createRequire } from "module";
-import { dirname as dirname16, join as join41, resolve as resolve14 } from "path";
+import { dirname as dirname16, join as join42, resolve as resolve15 } from "path";
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 function localTestedScs(interact) {
@@ -71032,7 +71205,7 @@ function measuredScs(outs, interact) {
 var PW_SPEC = "@playwright/test";
 var AXE_SPEC = "@axe-core/playwright";
 function resolveAnchors(cwd) {
-  return [resolve14(cwd, "package.json"), import.meta.url];
+  return [resolve15(cwd, "package.json"), import.meta.url];
 }
 function requireRuntime(cwd, spec) {
   let last;
@@ -71066,7 +71239,7 @@ function localTierStatus(cwd, choice = {}) {
     const executable = choice.browserPath;
     let isFile = false;
     try {
-      isFile = statSync16(executable).isFile();
+      isFile = statSync17(executable).isFile();
     } catch {
       isFile = false;
     }
@@ -71082,9 +71255,9 @@ function localTierStatus(cwd, choice = {}) {
   try {
     const pw = requireRuntime(cwd, PW_SPEC);
     const bin = pw.chromium?.executablePath?.();
-    if (typeof bin === "string" && bin.length > 0 && !existsSync31(bin)) {
+    if (typeof bin === "string" && bin.length > 0 && !existsSync33(bin)) {
       const pw2 = resolvedPlaywright(cwd);
-      const cliJs = pw2 ? join41(dirname16(pw2.path), "cli.js") : void 0;
+      const cliJs = pw2 ? join42(dirname16(pw2.path), "cli.js") : void 0;
       return {
         ok: false,
         reason: `no browser binary at ${bin} for ${PW_SPEC}${pw2?.version ? `@${pw2.version}` : ""}${pw2 ? ` (${pw2.path})` : ""} \u2014 run \`${cliJs ? `node ${cliJs}` : "npx playwright"} install chromium\`, or pass --runtime local to fall back on an installed Google Chrome`
@@ -71139,7 +71312,7 @@ var realDir = (dir) => {
   try {
     return realpathSync4(dir);
   } catch {
-    return resolve14(dir);
+    return resolve15(dir);
   }
 };
 var MISSING_BROWSER = /Executable doesn'?t exist|playwright install|browserType\.launch/i;
@@ -71175,8 +71348,8 @@ async function launchChromium(chromium, cwd = ".", warn = (m) => console.error(m
   const msg = first instanceof Error ? first.message : String(first);
   const pw = resolvedPlaywright(cwd);
   const which = pw ? `${PW_SPEC}${pw.version ? `@${pw.version}` : ""} resolved at ${pw.path}` : `${PW_SPEC} (resolution path unknown)`;
-  const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve14(cwd)) : false;
-  const cliJs = pw ? join41(dirname16(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
+  const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve15(cwd)) : false;
+  const cliJs = pw ? join42(dirname16(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
   throw new Error(
     `Could not launch Chromium: the browser for ${which} is not installed, and no installed Google Chrome was found either. Install the browser for THAT Playwright \u2014 \`node ${cliJs} install chromium\`${own ? " (this is ultra11y's own Playwright, not the audited project's)" : ""} \u2014 or install Google Chrome, or use --runtime docker. (${msg.split("\n")[0]})`
   );
@@ -71362,7 +71535,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
   const page = await context.newPage();
   const empty = [];
   try {
-    const url = isFile ? "file://" + resolve14(target) : target;
+    const url = isFile ? "file://" + resolve15(target) : target;
     const response = await page.goto(url, { waitUntil: "load", timeout: 45e3 });
     await page.waitForLoadState("networkidle", { timeout: 8e3 }).catch(() => {
     });
@@ -71513,10 +71686,10 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
 }
 async function runScanLocal(opts) {
   const isUrl3 = /^https?:\/\//i.test(opts.target);
-  if (!isUrl3 && !existsSync31(opts.target)) {
+  if (!isUrl3 && !existsSync33(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
-  const isFile = !isUrl3 && statSync16(opts.target).isFile();
+  const isFile = !isUrl3 && statSync17(opts.target).isFile();
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
@@ -71629,7 +71802,7 @@ async function runSampleScanLocal(pages, opts) {
         });
         continue;
       }
-      const requestedUrl = isFile ? "file://" + resolve14(page.url) : page.url;
+      const requestedUrl = isFile ? "file://" + resolve15(page.url) : page.url;
       const landedUrl = out2.landedUrl ?? out2.url;
       if (!landedOnRequestedPage(requestedUrl, landedUrl)) {
         redirected.push({ id: page.id, name: page.name, requested: page.url, landed: landedUrl, reason: "redirect" });
@@ -72169,7 +72342,7 @@ function fixSummary(r, lang = "fr", write = false, standard = CORE2) {
 // src/init.ts
 import { writeFileSync as writeFileSync16, mkdirSync as mkdirSync12, chmodSync as chmodSync2, realpathSync as realpathSync5 } from "fs";
 import { execFileSync as execFileSync7 } from "child_process";
-import { join as join42, relative as relative6, sep as sep4 } from "path";
+import { join as join43, relative as relative6, sep as sep4 } from "path";
 var EN_SEV = { bloquant: "blocking", majeur: "major", mineur: "minor" };
 function repoRoot() {
   try {
@@ -72287,23 +72460,23 @@ jobs:
 `;
 }
 function writeHook(root, enginePath, failOn, mode = "staged") {
-  const dir = join42(root, ".git", "hooks");
+  const dir = join43(root, ".git", "hooks");
   mkdirSync12(dir, { recursive: true });
-  const path = join42(dir, "pre-commit");
+  const path = join43(dir, "pre-commit");
   writeFileSync16(path, mode === "baseline" ? hookScript(enginePath, failOn) : stagedHookScript(enginePath, failOn));
   chmodSync2(path, 493);
   return path;
 }
 function writeCi(root, enginePath, failOn) {
-  const dir = join42(root, ".github", "workflows");
+  const dir = join43(root, ".github", "workflows");
   mkdirSync12(dir, { recursive: true });
-  const path = join42(dir, "a11y.yml");
+  const path = join43(dir, "a11y.yml");
   writeFileSync16(path, ciWorkflow(enginePath, failOn));
   return path;
 }
 
 // src/install/json-edit.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync32, mkdirSync as mkdirSync13, readFileSync as readFileSync26, renameSync as renameSync3, rmSync as rmSync6, writeFileSync as writeFileSync17 } from "fs";
+import { copyFileSync as copyFileSync2, existsSync as existsSync34, mkdirSync as mkdirSync13, readFileSync as readFileSync26, renameSync as renameSync3, rmSync as rmSync6, writeFileSync as writeFileSync17 } from "fs";
 import { dirname as dirname17 } from "path";
 var SettingsParseError = class extends Error {
   constructor(path, cause) {
@@ -72317,10 +72490,10 @@ function stamp() {
   return (/* @__PURE__ */ new Date()).toISOString().replaceAll(/[:.]/g, "-");
 }
 function writeTextWithBackup(path, content, marker = "ultra11y") {
-  if (existsSync32(path) && readFileSync26(path, "utf8") === content) return { path, changed: false };
+  if (existsSync34(path) && readFileSync26(path, "utf8") === content) return { path, changed: false };
   mkdirSync13(dirname17(path), { recursive: true });
   let backup;
-  if (existsSync32(path)) {
+  if (existsSync34(path)) {
     backup = `${path}.${marker}-backup-${stamp()}`;
     copyFileSync2(path, backup);
   }
@@ -72336,7 +72509,7 @@ function writeTextWithBackup(path, content, marker = "ultra11y") {
 }
 function editJsonFile(path, mutate) {
   let root = {};
-  if (existsSync32(path)) {
+  if (existsSync34(path)) {
     const raw = readFileSync26(path, "utf8");
     if (raw.trim()) {
       let parsed;
@@ -72353,7 +72526,7 @@ function editJsonFile(path, mutate) {
   }
   const before = JSON.stringify(root);
   mutate(root);
-  if (JSON.stringify(root) === before && existsSync32(path)) return { path, changed: false };
+  if (JSON.stringify(root) === before && existsSync34(path)) return { path, changed: false };
   return writeTextWithBackup(path, `${JSON.stringify(root, null, 2)}
 `);
 }
@@ -72400,7 +72573,7 @@ function claudeCodeWired(settingsPath) {
 }
 
 // src/install/text-edit.ts
-import { existsSync as existsSync33, readFileSync as readFileSync27, rmSync as rmSync7 } from "fs";
+import { existsSync as existsSync35, readFileSync as readFileSync27, rmSync as rmSync7 } from "fs";
 var BLOCK_BEGIN = "<!-- BEGIN ultra11y (managed by `ultra11y install --agents-md`; edit outside this block) -->";
 var BLOCK_END = "<!-- END ultra11y -->";
 var blockRe = () => new RegExp(`${escapeRe2(BLOCK_BEGIN)}[\\s\\S]*?${escapeRe2(BLOCK_END)}\\n?`);
@@ -72412,14 +72585,14 @@ function upsertManagedBlock(path, body3) {
 ${body3.trim()}
 ${BLOCK_END}
 `;
-  if (!existsSync33(path)) return writeTextWithBackup(path, block);
+  if (!existsSync35(path)) return writeTextWithBackup(path, block);
   const current = readFileSync27(path, "utf8");
   if (blockRe().test(current)) return writeTextWithBackup(path, current.replace(blockRe(), block));
   const sep8 = current.endsWith("\n\n") ? "" : current.endsWith("\n") ? "\n" : "\n\n";
   return writeTextWithBackup(path, `${current}${sep8}${block}`);
 }
 function removeManagedBlock(path) {
-  if (!existsSync33(path)) return { path, changed: false };
+  if (!existsSync35(path)) return { path, changed: false };
   const current = readFileSync27(path, "utf8");
   if (!blockRe().test(current)) return { path, changed: false };
   const rest = current.replace(blockRe(), "");
@@ -72430,13 +72603,13 @@ function removeManagedBlock(path) {
   return writeTextWithBackup(path, rest.replace(/\n+$/, "\n"));
 }
 function hasManagedBlock(path) {
-  return existsSync33(path) && blockRe().test(readFileSync27(path, "utf8"));
+  return existsSync35(path) && blockRe().test(readFileSync27(path, "utf8"));
 }
 
 // src/install/agents-md.ts
-import { join as join43 } from "path";
+import { join as join44 } from "path";
 function agentsMdPath(root) {
-  return join43(root, "AGENTS.md");
+  return join44(root, "AGENTS.md");
 }
 function agentsMdBlock(root) {
   const e = engineInvocation(root);
@@ -72491,25 +72664,25 @@ function agentsMdWired(root) {
 }
 
 // src/install/codex.ts
-import { existsSync as existsSync35, readFileSync as readFileSync29 } from "fs";
-import { join as join45 } from "path";
+import { existsSync as existsSync37, readFileSync as readFileSync29 } from "fs";
+import { join as join46 } from "path";
 
 // src/install/paths.ts
-import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync34, mkdirSync as mkdirSync14, readFileSync as readFileSync28, realpathSync as realpathSync6, statSync as statSync17 } from "fs";
+import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync36, mkdirSync as mkdirSync14, readFileSync as readFileSync28, realpathSync as realpathSync6, statSync as statSync18 } from "fs";
 import { homedir as homedir2 } from "os";
-import { dirname as dirname18, join as join44 } from "path";
+import { dirname as dirname18, join as join45 } from "path";
 function codexHome() {
-  return process.env.CODEX_HOME || join44(homedir2(), ".codex");
+  return process.env.CODEX_HOME || join45(homedir2(), ".codex");
 }
 function opencodeConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join44(xdg && xdg !== "" ? xdg : join44(homedir2(), ".config"), "opencode");
+  return join45(xdg && xdg !== "" ? xdg : join45(homedir2(), ".config"), "opencode");
 }
 function claudeSettingsPath(project, cwd = process.cwd()) {
-  return project ? join44(cwd, ".claude", "settings.json") : join44(homedir2(), ".claude", "settings.json");
+  return project ? join45(cwd, ".claude", "settings.json") : join45(homedir2(), ".claude", "settings.json");
 }
 function pinnedEnginePath() {
-  return join44(homedir2(), ".ultra11y", "bin", "ultra11y.mjs");
+  return join45(homedir2(), ".ultra11y", "bin", "ultra11y.mjs");
 }
 function installedCliCommand() {
   const override = process.env.ULTRA11Y_BIN;
@@ -72524,7 +72697,7 @@ function installedCliCommand() {
   if (source && !ephemeral) return `node ${JSON.stringify(source)}`;
   const pin = pinnedEnginePath();
   if (source) {
-    mkdirSync14(join44(pin, ".."), { recursive: true });
+    mkdirSync14(join45(pin, ".."), { recursive: true });
     copyFileSync3(source, pin);
   }
   return `node ${JSON.stringify(pin)}`;
@@ -72537,32 +72710,32 @@ function packageRoot() {
     return null;
   }
   for (let i2 = 0; i2 < 6 && dir && dir !== "/"; i2++) {
-    if (existsSync34(join44(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
+    if (existsSync36(join45(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
     dir = dirname18(dir);
   }
   return null;
 }
 function bundledSkillsDir() {
   const root = packageRoot();
-  const p = root ? join44(root, "skills") : null;
-  return p && existsSync34(p) ? p : null;
+  const p = root ? join45(root, "skills") : null;
+  return p && existsSync36(p) ? p : null;
 }
 function bundledOpencodePlugin() {
   const root = packageRoot();
-  const p = root ? join44(root, ".opencode", "plugins", "ultra11y.js") : null;
-  return p && existsSync34(p) ? p : null;
+  const p = root ? join45(root, ".opencode", "plugins", "ultra11y.js") : null;
+  return p && existsSync36(p) ? p : null;
 }
 function copySkillsInto(source, dest) {
   const out2 = [];
   for (const name2 of ["ultra11y", "review-a11y"]) {
-    const from = join44(source, name2);
-    if (!existsSync34(from)) continue;
-    const to = join44(dest, name2);
-    const same = ["SKILL.md", join44("scripts", "ultra11y.mjs")].every((f) => {
-      const a = join44(from, f);
-      const b = join44(to, f);
+    const from = join45(source, name2);
+    if (!existsSync36(from)) continue;
+    const to = join45(dest, name2);
+    const same = ["SKILL.md", join45("scripts", "ultra11y.mjs")].every((f) => {
+      const a = join45(from, f);
+      const b = join45(to, f);
       try {
-        return existsSync34(b) && statSync17(a).size === statSync17(b).size && readFileSync28(a).equals(readFileSync28(b));
+        return existsSync36(b) && statSync18(a).size === statSync18(b).size && readFileSync28(a).equals(readFileSync28(b));
       } catch {
         return false;
       }
@@ -72612,7 +72785,7 @@ function featuresBody(content) {
 function installCodex({ codexDir, command, skillsSource }) {
   const reports = [];
   reports.push(
-    editJsonFile(join45(codexDir, "hooks.json"), (root) => {
+    editJsonFile(join46(codexDir, "hooks.json"), (root) => {
       const hooks = root.hooks ??= {};
       hooks.PreToolUse = [
         ...withoutOurs2(hooks.PreToolUse),
@@ -72620,11 +72793,11 @@ function installCodex({ codexDir, command, skillsSource }) {
       ];
     })
   );
-  const configPath = join45(codexDir, "config.toml");
-  const current = existsSync35(configPath) ? readFileSync29(configPath, "utf8") : "";
+  const configPath = join46(codexDir, "config.toml");
+  const current = existsSync37(configPath) ? readFileSync29(configPath, "utf8") : "";
   const edit = enableHooksFeature(current);
   if (edit.changed) reports.push(writeTextWithBackup(configPath, edit.content));
-  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join45(codexDir, "skills")));
+  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join46(codexDir, "skills")));
   return {
     reports,
     guidance: [
@@ -72639,8 +72812,8 @@ function installCodex({ codexDir, command, skillsSource }) {
 }
 function uninstallCodex({ codexDir }) {
   const reports = [];
-  const hooksPath = join45(codexDir, "hooks.json");
-  if (existsSync35(hooksPath)) {
+  const hooksPath = join46(codexDir, "hooks.json");
+  if (existsSync37(hooksPath)) {
     reports.push(
       editJsonFile(hooksPath, (root) => {
         const hooks = root.hooks;
@@ -72655,20 +72828,20 @@ function uninstallCodex({ codexDir }) {
   return { reports, guidance: ["codex: `[features] hooks = true` was left enabled \u2014 other hooks may depend on it."] };
 }
 function codexWired(codexDir) {
-  const root = readJsonSafe(join45(codexDir, "hooks.json"));
+  const root = readJsonSafe(join46(codexDir, "hooks.json"));
   const groups = root?.hooks?.PreToolUse;
   if (!Array.isArray(groups)) return 0;
   return groups.reduce((n, g) => n + (g.hooks ?? []).filter((h2) => String(h2.command ?? "").includes(CODEX_MARKER)).length, 0);
 }
 function codexHooksEnabled(codexDir) {
-  const p = join45(codexDir, "config.toml");
-  return existsSync35(p) && HOOKS_ON.test(featuresBody(readFileSync29(p, "utf8")));
+  const p = join46(codexDir, "config.toml");
+  return existsSync37(p) && HOOKS_ON.test(featuresBody(readFileSync29(p, "utf8")));
 }
 
 // src/install/opencode.ts
-import { spawnSync as spawnSync2 } from "child_process";
-import { existsSync as existsSync36, readFileSync as readFileSync30, rmSync as rmSync8 } from "fs";
-import { join as join46 } from "path";
+import { spawnSync as spawnSync3 } from "child_process";
+import { existsSync as existsSync38, readFileSync as readFileSync30, rmSync as rmSync8 } from "fs";
+import { join as join47 } from "path";
 var OPENCODE_MARKER = "ULTRA11Y_OPENCODE_PLUGIN";
 var PLUGIN_DIRS = ["plugin", "plugins"];
 function dirFor(major) {
@@ -72677,8 +72850,8 @@ function dirFor(major) {
 function opencodePinKey(major) {
   return major === 2 ? "plugins" : "plugin";
 }
-var pluginFile = (configDir, dir) => join46(configDir, dir, "ultra11y.js");
-var ours = (path) => existsSync36(path) && readFileSync30(path, "utf8").includes(OPENCODE_MARKER);
+var pluginFile = (configDir, dir) => join47(configDir, dir, "ultra11y.js");
+var ours = (path) => existsSync38(path) && readFileSync30(path, "utf8").includes(OPENCODE_MARKER);
 function parseOpencodeVersion(text) {
   const m = /\bv?(\d+)\.\d+\.\d+/.exec(text);
   if (!m) return null;
@@ -72687,7 +72860,7 @@ function parseOpencodeVersion(text) {
   return major >= 2 ? 2 : null;
 }
 var runOpencodeVersion = () => {
-  const r = spawnSync2("opencode", ["--version"], {
+  const r = spawnSync3("opencode", ["--version"], {
     encoding: "utf8",
     timeout: 1e4,
     stdio: ["ignore", "pipe", "pipe"],
@@ -72717,7 +72890,7 @@ function isUltra11yPin(entry2) {
 }
 function pinnedKeys(configDir) {
   try {
-    const cfg = JSON.parse(readFileSync30(join46(configDir, "opencode.json"), "utf8"));
+    const cfg = JSON.parse(readFileSync30(join47(configDir, "opencode.json"), "utf8"));
     return ["plugin", "plugins"].filter((k) => Array.isArray(cfg?.[k]) && cfg[k].some(isUltra11yPin));
   } catch {
     return [];
@@ -72726,28 +72899,28 @@ function pinnedKeys(configDir) {
 function installOpencode({ configDir, pluginSource, skillsSource, enginePath, major = null }) {
   const dir = dirFor(major);
   const target = pluginFile(configDir, dir);
-  if (existsSync36(target) && !ours(target)) {
+  if (existsSync38(target) && !ours(target)) {
     throw new Error(`refusing to overwrite ${target}: it is not a file ultra11y wrote. Remove it manually if you want the plugin here.`);
   }
   const reports = [writeTextWithBackup(target, readFileSync30(pluginSource, "utf8"))];
   const guidance = [];
-  if (enginePath && existsSync36(enginePath)) {
-    reports.push(writeTextWithBackup(join46(configDir, dir, "ultra11y.mjs"), readFileSync30(enginePath, "utf8")));
+  if (enginePath && existsSync38(enginePath)) {
+    reports.push(writeTextWithBackup(join47(configDir, dir, "ultra11y.mjs"), readFileSync30(enginePath, "utf8")));
   }
-  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join46(configDir, "skills")));
+  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join47(configDir, "skills")));
   for (const other of PLUGIN_DIRS) {
     if (other === dir) continue;
     const stale = pluginFile(configDir, other);
     if (!ours(stale)) continue;
     rmSync8(stale, { force: true });
-    rmSync8(join46(configDir, other, "ultra11y.mjs"), { force: true });
+    rmSync8(join47(configDir, other, "ultra11y.mjs"), { force: true });
     guidance.push(`opencode: moved the plugin from ${other}/ to ${dir}/ \u2014 it is loaded from one place only.`);
   }
   const key2 = opencodePinKey(major);
   guidance.push(
     major === null ? "opencode: no `opencode` on PATH to ask its version \u2014 wired plugin/, which OpenCode 1 and 2 both read (pass --opencode-version 1|2 to choose)." : `opencode: wired for OpenCode ${major}.`,
     "opencode: restart the session \u2014 plugins load at startup.",
-    `opencode: the alternative is an npm pin \u2014 add "${key2}": ["ultra11y@latest"] to ${join46(configDir, "opencode.json")} and drop this file.`,
+    `opencode: the alternative is an npm pin \u2014 add "${key2}": ["ultra11y@latest"] to ${join47(configDir, "opencode.json")} and drop this file.`,
     "opencode: the gate surfaces as a blocked tool call whose error message carries the findings (OpenCode has no permission-decision channel)."
   );
   const pins = pinnedKeys(configDir);
@@ -72762,11 +72935,11 @@ function uninstallOpencode({ configDir }) {
     const target = pluginFile(configDir, dir);
     if (!ours(target)) continue;
     rmSync8(target, { force: true });
-    rmSync8(join46(configDir, dir, "ultra11y.mjs"), { force: true });
+    rmSync8(join47(configDir, dir, "ultra11y.mjs"), { force: true });
     reports.push({ path: target, changed: true });
   }
-  const configPath = join46(configDir, "opencode.json");
-  if (existsSync36(configPath)) {
+  const configPath = join47(configDir, "opencode.json");
+  if (existsSync38(configPath)) {
     reports.push(
       editJsonFile(configPath, (root) => {
         for (const key2 of ["plugin", "plugins"]) {
@@ -72792,8 +72965,8 @@ function opencodeWired(configDir) {
 }
 
 // src/install/index.ts
-import { existsSync as existsSync37 } from "fs";
-import { join as join47 } from "path";
+import { existsSync as existsSync39 } from "fs";
+import { join as join48 } from "path";
 var ALL_TARGETS = ["claude-code", "codex", "opencode"];
 function parseTargets(flags2) {
   const picked = /* @__PURE__ */ new Set();
@@ -72832,7 +73005,7 @@ function installForTargets(opts) {
             const out3 = installCodex({ codexDir: codexHome(), command: cmd(), skillsSource: opts.skills === false ? null : bundledSkillsDir() });
             r.reports.push(...out3.reports);
             r.guidance.push(...out3.guidance);
-          } else r.reports.push({ path: join47(codexHome(), "hooks.json"), changed: false });
+          } else r.reports.push({ path: join48(codexHome(), "hooks.json"), changed: false });
           break;
         }
         case "opencode": {
@@ -72841,15 +73014,15 @@ function installForTargets(opts) {
             r.error = "opencode: this engine was not run from a package carrying .opencode/plugins/ultra11y.js \u2014 install ultra11y from npm and retry.";
             break;
           }
-          const configDir = opts.project === true ? join47(cwd, ".opencode") : opencodeConfigDir();
+          const configDir = opts.project === true ? join48(cwd, ".opencode") : opencodeConfigDir();
           const major = opts.opencodeVersion ?? detectOpencodeMajor();
           if (!opts.dryRun) {
-            const engine = existsSync37(pinnedEnginePath()) ? pinnedEnginePath() : join47(packageRoot() ?? "", "scripts", "ultra11y.mjs");
+            const engine = existsSync39(pinnedEnginePath()) ? pinnedEnginePath() : join48(packageRoot() ?? "", "scripts", "ultra11y.mjs");
             const out3 = installOpencode({
               configDir,
               pluginSource: source,
               skillsSource: opts.skills === false ? null : bundledSkillsDir(),
-              enginePath: existsSync37(engine) ? engine : null,
+              enginePath: existsSync39(engine) ? engine : null,
               major
             });
             r.reports.push(...out3.reports);
@@ -72892,7 +73065,7 @@ function uninstallForTargets(opts) {
           break;
         }
         case "opencode": {
-          const out3 = uninstallOpencode({ configDir: opts.project === true ? join47(cwd, ".opencode") : opencodeConfigDir() });
+          const out3 = uninstallOpencode({ configDir: opts.project === true ? join48(cwd, ".opencode") : opencodeConfigDir() });
           r.reports.push(...out3.reports);
           r.guidance.push(...out3.guidance);
           break;
@@ -72913,14 +73086,14 @@ function statusReport(opts = {}) {
   const claudePath = claudeSettingsPath(opts.project === true, cwd);
   const root = projectRoot(cwd);
   const codexDir = codexHome();
-  const ocDir = opts.project === true ? join47(cwd, ".opencode") : opencodeConfigDir();
+  const ocDir = opts.project === true ? join48(cwd, ".opencode") : opencodeConfigDir();
   const codexOn = codexWired(codexDir) > 0;
   return [
     { target: "claude-code", wired: claudeCodeWired(claudePath) > 0, path: claudePath, note: "the plugin route wires this separately and does not show here" },
     {
       target: "codex",
       wired: codexOn,
-      path: join47(codexDir, "hooks.json"),
+      path: join48(codexDir, "hooks.json"),
       // A wired hook behind a disabled feature flag never fires and looks fine. Say so.
       note: codexOn && !codexHooksEnabled(codexDir) ? "WIRED BUT INERT: `[features] hooks = true` is not set in config.toml" : void 0
     },
@@ -73831,8 +74004,8 @@ function pagesComment(result, opts = {}) {
 
 // src/evidence.ts
 import { createHash as createHash8 } from "crypto";
-import { existsSync as existsSync38, mkdirSync as mkdirSync15, readFileSync as readFileSync31, writeFileSync as writeFileSync18 } from "fs";
-import { join as join48 } from "path";
+import { existsSync as existsSync40, mkdirSync as mkdirSync15, readFileSync as readFileSync31, writeFileSync as writeFileSync18 } from "fs";
+import { join as join49 } from "path";
 var DEFAULT_GEOMETRY = { pad: 24, minWidth: 320, minHeight: 120, maxWidth: 960, maxHeight: 540 };
 var DEFAULT_CAPS = { perRule: 6, perPage: 12, total: 200 };
 var HALO = { r: 255, g: 255, b: 255, a: 0.92 };
@@ -73865,10 +74038,10 @@ function resolveScale(img, viewport, boxes) {
 }
 function loadPageEvidence(root, pageId) {
   const dir = snapshotDir(root, pageId);
-  const domFile = join48(dir, "dom.html");
-  const shotFile = join48(dir, "screen.png");
-  if (!existsSync38(domFile)) return { skip: "no-snapshot" };
-  if (!existsSync38(shotFile)) return { skip: "no-screenshot" };
+  const domFile = join49(dir, "dom.html");
+  const shotFile = join49(dir, "screen.png");
+  if (!existsSync40(domFile)) return { skip: "no-snapshot" };
+  if (!existsSync40(shotFile)) return { skip: "no-screenshot" };
   let dom;
   let shot;
   try {
@@ -73879,7 +74052,7 @@ function loadPageEvidence(root, pageId) {
   }
   const img = decodePng(shot);
   if (!img) return { skip: "unreadable-image" };
-  const digest = readJson3(join48(dir, "boxes.json"));
+  const digest = readJson3(join49(dir, "boxes.json"));
   if (!digest) return { skip: "no-boxes" };
   const doc = parseHtml(dom, domFile);
   const boxes = alignedBoxes(dom, digest, doc);
@@ -73895,7 +74068,7 @@ function loadPageEvidence(root, pageId) {
   return { pageId, img, scale, viewport, ordinalOf, boxes, truncated: Boolean(digest.truncated) };
 }
 function metaOf(dir) {
-  const raw = readJson3(join48(dir, "meta.json"));
+  const raw = readJson3(join49(dir, "meta.json"));
   if (raw === void 0) return void 0;
   const v = validateSnapshotMeta(raw);
   return v.ok && v.meta ? v.meta : void 0;
@@ -74060,7 +74233,7 @@ function writeEvidence(result, opts) {
       }
       continue;
     }
-    const dir = join48(opts.outDir, "assets", pageId);
+    const dir = join49(opts.outDir, "assets", pageId);
     let wrote = false;
     const perRule = /* @__PURE__ */ new Map();
     const seen = /* @__PURE__ */ new Set();
@@ -74085,7 +74258,7 @@ function writeEvidence(result, opts) {
         continue;
       }
       const name2 = cropName(f);
-      const path = join48(dir, name2);
+      const path = join49(dir, name2);
       try {
         if (!wrote) {
           mkdirSync15(dir, { recursive: true });
@@ -74123,8 +74296,8 @@ function writeEvidence(result, opts) {
 }
 
 // src/html-emit.ts
-import { mkdirSync as mkdirSync16, readFileSync as readFileSync32, statSync as statSync18, writeFileSync as writeFileSync19 } from "fs";
-import { join as join49 } from "path";
+import { mkdirSync as mkdirSync16, readFileSync as readFileSync32, statSync as statSync19, writeFileSync as writeFileSync19 } from "fs";
+import { join as join50 } from "path";
 
 // src/html.ts
 var MARK4 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
@@ -74869,7 +75042,7 @@ var T5 = {
 var mb = (n) => (n / (1024 * 1024)).toFixed(1);
 function inlineSize(path) {
   try {
-    return Math.ceil(statSync18(path).size / 3) * 4;
+    return Math.ceil(statSync19(path).size / 3) * 4;
   } catch {
     return 0;
   }
@@ -74947,7 +75120,7 @@ function writeHtml(result, opts) {
     return drawn;
   };
   const flat = opts.layout === "pages";
-  const sheetDir = flat ? opts.outDir : join49(opts.outDir, "pages");
+  const sheetDir = flat ? opts.outDir : join50(opts.outDir, "pages");
   const up = flat ? "./" : "../";
   const compositeName = `ultra11y-${stdKey}-${result.date}.html`;
   const nav = flat ? [{ href: "./index.html", text: t3.pagesTitle }] : [
@@ -74966,13 +75139,13 @@ function writeHtml(result, opts) {
       nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` }))
     });
     if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
-    compositePath = join49(opts.outDir, compositeName);
+    compositePath = join50(opts.outDir, compositeName);
     writeFileSync19(compositePath, renderHtmlDocument(composite));
   }
   const fileCrops = cropLookup(opts.evidence, lang, (_p, href) => href.replace(/^\.\//, up));
   const indexNav = nav.map((n) => ({ ...n, current: n.href === "./index.html" }));
   const index = flat ? pagesIndexDoc(result, { standard, lang, nav: indexNav, sheetHref: (id) => `./page-${id}.html` }) : indexDoc(result, { standard, lang, nav: indexNav, links: nav.filter((n) => n.href !== "./index.html") });
-  const indexPath = join49(opts.outDir, "index.html");
+  const indexPath = join50(opts.outDir, "index.html");
   writeFileSync19(indexPath, renderHtmlDocument(index));
   const sheets = [];
   if (opts.pages) {
@@ -74985,7 +75158,7 @@ function writeHtml(result, opts) {
     ];
     if (!flat) {
       writeFileSync19(
-        join49(sheetDir, "index.html"),
+        join50(sheetDir, "index.html"),
         renderHtmlDocument(
           pagesIndexDoc(result, {
             standard,
@@ -74995,7 +75168,7 @@ function writeHtml(result, opts) {
           })
         )
       );
-      sheets.push(join49(sheetDir, "index.html"));
+      sheets.push(join50(sheetDir, "index.html"));
     }
     for (const p of derived) {
       const doc = pageDoc(result, p, {
@@ -75008,7 +75181,7 @@ function writeHtml(result, opts) {
         // beside the entry point, seen from wherever this sheet sits.
         ...opts.screenshots?.has(p.id) ? { screenshot: `${up}assets/${p.id}.png` } : {}
       });
-      const path = join49(sheetDir, `page-${p.id}.html`);
+      const path = join50(sheetDir, `page-${p.id}.html`);
       writeFileSync19(path, renderHtmlDocument(doc));
       sheets.push(path);
     }
@@ -75030,7 +75203,7 @@ function noticeRuns(notices) {
 // src/dev.ts
 import { createServer } from "http";
 import { mkdirSync as mkdirSync17, readFileSync as readFileSync33, writeFileSync as writeFileSync20 } from "fs";
-import { dirname as dirname19, join as join50 } from "path";
+import { dirname as dirname19, join as join51 } from "path";
 var DEV_DEFAULT_PORT = 4111;
 function criterionLabel3(f, standard) {
   if (isCore(standard)) return `WCAG ${f.criteriaId}`;
@@ -75252,13 +75425,13 @@ function auditCollected(root, payload) {
     ...payload.css ? { css: payload.css } : {},
     ...shot ? { screenshotBase64: shot } : {}
   });
-  return { ok: true, result: runAudit({ inputs: [join50(dir, "dom.html")] }) };
+  return { ok: true, result: runAudit({ inputs: [join51(dir, "dom.html")] }) };
 }
 function projectPages(root) {
   const snaps = readSnapshots(root);
   if (!snaps.length) return { result: null, pages: [] };
   const scope = pageScopesFrom(snaps);
-  const result = runAudit({ inputs: [join50(root, ".ultra11y/pages")] });
+  const result = runAudit({ inputs: [join51(root, ".ultra11y/pages")] });
   result.scope.pages = scope;
   attributePages(result, scope);
   foldRecordedAdjudication(root, result);
@@ -75272,7 +75445,7 @@ function judgePages(result) {
 function foldRecordedAdjudication(root, fresh) {
   let prior;
   try {
-    prior = JSON.parse(readFileSync33(join50(root, "audits", "audit-latest.json"), "utf8"));
+    prior = JSON.parse(readFileSync33(join51(root, "audits", "audit-latest.json"), "utf8"));
   } catch {
     return;
   }
@@ -75388,7 +75561,7 @@ function startDevServer(opts) {
           });
           let auditPath;
           if (applied.ok) {
-            auditPath = join50(opts.root, "audits", "audit-latest.json");
+            auditPath = join51(opts.root, "audits", "audit-latest.json");
             mkdirSync17(dirname19(auditPath), { recursive: true });
             writeFileSync20(auditPath, `${JSON.stringify(applied.audit, null, 2)}
 `);
@@ -75417,10 +75590,10 @@ function startDevServer(opts) {
     }
     res.writeHead(404, { "content-type": "text/plain" }).end("not found");
   });
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve20, reject) => {
     server.once("error", reject);
     server.listen(opts.port, "127.0.0.1", () => {
-      resolve19({
+      resolve20({
         port: server.address().port,
         close: () => new Promise((r) => server.close(() => r()))
       });
@@ -75708,11 +75881,11 @@ function e2eSetupPlan(runners, paths, lang = "en") {
 }
 
 // src/orchestrate.ts
-import { existsSync as existsSync39, mkdirSync as mkdirSync18, readFileSync as readFileSync34, rmSync as rmSync9, writeFileSync as writeFileSync21 } from "fs";
-import { join as join52, resolve as resolve15 } from "path";
+import { existsSync as existsSync41, mkdirSync as mkdirSync18, readFileSync as readFileSync34, rmSync as rmSync9, writeFileSync as writeFileSync21 } from "fs";
+import { join as join53, resolve as resolve16 } from "path";
 
 // src/orchestrate-templates.ts
-import { join as join51 } from "path";
+import { join as join52 } from "path";
 var ONE_WRITER_FOOTER = `
 ## Return, don't write
 
@@ -75818,7 +75991,7 @@ function toBatches(ids2, batchSize) {
 }
 function phaseWorkflowScript(ph, runAbs, engineAbs, batchSize) {
   const spec = phaseSpec(ph.name);
-  const scriptPath = join51(runAbs, "orchestration", `${ph.name}.workflow.mjs`);
+  const scriptPath = join52(runAbs, "orchestration", `${ph.name}.workflow.mjs`);
   const meta2 = { name: `ultra11y-${ph.name}`, description: spec.description(ph.items), phases: [{ title: spec.title }] };
   return [
     `export const meta = ${JSON.stringify(meta2)}`,
@@ -75864,8 +76037,8 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 
 ## Which files \u2014 your prompt decides, and it wins over this document
 
-- **With a shell.** Read \`${join51(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join51(runAbs, "ADJUDICATE.todo.json")} --in ${join51(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
-- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join51(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join51(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
+- **With a shell.** Read \`${join52(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join52(runAbs, "ADJUDICATE.todo.json")} --in ${join52(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
+- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join52(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join52(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
 
 ## For EACH criterion
 
@@ -75882,7 +76055,7 @@ function ecoRefuterContract(runAbs, verify) {
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
 
-There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join51(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
+There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join52(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
 
 For EACH entry:
 
@@ -75895,24 +76068,24 @@ For EACH entry:
    When unsure, choose the HARSHER verdict \u2014 a false pass is worse than a false fail.
 3. \`note\` is REQUIRED \u2014 one line grounded in what you read (quote or paraphrase the decisive code).
 
-Then fold: \`ultra11y verify --apply ${join51(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
+Then fold: \`ultra11y verify --apply ${join52(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
 `;
 }
 function agentContracts(runAbs, opts = {}) {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
-  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join51(runAbs, "audit-latest.json")}` };
+  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join52(runAbs, "audit-latest.json")}` };
   if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs, verify) };
   return {
     adjudicator: `# Contract: adjudicator
 
 You adjudicate the residual judgment criteria of an ultra11y audit \u2014 the ones the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order\u2026). The ACTIVE STANDARD is recorded in the worklist's \`standard\` field: under a country standard (e.g. \`rgaa\`) the items are that standard's OWN criteria, each carrying its numbered tests \u2014 not WCAG success criteria.
 
-Worklist: \`${join51(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,\u2026>\`).
+Worklist: \`${join52(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,\u2026>\`).
 
 For EACH of your criteria:
 
 1. Read its worklist entry for the EVIDENCE: \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide.
-1b. Read \`${join51(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF \u2014 its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
+1b. Read \`${join52(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF \u2014 its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
 2. Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold):
    - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this item's own \`evidence[]\`; an anchor that is not in that list is treated as fabricated). A criterion whose \`evidence[]\` is empty cannot be \`C\` at all \u2014 it is \`manual\` (\`undecidable\`), or \`NA\` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate \u2014 an uncited NA is put on trial by \`verify\`.
    - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the item's OWN tests, which its brief lists for you under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
@@ -75926,7 +76099,7 @@ ${footer}`,
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
 
-Worklist: \`${join51(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`). Handle ONLY the entries whose \`n\` is named in your prompt (\`ITEMS=<n,\u2026>\`).
+Worklist: \`${join52(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`). Handle ONLY the entries whose \`n\` is named in your prompt (\`ITEMS=<n,\u2026>\`).
 
 For EACH of your entries:
 
@@ -75955,8 +76128,8 @@ function runbookMd(manifest, unrendered = []) {
 > no model in the loop \u2014 then re-emit this runbook:
 >
 > \`\`\`
-> ${engine} scan <url> --runtime local --merge ${join51(runAbs, "audit-latest.json")} --out ${runAbs}
-> ${engine} verify --manual --in ${join51(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} scan <url> --runtime local --merge ${join52(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} verify --manual --in ${join52(runAbs, "audit-latest.json")} --out ${runAbs}
 > ${engine} orchestrate --run ${runAbs}
 > \`\`\`
 >
@@ -75978,14 +76151,14 @@ ${status}
 
 ## The loop (play every role yourself, one item at a time)
 
-1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join51(runAbs, "audit-latest.json")}\`.
-2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join51(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join51(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
+1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join52(runAbs, "audit-latest.json")}\`.
+2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join52(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join52(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`${cmd("report")}\`.
-4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join51(runAbs, "VERIFY.todo.json")}\` (and \`${join51(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join51(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
+4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join52(runAbs, "VERIFY.todo.json")}\` (and \`${join52(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join52(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
 5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
 6. **Fix & re-audit**: \`${cmd("fix")}\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
-With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join51(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` \u2014 you stay the sole writer either way.
+With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join52(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` \u2014 you stay the sole writer either way.
 `;
 }
 
@@ -75998,7 +76171,7 @@ function runStandard(run2) {
   if (ctx?.standard) return ctx.standard;
   for (const f of ["ADJUDICATE.todo.json", "audit-latest.json"]) {
     try {
-      const std = JSON.parse(readFileSync34(join52(run2, f), "utf8")).standard;
+      const std = JSON.parse(readFileSync34(join53(run2, f), "utf8")).standard;
       if (typeof std === "string" && std) return std;
     } catch {
     }
@@ -76006,10 +76179,10 @@ function runStandard(run2) {
   return void 0;
 }
 function verifyRunContext(runDir) {
-  const run2 = resolve15(runDir);
+  const run2 = resolve16(runDir);
   const ctx = readVerifyContext(run2);
   const standard = runStandard(run2);
-  const flagArgs = ["--in", ctx?.in ?? join52(run2, "audit-latest.json")];
+  const flagArgs = ["--in", ctx?.in ?? join53(run2, "audit-latest.json")];
   if (standard) flagArgs.push("--standard", standard);
   if (ctx?.conformities.source === "file") flagArgs.push("--conformities", ctx.conformities.path);
   if (ctx?.conformities.source === "disabled") flagArgs.push("--no-conformities");
@@ -76023,16 +76196,16 @@ function verifyRunContext(runDir) {
 var GLOBS_PLACEHOLDER = "<globs>";
 var REPORT_PLACEHOLDER = "<report.md>";
 function engineArgs(run2) {
-  const audit2 = join52(run2, "audit-latest.json");
+  const audit2 = join53(run2, "audit-latest.json");
   const v = verifyRunContext(run2);
   return {
     audit: ["audit", GLOBS_PLACEHOLDER, "--graph", "--out", run2],
     "adjudicate-worklist": ["verify", "--manual", "--in", audit2, "--out", run2],
-    "adjudicate-fold": ["verify", "--apply", join52(run2, "ADJUDICATE.todo.json"), "--in", audit2, "--out", run2],
+    "adjudicate-fold": ["verify", "--apply", join53(run2, "ADJUDICATE.todo.json"), "--in", audit2, "--out", run2],
     report: ["report", "--in", audit2, "--out", run2],
     "verify-worklist": ["verify", "--report", v.report, ...v.flagArgs, "--out", run2],
-    "verify-fold": ["verify", "--apply", join52(run2, "VERIFY.todo.json"), "--report", v.report, ...v.flagArgs],
-    gate: ["check", "--report", v.report, ...v.standard ? ["--standard", v.standard] : [], "--semantic", "--verdicts", join52(run2, "VERIFY.todo.json")],
+    "verify-fold": ["verify", "--apply", join53(run2, "VERIFY.todo.json"), "--report", v.report, ...v.flagArgs],
+    gate: ["check", "--report", v.report, ...v.standard ? ["--standard", v.standard] : [], "--semantic", "--verdicts", join53(run2, "VERIFY.todo.json")],
     fix: ["fix", GLOBS_PLACEHOLDER, "--write", "--iterate"]
   };
 }
@@ -76040,11 +76213,11 @@ function renderCommand(engineAbs, args2) {
   return `node ${engineAbs} ${args2.map((a) => a === GLOBS_PLACEHOLDER ? `"${a}"` : a).join(" ")}`;
 }
 function listPhases(runDir, engineAbs) {
-  const run2 = resolve15(runDir);
-  const adjPath = join52(run2, "ADJUDICATE.todo.json");
+  const run2 = resolve16(runDir);
+  const adjPath = join53(run2, "ADJUDICATE.todo.json");
   let adjIds = [];
   let adjReady = false;
-  if (existsSync39(adjPath)) {
+  if (existsSync41(adjPath)) {
     try {
       const f = JSON.parse(readFileSync34(adjPath, "utf8"));
       if (f && f.kind === "adjudication" && Array.isArray(f.items)) {
@@ -76054,10 +76227,10 @@ function listPhases(runDir, engineAbs) {
     } catch {
     }
   }
-  const verPath = join52(run2, "VERIFY.todo.json");
+  const verPath = join53(run2, "VERIFY.todo.json");
   let verIds = [];
   let verReady = false;
-  if (existsSync39(verPath)) {
+  if (existsSync41(verPath)) {
     try {
       const items = JSON.parse(readFileSync34(verPath, "utf8"));
       if (Array.isArray(items)) {
@@ -76091,15 +76264,15 @@ function listPhases(runDir, engineAbs) {
 }
 var EXIT_USAGE = "usage / bad input (missing or unreadable file, unknown flag value)";
 function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
-  const run2 = resolve15(runDir);
+  const run2 = resolve16(runDir);
   const args2 = engineArgs(run2);
   const phases = listPhases(run2, engineAbs);
   const v = verifyRunContext(run2);
-  const audit2 = join52(run2, "audit-latest.json");
-  const adjTodo = join52(run2, "ADJUDICATE.todo.json");
-  const verTodo = join52(run2, "VERIFY.todo.json");
+  const audit2 = join53(run2, "audit-latest.json");
+  const adjTodo = join53(run2, "ADJUDICATE.todo.json");
+  const verTodo = join53(run2, "VERIFY.todo.json");
   const placeholder = (f) => f === GLOBS_PLACEHOLDER || f === REPORT_PLACEHOLDER;
-  const ready = (inputs) => inputs.every((f) => placeholder(f) || existsSync39(f));
+  const ready = (inputs) => inputs.every((f) => placeholder(f) || existsSync41(f));
   const engine = (id, title, inputs, outputs, exit, next) => ({
     id,
     kind: "engine",
@@ -76117,7 +76290,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
     kind: "judgment",
     title,
     role,
-    contract: join52(run2, "orchestration", "agents", `${role}.md`),
+    contract: join53(run2, "orchestration", "agents", `${role}.md`),
     worklist: ph.worklist,
     items: ph.items,
     batches: toBatches(ph.ids, batchSize),
@@ -76153,7 +76326,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
         "adjudicate-worklist",
         "Adjudication worklist \u2014 the criteria the engine could not decide",
         [audit2],
-        [adjTodo, join52(run2, "ADJUDICATE.md"), join52(run2, "ADJUDICATE.verdicts.json"), join52(run2, "adjudicate")],
+        [adjTodo, join53(run2, "ADJUDICATE.md"), join53(run2, "ADJUDICATE.verdicts.json"), join53(run2, "adjudicate")],
         { "0": "worklist written (possibly empty: nothing to adjudicate)", "2": EXIT_USAGE },
         "adjudicate"
       ),
@@ -76162,7 +76335,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
         adj,
         "adjudicator",
         "Adjudicate \u2014 fill every item's verdict (C/NC/NA/manual)",
-        [adjTodo, join52(run2, "adjudicate")],
+        [adjTodo, join53(run2, "adjudicate")],
         "adjudicate-fold"
       ),
       engine(
@@ -76189,7 +76362,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
         "verify-worklist",
         "Trial worklist \u2014 the report's non-conformities and the audit's claimed conformities",
         [v.report, verAudit],
-        [verTodo, join52(run2, "VERIFY.md"), join52(run2, "VERIFY.context.json")],
+        [verTodo, join53(run2, "VERIFY.md"), join53(run2, "VERIFY.context.json")],
         { "0": "worklist written", "2": EXIT_USAGE },
         "verify"
       ),
@@ -76223,16 +76396,16 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
 }
 function unrenderedInRun(run2) {
   try {
-    const audit2 = JSON.parse(readFileSync34(join52(run2, "audit-latest.json"), "utf8"));
-    const todo = JSON.parse(readFileSync34(join52(run2, "ADJUDICATE.todo.json"), "utf8"));
+    const audit2 = JSON.parse(readFileSync34(join53(run2, "audit-latest.json"), "utf8"));
+    const todo = JSON.parse(readFileSync34(join53(run2, "ADJUDICATE.todo.json"), "utf8"));
     return unrenderedResidual(audit2, todo.items ?? []);
   } catch {
     return [];
   }
 }
 function orchestrateRun(runDir, engineAbs, opts = {}) {
-  const run2 = resolve15(runDir);
-  if (!existsSync39(run2)) {
+  const run2 = resolve16(runDir);
+  if (!existsSync41(run2)) {
     return { exitCode: 2, written: [], notices: [], errors: [`run dir not found: ${run2}`], phases: [] };
   }
   const phases = listPhases(run2, engineAbs);
@@ -76259,22 +76432,22 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
     }
     selected = [ph];
   }
-  const orchDir = join52(run2, "orchestration");
-  const agentsDir = join52(orchDir, "agents");
-  mkdirSync18(join52(orchDir, "out"), { recursive: true });
+  const orchDir = join53(run2, "orchestration");
+  const agentsDir = join53(orchDir, "agents");
+  mkdirSync18(join53(orchDir, "out"), { recursive: true });
   mkdirSync18(agentsDir, { recursive: true });
   const written = [];
   const notices = [];
   for (const [name2, content] of Object.entries(agentContracts(run2, { eco: opts.eco === true, verify: verifyRunContext(run2) }))) {
-    const p = join52(agentsDir, `${name2}.md`);
+    const p = join53(agentsDir, `${name2}.md`);
     writeFileSync21(p, content);
     written.push(p);
   }
   const emitted = new Set(opts.eco ? [] : selected.filter((p) => p.items > 0).map((p) => p.name));
   for (const ph of phases) {
     if (emitted.has(ph.name)) continue;
-    const stale = join52(orchDir, `${ph.name}.workflow.mjs`);
-    if (existsSync39(stale)) {
+    const stale = join53(orchDir, `${ph.name}.workflow.mjs`);
+    if (existsSync41(stale)) {
       rmSync9(stale, { force: true });
       notices.push(`phase "${ph.name}": stale workflow removed \u2014 its worklist ${ph.ready ? "is now empty" : "no longer exists"}.`);
     }
@@ -76288,12 +76461,12 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
       if (ph.items <= SMALL_WORKLIST) {
         notices.push(`phase "${ph.name}": only ${ph.items} item(s) \u2014 the sequential --eco path is equivalent and cheaper.`);
       }
-      const p = join52(orchDir, `${ph.name}.workflow.mjs`);
+      const p = join53(orchDir, `${ph.name}.workflow.mjs`);
       writeFileSync21(p, phaseWorkflowScript(ph, run2, engineAbs, BATCH_SIZE2));
       written.push(p);
     }
   }
-  const rb = join52(orchDir, "RUNBOOK.md");
+  const rb = join53(orchDir, "RUNBOOK.md");
   writeFileSync21(rb, runbookMd(buildManifest(run2, engineAbs), unrenderedInRun(run2)));
   written.push(rb);
   return { exitCode: 0, written, notices, errors: [], phases };
@@ -76553,8 +76726,8 @@ ${xs.map(line).join("\n")}` : t3.none;
 import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
-import { existsSync as existsSync40, lstatSync as lstatSync2, mkdirSync as mkdirSync19, readFileSync as readFileSync36, realpathSync as realpathSync7, statSync as statSync19, writeFileSync as writeFileSync22 } from "fs";
-import { basename as basename4, dirname as dirname20, isAbsolute as isAbsolute6, join as join53, resolve as resolve16, sep as sep5 } from "path";
+import { existsSync as existsSync42, lstatSync as lstatSync2, mkdirSync as mkdirSync19, readFileSync as readFileSync36, realpathSync as realpathSync7, statSync as statSync20, writeFileSync as writeFileSync22 } from "fs";
+import { basename as basename4, dirname as dirname20, isAbsolute as isAbsolute6, join as join54, resolve as resolve17, sep as sep5 } from "path";
 
 // src/criteria-view.ts
 var CriteriaLookupError = class extends Error {
@@ -77037,9 +77210,9 @@ function positive(v, key2) {
 function requiredCwd(args2, defaults) {
   const cwd = str2(args2.cwd) ?? defaults.defaultCwd;
   if (!cwd) throw new ToolError("`cwd` is required: an absolute path to the project root.");
-  const abs = resolve16(cwd);
-  if (!existsSync40(abs)) throw new ToolError(`project root not found: ${abs}`);
-  if (!statSync19(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
+  const abs = resolve17(cwd);
+  if (!existsSync42(abs)) throw new ToolError(`project root not found: ${abs}`);
+  if (!statSync20(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
   return abs;
 }
 function optionalCwd(args2, defaults) {
@@ -77151,7 +77324,7 @@ function audit(args2, cwd) {
     process.chdir(cwd);
     const inputs = strArray2(args2.globs) ?? DEFAULT_GLOBS;
     const scopedToDiff = bool(args2.changed) || bool(args2.staged) || str2(args2.since) !== void 0;
-    const extra = [CAPTURES_DIR, PAGES_DIR].filter((d) => !scopedToDiff && existsSync40(d) && !inputs.includes(d));
+    const extra = [CAPTURES_DIR, PAGES_DIR].filter((d) => !scopedToDiff && existsSync42(d) && !inputs.includes(d));
     const result = runAudit({
       inputs: [...inputs, ...extra],
       include: strArray2(args2.include),
@@ -77258,7 +77431,7 @@ function handleAdjudicate(args2, cwd) {
     standard,
     count: items.length,
     items,
-    worklist: formatAdjudication(items, langOf(args2)),
+    worklist: formatAdjudication(items, langOf(args2), CORE2, { cwd }),
     next: "These are the criteria the engine cannot decide. Read each element's real context with ultra11y_read, then rule on it."
   };
 }
@@ -77270,8 +77443,8 @@ function handlePackCheck(args2, cwd) {
   return { cwd, ...res };
 }
 function handleSampleCheck(cwd, standard) {
-  const file = join53(cwd, ".ultra11yrc.json");
-  if (!existsSync40(file)) {
+  const file = join54(cwd, ".ultra11yrc.json");
+  if (!existsSync42(file)) {
     throw new ToolError(`no .ultra11yrc.json at ${cwd} \u2014 a page sample must be declared before it can be linted.`);
   }
   let raw;
@@ -77405,7 +77578,7 @@ function handleFold(args2, cwd) {
     };
   }
   mkdirSync19(outDir, { recursive: true });
-  const auditPath = join53(outDir, "audit-latest.json");
+  const auditPath = join54(outDir, "audit-latest.json");
   writeFileSync22(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
 `);
   let ledger;
@@ -77428,7 +77601,7 @@ function containedPath(raw, cwd, field) {
   const refuse = () => {
     throw new ToolError(`\`${field}\` is outside the project: ${raw}. The fold reads and writes inside its cwd only.`);
   };
-  const target = resolve16(cwd, raw);
+  const target = resolve17(cwd, raw);
   let existing = target;
   const rest = [];
   for (; ; ) {
@@ -77444,7 +77617,7 @@ function containedPath(raw, cwd, field) {
   }
   let real;
   try {
-    real = join53(realpathSync7(existing), ...rest);
+    real = join54(realpathSync7(existing), ...rest);
   } catch {
     return refuse();
   }
@@ -77481,10 +77654,10 @@ function handleInit(args2, cwd) {
   if (failOn === null) {
     throw new ToolError(`\`fail_on\` must be one of: ${FAIL_ON_TOKENS} (got "${failOnRaw}")`);
   }
-  const enginePath = resolve16("scripts/ultra11y.mjs");
+  const enginePath = resolve17("scripts/ultra11y.mjs");
   const written = [];
   if (bool(args2.hook)) written.push(writeHook(cwd, enginePath, failOn));
-  if (bool(args2.ci)) written.push(join53(cwd, ".github/workflows/a11y.yml"));
+  if (bool(args2.ci)) written.push(join54(cwd, ".github/workflows/a11y.yml"));
   if (!written.length) {
     throw new ToolError("nothing to install \u2014 pass hook:true and/or ci:true.");
   }
@@ -77504,7 +77677,7 @@ function reportText(args2, tool) {
   if (inline) return inline;
   if (!file) throw new ToolError(`\`report_text\` is required \u2014 the report markdown for ultra11y_${tool} to work on.`);
   if (!isAbsolute6(file)) throw new ToolError("`report_file` must be an absolute path.");
-  if (!existsSync40(file)) throw new ToolError(`report file not found: ${file}`);
+  if (!existsSync42(file)) throw new ToolError(`report file not found: ${file}`);
   try {
     return withReportAnnexes(readFileSync36(file, "utf8"), file, (p) => readFileSync36(p, "utf8"));
   } catch (e) {
@@ -77576,7 +77749,7 @@ function handleMethod(args2) {
 function handleRead(args2, cwd) {
   const raw = str2(args2.path);
   if (!raw) throw new ToolError("`path` is required \u2014 relative to the project root, or an absolute path inside it.");
-  const target = isAbsolute6(raw) ? raw : join53(cwd, raw);
+  const target = isAbsolute6(raw) ? raw : join54(cwd, raw);
   let real;
   try {
     real = realpathSync7(target);
@@ -77587,7 +77760,7 @@ function handleRead(args2, cwd) {
   if (real !== root && !real.startsWith(root + sep5)) {
     throw new ToolError(`path is outside the project: ${raw}. Use your own file tool for anything else.`);
   }
-  const st = statSync19(real);
+  const st = statSync20(real);
   if (!st.isFile()) throw new ToolError(`not a file: ${raw}`);
   if (st.size > MAX_READ_BYTES) throw new ToolError(`file is too large to read (${st.size} bytes): ${raw}`);
   const lines = readFileSync36(real, "utf8").split("\n");
@@ -77636,12 +77809,12 @@ function validateArgs2(schema, args2) {
     }
     if (spec.type === "array") {
       if (actual !== "array") return `\`${key2}\` must be an array, got ${actual}`;
-      const arr = value;
-      if (spec.items?.type === "string" && !arr.every((x) => typeof x === "string")) {
+      const arr2 = value;
+      if (spec.items?.type === "string" && !arr2.every((x) => typeof x === "string")) {
         return `\`${key2}\` must be an array of strings`;
       }
       if (spec.enum) {
-        const bad = arr.find((x) => typeof x === "string" && !spec.enum.includes(x));
+        const bad = arr2.find((x) => typeof x === "string" && !spec.enum.includes(x));
         if (bad !== void 0) return `\`${key2}\` contains "${String(bad)}" \u2014 allowed: ${spec.enum.join(", ")}`;
       }
       continue;
@@ -78285,25 +78458,25 @@ function str3(v) {
 var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
-import { existsSync as existsSync41, readdirSync as readdirSync8, readFileSync as readFileSync37, realpathSync as realpathSync8, statSync as statSync20 } from "fs";
-import { basename as basename5, dirname as dirname21, join as join54, resolve as resolve17, sep as sep6 } from "path";
+import { existsSync as existsSync43, readdirSync as readdirSync8, readFileSync as readFileSync37, realpathSync as realpathSync8, statSync as statSync21 } from "fs";
+import { basename as basename5, dirname as dirname21, join as join55, resolve as resolve18, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath5 } from "url";
 var SKILL_NAME = "ultra11y";
 var URI_SCHEME = "skill://";
 function resolveSkillRoot(moduleDir) {
   const here = moduleDir ?? dirname21(fileURLToPath5(import.meta.url));
-  const candidates2 = [resolve17(here, ".."), resolve17(here, "..", "skills", SKILL_NAME), resolve17(here, "..", "..", "skills", SKILL_NAME)];
-  return candidates2.find((dir) => existsSync41(join54(dir, "SKILL.md")));
+  const candidates2 = [resolve18(here, ".."), resolve18(here, "..", "skills", SKILL_NAME), resolve18(here, "..", "..", "skills", SKILL_NAME)];
+  return candidates2.find((dir) => existsSync43(join55(dir, "SKILL.md")));
 }
 function listResources(moduleDir) {
   const root = resolveSkillRoot(moduleDir);
   if (!root) return [];
   const out2 = [describe(root, "SKILL.md", `${SKILL_NAME}: the skill`)];
-  const refDir = join54(root, "references");
-  if (!existsSync41(refDir)) return out2;
+  const refDir = join55(root, "references");
+  if (!existsSync43(refDir)) return out2;
   for (const file of readdirSync8(refDir).sort()) {
     if (!file.endsWith(".md")) continue;
-    out2.push(describe(root, join54("references", file), `${SKILL_NAME} reference: ${basename5(file, ".md")}`));
+    out2.push(describe(root, join55("references", file), `${SKILL_NAME} reference: ${basename5(file, ".md")}`));
   }
   return out2;
 }
@@ -78315,7 +78488,7 @@ function readResource(uri, moduleDir) {
   if (!root) throw new ResourceError("no skill payload found next to this build \u2014 nothing to read");
   const rel2 = uri.slice(URI_SCHEME.length);
   if (!rel2) throw new ResourceError("empty resource path");
-  const target = resolve17(root, rel2);
+  const target = resolve18(root, rel2);
   const rootReal = realpathSync8(root);
   let targetReal;
   try {
@@ -78326,7 +78499,7 @@ function readResource(uri, moduleDir) {
   if (targetReal !== rootReal && !targetReal.startsWith(rootReal + sep6)) {
     throw new ResourceError(`resource path escapes the skill root: ${uri}`);
   }
-  if (!statSync20(targetReal).isFile()) throw new ResourceError(`not a file: ${uri}`);
+  if (!statSync21(targetReal).isFile()) throw new ResourceError(`not a file: ${uri}`);
   return { uri, mimeType: "text/markdown", text: readFileSync37(targetReal, "utf8") };
 }
 var ResourceError = class extends Error {
@@ -78338,7 +78511,7 @@ function describe(root, rel2, fallbackTitle) {
     title: fallbackTitle,
     mimeType: "text/markdown"
   };
-  const summary = firstProse(join54(root, rel2));
+  const summary = firstProse(join55(root, rel2));
   if (summary) decl.description = summary;
   return decl;
 }
@@ -78727,14 +78900,14 @@ function startHttpServer(opts = {}) {
   server.requestTimeout = 0;
   server.headersTimeout = 6e4;
   server.keepAliveTimeout = 12e4;
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve20, reject) => {
     server.once("error", reject);
     server.listen(opts.port ?? 0, bind, () => {
       server.removeListener("error", reject);
       const addr2 = server.address();
       const port = typeof addr2 === "object" && addr2 ? addr2.port : opts.port ?? 0;
       const host = bind.includes(":") ? `[${bind}]` : bind;
-      resolve19({
+      resolve20({
         server,
         port,
         url: `http://${host}:${port}${MCP_PATH}`,
@@ -78843,7 +79016,7 @@ function sendJson(res, status, body3, origin, extra = {}) {
 }
 var DRAIN_LIMIT = MAX_BODY_BYTES * 8;
 function readBody2(req) {
-  return new Promise((resolve19, reject) => {
+  return new Promise((resolve20, reject) => {
     const chunks = [];
     let size = 0;
     let over = false;
@@ -78867,7 +79040,7 @@ function readBody2(req) {
     });
     req.on("end", () => {
       if (over) reject(new Error("too large"));
-      else resolve19(Buffer.concat(chunks).toString("utf8"));
+      else resolve20(Buffer.concat(chunks).toString("utf8"));
     });
     req.on("error", reject);
     req.on("aborted", () => reject(new Error("client aborted the request")));
@@ -79780,13 +79953,13 @@ async function cmdAudit(p) {
   const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
   const capturesDir = capturesFlag ?? CAPTURES_DIR;
   const scopedToDiff = p.flags.changed === true || p.flags.staged === true || since !== void 0;
-  const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync42(capturesDir));
+  const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync44(capturesDir));
   const useCaptures = capturesWanted && !scopedToDiff && !inputs.includes(capturesDir);
-  const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync42(PAGES_DIR);
+  const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync44(PAGES_DIR);
   const usePages = pagesWanted && !scopedToDiff && !inputs.includes(PAGES_DIR);
   const pagesInScope = pagesWanted && !scopedToDiff;
   const documentsGlob = `${DOCUMENTS_DIR}/*.pdf`;
-  const useDocuments = p.flags["no-pdf"] !== true && !inputs.includes("-") && !scopedToDiff && existsSync42(DOCUMENTS_DIR) && !inputs.includes(documentsGlob) && !inputs.includes(DOCUMENTS_DIR);
+  const useDocuments = p.flags["no-pdf"] !== true && !inputs.includes("-") && !scopedToDiff && existsSync44(DOCUMENTS_DIR) && !inputs.includes(documentsGlob) && !inputs.includes(DOCUMENTS_DIR);
   const auditInputs = [...inputs, ...useCaptures ? [capturesDir] : [], ...usePages ? [PAGES_DIR] : [], ...useDocuments ? [documentsGlob] : []];
   if (useCaptures)
     console.error(
@@ -79831,7 +80004,7 @@ async function cmdAudit(p) {
   if (typeof p.flags.out === "string") {
     const out2 = p.flags.out;
     const asFile = out2.toLowerCase().endsWith(".json");
-    const target = asFile ? out2 : join55(out2, "audit-latest.json");
+    const target = asFile ? out2 : join56(out2, "audit-latest.json");
     try {
       mkdirSync20(asFile ? dirname22(out2) : out2, { recursive: true });
       writeFileSync23(target, JSON.stringify(document, null, 2) + "\n");
@@ -79853,7 +80026,7 @@ async function cmdAudit(p) {
   const baselineFlag = p.flags.baseline;
   if (typeof baselineFlag === "string" && baselineFlag) {
     let baseline = null;
-    if (existsSync42(baselineFlag)) {
+    if (existsSync44(baselineFlag)) {
       try {
         const parsed = unwrapAudit(JSON.parse(readText(baselineFlag)));
         if (isCurrentAudit(parsed)) baseline = parsed;
@@ -79907,11 +80080,11 @@ async function cmdDev(p) {
     return 2;
   }
   if (p.flags.next === true) {
-    const dir = join55(root, ".ultra11y", "next");
+    const dir = join56(root, ".ultra11y", "next");
     const rel2 = ".ultra11y/next/overlay.jsx";
     try {
       mkdirSync20(dir, { recursive: true });
-      writeFileSync23(join55(dir, "overlay.jsx"), nextOverlayComponent(port));
+      writeFileSync23(join56(dir, "overlay.jsx"), nextOverlayComponent(port));
     } catch (e) {
       console.error(`ultra11y dev: could not write ${rel2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -79942,9 +80115,9 @@ async function cmdDev(p) {
   }
   console.error(fr ? `ultra11y dev : tableau de bord sur http://127.0.0.1:${server.port}` : `ultra11y dev: dashboard on http://127.0.0.1:${server.port}`);
   console.error(fr ? "Boucle locale uniquement (l'outil \xE9crit des fichiers). Ctrl-C pour arr\xEAter." : "Loopback only (the tool writes files). Ctrl-C to stop.");
-  await new Promise((resolve19) => {
+  await new Promise((resolve20) => {
     const stop2 = () => {
-      void server.close().then(resolve19);
+      void server.close().then(resolve20);
     };
     process.once("SIGINT", stop2);
     process.once("SIGTERM", stop2);
@@ -79960,7 +80133,7 @@ async function cmdPagesDiscover(p) {
     const snaps = sampleFromSnapshots(readSnapshots(root));
     if (!snaps.length) {
       console.error(
-        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join55(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join55(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
+        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join56(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join56(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
       );
       return 1;
     }
@@ -79974,9 +80147,9 @@ async function cmdPagesDiscover(p) {
   }
   const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : void 0;
   const max = typeof p.flags.max === "string" ? Number(p.flags.max) : void 0;
-  const cache = /* @__PURE__ */ new Map();
+  const cache2 = /* @__PURE__ */ new Map();
   const fetchHtml2 = async (url) => {
-    const hit = cache.get(url);
+    const hit = cache2.get(url);
     if (hit !== void 0) return hit;
     let html = "";
     try {
@@ -79984,7 +80157,7 @@ async function cmdPagesDiscover(p) {
       if (res.ok) html = await res.text();
     } catch {
     }
-    cache.set(url, html);
+    cache2.set(url, html);
     return html;
   };
   let urls;
@@ -80041,9 +80214,9 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
     }
     return 0;
   }
-  const file = join55(process.cwd(), ".ultra11yrc.json");
+  const file = join56(process.cwd(), ".ultra11yrc.json");
   let doc = {};
-  if (existsSync42(file)) {
+  if (existsSync44(file)) {
     try {
       doc = JSON.parse(readText(file));
     } catch {
@@ -80108,7 +80281,7 @@ async function cmdPages(p) {
     const outDir2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "";
     if (outDir2) {
       mkdirSync20(outDir2, { recursive: true });
-      writeFileSync23(join55(outDir2, "pages.json"), `${json}
+      writeFileSync23(join56(outDir2, "pages.json"), `${json}
 `);
     }
     return 0;
@@ -80134,27 +80307,27 @@ async function cmdPages(p) {
   const derived = derivePages(result, scope);
   const split = p.flags.split === "page";
   const outDir = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : void 0;
-  const shotOf = (id) => join55(PAGES_DIR, id, "screen.png");
+  const shotOf = (id) => join56(PAGES_DIR, id, "screen.png");
   const shotsRelative = (fileDir) => {
     const m = /* @__PURE__ */ new Map();
     for (const pg of derived) {
-      if (existsSync42(shotOf(pg.id))) m.set(pg.id, relative7(fileDir, shotOf(pg.id)).split("\\").join("/"));
+      if (existsSync44(shotOf(pg.id))) m.set(pg.id, relative7(fileDir, shotOf(pg.id)).split("\\").join("/"));
     }
     return m;
   };
   const shotPaths = (pages) => {
     const m = /* @__PURE__ */ new Map();
-    for (const pg of pages) if (existsSync42(shotOf(pg.id))) m.set(pg.id, shotOf(pg.id));
+    for (const pg of pages) if (existsSync44(shotOf(pg.id))) m.set(pg.id, shotOf(pg.id));
     return m;
   };
   const shotsCopiedInto = (dir) => {
     const m = /* @__PURE__ */ new Map();
-    const assets = join55(dir, "assets");
+    const assets = join56(dir, "assets");
     for (const pg of derived) {
       const src = shotOf(pg.id);
-      if (!existsSync42(src)) continue;
+      if (!existsSync44(src)) continue;
       mkdirSync20(assets, { recursive: true });
-      copyFileSync4(src, join55(assets, `${pg.id}.png`));
+      copyFileSync4(src, join56(assets, `${pg.id}.png`));
       m.set(pg.id, `./assets/${pg.id}.png`);
     }
     return m;
@@ -80180,7 +80353,7 @@ async function cmdPages(p) {
   if (manifest) {
     const total = evidenceNotice(manifest, null, lang);
     console.error(
-      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join55(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join55(outDir, "assets")}.`
+      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join56(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join56(outDir, "assets")}.`
     );
     for (const line of total) console.error(line);
   }
@@ -80189,7 +80362,7 @@ async function cmdPages(p) {
     ...manifest ? { evidenceNotice: (id) => evidenceNotice(manifest, id, lang) } : {}
   };
   if (!split) {
-    const file = join55(outDir, `pages-${result.date}.md`);
+    const file = join56(outDir, `pages-${result.date}.md`);
     writeFileSync23(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
 `);
     const html2 = wantHtml ? emitHtml(result, {
@@ -80209,10 +80382,10 @@ async function cmdPages(p) {
   const sheet = (id) => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    writeFileSync23(join55(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
+    writeFileSync23(join56(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
 `);
   }
-  const index = join55(outDir, "index.md");
+  const index = join56(outDir, "index.md");
   writeFileSync23(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
 `);
   const html = wantHtml ? emitHtml(result, {
@@ -80264,7 +80437,7 @@ async function cmdSnapshot(p) {
           2
         )
       );
-    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join55(root, PAGES_DIR)}.` : `No snapshot in ${join55(root, PAGES_DIR)}.`);
+    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join56(root, PAGES_DIR)}.` : `No snapshot in ${join56(root, PAGES_DIR)}.`);
     else for (const s of snaps) console.log(`${s.meta.id}	${s.meta.name}	${s.meta.url}${s.meta.auth ? "	[auth]" : ""}`);
     return 0;
   }
@@ -80318,7 +80491,7 @@ async function cmdSnapshot(p) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
-  const result = runAudit({ inputs: [join55(dir, "dom.html")], onWarn: (m) => console.error(m) });
+  const result = runAudit({ inputs: [join56(dir, "dom.html")], onWarn: (m) => console.error(m) });
   const failOnRaw = p.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
@@ -80350,8 +80523,8 @@ function cmdInit(p) {
   if (want.baseline) {
     const inputs = p.positionals.length ? p.positionals : ["."];
     const result = runAudit({ inputs, onWarn: (m) => console.error(m) });
-    mkdirSync20(join55(root, "audits"), { recursive: true });
-    const bp = join55(root, "audits", "baseline.json");
+    mkdirSync20(join56(root, "audits"), { recursive: true });
+    const bp = join56(root, "audits", "baseline.json");
     writeFileSync23(bp, JSON.stringify(result, null, 2) + "\n");
     wrote.push(bp);
   }
@@ -80678,7 +80851,7 @@ async function cmdTickets(p) {
   let setPath;
   if (ticketsOut) {
     mkdirSync20(ticketsOut, { recursive: true });
-    setPath = join55(ticketsOut, `issues-${result.date}.json`);
+    setPath = join56(ticketsOut, `issues-${result.date}.json`);
     const payload = {
       tool: "ultra11y",
       kind: "issues",
@@ -80779,8 +80952,8 @@ async function cmdTickets(p) {
   return pushed.failed > 0 ? 1 : 0;
 }
 function depsAt(root) {
-  const pkgPath = join55(root, "package.json");
-  if (!existsSync42(pkgPath)) return {};
+  const pkgPath = join56(root, "package.json");
+  if (!existsSync44(pkgPath)) return {};
   try {
     const pkg = JSON.parse(readText(pkgPath));
     return { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
@@ -80806,24 +80979,24 @@ function cmdRender(p) {
       console.error(`ultra11y render: --runner must be playwright|cypress|auto (got "${forced}").`);
       return 2;
     }
-    const detected = detectE2eRunner(depsAt(root), (f) => existsSync42(join55(root, f)));
+    const detected = detectE2eRunner(depsAt(root), (f) => existsSync44(join56(root, f)));
     const runners = forced && forced !== "auto" ? [forced] : detected;
     if (!runners.length) {
       console.error(e2eSetupPlan([], {}, lang));
       return 1;
     }
     const engineRef = engineRefFor(root);
-    const dir = join55(root, ".ultra11y", "e2e");
+    const dir = join56(root, ".ultra11y", "e2e");
     const paths = {};
     try {
       mkdirSync20(dir, { recursive: true });
       if (runners.includes("playwright")) {
-        writeFileSync23(join55(dir, "playwright.mjs"), playwrightFixture(engineRef));
+        writeFileSync23(join56(dir, "playwright.mjs"), playwrightFixture(engineRef));
         paths.playwright = ".ultra11y/e2e/playwright.mjs";
       }
       if (runners.includes("cypress")) {
-        writeFileSync23(join55(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
-        writeFileSync23(join55(dir, "cypress-commands.mjs"), cypressCommands());
+        writeFileSync23(join56(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
+        writeFileSync23(join56(dir, "cypress-commands.mjs"), cypressCommands());
         paths.cypressPlugin = ".ultra11y/e2e/cypress-plugin.mjs";
         paths.cypressCommands = ".ultra11y/e2e/cypress-commands.mjs";
       }
@@ -80852,7 +81025,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
   }
   if (p.flags.setup === true) {
     const rel2 = ".ultra11y/capture-setup.mjs";
-    const out2 = join55(root, rel2);
+    const out2 = join56(root, rel2);
     try {
       mkdirSync20(dirname22(out2), { recursive: true });
       writeFileSync23(out2, captureSetup());
@@ -80861,20 +81034,20 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
       return 1;
     }
     let setupDeps = {};
-    const setupPkg = join55(root, "package.json");
-    if (existsSync42(setupPkg)) {
+    const setupPkg = join56(root, "package.json");
+    if (existsSync44(setupPkg)) {
       try {
         const pkg = JSON.parse(readText(setupPkg));
         setupDeps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
       } catch {
       }
     }
-    const tr = detectTestRunner(setupDeps, (f) => existsSync42(join55(root, f)));
+    const tr = detectTestRunner(setupDeps, (f) => existsSync44(join56(root, f)));
     console.log(captureSetupPlan(tr, rel2, lang));
     const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
-    const gaPath = join55(root, ".gitattributes");
+    const gaPath = join56(root, ".gitattributes");
     try {
-      const existing = existsSync42(gaPath) ? readFileSync38(gaPath, "utf8") : "";
+      const existing = existsSync44(gaPath) ? readFileSync38(gaPath, "utf8") : "";
       if (!existing.includes(".ultra11y/captures/")) {
         appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
         console.log(lang === "fr" ? `.gitattributes : ajout\xE9 \xAB ${gaLine} \xBB` : `.gitattributes: added "${gaLine}"`);
@@ -80882,8 +81055,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     } catch {
     }
     try {
-      const giPath = join55(root, ".gitignore");
-      if (existsSync42(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync38(giPath, "utf8")))
+      const giPath = join56(root, ".gitignore");
+      if (existsSync44(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync38(giPath, "utf8")))
         console.error(
           lang === "fr" ? "\u26A0\uFE0F .ultra11y semble ignor\xE9 par .gitignore \u2014 les captures doivent \xEAtre committ\xE9es pour le gate (ajoutez \xAB !.ultra11y/captures/ \xBB)." : '\u26A0\uFE0F .ultra11y appears gitignored \u2014 captures must be committed for the gate (add "!.ultra11y/captures/").'
         );
@@ -80893,8 +81066,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
   }
   if (p.flags.storybook === true || typeof p.flags.storybook === "string") {
     const sbDir = p.positionals[0] ?? "storybook-static";
-    const indexPath = existsSync42(join55(sbDir, "index.json")) ? join55(sbDir, "index.json") : join55(sbDir, "stories.json");
-    if (!existsSync42(indexPath)) {
+    const indexPath = existsSync44(join56(sbDir, "index.json")) ? join56(sbDir, "index.json") : join56(sbDir, "stories.json");
+    if (!existsSync44(indexPath)) {
       console.error(
         lang === "fr" ? `ultra11y render : aucun index Storybook (index.json/stories.json) dans ${sbDir}.` : `ultra11y render: no Storybook index (index.json/stories.json) in ${sbDir}.`
       );
@@ -80904,7 +81077,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const provById = new Map(stories.map((s) => [s.id, storyProvenance(s)]));
     const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
     const htmlDir = capturesFlag ?? sbDir;
-    const htmlFiles = existsSync42(htmlDir) ? discover([htmlDir]).files.filter((f) => /\.html?$/i.test(f)) : [];
+    const htmlFiles = existsSync44(htmlDir) ? discover([htmlDir]).files.filter((f) => /\.html?$/i.test(f)) : [];
     const outDir = ".ultra11y/captures";
     let attributed = 0;
     let skipped = 0;
@@ -80927,7 +81100,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
       }
       try {
         mkdirSync20(outDir, { recursive: true });
-        writeFileSync23(join55(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
+        writeFileSync23(join56(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
 ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
         attributed++;
       } catch {
@@ -80949,11 +81122,11 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   }
   if (p.flags.coverage === true) {
     const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
-    const capturesDir = capturesFlag ?? join55(root, ".ultra11y/captures");
+    const capturesDir = capturesFlag ?? join56(root, ".ultra11y/captures");
     const graphExt = [...GRAPH_ONLY_EXT, ...asList(p.flags.ext) ?? []];
     const sourceFiles = discover([root], { include: asList(p.flags.include), exclude: asList(p.flags.exclude), ext: graphExt }).files;
     const graph = buildGraphStreaming(sourceFiles);
-    const capFiles = existsSync42(capturesDir) ? discover([capturesDir]).files : [];
+    const capFiles = existsSync44(capturesDir) ? discover([capturesDir]).files : [];
     const entries = capFiles.map((f) => ({ file: toPosix(f), provenance: parseCaptureProvenance(readText(f)) }));
     const cov = computeCaptureCoverage(graph, entries);
     if (p.flags.json) console.log(JSON.stringify(cov, null, 2));
@@ -80961,15 +81134,15 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
     return 0;
   }
   let deps = {};
-  const pkgPath = join55(root, "package.json");
-  if (existsSync42(pkgPath)) {
+  const pkgPath = join56(root, "package.json");
+  if (existsSync44(pkgPath)) {
     try {
       const pkg = JSON.parse(readText(pkgPath));
       deps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
     } catch {
     }
   }
-  const detection = detectFrameworks(deps, (f) => existsSync42(join55(root, f)));
+  const detection = detectFrameworks(deps, (f) => existsSync44(join56(root, f)));
   if (p.flags.json) console.log(JSON.stringify(detection, null, 2));
   else console.log(renderPlan(detection, lang));
   return 0;
@@ -81139,7 +81312,7 @@ function cmdVerify(p) {
     const trial = conformityTrial(p, standard, lang);
     const expected = [...expectedNc, ...buildConformityWorklist(trial.claims, expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items, expected);
-    const ctx = readVerifyContext(dirname22(resolve18(apply)));
+    const ctx = readVerifyContext(dirname22(resolve19(apply)));
     const absentItems = r.failures.filter((f) => !items.includes(f));
     const absentC = absentItems.filter((f) => f.kind === "c").length;
     const sourceDiffers = ctx ? !sameConformitySource(ctx.conformities, trial.source) : absentC > 0 && !items.some((it) => it.kind === "c");
@@ -81235,7 +81408,7 @@ function cmdVerifySummary(p) {
   if (typeof prunedFlag === "string" && prunedFlag) {
     const raw = readJson4(prunedFlag, "pruned");
     if (raw === void 0) return 2;
-    pruned = { audit: unwrapAudit(raw), path: resolve18(prunedFlag) };
+    pruned = { audit: unwrapAudit(raw), path: resolve19(prunedFlag) };
   }
   const reportMd = readReportInput(reportPath, "verify");
   if (reportMd === null) return 2;
@@ -81244,11 +81417,11 @@ function cmdVerifySummary(p) {
     standard,
     lang,
     audit: audit2,
-    auditPath: resolve18(auditPath),
+    auditPath: resolve19(auditPath),
     verdicts,
-    verdictsPath: resolve18(verdictsPath),
+    verdictsPath: resolve19(verdictsPath),
     reportMd,
-    reportPath: resolve18(reportPath),
+    reportPath: resolve19(reportPath),
     ...pruned ? { pruned } : {},
     gate
   });
@@ -81258,7 +81431,7 @@ function cmdVerifySummary(p) {
   }
   const out2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : ".";
   mkdirSync20(out2, { recursive: true });
-  const mdPath = join55(out2, "TRIAL.md");
+  const mdPath = join56(out2, "TRIAL.md");
   writeFileSync23(mdPath, formatTrialSummary(summary, lang));
   console.log(
     summary.validated ? lang === "fr" ? `\u2713 Bilan de contre-expertise \u2192 ${mdPath} \u2014 gate s\xE9mantique vert.` : `\u2713 Counter-review summary \u2192 ${mdPath} \u2014 semantic gate green.` : lang === "fr" ? `Bilan de contre-expertise \u2192 ${mdPath} \u2014 audit NON valid\xE9 (gate ${summary.gate.ok ? "vert" : "en \xE9chec"}, ${summary.contestedEngine.length} d\xE9cision(s) moteur contest\xE9e(s), ${summary.untried.length} jamais mise(s) \xE0 l'\xE9preuve, ${summary.foreign.length} \xE9trang\xE8re(s)).` : `Counter-review summary \u2192 ${mdPath} \u2014 audit NOT validated (gate ${summary.gate.ok ? "green" : "failing"}, ${summary.contestedEngine.length} contested engine decision(s), ${summary.untried.length} never tried, ${summary.foreign.length} foreign).`
@@ -81285,7 +81458,7 @@ function applyPrune(p, standard, items, lang, untried = []) {
   let ledgerRepair;
   if (ledgerFile) {
     let ledger = readLedger(ledgerFile);
-    if (!ledger && !existsSync42(ledgerFile)) {
+    if (!ledger && !existsSync44(ledgerFile)) {
       ledger = emptyLedger(standard);
       console.error(
         lang === "fr" ? `\u26A0 Aucun registre en ${ledgerFile} \u2014 un registre vide est cr\xE9\xE9. Les verdicts d\xE9j\xE0 repli\xE9s n'y figurent pas : repliez-les avec \`verify --apply <ADJUDICATE.todo.json> --ledger\` pour qu'ils soient rejouables.` : `\u26A0 No ledger at ${ledgerFile} \u2014 creating an empty one. Verdicts folded earlier are not in it: fold them with \`verify --apply <ADJUDICATE.todo.json> --ledger\` to make them replayable.`
@@ -81302,7 +81475,7 @@ function applyPrune(p, standard, items, lang, untried = []) {
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
   mkdirSync20(out2, { recursive: true });
-  writeFileSync23(join55(out2, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
+  writeFileSync23(join56(out2, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
   if (ledgerFile && ledgerRepair) {
     writeLedger(ledgerFile, ledgerRepair.ledger);
     if (!p.flags.json)
@@ -81421,8 +81594,8 @@ function cmdVerifyWorklist(p, langIn) {
   const contextPath = writeVerifyContext(out2, {
     kind: "verify-context",
     standard,
-    report: rep === "-" ? rep : resolve18(rep),
-    ...typeof inFlag === "string" && inFlag && inFlag !== "-" ? { in: resolve18(inFlag) } : {},
+    report: rep === "-" ? rep : resolve19(rep),
+    ...typeof inFlag === "string" && inFlag && inFlag !== "-" ? { in: resolve19(inFlag) } : {},
     conformities: trial.source,
     capped: { nc: droppedNc, c: droppedC }
   });
@@ -81456,14 +81629,14 @@ function conformityTrial(p, standard, lang) {
     if (typeof inFlag === "string" && inFlag && inFlag !== "-") {
       try {
         const audit2 = unwrapAudit(JSON.parse(readText(inFlag)));
-        if (Array.isArray(audit2.criteria)) return { claims: conformityClaimsFromAudit(audit2, standard), source: { source: "in", path: resolve18(inFlag) } };
+        if (Array.isArray(audit2.criteria)) return { claims: conformityClaimsFromAudit(audit2, standard), source: { source: "in", path: resolve19(inFlag) } };
       } catch {
       }
     }
   }
   const path = named3 ?? ledgerPath(standard);
-  const source = { source: named3 ? "file" : "ledger", path: resolve18(path) };
-  if (!existsSync42(path)) {
+  const source = { source: named3 ? "file" : "ledger", path: resolve19(path) };
+  if (!existsSync44(path)) {
     if (named3) {
       console.error(
         lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named3}.` : `ultra11y verify: --conformities file not found: ${named3}.`
@@ -81544,7 +81717,7 @@ function replayLedgerFile(p, ledger, lang) {
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
   mkdirSync20(out2, { recursive: true });
-  const auditPath = join55(out2, "audit-latest.json");
+  const auditPath = join56(out2, "audit-latest.json");
   writeFileSync23(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, standard, lang), null, 2)}
 `);
   if (p.flags.json)
@@ -81623,7 +81796,7 @@ function applyAdjudicationFile(p, adj, lang) {
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
   mkdirSync20(out2, { recursive: true });
-  const auditPath = join55(out2, "audit-latest.json");
+  const auditPath = join56(out2, "audit-latest.json");
   writeFileSync23(auditPath, JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2) + "\n");
   const ledgerOut = ledgerTarget(p, adj.standard);
   if (ledgerOut) {
@@ -81876,7 +82049,7 @@ async function cmdJudge(p) {
         { cwd }
       );
       if (partial.applied > 0)
-        writeFileSync23(join55(outDir, "audit-latest.json"), `${JSON.stringify(auditDocumentFor(partial.audit, standard, lang), null, 2)}
+        writeFileSync23(join56(outDir, "audit-latest.json"), `${JSON.stringify(auditDocumentFor(partial.audit, standard, lang), null, 2)}
 `);
     } catch {
     }
@@ -81946,7 +82119,7 @@ async function cmdJudge(p) {
     if (r.issues.length > 40) console.error(`  \u2026 +${r.issues.length - 40}`);
   }
   mkdirSync20(out2, { recursive: true });
-  const auditPath = join55(out2, "audit-latest.json");
+  const auditPath = join56(out2, "audit-latest.json");
   writeFileSync23(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
 `);
   const ledgerOut = ledgerTarget(p, adj.standard);
@@ -82025,7 +82198,7 @@ Iterated over ${rounds} round(s) to a fixpoint \u2014 ${totalWritten} file(s) wr
 }
 function scanSnapshotRoot(flags2) {
   if (flags2["no-snapshot"] === true) return void 0;
-  return typeof flags2.root === "string" && flags2.root ? resolve18(flags2.root) : process.cwd();
+  return typeof flags2.root === "string" && flags2.root ? resolve19(flags2.root) : process.cwd();
 }
 async function cmdScan(p) {
   const standard = stdOf(p, "scan");
@@ -82040,7 +82213,7 @@ async function cmdScan(p) {
     return 0;
   }
   for (const target of p.positionals.filter((a) => a !== "-")) {
-    if (/^https?:\/\//i.test(target) || existsSync42(target)) continue;
+    if (/^https?:\/\//i.test(target) || existsSync44(target)) continue;
     console.error(
       lang === "fr" ? `ultra11y scan : fichier introuvable (file not found) : ${target}. Passez une URL http(s):// ou un fichier HTML existant.` : `ultra11y scan: File not found: ${target}. Pass an http(s):// URL or an existing HTML file.`
     );
@@ -82215,7 +82388,7 @@ async function cmdScan(p) {
     }
     let merged = mergeDynamic(audit2, dynamic, lang);
     if (dynamic.snapshots?.length) {
-      const doms = dynamic.snapshots.map((id) => join55(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync42(f));
+      const doms = dynamic.snapshots.map((id) => join56(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync44(f));
       if (doms.length) {
         const snapAudit = runAudit({ inputs: [...doms, ...documentFiles], onWarn: (m) => console.error(m) });
         merged = mergeSnapshotAudit(merged, snapAudit);
@@ -82228,7 +82401,7 @@ async function cmdScan(p) {
     }
     mkdirSync20(out2, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);
-    writeFileSync23(join55(out2, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
+    writeFileSync23(join56(out2, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
     if (p.flags.json)
       console.log(
         JSON.stringify(
@@ -82244,7 +82417,7 @@ async function cmdScan(p) {
       );
     else {
       console.log(
-        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join55(out2, "audit-latest.json")} (${merged.conformancePct}% r\xE9ussite, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join55(out2, "audit-latest.json")} (${merged.conformancePct}% pass rate, ${merged.findings.length} findings).`
+        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join56(out2, "audit-latest.json")} (${merged.conformancePct}% r\xE9ussite, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join56(out2, "audit-latest.json")} (${merged.conformancePct}% pass rate, ${merged.findings.length} findings).`
       );
       if (dynamic.snapshots?.length)
         console.log(
@@ -82487,7 +82660,7 @@ async function cmdImport(p) {
     }
     if (outDir) {
       mkdirSync20(outDir, { recursive: true });
-      const rawFile = join55(outDir, `external-${adapterId}-${arg}.raw.json`);
+      const rawFile = join56(outDir, `external-${adapterId}-${arg}.raw.json`);
       writeFileSync23(rawFile, rawText.endsWith("\n") ? rawText : `${rawText}
 `);
       if (!p.flags.json) console.log(rawFile);
@@ -82523,7 +82696,7 @@ async function cmdImport(p) {
   }
   if (outDir) {
     mkdirSync20(outDir, { recursive: true });
-    const file = join55(outDir, "external-latest.json");
+    const file = join56(outDir, "external-latest.json");
     writeFileSync23(file, `${JSON.stringify(audit2, null, 2)}
 `);
     console.log(file);
@@ -82629,7 +82802,7 @@ function cmdOrchestrate(p) {
   }
   const engineAbs = realpathSync9(fileURLToPath6(import.meta.url));
   if (p.flags.list === true) {
-    if (!existsSync42(runFlag)) {
+    if (!existsSync44(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }
@@ -82637,7 +82810,7 @@ function cmdOrchestrate(p) {
     return 0;
   }
   if (p.flags.manifest === true) {
-    if (!existsSync42(runFlag)) {
+    if (!existsSync44(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }
@@ -82664,7 +82837,7 @@ function cmdOrchestrate(p) {
     );
   } else {
     console.log(
-      lang === "fr" ? `Suivez ${join55(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join55(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
+      lang === "fr" ? `Suivez ${join56(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join56(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
     );
   }
   if (p.flags.phase === void 0 && workflows.length === 0 && p.flags.eco !== true) {
@@ -82720,7 +82893,7 @@ async function main(argv) {
     if (typeof v === "string" && v && !allowed.includes(v)) console.error(`ultra11y: --${flag} "${v}" is not one of ${allowed.join("|")} \u2014 using the default.`);
   }
   const packList = typeof p.flags.pack === "string" ? p.flags.pack.split(",").map((s) => s.trim()).filter(Boolean) : [];
-  const configRoot = p.command === "mcp" && typeof p.flags.cwd === "string" && p.flags.cwd ? resolve18(p.flags.cwd) : process.cwd();
+  const configRoot = p.command === "mcp" && typeof p.flags.cwd === "string" && p.flags.cwd ? resolve19(p.flags.cwd) : process.cwd();
   const loaded2 = loadRuntimeStandards(configRoot, packList, (m) => console.error(m), p.flags.override === true);
   if (loaded2.errors.length) {
     for (const e of loaded2.errors) console.error(`ultra11y: ${e}`);

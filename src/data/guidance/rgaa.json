@@ -197,15 +197,15 @@
         "en": "Structure via headings"
       },
       "summary": {
-        "fr": "L'information est structurée par une hiérarchie de titres (h1…h6) sans saut de niveau, avec un h1 unique.",
-        "en": "Content is structured by a heading hierarchy (h1…h6) with no skipped level and a single h1."
+        "fr": "Chaque passage qui joue le rôle d'un titre est balisé comme tel (h1…h6, ou role=\"heading\" avec aria-level), son contenu est pertinent et la hiérarchie reste cohérente. Un saut de niveau (un h3 juste après un h1) ou l'absence de h1 n'invalide pas le critère (glossaire RGAA, « Titre »).",
+        "en": "Every passage acting as a heading is marked up as one (h1…h6, or role=\"heading\" with aria-level), its text is relevant, and the hierarchy stays coherent. A skipped level (an h3 right after an h1) or a missing h1 does not fail the criterion (RGAA glossary, « Titre »)."
       },
       "impact": "high",
       "examples": [
         {
           "lang": "html",
-          "bad": "<h1>Titre</h1><h3>Sous-section</h3>",
-          "good": "<h1>Titre</h1><h2>Sous-section</h2>"
+          "bad": "<h1>Nos services</h1><p class=\"titre-section\"><strong>Déclarer en ligne</strong></p>",
+          "good": "<h1>Nos services</h1><h2>Déclarer en ligne</h2>"
         }
       ],
       "reference": "https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/#9.1"

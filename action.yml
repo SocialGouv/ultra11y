@@ -1018,9 +1018,9 @@ runs:
 
           THE RENDERED PAGE IS PROBABLY ON DISK. When this audit ingested page captures — look
           for evidence anchored in `.ultra11y/pages/<id>/dom.html` — the rendered page is there
-          to read: `dom.html` is the DOM the browser serialized, beside `styles.json` (computed
-          styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree)
-          and `screen.png`. A needs-rendering criterion — information carried by colour,
+          to read: `dom.html` is the DOM the browser serialized, beside whichever digests the
+          capture holds — `styles.json` (computed styles), `boxes.json` (boxes and positions),
+          `screen.png`… each brief names the files that exist. A needs-rendering criterion — information carried by colour,
           keyboard operability of a script, a pointer gesture — is decided FROM THOSE FILES.
           Open them as you would open the source. `needs-rendered-dom` is the right answer only
           for a criterion no capture carries the subject of; on an audit full of captures it is
@@ -1260,8 +1260,8 @@ runs:
           « particular cases » often say so outright.
 
           When a criterion's evidence is anchored under `.ultra11y/pages/<id>/`, the browser has
-          already run and the page is on disk (`dom.html`, `styles.json`, `boxes.json`,
-          `axtree.json`, `screen.png`). `needs-rendered-dom` is REFUSED on such a criterion:
+          already run and the page is on disk (`dom.html` and the digests the brief names beside
+          it). `needs-rendered-dom` is REFUSED on such a criterion:
           decide it from those files, or answer `undecidable` and say what the capture leaves
           open. A criterion you genuinely cannot decide from the evidence is `manual` with its
           `reason` — that is a correct answer, and it is the one to give rather than guessing.

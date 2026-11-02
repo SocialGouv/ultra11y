@@ -34,7 +34,9 @@ This phase makes each verdict defensible and recorded, never invented, never sil
    - `recommendations[]` — a **good practice with no failing normative test** (e.g. "state a
      download link's format/weight", "one `<h1>` per page") is NOT an NC: record it as a
      non-normative recommendation (groundable exactly like an NC, but **no `normativeRef`
-     required**). It renders under « Recommandations (non normatives) » and never flips the
+     required**). Each entry is an **object** `{ file, line, message, selector?, snippet? }`
+     whose `file`/`line`/`snippet` are copied from the criterion's own evidence — a bare sentence,
+     or an object without `file`, is refused (the contract's `requires.recommendations`). It renders under « Recommandations (non normatives) » and never flips the
      criterion to NC. A purely UX concern is neither an NC nor a recommendation — leave it out.
    **`citations[]`** is an array of anchors, one per piece of harvested evidence the verdict
    rests on:

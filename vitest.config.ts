@@ -27,5 +27,9 @@ export default defineConfig({
       "tests/browser-tier.e2e.test.ts",
       "tests/opencode-smoke.e2e.test.ts",
     ],
+    // An installed veraPDF adds its result to the 13.3 brief (src/verapdf.ts). Off for the suite,
+    // so a brief renders the same on a machine that has it and on CI that does not; the tests
+    // that exercise it name the executable themselves.
+    env: { ULTRA11Y_VERAPDF: "off" },
   },
 });
