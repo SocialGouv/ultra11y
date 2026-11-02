@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.51.1](https://github.com/SocialGouv/ultra11y/compare/v5.51.0...v5.51.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **rules:** flag a form field whose aria-label overrides its visible <label> (rgaa 11.2.5 / wcag 2.5.3) ([#91](https://github.com/SocialGouv/ultra11y/issues/91)) ([0805e3b](https://github.com/SocialGouv/ultra11y/commit/0805e3bcdae7d0c84391acc975a9ddda31c79b2a))
+
 # [5.51.0](https://github.com/SocialGouv/ultra11y/compare/v5.50.1...v5.51.0) (2026-11-02)
 
 
