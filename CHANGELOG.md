@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.50.0](https://github.com/SocialGouv/ultra11y/compare/v5.49.1...v5.50.0) (2026-11-02)
+
+
+### Features
+
+* **ledger:** root-aware file identity on both sides — relative source citations in a committed ledger ([#86](https://github.com/SocialGouv/ultra11y/issues/86)) ([1ad2c00](https://github.com/SocialGouv/ultra11y/commit/1ad2c0050bc1ac592fb58e6fc8d41b8036b61e53))
+* **rgaa:** print the « taux moyen de conformité » beside the global rate ([#87](https://github.com/SocialGouv/ultra11y/issues/87)) ([313348f](https://github.com/SocialGouv/ultra11y/commit/313348fb5d528cc8d6d759b3b39d83c2ecf1d101))
+
 ## [5.49.1](https://github.com/SocialGouv/ultra11y/compare/v5.49.0...v5.49.1) (2026-10-29)
 
 
