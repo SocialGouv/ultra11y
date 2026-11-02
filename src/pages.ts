@@ -583,6 +583,8 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
     criteria: page.criteria,
     findings: page.findings,
     ...(result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}),
+    // A document's findings are attributed to each page linking it (src/audit.ts foldDocument).
+    ...(result.documentFindings ? { documentFindings: result.documentFindings.filter((f) => f.page === page.id) } : {}),
   };
 }
 

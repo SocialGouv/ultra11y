@@ -9,6 +9,7 @@ import { dirname, resolve as resolvePath } from "node:path";
 import type {
   AuditResult,
   CriterionResult,
+  DocumentAudit,
   DynamicEngine,
   Finding,
   PageCoverage,
@@ -38,6 +39,9 @@ import type { DepGraph } from "./graph/graph.js";
 import { discover } from "./discover.js";
 import { GRAPH_ONLY_EXT } from "./glob.js";
 import { readText, today } from "./util.js";
+import { isPdfPath, loadPdfDoc, pdfDocFromBytes, readDocumentOrigin } from "./documents.js";
+import { PDF_MAX_BYTES } from "./parse/pdf.js";
+import { pdfCheckOutcomes } from "./rules/pdf.js";
 import { INAPPLICABLE_STATUS } from "./types.js";
 
 export type DedupMode = "exact" | "normalized" | "off";
@@ -381,6 +385,8 @@ interface Accum {
   uncertainStatic: Map<string, string>;
   allFindings: Finding[];
   packFindings: Finding[]; // declarative pack-rule findings (namespaced pack:<key>:<id>)
+  documents: DocumentAudit[]; // downloadable documents read (PDF), with their check outcomes
+  documentFindings: Finding[]; // document-rule findings — never folded into the WCAG verdict
   fileCount: number;
   opaqueLibs: Set<string>; // component-library specifiers rendered but not source-analysable
   opaqueFiles: number; // count of source files that render such components
@@ -479,6 +485,8 @@ function newAccum(): Accum {
     uncertainStatic: new Map(),
     allFindings: [],
     packFindings: [],
+    documents: [],
+    documentFindings: [],
     fileCount: 0,
     opaqueLibs: new Set(),
     opaqueFiles: 0,
@@ -507,6 +515,10 @@ function primarySubtag(lang: string): string | undefined {
  *  graph is supplied, cross-file findings are added and graph-proven false
  *  positives are suppressed (matched by ruleId + line on this same doc). */
 export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
+  if (doc.kind === "pdf") {
+    foldDocument(acc, doc);
+    return;
+  }
   // PAGE IDENTITY, SYNTHESIZED FROM THE PATH when the DOM does not carry it. Must happen BEFORE
   // any rule runs: every finding constructor reads `doc.capture` at construction time.
   //
@@ -679,6 +691,53 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   const subtag = htmlLang ? primarySubtag(htmlLang) : undefined;
   if (subtag) acc.langCounts.set(subtag, (acc.langCounts.get(subtag) ?? 0) + 1);
   acc.fileCount++;
+}
+
+/** Fold one downloadable DOCUMENT. Its findings go to `documentFindings`, never to the criteria:
+ *  the document is not the page that links it, and a conforming alternate version may exist, so
+ *  nothing here may make a WCAG criterion of the scope non-conformant — or conformant. What the
+ *  fold does record is that a downloadable document EXISTS (the `downloadDocs` subject, scope-wide
+ *  and on every page linking it), which keeps RGAA 13.3/13.4 open for the adjudicator. */
+function foldDocument(acc: Accum, doc: Doc): void {
+  const findings = runRules(doc);
+  const pages = doc.document?.pages ?? [];
+  for (const f of findings) {
+    // Attributed to every page a reader reaches the document from — the page is where RGAA asks
+    // « does each downloadable document have an accessible version? ».
+    if (pages.length) for (const page of pages) acc.documentFindings.push({ ...f, page });
+    else acc.documentFindings.push(f);
+  }
+  acc.documents.push(documentAudit(doc, new Set(findings.map((f) => f.ruleId))));
+  acc.subjectsSeen.add("downloadDocs");
+  for (const page of pages) {
+    const own = acc.pageSubjects.get(page) ?? new Set<string>();
+    own.add("downloadDocs");
+    acc.pageSubjects.set(page, own);
+  }
+  acc.fileCount++;
+}
+
+function documentAudit(doc: Doc, fired: ReadonlySet<string>): DocumentAudit {
+  const f = doc.pdf;
+  const text: DocumentAudit["text"] = !f?.readable || !f.contentScanned ? "unknown" : f.textOps > 0 ? "yes" : f.fonts > 0 ? "unknown" : "no";
+  return {
+    file: doc.file,
+    ...(doc.document?.url ? { url: doc.document.url } : {}),
+    ...(doc.document?.pages?.length ? { pages: doc.document.pages } : {}),
+    format: "pdf",
+    readable: f?.readable ?? false,
+    ...(f?.unreadable ? { unreadable: f.unreadable } : {}),
+    ...(f?.detail ? { detail: f.detail } : {}),
+    ...(f?.version ? { version: f.version } : {}),
+    pageCount: f?.pages ?? 0,
+    tagged: f?.tagged ?? false,
+    ...(f?.lang ? { lang: f.lang } : {}),
+    ...(f?.title ? { title: f.title } : {}),
+    displayDocTitle: f?.displayDocTitle ?? false,
+    text,
+    ...(f?.structure ? { headings: f.structure.headings, tables: f.structure.tables, tablesWithoutTh: f.structure.tablesWithoutTh } : {}),
+    checks: pdfCheckOutcomes(doc, fired),
+  };
 }
 
 interface FinalizeExtra {
@@ -1035,6 +1094,8 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
     criteria,
     findings: acc.allFindings,
     ...(acc.packFindings.length ? { packFindings: acc.packFindings } : {}),
+    ...(acc.documents.length ? { documents: acc.documents } : {}),
+    ...(acc.documentFindings.length ? { documentFindings: acc.documentFindings } : {}),
     residualRisks,
     conformancePct,
   };
@@ -1137,6 +1198,31 @@ export function runAudit(opts: AuditInput): AuditResult {
       break;
     }
     const file = files[i]!;
+    // A PDF is bytes, not text: read, de-duplicated and parsed as such (src/parse/pdf.ts).
+    if (isPdfPath(file)) {
+      let doc: Doc;
+      try {
+        if (statSync(file).size > PDF_MAX_BYTES) doc = loadPdfDoc(file);
+        else {
+          const bytes = readFileSync(file);
+          if (dedupMode !== "off") {
+            const h = createHash("sha1").update(bytes).digest("hex");
+            if (seen.has(h)) {
+              duplicateFiles++;
+              continue;
+            }
+            seen.add(h);
+          }
+          doc = pdfDocFromBytes(bytes, file, readDocumentOrigin(file));
+        }
+      } catch {
+        continue; // vanished between discovery and read
+      }
+      if (doc.pdf && !doc.pdf.readable)
+        opts.onWarn?.(`ultra11y: ${file}: PDF unreadable (${doc.pdf.unreadable}) — reported as unreadable, never as conforming.`);
+      foldDoc(acc, doc, graph);
+      continue;
+    }
     let content: string;
     const staged = useStaged ? stagedContent?.get(file) : undefined;
     // A carried Doc already holds the file's source, so a hit skips the read entirely.

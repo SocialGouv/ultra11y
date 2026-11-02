@@ -1457,6 +1457,60 @@ function renderReaderAdvisory(u: PrdUnit, lang: Lang, resolver: PageResolver): s
 // audit — `file:line`, selectors, the tool's method, its automatic rate, its commands, the S/R/J
 // contract — is in the annex. Both come out of the same units, pages and tallies, computed once
 // here.
+/** « Documents téléchargeables » — every PDF the run read, one row each, with the outcome of
+ *  every document check. Worded so that a row with nothing found cannot be read as a pass: the
+ *  checks prove the absence of gross failures, and PDF/UA conformance is a validator's verdict. */
+function renderDocuments(r: AuditResult, lang: Lang): string[] {
+  const docs = r.documents ?? [];
+  if (!docs.length) return [];
+  const fr = lang === "fr";
+  const RULES = ["pdf-untagged", "pdf-lang-missing", "pdf-title-missing", "pdf-no-text", "pdf-structure-shallow"] as const;
+  const head: Record<(typeof RULES)[number], string> = fr
+    ? {
+        "pdf-untagged": "Balisé",
+        "pdf-lang-missing": "Langue",
+        "pdf-title-missing": "Titre affiché",
+        "pdf-no-text": "Texte",
+        "pdf-structure-shallow": "Structure",
+      }
+    : {
+        "pdf-untagged": "Tagged",
+        "pdf-lang-missing": "Language",
+        "pdf-title-missing": "Title shown",
+        "pdf-no-text": "Text",
+        "pdf-structure-shallow": "Structure",
+      };
+  const mark = (o: string | undefined): string =>
+    o === "fail" ? (fr ? "❌ non" : "❌ no") : o === "not-detected" ? (fr ? "— rien relevé" : "— none found") : fr ? "· non vérifié" : "· not checked";
+  const out: string[] = [
+    '<a id="documents"></a>',
+    `## 📎 ${fr ? "Documents téléchargeables" : "Downloadable documents"}`,
+    "",
+    `> ${
+      fr
+        ? "Chaque document PDF lu, avec chacun de ses contrôles. « rien relevé » ne veut pas dire conforme : ces contrôles détectent les défauts grossiers (non balisé, sans langue, sans titre, sans texte), jamais la conformité PDF/UA, que seul un validateur (veraPDF, PAC) établit. Le critère reste à juger : une version alternative accessible peut exister."
+        : "Every PDF document read, with each of its checks. « none found » does not mean conforming: these checks find the gross failures (untagged, no language, no title, no text), never PDF/UA conformance, which only a validator (veraPDF, PAC) establishes. The criterion remains to be judged: an accessible alternative version may exist."
+    }`,
+    "",
+    `| ${fr ? "Document" : "Document"} | ${fr ? "Pages qui le lient" : "Linked from"} | ${RULES.map((id) => head[id]).join(" | ")} |`,
+    `| --- | --- |${" --- |".repeat(RULES.length)}`,
+  ];
+  for (const d of docs) {
+    const name = mdText(d.url ?? d.file);
+    const label = d.title ? `${name} — « ${mdText(d.title.slice(0, 60))} »` : name;
+    const linked = d.pages?.length ? d.pages.map((p) => `\`${p}\``).join(", ") : "—";
+    if (!d.readable) {
+      out.push(
+        `| ${label} | ${linked} | ${fr ? `⚠️ illisible (${d.unreadable ?? "?"}) — à ouvrir et juger à la main` : `⚠️ unreadable (${d.unreadable ?? "?"}) — open and judge it by hand`} |${" |".repeat(RULES.length - 1)}`,
+      );
+      continue;
+    }
+    out.push(`| ${label} | ${linked} | ${RULES.map((id) => mark(d.checks[id])).join(" | ")} |`);
+  }
+  out.push("");
+  return out;
+}
+
 function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   const s = L[lang];
   const reportFile = reportFileName(opts.standard, r.date);
@@ -1533,6 +1587,7 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
     ...(advisoryUnits.length ? [["recommendations", `💡 ${s.recTitle}`] as [string, string]] : []),
     ...(derivedPages.length ? [["page-rates", `📋 ${s.pageRatesTitle}`] as [string, string]] : []),
     ...(derivedPages.length ? [["page-findings", `📄 ${s.perPageTitle}`] as [string, string]] : []),
+    ...(r.documents?.length ? [["documents", `📎 ${lang === "fr" ? "Documents téléchargeables" : "Downloadable documents"}`] as [string, string]] : []),
     ["conforming", s.cTitle],
     ["not-applicable", s.naTitle],
     ["to-assess", s.manualTitle],
@@ -1642,6 +1697,8 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
       out.push("", "</details>", "");
     }
   }
+
+  out.push(...renderDocuments(r, lang));
 
   // 3. conforming — split by PROVENANCE. A criterion the deterministic engine decided and one an
   // agent ruled on are both "C", but they are not the same claim. Both lists fold.

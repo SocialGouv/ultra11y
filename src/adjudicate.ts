@@ -27,6 +27,7 @@ import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
 import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
+import { isPdfPath, loadPdfDoc } from "./documents.js";
 import { attachSignals, PAGES_DIR, snapshotPageId } from "./snapshot.js";
 import { loadConfig } from "./config.js";
 import {
@@ -261,7 +262,14 @@ function docsForAudit(audit: AuditResult, cwd?: string): Doc[] {
       // ZERO evidence. The gate then refused each C verdict for "no evidence harvested",
       // blaming the adjudicator for a path bug. Grounding has always used `resolve` for the
       // same reason; these two must agree, since one harvests the anchors the other checks.
-      const doc = parseSource(readText(cwd ? resolve(cwd, f) : f), f);
+      const path = cwd ? resolve(cwd, f) : f;
+      // A downloadable document is bytes, read by the same reader the audit used — so the 13.3
+      // brief lists each one with what was established about it.
+      if (isPdfPath(f)) {
+        docs.push(loadPdfDoc(path, f));
+        continue;
+      }
+      const doc = parseSource(readText(path), f);
       // A page snapshot is a DIRECTORY of signals (computed styles, boxes, stylesheets, the
       // screenshot), not a lone .html — and `parseSource` only reads the DOM. Without this
       // call the harvest sees every captured page as inert markup, so a criterion decided on

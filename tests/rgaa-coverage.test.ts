@@ -64,6 +64,13 @@ describe("the mapping is real, not aspirational", () => {
       for (const ruleId of c.appliesTo?.ruleIds ?? []) {
         const rule = ruleById(ruleId);
         if (!rule) continue; // cross-file, rendered, axe, dynamic or pack-owned tier
+        // A DOCUMENT rule is routed by rule id, not by SC (src/standards/derive.ts): the PDF is
+        // not the page, and RGAA files all of its failures under 13.3 — the one criterion that
+        // asks about documents, whose crosswalk does not include 2.4.2 (a PDF's missing title).
+        if (rule.input === "pdf") {
+          expect(c.id, `${ruleId} is a document rule; its only RGAA home is 13.3`).toBe("13.3");
+          continue;
+        }
         expect(
           rule.criteria.some((sc) => c.wcag.includes(sc)),
           `RGAA ${c.id} maps ${ruleId}, but the rule owns ${rule.criteria.join(", ")}`,
@@ -112,8 +119,11 @@ describe("the rendered tier's own contribution", () => {
   });
 
   it("leaves criteria no rule can evidence alone, rather than forcing a verdict", () => {
-    // 13.3 depends on downloadable office documents — nothing in the DOM decides it.
-    expect(pack.criteria.find((c) => c.id === "13.3")?.appliesTo?.ruleIds ?? []).toEqual([]);
+    // 13.3 depends on downloadable office documents — nothing in the DOM decides it. Only the
+    // document rules, which read the PDF itself, reach it, and only as candidate evidence.
+    const docRules = pack.criteria.find((c) => c.id === "13.3")?.appliesTo?.ruleIds ?? [];
+    expect(docRules.every((id) => id.startsWith("pdf-"))).toBe(true);
+    expect(pack.criteria.find((c) => c.id === "13.3")?.automation?.rules.every((r) => r.effect !== "decisive-nc")).toBe(true);
     // Structurally out of the DSL's reach, and honestly left alone: 11.4 is positional
     // (no sibling/order notion), 10.14 needs CSS :hover rules, 13.2 needs JS semantics,
     // and the whole of theme 12 needs cross-page reasoning runPackRules cannot do.

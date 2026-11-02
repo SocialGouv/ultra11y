@@ -91,6 +91,34 @@ repo. Declare that sample once in `.ultra11yrc.json`:
   scan is flagged **partial** — a CLI warning + a report banner naming the needs-rendering
   criteria that were not tested. Say the audit is partial rather than implying full coverage.
 
+## Downloadable PDF documents
+
+`audit report.pdf` or `audit "public/**/*.pdf"` reads PDF files with the engine's own reader
+(Node built-ins only — `zlib` for object and xref streams; classic and stream xrefs, incremental
+updates, a repair scan when the offsets lie). A directory input never pulls in the PDFs it holds:
+a PDF is audited when it is named, matched by a glob ending in `.pdf`, or downloaded by `scan`
+into `.ultra11y/documents/` (re-ingested automatically; `--no-pdf` opts out). Five document checks
+run on each file:
+
+| Rule | What it observes | WCAG |
+|---|---|---|
+| `pdf-untagged` | no `/MarkInfo << /Marked true >>`, or no `/StructTreeRoot` (PDF/UA-1 §7.1) | 1.3.1 |
+| `pdf-lang-missing` | no `/Lang` on the catalog (PDF/UA-1 §7.2) | 3.1.1 |
+| `pdf-title-missing` | no `/Title` (Info or XMP `dc:title`), or `/DisplayDocTitle` not true (PDF18) | 2.4.2 |
+| `pdf-no-text` | no font resource and no text-showing operator on any page — an image-only scan | 1.1.1 |
+| `pdf-structure-shallow` | advisory: tagged, but no heading, or a table with no `TH` | 1.3.1 |
+
+The audit JSON lists every document under `documents[]` with each check's outcome — `fail`,
+`not-detected` or `not-checked` — and the report renders them in a « Documents téléchargeables »
+section. **`not-detected` is not a pass**: these checks prove the absence of the gross failures,
+never PDF/UA conformance, which a validator (veraPDF, PAC) establishes. An encrypted, malformed,
+truncated or oversized file is reported **unreadable**, never as conforming.
+
+Document findings live in `documentFindings`, **outside** the WCAG criteria: the PDF is not the
+page that links it, and a conforming alternate version may exist. Under RGAA they are routed by
+rule id to **13.3** as candidate evidence, and the 13.3 brief lists each document with its checks,
+citable at the file's `%PDF-x.y` header line — the agent rules, with something to cite.
+
 ## Golden rules
 
 - **Never invent a non-conformity**: every `NC` must cite a real, resolvable element

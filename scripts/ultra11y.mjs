@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync8, writeFileSync as writeFileSync22, mkdirSync as mkdirSync19, existsSync as existsSync40, readFileSync as readFileSync36, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
-import { join as join53, relative as relative6, resolve as resolve18, sep as sep7, dirname as dirname20 } from "path";
-import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
+import { realpathSync as realpathSync8, writeFileSync as writeFileSync23, mkdirSync as mkdirSync20, existsSync as existsSync41, readFileSync as readFileSync37, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
+import { join as join54, relative as relative6, resolve as resolve18, sep as sep7, dirname as dirname21 } from "path";
+import { fileURLToPath as fileURLToPath6, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
 var VERSION = "5.54.3";
@@ -14,9 +14,9 @@ function isAdjudicated(by) {
 var INAPPLICABLE_STATUS = "C";
 
 // src/audit.ts
-import { createHash as createHash4 } from "crypto";
-import { existsSync as existsSync16, readFileSync as readFileSync17, statSync as statSync11 } from "fs";
-import { dirname as dirname10, resolve as resolvePath } from "path";
+import { createHash as createHash5 } from "crypto";
+import { existsSync as existsSync17, readFileSync as readFileSync18, statSync as statSync12 } from "fs";
+import { dirname as dirname11, resolve as resolvePath } from "path";
 
 // src/data/wcag.json
 var wcag_default = {
@@ -132,7 +132,8 @@ var wcag_default = {
         "input-image-alt-missing",
         "object-embed-no-name",
         "chart-no-accessible-name",
-        "figure-caption-unassociated"
+        "figure-caption-unassociated",
+        "pdf-no-text"
       ],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html",
       techniques: [
@@ -322,7 +323,9 @@ var wcag_default = {
         "css-generated-content-informative",
         "presentational-element",
         "presentational-attribute",
-        "presentational-spacing"
+        "presentational-spacing",
+        "pdf-untagged",
+        "pdf-structure-shallow"
       ],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html",
       techniques: [
@@ -805,7 +808,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.0",
       automatability: "static",
-      ruleIds: ["title-missing-empty"],
+      ruleIds: ["title-missing-empty", "pdf-title-missing"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/page-titled.html",
       techniques: ["G127", "G88", "H25"],
       text: "Web pages have titles that describe topic or purpose.",
@@ -1057,7 +1060,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.0",
       automatability: "static",
-      ruleIds: ["html-lang-missing", "document-language-missing", "html-lang-xml-lang-mismatch", "lang-invalid"],
+      ruleIds: ["html-lang-missing", "document-language-missing", "html-lang-xml-lang-mismatch", "lang-invalid", "pdf-lang-missing"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/language-of-page.html",
       techniques: ["F15", "G10", "G135", "H57"],
       text: "The default human language of each web page can be programmatically determined.",
@@ -3208,7 +3211,7 @@ var EntityDecoder = class {
     let valueLength = (current & BinTrieFlags.VALUE_LENGTH) >> 14;
     while (offset < input.length) {
       if (valueLength === 0 && (current & BinTrieFlags.FLAG13) !== 0) {
-        const runLength = (current & BinTrieFlags.BRANCH_LENGTH) >> 7;
+        const runLength2 = (current & BinTrieFlags.BRANCH_LENGTH) >> 7;
         if (this.runConsumed === 0) {
           const firstChar = current & BinTrieFlags.JUMP_TABLE;
           if (input.charCodeAt(offset) !== firstChar) {
@@ -3218,7 +3221,7 @@ var EntityDecoder = class {
           this.excess++;
           this.runConsumed++;
         }
-        while (this.runConsumed < runLength) {
+        while (this.runConsumed < runLength2) {
           if (offset >= input.length) {
             return -1;
           }
@@ -3234,7 +3237,7 @@ var EntityDecoder = class {
           this.runConsumed++;
         }
         this.runConsumed = 0;
-        this.treeIndex += 1 + (runLength >> 1);
+        this.treeIndex += 1 + (runLength2 >> 1);
         current = decodeTree[this.treeIndex];
         valueLength = (current & BinTrieFlags.VALUE_LENGTH) >> 14;
       }
@@ -19926,7 +19929,7 @@ function opaqueLibrarySpecifiers(ast, elements) {
 }
 
 // src/glob.ts
-import { existsSync as existsSync12, statSync as statSync10 } from "fs";
+import { existsSync as existsSync12, readdirSync as readdirSync4, statSync as statSync10 } from "fs";
 import { join as join23, sep as sep3 } from "path";
 
 // src/util.ts
@@ -37554,6 +37557,29 @@ function walk2(dir, acc) {
     acc.push(join23(dir, f.rel));
   }
 }
+var PDF_GLOB = /\.pdf$/i;
+var PDF_WALK_SKIP = /* @__PURE__ */ new Set(["node_modules", ".git", ".hg", ".svn"]);
+var PDF_WALK_MAX = 1e4;
+function walkPdfs(dir) {
+  const out2 = [];
+  const stack = [{ abs: dir, depth: 0 }];
+  while (stack.length && out2.length < PDF_WALK_MAX) {
+    const { abs, depth } = stack.pop();
+    let entries;
+    try {
+      entries = readdirSync4(abs, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
+      const p = join23(abs, e.name);
+      if (e.isDirectory()) {
+        if (depth < 32 && !PDF_WALK_SKIP.has(e.name) && !SKIP_DIR.has(e.name)) stack.push({ abs: p, depth: depth + 1 });
+      } else if (e.isFile() && PDF_GLOB.test(e.name)) out2.push(p);
+    }
+  }
+  return out2;
+}
 function staticBase(glob) {
   const idx = glob.search(/[*?]/);
   const head = idx === -1 ? glob : glob.slice(0, idx);
@@ -37578,13 +37604,17 @@ function expandInputs(inputs, opts = {}) {
     if (input === "-") continue;
     if (hasGlob(input)) {
       const match = compileGlobs([input]);
+      if (PDF_GLOB.test(input)) {
+        for (const f of walkPdfs(staticBase(input))) if (match(toPosix(f))) files.add(f);
+        continue;
+      }
       const acc = walkCached(staticBase(input), opts);
       for (const f of acc) if (match(toPosix(f)) && exts.has(ext(f))) files.add(f);
     } else if (existsSync12(input)) {
       if (statSync10(input).isDirectory()) {
         const acc = walkCached(input, opts);
         for (const f of acc) if (exts.has(ext(f))) files.add(f);
-      } else if (exts.has(ext(input))) {
+      } else if (exts.has(ext(input)) || PDF_GLOB.test(input)) {
         files.add(input);
         explicit.add(input);
       }
@@ -37755,7 +37785,7 @@ function parseSourceWithAst(source, file, opts = {}) {
 }
 
 // src/snapshot.ts
-import { existsSync as existsSync13, mkdirSync as mkdirSync4, readFileSync as readFileSync14, readdirSync as readdirSync4, writeFileSync as writeFileSync5 } from "fs";
+import { existsSync as existsSync13, mkdirSync as mkdirSync4, readFileSync as readFileSync14, readdirSync as readdirSync5, writeFileSync as writeFileSync5 } from "fs";
 import { dirname as dirname6, join as join24 } from "path";
 
 // src/probes.ts
@@ -38662,7 +38692,7 @@ function readSnapshots(root) {
   const base = join24(root, PAGES_DIR);
   let dirs;
   try {
-    dirs = readdirSync4(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    dirs = readdirSync5(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
   } catch {
     return [];
   }
@@ -38738,6 +38768,57 @@ function attachSignals(doc) {
 
 // src/messages.ts
 var MSG_CATALOG = {
+  // ---- Document rules (src/rules/pdf.ts) ----
+  "pdf-untagged": {
+    message: {
+      fr: (p) => `Document PDF non balis\xE9 (PDF ${p.version}) \u2014 ${p.marked === "yes" ? "/MarkInfo d\xE9clare le balisage" : "pas de /MarkInfo << /Marked true >>"}, ${p.structTree === "yes" ? "un arbre de structure existe" : "pas d'arbre de structure (/StructTreeRoot)"} : une technologie d'assistance lit un flux de texte sans titres, listes ni tableaux.`,
+      en: (p) => `Untagged PDF document (PDF ${p.version}) \u2014 ${p.marked === "yes" ? "/MarkInfo declares it marked" : "no /MarkInfo << /Marked true >>"}, ${p.structTree === "yes" ? "a structure tree exists" : "no structure tree (/StructTreeRoot)"}: assistive technology reads a flat stream of text with no headings, lists or tables.`
+    },
+    remediation: {
+      fr: () => `Produisez un PDF balis\xE9 (PDF/UA-1) depuis l'outil source, ou proposez une version alternative accessible (HTML ou document balis\xE9) ; v\xE9rifiez le r\xE9sultat avec veraPDF ou PAC.`,
+      en: () => `Produce a tagged PDF (PDF/UA-1) from the source tool, or offer an accessible alternative version (HTML or a tagged document); check the result with veraPDF or PAC.`
+    }
+  },
+  "pdf-lang-missing": {
+    message: {
+      fr: () => `Le document PDF ne d\xE9clare pas de langue (/Lang absent du catalogue) \u2014 la synth\xE8se vocale ne sait pas dans quelle langue le lire.`,
+      en: () => `The PDF document declares no language (no /Lang in the catalog) \u2014 speech synthesis cannot tell which language to read it in.`
+    },
+    remediation: {
+      fr: () => `D\xE9clarez la langue du document (ex. /Lang (fr-FR)) dans l'outil qui produit le PDF.`,
+      en: () => `Declare the document language (e.g. /Lang (en-GB)) in the tool that produces the PDF.`
+    }
+  },
+  "pdf-title-missing": {
+    message: {
+      fr: (p) => p.titleState === "not-displayed" ? `Le document PDF a un titre (\xAB ${p.title} \xBB) mais /ViewerPreferences /DisplayDocTitle n'est pas vrai \u2014 le lecteur affiche le nom du fichier \xE0 la place.` : `Le document PDF n'a pas de titre (ni /Title dans les m\xE9tadonn\xE9es, ni dc:title XMP).`,
+      en: (p) => p.titleState === "not-displayed" ? `The PDF document has a title ("${p.title}") but /ViewerPreferences /DisplayDocTitle is not true \u2014 the viewer shows the file name instead.` : `The PDF document has no title (no /Title in its metadata, no XMP dc:title).`
+    },
+    remediation: {
+      fr: () => `Renseignez un titre pertinent dans les m\xE9tadonn\xE9es du document et activez l'affichage du titre (DisplayDocTitle).`,
+      en: () => `Set a relevant title in the document metadata and turn on title display (DisplayDocTitle).`
+    }
+  },
+  "pdf-no-text": {
+    message: {
+      fr: (p) => `Document PDF sans texte extractible (${p.pages} page(s), ${p.images} image(s), aucune police ni op\xE9rateur de texte) \u2014 un document num\xE9ris\xE9 dont le contenu est inaccessible \xE0 une technologie d'assistance.`,
+      en: (p) => `PDF document with no extractable text (${p.pages} page(s), ${p.images} image(s), no font and no text operator) \u2014 a scanned document whose content assistive technology cannot reach.`
+    },
+    remediation: {
+      fr: () => `Fournissez le document source en texte r\xE9el (ou passez-le en reconnaissance de caract\xE8res puis balisez-le), ou proposez une version alternative accessible.`,
+      en: () => `Provide the source document as real text (or OCR it and then tag it), or offer an accessible alternative version.`
+    }
+  },
+  "pdf-structure-shallow": {
+    message: {
+      fr: (p) => p.gap === "table-no-th" ? `Le document PDF est balis\xE9, mais ${p.without} tableau(x) sur ${p.tables} n'a(ont) aucune cellule d'en-t\xEAte (TH).` : `Le document PDF est balis\xE9, mais son arbre de structure (${p.elements} \xE9l\xE9ment(s)) ne contient aucun titre (H, H1\u2013H6).`,
+      en: (p) => p.gap === "table-no-th" ? `The PDF document is tagged, but ${p.without} of its ${p.tables} table(s) have no header cell (TH).` : `The PDF document is tagged, but its structure tree (${p.elements} element(s)) holds no heading (H, H1\u2013H6).`
+    },
+    remediation: {
+      fr: (p) => p.gap === "table-no-th" ? `Balisez les cellules d'en-t\xEAte des tableaux de donn\xE9es en TH (avec /Scope), si le tableau en a.` : `Balisez les intertitres du document en titres (H1\u2013H6), s'il en comporte.`,
+      en: (p) => p.gap === "table-no-th" ? `Tag data-table header cells as TH (with /Scope), where the table has them.` : `Tag the document's headings as H1\u2013H6, where it has any.`
+    }
+  },
   "document-language-missing": {
     message: {
       fr: () => `La page n'a pas de langue par d\xE9faut sur <html> et au moins un texte visible n'h\xE9rite d'aucun attribut lang/xml:lang.`,
@@ -40295,7 +40376,7 @@ function strokeRect(raster, rect, color, width, dash) {
   const x1 = Math.round(rect.x + rect.w);
   const y1 = Math.round(rect.y + rect.h);
   if (x1 <= x0 || y1 <= y0) return;
-  const on = (coord) => {
+  const on2 = (coord) => {
     if (!dash || dash <= 1) return true;
     const half = dash / 2;
     return Math.floor(coord / half) % 2 === 0;
@@ -40307,7 +40388,7 @@ function strokeRect(raster, rect, color, width, dash) {
       const left = x < x0 + t3;
       const right = x >= x1 - t3;
       if (!top && !bottom && !left && !right) continue;
-      if (!on(top || bottom ? x : y)) continue;
+      if (!on2(top || bottom ? x : y)) continue;
       blend(raster, x, y, color);
     }
   }
@@ -46648,14 +46729,45 @@ var rgaa_default = {
       ],
       wcag: ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["pdf-lang-missing", "pdf-no-text", "pdf-structure-shallow", "pdf-title-missing", "pdf-untagged"]
       },
       judgment: true,
       automation: {
         tests: {
           "1": "judgment"
         },
-        rules: []
+        rules: [
+          {
+            id: "pdf-lang-missing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "pdf-no-text",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "pdf-structure-shallow",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "pdf-title-missing",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "pdf-untagged",
+            tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {
@@ -48253,6 +48365,33 @@ function hAt(doc, line, selector, note, cls) {
     at: line
   };
 }
+function pdfDocumentAnchor(doc) {
+  const f = doc.pdf;
+  const where = doc.document?.url ?? doc.file;
+  let note;
+  if (!f?.readable) {
+    note = `downloadable PDF document ${where} \u2014 UNREADABLE (${f?.unreadable ?? "unknown"}${f?.detail ? `: ${f.detail}` : ""}); nothing about it could be established, so it must be opened and judged by hand \u2014 is it accessible, or is an accessible alternative offered?`;
+  } else {
+    const s = f.structure;
+    const text = !f.contentScanned ? "unknown" : f.textOps > 0 ? "yes" : f.fonts > 0 ? "unknown" : "no (image-only?)";
+    const facts = [
+      `PDF ${f.version ?? "?"}, ${f.pages} page(s)`,
+      `tagged: ${f.tagged ? "yes" : `no (MarkInfo ${f.marked ? "yes" : "no"}, StructTreeRoot ${f.structTree ? "yes" : "no"})`}`,
+      `language: ${f.lang ?? "none"}`,
+      `title: ${f.title ? `"${f.title.slice(0, 60)}"${f.displayDocTitle ? "" : " (not displayed: DisplayDocTitle false)"}` : "none"}`,
+      `extractable text: ${text}`,
+      ...s ? [
+        `structure: ${s.elements} element(s), ${s.headings} heading(s), ${s.tables} table(s)${s.tablesWithoutTh ? ` (${s.tablesWithoutTh} without TH)` : ""}`
+      ] : []
+    ];
+    note = `downloadable PDF document ${where} \u2014 ${facts.join(" \xB7 ")} \u2014 these checks find gross failures only, never PDF/UA conformance: is the document accessible, or is an accessible alternative (tagged document or HTML) offered?`;
+  }
+  return {
+    ev: { file: doc.file, line: 1, selector: "", snippet: doc.source.slice(0, 160), note },
+    cls: stable(`pdf|${doc.document?.url ?? doc.file}`),
+    at: 0
+  };
+}
 var declsText = (decls) => Object.entries(decls).map(([k, v]) => `${k}: ${v}`).join("; ").slice(0, 100);
 var t = (el, n = 60) => textContent(el).trim().replace(/\s+/g, " ").slice(0, n);
 function nearestHeading(doc, el) {
@@ -49181,8 +49320,11 @@ var SUBJECTS = {
     )
   ]),
   // Office documents offered for download — the subject of "is there an accessible version?".
+  // A PDF the run READ (named as an input, or downloaded by `scan`) is the subject itself: it is
+  // listed with everything the reader established about it, so the adjudicator rules on 13.3
+  // with the document's own checks in front of it rather than the link alone.
   downloadDocs: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "a").filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? "") || attr(e, "download") !== void 0 && attr(e, "href") !== void 0).map(
+    (d) => d.kind === "pdf" ? [pdfDocumentAnchor(d)] : elementsByTag(d, "a").filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? "") || attr(e, "download") !== void 0 && attr(e, "href") !== void 0).map(
       (e) => h(
         d,
         e,
@@ -53391,6 +53533,94 @@ var blinkMarquee = {
 };
 var timingRules = [metaRefreshRedirect, blinkMarquee];
 
+// src/rules/pdf.ts
+function pdfAnchor(doc) {
+  return { type: "element", tag: "pdf", attribs: {}, children: [], parent: null, line: 1, col: 1, start: 0, end: doc.source.length };
+}
+var on = (doc, f) => ({ el: pdfAnchor(doc), selectorHint: "document", ...f });
+var yn = (b) => b ? "yes" : "no";
+var pdfUntagged = {
+  id: "pdf-untagged",
+  input: "pdf",
+  criteria: ["1.3.1"],
+  severity: "majeur",
+  run(doc) {
+    const f = doc.pdf;
+    if (!f?.readable || f.tagged) return [];
+    return [on(doc, { criteriaId: "1.3.1", msgId: "pdf-untagged", params: { marked: yn(f.marked), structTree: yn(f.structTree), version: f.version ?? "?" } })];
+  }
+};
+var pdfLangMissing = {
+  id: "pdf-lang-missing",
+  input: "pdf",
+  criteria: ["3.1.1"],
+  severity: "majeur",
+  run(doc) {
+    const f = doc.pdf;
+    if (!f?.readable || f.lang) return [];
+    return [on(doc, { criteriaId: "3.1.1", msgId: "pdf-lang-missing" })];
+  }
+};
+var pdfTitleMissing = {
+  id: "pdf-title-missing",
+  input: "pdf",
+  criteria: ["2.4.2"],
+  severity: "majeur",
+  run(doc) {
+    const f = doc.pdf;
+    if (!f?.readable) return [];
+    if (!f.title) return [on(doc, { criteriaId: "2.4.2", msgId: "pdf-title-missing", params: { titleState: "missing" } })];
+    if (!f.displayDocTitle)
+      return [
+        on(doc, { criteriaId: "2.4.2", msgId: "pdf-title-missing", params: { titleState: "not-displayed", title: f.title.slice(0, 80) }, severity: "mineur" })
+      ];
+    return [];
+  }
+};
+var pdfNoText = {
+  id: "pdf-no-text",
+  input: "pdf",
+  criteria: ["1.1.1"],
+  severity: "bloquant",
+  run(doc) {
+    const f = doc.pdf;
+    if (!f?.readable || !f.contentScanned || f.pages === 0) return [];
+    if (f.textOps > 0 || f.fonts > 0) return [];
+    const s = f.structure;
+    if (f.tagged && s && s.figures > 0 && s.figuresWithoutAlt === 0) return [];
+    return [on(doc, { criteriaId: "1.1.1", msgId: "pdf-no-text", params: { pages: f.pages, images: f.images } })];
+  }
+};
+var pdfStructureShallow = {
+  id: "pdf-structure-shallow",
+  input: "pdf",
+  criteria: ["1.3.1"],
+  severity: "mineur",
+  advisory: true,
+  run(doc) {
+    const f = doc.pdf;
+    const s = f?.structure;
+    if (!f?.readable || !f.tagged || !s) return [];
+    const out2 = [];
+    if (s.headings === 0) out2.push(on(doc, { criteriaId: "1.3.1", msgId: "pdf-structure-shallow", params: { gap: "no-heading", elements: s.elements } }));
+    if (s.tablesWithoutTh > 0)
+      out2.push(on(doc, { criteriaId: "1.3.1", msgId: "pdf-structure-shallow", params: { gap: "table-no-th", tables: s.tables, without: s.tablesWithoutTh } }));
+    return out2;
+  }
+};
+var pdfRules = [pdfUntagged, pdfLangMissing, pdfTitleMissing, pdfNoText, pdfStructureShallow];
+function pdfCheckOutcomes(doc, firedRuleIds) {
+  const f = doc.pdf;
+  const out2 = {};
+  for (const r of pdfRules) {
+    let checkable = !!f?.readable;
+    if (r.id === "pdf-no-text") checkable &&= !!f?.contentScanned && (f?.pages ?? 0) > 0;
+    if (r.id === "pdf-structure-shallow") checkable &&= !!f?.tagged && !!f?.structure;
+    out2[r.id] = firedRuleIds.has(r.id) ? "fail" : checkable ? "not-detected" : "not-checked";
+  }
+  return out2;
+}
+
 // src/rules/registry.ts
 var ALL_RULES = [
   ...colorsRules,
@@ -53406,7 +53636,8 @@ var ALL_RULES = [
   ...navigationRules,
   ...multimediaRules,
   ...presentationRules,
-  ...timingRules
+  ...timingRules,
+  ...pdfRules
 ];
 var SEVERITY_ORDER = { bloquant: 0, majeur: 1, mineur: 2 };
 function ruleIds() {
@@ -53415,8 +53646,10 @@ function ruleIds() {
 function runRules(doc, only) {
   const out2 = [];
   const fullDoc = isFullDocument(doc);
+  const pdf = doc.kind === "pdf";
   for (const rule of ALL_RULES) {
     if (only && !only.has(rule.id)) continue;
+    if (rule.input === "pdf" !== pdf) continue;
     if (rule.scope === "page" && !fullDoc) continue;
     for (const rf of rule.run(doc)) out2.push(toFinding(doc, rule.id, rule.severity, rf, rule.advisory));
   }
@@ -54447,6 +54680,1174 @@ function discover(inputs, opts = {}) {
   return { files, changedMode, gitUnavailable, ...staged ? { stagedContent: staged } : {} };
 }
 
+// src/documents.ts
+import { createHash as createHash4 } from "crypto";
+import { existsSync as existsSync16, mkdirSync as mkdirSync5, readFileSync as readFileSync17, statSync as statSync11, writeFileSync as writeFileSync6 } from "fs";
+import { dirname as dirname10, join as join28 } from "path";
+import { fileURLToPath as fileURLToPath3 } from "url";
+
+// src/parse/pdf.ts
+import { inflateSync as inflateSync2, constants as zlibConstants } from "zlib";
+var PdfName = class {
+  v;
+  constructor(v) {
+    this.v = v;
+  }
+};
+var PdfRef = class {
+  num;
+  gen;
+  constructor(num4, gen) {
+    this.num = num4;
+    this.gen = gen;
+  }
+};
+var PdfStr = class {
+  bytes;
+  constructor(bytes) {
+    this.bytes = bytes;
+  }
+};
+var PdfStream = class {
+  dict;
+  start;
+  end;
+  constructor(dict, start2, end) {
+    this.dict = dict;
+    this.start = start2;
+    this.end = end;
+  }
+};
+var isDict = (v) => v instanceof Map;
+var PdfUnreadable = class extends Error {
+  reason;
+  constructor(reason, detail) {
+    super(detail);
+    this.reason = reason;
+  }
+};
+var WS = /* @__PURE__ */ new Set([0, 9, 10, 12, 13, 32]);
+var DELIM = /* @__PURE__ */ new Set([40, 41, 60, 62, 91, 93, 123, 125, 47, 37]);
+var isRegular = (c2) => c2 !== void 0 && !WS.has(c2) && !DELIM.has(c2);
+var MAX_NESTING = 64;
+var Lexer = class {
+  buf;
+  pos;
+  constructor(buf, pos = 0) {
+    this.buf = buf;
+    this.pos = pos;
+  }
+  skipWs() {
+    const b = this.buf;
+    for (; ; ) {
+      while (this.pos < b.length && WS.has(b[this.pos])) this.pos++;
+      if (b[this.pos] === 37) {
+        while (this.pos < b.length && b[this.pos] !== 10 && b[this.pos] !== 13) this.pos++;
+        continue;
+      }
+      return;
+    }
+  }
+  /** A bare keyword/number token at the cursor, without consuming it. */
+  peekToken() {
+    this.skipWs();
+    let e = this.pos;
+    while (isRegular(this.buf[e])) e++;
+    return this.buf.toString("latin1", this.pos, e);
+  }
+  readToken() {
+    const t3 = this.peekToken();
+    this.pos += t3.length;
+    return t3;
+  }
+  parse(depth = 0) {
+    if (depth > MAX_NESTING) throw new PdfUnreadable("malformed", "object nesting too deep");
+    this.skipWs();
+    const b = this.buf;
+    const c2 = b[this.pos];
+    if (c2 === void 0) throw new PdfUnreadable("truncated", "unexpected end of file");
+    if (c2 === 47) return this.name();
+    if (c2 === 40) return this.literal();
+    if (c2 === 60) {
+      if (b[this.pos + 1] === 60) return this.dict(depth);
+      return this.hex();
+    }
+    if (c2 === 91) {
+      this.pos++;
+      const arr = [];
+      for (; ; ) {
+        this.skipWs();
+        if (this.pos >= b.length) throw new PdfUnreadable("truncated", "unterminated array");
+        if (b[this.pos] === 93) {
+          this.pos++;
+          return arr;
+        }
+        arr.push(this.parse(depth + 1));
+      }
+    }
+    const tok = this.readToken();
+    if (tok === "") {
+      this.pos++;
+      return null;
+    }
+    if (tok === "true") return true;
+    if (tok === "false") return false;
+    if (tok === "null") return null;
+    if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(tok)) {
+      const n = Number(tok);
+      if (/^\d+$/.test(tok)) {
+        const save = this.pos;
+        const gen = this.readToken();
+        if (/^\d+$/.test(gen) && this.readToken() === "R") return new PdfRef(n, Number(gen));
+        this.pos = save;
+      }
+      return n;
+    }
+    return new PdfName(`\0${tok}`);
+  }
+  name() {
+    const b = this.buf;
+    this.pos++;
+    const bytes = [];
+    while (isRegular(b[this.pos])) {
+      const c2 = b[this.pos];
+      if (c2 === 35 && /^[0-9a-f]{2}$/i.test(b.toString("latin1", this.pos + 1, this.pos + 3))) {
+        bytes.push(Number.parseInt(b.toString("latin1", this.pos + 1, this.pos + 3), 16));
+        this.pos += 3;
+        continue;
+      }
+      bytes.push(c2);
+      this.pos++;
+    }
+    return new PdfName(Buffer.from(bytes).toString("utf8"));
+  }
+  literal() {
+    const b = this.buf;
+    this.pos++;
+    let depth = 1;
+    const out2 = [];
+    while (this.pos < b.length) {
+      const c2 = b[this.pos++];
+      if (c2 === 92) {
+        const n = b[this.pos++];
+        if (n === void 0) break;
+        const map = { 110: 10, 114: 13, 116: 9, 98: 8, 102: 12, 40: 40, 41: 41, 92: 92 };
+        if (map[n] !== void 0) out2.push(map[n]);
+        else if (n >= 48 && n <= 55) {
+          let oct = n - 48;
+          for (let i2 = 0; i2 < 2 && b[this.pos] >= 48 && b[this.pos] <= 55; i2++) oct = oct * 8 + (b[this.pos++] - 48);
+          out2.push(oct & 255);
+        } else if (n === 13) {
+          if (b[this.pos] === 10) this.pos++;
+        } else if (n !== 10) out2.push(n);
+        continue;
+      }
+      if (c2 === 40) depth++;
+      else if (c2 === 41 && --depth === 0) return new PdfStr(Buffer.from(out2));
+      out2.push(c2);
+    }
+    throw new PdfUnreadable("truncated", "unterminated string");
+  }
+  hex() {
+    const b = this.buf;
+    const end = b.indexOf(62, this.pos);
+    if (end < 0) throw new PdfUnreadable("truncated", "unterminated hex string");
+    let digits = b.toString("latin1", this.pos + 1, end).replace(/[^0-9a-f]/gi, "");
+    if (digits.length % 2) digits += "0";
+    this.pos = end + 1;
+    return new PdfStr(Buffer.from(digits, "hex"));
+  }
+  dict(depth) {
+    const b = this.buf;
+    this.pos += 2;
+    const d = /* @__PURE__ */ new Map();
+    for (; ; ) {
+      this.skipWs();
+      if (this.pos >= b.length) throw new PdfUnreadable("truncated", "unterminated dictionary");
+      if (b[this.pos] === 62 && b[this.pos + 1] === 62) {
+        this.pos += 2;
+        break;
+      }
+      const key2 = this.parse(depth + 1);
+      if (!(key2 instanceof PdfName)) continue;
+      d.set(key2.v, this.parse(depth + 1));
+    }
+    return d;
+  }
+};
+var MAX_DECODED_TOTAL = 256 * 1024 * 1024;
+var MAX_STREAM_DECODED = 64 * 1024 * 1024;
+var tooLarge = () => new PdfUnreadable("too-large", `a decoded stream exceeds ${MAX_STREAM_DECODED} bytes`);
+var ByteSink = class {
+  buf = Buffer.alloc(4096);
+  length = 0;
+  ensure(n) {
+    if (this.length + n > MAX_STREAM_DECODED) throw tooLarge();
+    if (this.length + n <= this.buf.length) return;
+    let size = this.buf.length * 2;
+    while (size < this.length + n) size *= 2;
+    const next = Buffer.alloc(Math.min(size, MAX_STREAM_DECODED));
+    this.buf.copy(next, 0, 0, this.length);
+    this.buf = next;
+  }
+  push(b) {
+    this.ensure(1);
+    this.buf[this.length++] = b;
+  }
+  fill(b, n) {
+    this.ensure(n);
+    this.buf.fill(b, this.length, this.length + n);
+    this.length += n;
+  }
+  append(bytes) {
+    this.ensure(bytes.length);
+    for (let i2 = 0; i2 < bytes.length; i2++) this.buf[this.length++] = bytes[i2];
+  }
+  done() {
+    return this.buf.subarray(0, this.length);
+  }
+};
+function inflate(data2) {
+  const attempt = (opts) => {
+    try {
+      return inflateSync2(data2, { ...opts, maxOutputLength: MAX_STREAM_DECODED });
+    } catch (e) {
+      if (e instanceof RangeError || e.code === "ERR_BUFFER_TOO_LARGE") throw tooLarge();
+      throw e;
+    }
+  };
+  try {
+    return attempt({});
+  } catch (e) {
+    if (e instanceof PdfUnreadable) throw e;
+    try {
+      return attempt({ finishFlush: zlibConstants.Z_SYNC_FLUSH });
+    } catch (e2) {
+      if (e2 instanceof PdfUnreadable) throw e2;
+      throw new PdfUnreadable("malformed", "a FlateDecode stream could not be inflated");
+    }
+  }
+}
+function unpredict(data2, parms) {
+  const predictor = num2(parms?.get("Predictor")) ?? 1;
+  if (predictor < 10) {
+    if (predictor === 1) return data2;
+    throw new PdfUnreadable("malformed", `unsupported predictor ${predictor}`);
+  }
+  const colors = num2(parms?.get("Colors")) ?? 1;
+  const bpc = num2(parms?.get("BitsPerComponent")) ?? 8;
+  const columns = num2(parms?.get("Columns")) ?? 1;
+  const bpp = Math.max(1, Math.ceil(colors * bpc / 8));
+  const rowLen = Math.ceil(colors * bpc * columns / 8);
+  const out2 = Buffer.alloc(Math.floor(data2.length / (rowLen + 1)) * rowLen);
+  let prev = Buffer.alloc(rowLen);
+  let o = 0;
+  for (let i2 = 0; i2 + rowLen < data2.length + 1 && o < out2.length; i2 += rowLen + 1) {
+    const type = data2[i2];
+    const row = Buffer.from(data2.subarray(i2 + 1, i2 + 1 + rowLen));
+    for (let x = 0; x < rowLen; x++) {
+      const left = x >= bpp ? row[x - bpp] : 0;
+      const up = prev[x];
+      const ul = x >= bpp ? prev[x - bpp] : 0;
+      let v = row[x];
+      if (type === 1) v += left;
+      else if (type === 2) v += up;
+      else if (type === 3) v += left + up >> 1;
+      else if (type === 4) {
+        const p = left + up - ul;
+        const pa = Math.abs(p - left);
+        const pb = Math.abs(p - up);
+        const pc = Math.abs(p - ul);
+        v += pa <= pb && pa <= pc ? left : pb <= pc ? up : ul;
+      }
+      row[x] = v & 255;
+    }
+    row.copy(out2, o);
+    o += rowLen;
+    prev = row;
+  }
+  return out2.subarray(0, o);
+}
+function asciiHex(data2) {
+  let s = data2.toString("latin1");
+  const end = s.indexOf(">");
+  if (end >= 0) s = s.slice(0, end);
+  s = s.replace(/[^0-9a-f]/gi, "");
+  if (s.length % 2) s += "0";
+  return Buffer.from(s, "hex");
+}
+function ascii85(data2) {
+  let s = data2.toString("latin1").replace(/\s+/g, "");
+  if (s.startsWith("<~")) s = s.slice(2);
+  const end = s.indexOf("~>");
+  if (end >= 0) s = s.slice(0, end);
+  const out2 = [];
+  let group = [];
+  const flush = (n) => {
+    let v = 0;
+    for (const c2 of group) v = v * 85 + c2;
+    const bytes = [v >>> 24 & 255, v >>> 16 & 255, v >>> 8 & 255, v & 255];
+    out2.push(...bytes.slice(0, n));
+  };
+  for (const ch of s) {
+    if (ch === "z" && group.length === 0) {
+      out2.push(0, 0, 0, 0);
+      continue;
+    }
+    const c2 = ch.charCodeAt(0) - 33;
+    if (c2 < 0 || c2 > 84) continue;
+    group.push(c2);
+    if (group.length === 5) {
+      flush(4);
+      group = [];
+    }
+  }
+  if (group.length) {
+    const n = group.length - 1;
+    while (group.length < 5) group.push(84);
+    flush(n);
+  }
+  return Buffer.from(out2);
+}
+function lzw(data2, earlyChange = 1) {
+  const out2 = new ByteSink();
+  let dict = [];
+  const reset = () => {
+    dict = [];
+    for (let i2 = 0; i2 < 256; i2++) dict.push([i2]);
+    dict.push([], []);
+  };
+  reset();
+  let width = 9;
+  let bitBuf = 0;
+  let bitCount = 0;
+  let prev = null;
+  for (const byte of data2) {
+    bitBuf = bitBuf << 8 | byte;
+    bitCount += 8;
+    while (bitCount >= width) {
+      const code2 = bitBuf >>> bitCount - width & (1 << width) - 1;
+      bitCount -= width;
+      bitBuf &= (1 << bitCount) - 1;
+      if (code2 === 256) {
+        reset();
+        width = 9;
+        prev = null;
+        continue;
+      }
+      if (code2 === 257) return out2.done();
+      let entry2;
+      if (code2 < dict.length && dict[code2].length) entry2 = dict[code2];
+      else if (prev) entry2 = [...prev, prev[0]];
+      else throw new PdfUnreadable("malformed", "corrupt LZW stream");
+      out2.append(entry2);
+      if (prev && dict.length < 4096) dict.push([...prev, entry2[0]]);
+      prev = entry2;
+      if (dict.length + earlyChange >= 1 << width && width < 12) width++;
+    }
+  }
+  return out2.done();
+}
+function runLength(data2) {
+  const out2 = new ByteSink();
+  for (let i2 = 0; i2 < data2.length; ) {
+    const n = data2[i2++];
+    if (n === 128) break;
+    if (n < 128) {
+      const end = Math.min(data2.length, i2 + n + 1);
+      out2.append(data2.subarray(i2, end));
+      i2 = end;
+    } else out2.fill(data2[i2++] ?? 0, 257 - n);
+  }
+  return out2.done();
+}
+var IMAGE_FILTERS = /* @__PURE__ */ new Set(["DCTDecode", "DCT", "JPXDecode", "CCITTFaxDecode", "CCF", "JBIG2Decode"]);
+function num2(v) {
+  return typeof v === "number" && Number.isFinite(v) ? v : void 0;
+}
+function nameOf2(v) {
+  return v instanceof PdfName ? v.v : void 0;
+}
+var PdfDocument = class {
+  xref = /* @__PURE__ */ new Map();
+  trailer = /* @__PURE__ */ new Map();
+  repaired = false;
+  xrefStream = false;
+  objectStreams = false;
+  cache = /* @__PURE__ */ new Map();
+  objStmCache = /* @__PURE__ */ new Map();
+  resolving = /* @__PURE__ */ new Set();
+  decodedTotal = 0;
+  text;
+  buf;
+  constructor(buf) {
+    this.buf = buf;
+    this.text = buf.toString("latin1");
+    try {
+      this.readXrefChain();
+      if (!isDict(this.get(this.trailer.get("Root")))) throw new PdfUnreadable("malformed", "the trailer's /Root does not resolve");
+    } catch (e) {
+      if (e instanceof PdfUnreadable && e.reason === "too-large") throw e;
+      this.repair();
+    }
+  }
+  // ---- xref ----------------------------------------------------------------------------------
+  readXrefChain() {
+    const tail = this.text.slice(Math.max(0, this.text.length - 4096));
+    const m = /startxref\s+(\d+)/g;
+    let last = null;
+    for (let r = m.exec(tail); r; r = m.exec(tail)) last = r;
+    if (!last) throw new PdfUnreadable("truncated", "no startxref");
+    let offset = Number(last[1]);
+    const seen = /* @__PURE__ */ new Set();
+    let first = true;
+    while (offset !== void 0 && !seen.has(offset)) {
+      seen.add(offset);
+      const trailer = this.readXrefSection(offset);
+      if (first) {
+        this.trailer = trailer;
+        first = false;
+      } else {
+        for (const [k, v] of trailer) if (!this.trailer.has(k)) this.trailer.set(k, v);
+      }
+      const stm = num2(trailer.get("XRefStm"));
+      if (stm !== void 0 && !seen.has(stm)) {
+        seen.add(stm);
+        this.readXrefSection(stm);
+      }
+      offset = num2(trailer.get("Prev"));
+    }
+  }
+  /** One xref section at `offset` — a table or a stream. Older entries never override newer
+   *  ones, so the chain is walked newest-first and `set` only fills gaps. */
+  readXrefSection(offset) {
+    if (offset < 0 || offset >= this.buf.length) throw new PdfUnreadable("malformed", "xref offset out of range");
+    const lx = new Lexer(this.buf, offset);
+    if (lx.peekToken() === "xref") {
+      lx.readToken();
+      for (; ; ) {
+        const tok = lx.peekToken();
+        if (tok === "trailer") {
+          lx.readToken();
+          const t3 = lx.parse();
+          if (!isDict(t3)) throw new PdfUnreadable("malformed", "trailer is not a dictionary");
+          return t3;
+        }
+        if (!/^\d+$/.test(tok)) throw new PdfUnreadable("malformed", "bad xref subsection");
+        const start2 = Number(lx.readToken());
+        const count = Number(lx.readToken());
+        for (let i2 = 0; i2 < count; i2++) {
+          const off = lx.readToken();
+          const gen = lx.readToken();
+          const kind = lx.readToken();
+          if (!/^\d+$/.test(off) || !/^\d+$/.test(gen) || kind !== "n" && kind !== "f") throw new PdfUnreadable("malformed", "bad xref entry");
+          if (kind === "n" && !this.xref.has(start2 + i2) && Number(off) > 0) this.xref.set(start2 + i2, { type: 1, a: Number(off), b: Number(gen) });
+        }
+      }
+    }
+    const obj = this.parseIndirectAt(offset);
+    if (!(obj instanceof PdfStream) || nameOf2(obj.dict.get("Type")) !== "XRef")
+      throw new PdfUnreadable("malformed", "startxref points at neither a table nor an xref stream");
+    this.xrefStream = true;
+    const data2 = this.decode(obj);
+    const w = obj.dict.get("W")?.map((x) => num2(x) ?? 0) ?? [];
+    if (w.length !== 3) throw new PdfUnreadable("malformed", "xref stream without /W");
+    const size = num2(obj.dict.get("Size")) ?? 0;
+    const index = (obj.dict.get("Index") ?? [0, size]).map((x) => num2(x) ?? 0);
+    const rowLen = w[0] + w[1] + w[2];
+    const field = (p2, n) => {
+      let v = 0;
+      for (let i2 = 0; i2 < n; i2++) v = v * 256 + data2[p2 + i2];
+      return v;
+    };
+    let p = 0;
+    for (let s = 0; s + 1 < index.length; s += 2) {
+      const start2 = index[s];
+      const count = index[s + 1];
+      for (let i2 = 0; i2 < count && p + rowLen <= data2.length; i2++, p += rowLen) {
+        const type = w[0] === 0 ? 1 : field(p, w[0]);
+        const a = field(p + w[0], w[1]);
+        const b = field(p + w[0] + w[1], w[2]);
+        if (this.xref.has(start2 + i2)) continue;
+        if (type === 1 && a > 0) this.xref.set(start2 + i2, { type: 1, a, b });
+        else if (type === 2) {
+          this.objectStreams = true;
+          this.xref.set(start2 + i2, { type: 2, a, b });
+        }
+      }
+    }
+    return obj.dict;
+  }
+  /** The xref lied or is missing: rebuild it from every `N G obj` header in the file (last
+   *  definition wins, as in an incremental update), and the trailer from the last `trailer`
+   *  dictionary or the last xref stream — the same recovery a viewer performs. */
+  repair() {
+    this.repaired = true;
+    this.xref.clear();
+    this.cache.clear();
+    const re = /(?:^|[\r\n\s])(\d{1,10})\s+(\d{1,5})\s+obj\b/g;
+    for (let m = re.exec(this.text); m; m = re.exec(this.text)) {
+      const at = m.index + m[0].indexOf(m[1]);
+      this.xref.set(Number(m[1]), { type: 1, a: at, b: Number(m[2]) });
+    }
+    const trailer = /* @__PURE__ */ new Map();
+    const tre = /trailer\s*<</g;
+    let lastTrailer = -1;
+    for (let m = tre.exec(this.text); m; m = tre.exec(this.text)) lastTrailer = m.index;
+    if (lastTrailer >= 0) {
+      try {
+        const lx = new Lexer(this.buf, lastTrailer + "trailer".length);
+        const t3 = lx.parse();
+        if (isDict(t3)) for (const [k, v] of t3) trailer.set(k, v);
+      } catch {
+      }
+    }
+    for (const [n, e] of [...this.xref]) {
+      if (e.type !== 1) continue;
+      let o;
+      try {
+        o = this.get(new PdfRef(n, e.b));
+      } catch {
+        continue;
+      }
+      if (!(o instanceof PdfStream)) continue;
+      const type = nameOf2(o.dict.get("Type"));
+      if (type === "XRef") {
+        for (const k of ["Root", "Info", "Encrypt", "ID"]) if (!trailer.has(k) && o.dict.has(k)) trailer.set(k, o.dict.get(k));
+      } else if (type === "ObjStm") {
+        try {
+          const stm = this.loadObjStm(n);
+          this.objectStreams = true;
+          let i2 = 0;
+          for (const objNum of stm.offsets.keys()) {
+            if (!this.xref.has(objNum)) this.xref.set(objNum, { type: 2, a: n, b: i2 });
+            i2++;
+          }
+        } catch {
+        }
+      }
+    }
+    if (!trailer.has("Root")) {
+      for (const [n, e] of this.xref) {
+        try {
+          const o = this.get(new PdfRef(n, e.type === 1 ? e.b : 0));
+          if (isDict(o) && nameOf2(o.get("Type")) === "Catalog") {
+            trailer.set("Root", new PdfRef(n, e.type === 1 ? e.b : 0));
+            break;
+          }
+        } catch {
+        }
+      }
+    }
+    this.trailer = trailer;
+    if (!isDict(this.get(trailer.get("Root")))) {
+      throw new PdfUnreadable(this.text.includes("%%EOF") ? "malformed" : "truncated", "no document catalog could be found");
+    }
+  }
+  // ---- objects -------------------------------------------------------------------------------
+  parseIndirectAt(offset) {
+    const lx = new Lexer(this.buf, offset);
+    const n = lx.readToken();
+    const g = lx.readToken();
+    if (!/^\d+$/.test(n) || !/^\d+$/.test(g) || lx.readToken() !== "obj") throw new PdfUnreadable("malformed", `no object at offset ${offset}`);
+    const val = lx.parse();
+    if (isDict(val) && lx.peekToken() === "stream") {
+      lx.readToken();
+      let start2 = lx.pos;
+      if (this.buf[start2] === 13 && this.buf[start2 + 1] === 10) start2 += 2;
+      else if (this.buf[start2] === 10 || this.buf[start2] === 13) start2 += 1;
+      const len = this.lengthOf(val.get("Length"));
+      let end = len !== void 0 ? start2 + len : -1;
+      if (end < 0 || end > this.buf.length || !/^\s*endstream/.test(this.text.slice(end, end + 32))) {
+        const found = this.text.indexOf("endstream", start2);
+        if (found < 0) throw new PdfUnreadable("truncated", "stream without endstream");
+        end = found;
+        if (this.buf[end - 1] === 10) end--;
+        if (this.buf[end - 1] === 13) end--;
+      }
+      return new PdfStream(val, start2, end);
+    }
+    return val;
+  }
+  lengthOf(v) {
+    if (typeof v === "number") return v;
+    if (v instanceof PdfRef) {
+      try {
+        return num2(this.get(v));
+      } catch {
+        return void 0;
+      }
+    }
+    return void 0;
+  }
+  loadObjStm(num_) {
+    const hit = this.objStmCache.get(num_);
+    if (hit) return hit;
+    const s = this.get(new PdfRef(num_, 0));
+    if (!(s instanceof PdfStream)) throw new PdfUnreadable("malformed", "object stream is not a stream");
+    const buf = this.decode(s);
+    const n = num2(s.dict.get("N")) ?? 0;
+    const first = num2(s.dict.get("First")) ?? 0;
+    const lx = new Lexer(buf, 0);
+    const offsets = /* @__PURE__ */ new Map();
+    for (let i2 = 0; i2 < n; i2++) {
+      const objNum = lx.readToken();
+      const off = lx.readToken();
+      if (!/^\d+$/.test(objNum) || !/^\d+$/.test(off)) break;
+      offsets.set(Number(objNum), first + Number(off));
+    }
+    const out2 = { buf, offsets };
+    this.objStmCache.set(num_, out2);
+    return out2;
+  }
+  /** Resolve a reference (or pass a direct value through). An object that cannot be read is
+   *  `null`, the PDF meaning of « absent » — callers decide what absence implies. */
+  get(v) {
+    if (!(v instanceof PdfRef)) return v ?? null;
+    const cached = this.cache.get(v.num);
+    if (cached !== void 0) return cached;
+    if (this.resolving.has(v.num)) return null;
+    const e = this.xref.get(v.num);
+    if (!e) return null;
+    this.resolving.add(v.num);
+    try {
+      let val;
+      if (e.type === 1) val = this.parseIndirectAt(e.a);
+      else {
+        const stm = this.loadObjStm(e.a);
+        const at = stm.offsets.get(v.num);
+        val = at === void 0 ? null : new Lexer(stm.buf, at).parse();
+      }
+      this.cache.set(v.num, val);
+      return val;
+    } catch (err2) {
+      if (err2 instanceof PdfUnreadable && err2.reason === "too-large") throw err2;
+      this.cache.set(v.num, null);
+      return null;
+    } finally {
+      this.resolving.delete(v.num);
+    }
+  }
+  dict(v) {
+    const r = this.get(v);
+    if (isDict(r)) return r;
+    if (r instanceof PdfStream) return r.dict;
+    return void 0;
+  }
+  array(v) {
+    const r = this.get(v);
+    return Array.isArray(r) ? r : void 0;
+  }
+  /** A stream's decoded bytes. Throws for an image codec or an unknown filter. */
+  decode(s) {
+    let data2 = this.buf.subarray(s.start, s.end);
+    const fv = this.get(s.dict.get("Filter"));
+    const filters = (Array.isArray(fv) ? fv : fv ? [fv] : []).map((f) => nameOf2(this.get(f)) ?? "");
+    const pv = this.get(s.dict.get("DecodeParms"));
+    const parmsList = Array.isArray(pv) ? pv.map((p) => this.dict(p)) : [this.dict(pv)];
+    filters.forEach((f, i2) => {
+      const parms = parmsList[i2] ?? (filters.length === 1 ? parmsList[0] : void 0);
+      if (f === "FlateDecode" || f === "Fl") data2 = unpredict(inflate(data2), parms);
+      else if (f === "LZWDecode" || f === "LZW") data2 = unpredict(lzw(data2, num2(parms?.get("EarlyChange")) ?? 1), parms);
+      else if (f === "ASCIIHexDecode" || f === "AHx") data2 = asciiHex(data2);
+      else if (f === "ASCII85Decode" || f === "A85") data2 = ascii85(data2);
+      else if (f === "RunLengthDecode" || f === "RL") data2 = runLength(data2);
+      else if (IMAGE_FILTERS.has(f)) throw new PdfUnreadable("malformed", `image filter ${f} is not decoded`);
+      else throw new PdfUnreadable("malformed", `unsupported filter ${f}`);
+    });
+    this.decodedTotal += data2.length;
+    if (this.decodedTotal > MAX_DECODED_TOTAL) throw new PdfUnreadable("too-large", "decoded content exceeds the reader's budget");
+    return data2;
+  }
+};
+function pdfText(v) {
+  if (!(v instanceof PdfStr)) return v instanceof PdfName ? v.v : void 0;
+  const b = v.bytes;
+  if (b[0] === 254 && b[1] === 255) {
+    const sw = Buffer.from(b.subarray(2));
+    if (sw.length % 2)
+      return sw.subarray(0, sw.length - 1).swap16().toString("utf16le");
+    return sw.swap16().toString("utf16le");
+  }
+  if (b[0] === 239 && b[1] === 187 && b[2] === 191) return b.subarray(3).toString("utf8");
+  return b.toString("latin1");
+}
+var MAX_PAGES_SCANNED = 500;
+var MAX_STRUCT_NODES = 5e4;
+var MAX_FORM_DEPTH = 4;
+var PDF_MAX_BYTES = 64 * 1024 * 1024;
+function unreadable(reason, detail, version) {
+  return {
+    readable: false,
+    unreadable: reason,
+    detail,
+    ...version ? { version } : {},
+    pages: 0,
+    marked: false,
+    structTree: false,
+    tagged: false,
+    displayDocTitle: false,
+    fonts: 0,
+    textOps: 0,
+    images: 0,
+    contentScanned: false,
+    xrefStream: false,
+    objectStreams: false,
+    repaired: false
+  };
+}
+function readPdf(bytes) {
+  const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (buf.length > PDF_MAX_BYTES) return unreadable("too-large", `file is ${buf.length} bytes; the reader stops at ${PDF_MAX_BYTES}`);
+  const head = buf.toString("latin1", 0, Math.min(buf.length, 1024));
+  const hv = /%PDF-(\d\.\d)/.exec(head);
+  if (!hv) return unreadable("not-pdf", "no %PDF- header in the first 1024 bytes");
+  let version = hv[1];
+  try {
+    const doc = new PdfDocument(buf);
+    if (doc.trailer.has("Encrypt") && doc.get(doc.trailer.get("Encrypt")) !== null) {
+      return unreadable("encrypted", "the file is encrypted; its strings and streams cannot be read without decrypting them", version);
+    }
+    const catalog = doc.dict(doc.trailer.get("Root"));
+    if (!catalog) return unreadable("malformed", "no document catalog", version);
+    const cv = nameOf2(doc.get(catalog.get("Version")));
+    if (cv && /^\d\.\d$/.test(cv) && cv > version) version = cv;
+    const markInfo = doc.dict(catalog.get("MarkInfo"));
+    const marked = doc.get(markInfo?.get("Marked")) === true;
+    const structRoot = doc.dict(catalog.get("StructTreeRoot"));
+    const lang = pdfText(doc.get(catalog.get("Lang")))?.trim() || void 0;
+    const prefs = doc.dict(catalog.get("ViewerPreferences"));
+    const displayDocTitle = doc.get(prefs?.get("DisplayDocTitle")) === true;
+    let title = pdfText(doc.get(doc.dict(doc.trailer.get("Info"))?.get("Title")))?.trim() || void 0;
+    let titleSource = title ? "info" : void 0;
+    if (!title) {
+      title = xmpTitle(doc, catalog);
+      if (title) titleSource = "xmp";
+    }
+    const pages = collectPages(doc, catalog);
+    const content = scanContent(doc, pages);
+    const structure = structRoot ? walkStructure(doc, structRoot) : void 0;
+    return {
+      readable: true,
+      version,
+      pages: Math.max(pages.length, num2(doc.dict(catalog.get("Pages"))?.get("Count")) ?? 0),
+      marked,
+      structTree: !!structRoot,
+      tagged: marked && !!structRoot,
+      ...lang ? { lang } : {},
+      ...title ? { title, titleSource } : {},
+      displayDocTitle,
+      fonts: content.fonts,
+      textOps: content.textOps,
+      images: content.images,
+      contentScanned: content.complete,
+      ...structure ? { structure } : {},
+      xrefStream: doc.xrefStream,
+      objectStreams: doc.objectStreams,
+      repaired: doc.repaired
+    };
+  } catch (e) {
+    if (e instanceof PdfUnreadable) return unreadable(e.reason, e.message, version);
+    return unreadable("malformed", e instanceof Error ? e.message : String(e), version);
+  }
+}
+function xmpTitle(doc, catalog) {
+  const md = doc.get(catalog.get("Metadata"));
+  if (!(md instanceof PdfStream)) return void 0;
+  let xml;
+  try {
+    xml = doc.decode(md).toString("utf8");
+  } catch {
+    return void 0;
+  }
+  const block = /<dc:title\b[^>]*>([\s\S]*?)<\/dc:title>/i.exec(xml)?.[1];
+  if (!block) return void 0;
+  const li = /<rdf:li\b[^>]*>([\s\S]*?)<\/rdf:li>/i.exec(block)?.[1] ?? block;
+  const text = li.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d))).replace(/&#x([0-9a-f]+);/gi, (_, h2) => String.fromCodePoint(Number.parseInt(h2, 16))).replace(/&amp;/g, "&").trim();
+  return text || void 0;
+}
+function collectPages(doc, catalog) {
+  const out2 = [];
+  const seen = /* @__PURE__ */ new Set();
+  const walk3 = (node, inherited, depth) => {
+    if (!node || seen.has(node) || depth > MAX_NESTING || out2.length >= MAX_PAGES_SCANNED * 4) return;
+    seen.add(node);
+    const resources = doc.dict(node.get("Resources")) ?? inherited;
+    const kids = doc.array(node.get("Kids"));
+    const type = nameOf2(doc.get(node.get("Type")));
+    if (type === "Page" || !kids && type !== "Pages") {
+      out2.push({ dict: node, resources });
+      return;
+    }
+    for (const k of kids ?? []) walk3(doc.dict(k), resources, depth + 1);
+  };
+  walk3(doc.dict(catalog.get("Pages")), void 0, 0);
+  return out2;
+}
+var TEXT_OPS2 = /* @__PURE__ */ new Set(["Tj", "TJ", "'", '"']);
+function scanContent(doc, pages) {
+  let fonts = 0;
+  let textOps = 0;
+  let images = 0;
+  let complete = pages.length > 0;
+  const fontSeen = /* @__PURE__ */ new Set();
+  const formSeen = /* @__PURE__ */ new Set();
+  const countFonts = (res) => {
+    const f = doc.dict(res?.get("Font"));
+    if (!f) return;
+    for (const v of f.values()) {
+      if (fontSeen.has(v)) continue;
+      fontSeen.add(v);
+      fonts++;
+    }
+  };
+  const scanStream = (data2, res, depth) => {
+    countFonts(res);
+    const xobjects = doc.dict(res?.get("XObject"));
+    const ops = contentOperators(data2);
+    textOps += ops.text;
+    images += ops.inlineImages;
+    for (const name2 of ops.xobjects) {
+      const xo = doc.get(xobjects?.get(name2));
+      if (!(xo instanceof PdfStream)) continue;
+      const sub = nameOf2(doc.get(xo.dict.get("Subtype")));
+      if (sub === "Image") images++;
+      else if (sub === "Form" && depth < MAX_FORM_DEPTH && !formSeen.has(xo)) {
+        formSeen.add(xo);
+        try {
+          scanStream(doc.decode(xo), doc.dict(xo.dict.get("Resources")) ?? res, depth + 1);
+        } catch {
+          complete = false;
+        }
+      }
+    }
+  };
+  for (const [i2, page] of pages.entries()) {
+    if (i2 >= MAX_PAGES_SCANNED) {
+      if (textOps === 0) complete = false;
+      break;
+    }
+    const cv = doc.get(page.dict.get("Contents"));
+    const streams = (Array.isArray(cv) ? cv.map((c2) => doc.get(c2)) : [cv]).filter((s) => s instanceof PdfStream);
+    const parts2 = [];
+    try {
+      for (const s of streams) parts2.push(doc.decode(s), Buffer.from("\n"));
+    } catch {
+      complete = false;
+      countFonts(page.resources);
+      continue;
+    }
+    scanStream(Buffer.concat(parts2), page.resources, 0);
+    if (textOps > 0) break;
+  }
+  return { fonts, textOps, images, complete };
+}
+function contentOperators(data2) {
+  let text = 0;
+  let inlineImages = 0;
+  const xobjects = [];
+  let lastName;
+  let i2 = 0;
+  const n = data2.length;
+  while (i2 < n) {
+    const c2 = data2[i2];
+    if (WS.has(c2)) {
+      i2++;
+      continue;
+    }
+    if (c2 === 37) {
+      while (i2 < n && data2[i2] !== 10 && data2[i2] !== 13) i2++;
+      continue;
+    }
+    if (c2 === 40) {
+      let depth = 0;
+      for (; i2 < n; i2++) {
+        const d = data2[i2];
+        if (d === 92) {
+          i2++;
+          continue;
+        }
+        if (d === 40) depth++;
+        else if (d === 41 && --depth === 0) {
+          i2++;
+          break;
+        }
+      }
+      continue;
+    }
+    if (c2 === 60) {
+      if (data2[i2 + 1] === 60) {
+        i2 += 2;
+        continue;
+      }
+      const e2 = data2.indexOf(62, i2);
+      i2 = e2 < 0 ? n : e2 + 1;
+      continue;
+    }
+    if (c2 === 62 || c2 === 91 || c2 === 93 || c2 === 123 || c2 === 125) {
+      i2++;
+      continue;
+    }
+    if (c2 === 47) {
+      let e2 = i2 + 1;
+      while (e2 < n && isRegular(data2[e2])) e2++;
+      lastName = data2.toString("latin1", i2 + 1, e2);
+      i2 = e2;
+      continue;
+    }
+    let e = i2;
+    while (e < n && isRegular(data2[e])) e++;
+    if (e === i2) e = i2 + 1;
+    const tok = data2.toString("latin1", i2, e);
+    i2 = e;
+    if (TEXT_OPS2.has(tok)) text++;
+    else if (tok === "Do" && lastName) xobjects.push(lastName);
+    else if (tok === "ID") {
+      inlineImages++;
+      i2++;
+      while (i2 < n) {
+        if (data2[i2] === 69 && data2[i2 + 1] === 73 && WS.has(data2[i2 - 1]) && (i2 + 2 >= n || WS.has(data2[i2 + 2]))) {
+          i2 += 2;
+          break;
+        }
+        i2++;
+      }
+    }
+  }
+  return { text, inlineImages, xobjects };
+}
+var HEADING = /^H[1-6]?$/;
+function walkStructure(doc, root) {
+  const roleMap = doc.dict(root.get("RoleMap"));
+  const mapRole = (s) => {
+    let cur = s;
+    for (let i2 = 0; i2 < 8; i2++) {
+      const next = nameOf2(doc.get(roleMap?.get(cur)));
+      if (!next || next === cur) break;
+      cur = next;
+    }
+    return cur;
+  };
+  const st = { elements: 0, headings: 0, tables: 0, tablesWithoutTh: 0, figures: 0, figuresWithoutAlt: 0, truncated: false };
+  const seen = /* @__PURE__ */ new Set();
+  const seenArrays = /* @__PURE__ */ new Set();
+  const tableHasTh = /* @__PURE__ */ new Map();
+  let nextTable = 0;
+  const stack = [{ v: root.get("K") ?? null, table: void 0 }];
+  while (stack.length) {
+    const { v, table } = stack.pop();
+    const r = doc.get(v);
+    if (Array.isArray(r)) {
+      if (seenArrays.has(r)) continue;
+      seenArrays.add(r);
+      if (stack.length + r.length > MAX_STRUCT_NODES * 4) {
+        st.truncated = true;
+        break;
+      }
+      for (const k2 of r) stack.push({ v: k2, table });
+      continue;
+    }
+    if (!isDict(r) || seen.has(r)) continue;
+    seen.add(r);
+    const s = nameOf2(doc.get(r.get("S")));
+    if (!s) continue;
+    if (++st.elements > MAX_STRUCT_NODES) {
+      st.truncated = true;
+      break;
+    }
+    const type = mapRole(s);
+    let inTable = table;
+    if (HEADING.test(type)) st.headings++;
+    else if (type === "Table") {
+      st.tables++;
+      inTable = nextTable++;
+      tableHasTh.set(inTable, false);
+    } else if (type === "TH" && table !== void 0) tableHasTh.set(table, true);
+    else if (type === "Figure") {
+      st.figures++;
+      const alt = pdfText(doc.get(r.get("Alt")))?.trim() || pdfText(doc.get(r.get("ActualText")))?.trim();
+      if (!alt) st.figuresWithoutAlt++;
+    }
+    const k = r.get("K");
+    if (k !== void 0) stack.push({ v: k, table: inTable });
+  }
+  st.tablesWithoutTh = [...tableHasTh.values()].filter((has2) => !has2).length;
+  return st;
+}
+
+// src/documents.ts
+var DOCUMENTS_DIR = ".ultra11y/documents";
+function isPdfPath(file) {
+  return /\.pdf$/i.test(file);
+}
+function readDocumentOrigin(pdfPath) {
+  const side = pdfPath.replace(/\.pdf$/i, ".json");
+  if (side === pdfPath || !existsSync16(side)) return void 0;
+  try {
+    const raw = JSON.parse(readFileSync17(side, "utf8"));
+    const url = typeof raw.url === "string" ? raw.url : void 0;
+    const pages = Array.isArray(raw.pages) ? raw.pages.filter((p) => typeof p === "string") : void 0;
+    return { ...url ? { url } : {}, ...pages?.length ? { pages: [...new Set(pages)].sort() } : {} };
+  } catch {
+    return void 0;
+  }
+}
+function pdfDocFromBytes(bytes, file, origin) {
+  const facts = readPdf(bytes);
+  const header4 = /%PDF-\d\.\d/.exec(bytes.toString("latin1", 0, Math.min(bytes.length, 1024)))?.[0] ?? "";
+  return {
+    file,
+    source: header4,
+    lossy: false,
+    kind: "pdf",
+    pdf: facts,
+    ...origin && (origin.url || origin.pages?.length) ? { document: origin } : {},
+    roots: [],
+    elements: [],
+    byId: /* @__PURE__ */ new Map(),
+    lineStarts: [0]
+  };
+}
+function loadPdfDoc(path, file = path) {
+  const size = statSync11(path).size;
+  if (size > PDF_MAX_BYTES) {
+    const doc = pdfDocFromBytes(Buffer.alloc(0), file, readDocumentOrigin(path));
+    if (doc.pdf) doc.pdf = { ...doc.pdf, unreadable: "too-large", detail: `file is ${size} bytes; the reader stops at ${PDF_MAX_BYTES}` };
+    return doc;
+  }
+  return pdfDocFromBytes(readFileSync17(path), file, readDocumentOrigin(path));
+}
+function pdfLinksIn(html, pageUrl) {
+  let page;
+  try {
+    page = new URL(pageUrl);
+  } catch {
+    return [];
+  }
+  const doc = parseHtml(html, "<page>");
+  const baseHref = elementsByTag(doc, "base").map((b) => attr(b, "href")).find((h2) => !!h2);
+  let base = page;
+  if (baseHref) {
+    try {
+      base = new URL(baseHref, page);
+    } catch {
+    }
+  }
+  const out2 = /* @__PURE__ */ new Set();
+  for (const a of elementsByTag(doc, "a")) {
+    const href = (attr(a, "href") ?? "").trim();
+    if (!href || href.startsWith("#") || /^(?:javascript|mailto|tel|data|blob):/i.test(href)) continue;
+    let u;
+    try {
+      u = new URL(href, base);
+    } catch {
+      continue;
+    }
+    const isPdf = /\.pdf$/i.test(u.pathname) || (attr(a, "type") ?? "").trim().toLowerCase() === "application/pdf";
+    if (!isPdf) continue;
+    if (u.protocol !== page.protocol) continue;
+    if ((u.protocol === "http:" || u.protocol === "https:") && u.host !== page.host) continue;
+    if (u.protocol !== "http:" && u.protocol !== "https:" && u.protocol !== "file:") continue;
+    u.hash = "";
+    out2.add(u.href);
+  }
+  return [...out2].sort();
+}
+async function fetchBounded(url, maxBytes, timeoutMs) {
+  const u = new URL(url);
+  if (u.protocol === "file:") {
+    const path = fileURLToPath3(u);
+    if (!existsSync16(path)) return { reason: "not found" };
+    const size = statSync11(path).size;
+    if (size > maxBytes) return { reason: `larger than ${maxBytes} bytes` };
+    return { bytes: readFileSync17(path) };
+  }
+  let res;
+  try {
+    res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(timeoutMs) });
+  } catch (e) {
+    return { reason: `request failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (!res.ok) return { reason: `HTTP ${res.status}` };
+  try {
+    if (new URL(res.url || url).host !== u.host) return { reason: `redirected off-origin to ${res.url}` };
+  } catch {
+  }
+  const declared = Number(res.headers.get("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > maxBytes) return { reason: `larger than ${maxBytes} bytes` };
+  const chunks = [];
+  let total = 0;
+  const reader = res.body?.getReader();
+  if (!reader) return { reason: "empty response" };
+  for (; ; ) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => void 0);
+      return { reason: `larger than ${maxBytes} bytes` };
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return { bytes: Buffer.concat(chunks) };
+}
+async function downloadLinkedDocuments(root, pages, opts = {}) {
+  const maxCount = opts.maxCount ?? 20;
+  const maxBytes = opts.maxBytes ?? 20 * 1024 * 1024;
+  const timeoutMs = opts.timeoutMs ?? 2e4;
+  const linked = /* @__PURE__ */ new Map();
+  for (const p of pages) {
+    for (const url of pdfLinksIn(p.html, p.url)) {
+      const set = linked.get(url) ?? /* @__PURE__ */ new Set();
+      set.add(p.id);
+      linked.set(url, set);
+    }
+  }
+  const dir = join28(root, DOCUMENTS_DIR);
+  const files = [];
+  const skipped = [];
+  let fetched = 0;
+  for (const [url, ids2] of linked) {
+    if (fetched >= maxCount) {
+      skipped.push({ url, reason: `document cap reached (${maxCount})` });
+      continue;
+    }
+    fetched++;
+    const r = await fetchBounded(url, maxBytes, timeoutMs);
+    if ("reason" in r) {
+      skipped.push({ url, reason: r.reason });
+      continue;
+    }
+    if (!r.bytes.toString("latin1", 0, Math.min(r.bytes.length, 1024)).includes("%PDF-")) {
+      skipped.push({ url, reason: "the response is not a PDF (a login page, an error page?)" });
+      continue;
+    }
+    const sha = createHash4("sha256").update(r.bytes).digest("hex");
+    const file = join28(dir, `${sha}.pdf`);
+    mkdirSync5(dirname10(file), { recursive: true });
+    writeFileSync6(file, r.bytes);
+    const prev = readDocumentOrigin(file);
+    const allPages = [.../* @__PURE__ */ new Set([...prev?.pages ?? [], ...ids2])].sort();
+    writeFileSync6(join28(dir, `${sha}.json`), `${JSON.stringify({ v: 1, url: prev?.url ?? url, pages: allPages }, null, 2)}
+`);
+    if (!files.includes(file)) files.push(file);
+  }
+  return { files, skipped };
+}
+async function downloadSnapshotDocuments(root, snapshotIds, opts = {}) {
+  const pages = [];
+  for (const id of snapshotIds) {
+    const dir = join28(root, PAGES_DIR, id);
+    try {
+      const meta2 = JSON.parse(readFileSync17(join28(dir, "meta.json"), "utf8"));
+      if (typeof meta2.url !== "string" || !meta2.url) continue;
+      pages.push({ id, url: meta2.url, html: readFileSync17(join28(dir, "dom.html"), "utf8") });
+    } catch {
+    }
+  }
+  return downloadLinkedDocuments(root, pages, opts);
+}
+
 // src/audit.ts
 var has = (d, ...tags) => d.elements.some((e) => tags.includes(e.tag));
 var APPLICABLE = {
@@ -54630,26 +56031,26 @@ var SCRIPT_CONSTRUCT_SCS = ["2.1.4", "2.2.1", "2.2.2", "2.5.1", "2.5.2", "2.5.4"
 var SCRIPT_READ_LIMIT = 2e6;
 function externalScripts(doc) {
   const readable = [];
-  let unreadable = 0;
-  if (doc.kind !== "html") return { readable, unreadable };
+  let unreadable2 = 0;
+  if (doc.kind !== "html") return { readable, unreadable: unreadable2 };
   for (const el of elementsByTag(doc, "script")) {
     const src = (attr(el, "src") ?? "").trim();
     if (!src) continue;
     const type = (attr(el, "type") ?? "").trim().toLowerCase();
     if (type && !/^(?:module|text\/javascript|application\/javascript)$/.test(type)) continue;
     if (/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(src) || src.startsWith("data:") || isSnapshotDom(doc.file)) {
-      unreadable++;
+      unreadable2++;
       continue;
     }
-    const path = resolvePath(dirname10(doc.file), src.split(/[?#]/)[0].replace(/^\//, ""));
+    const path = resolvePath(dirname11(doc.file), src.split(/[?#]/)[0].replace(/^\//, ""));
     try {
-      if (existsSync16(path) && statSync11(path).isFile() && statSync11(path).size <= SCRIPT_READ_LIMIT) readable.push(readFileSync17(path, "utf8"));
-      else unreadable++;
+      if (existsSync17(path) && statSync12(path).isFile() && statSync12(path).size <= SCRIPT_READ_LIMIT) readable.push(readFileSync18(path, "utf8"));
+      else unreadable2++;
     } catch {
-      unreadable++;
+      unreadable2++;
     }
   }
-  return { readable, unreadable };
+  return { readable, unreadable: unreadable2 };
 }
 var SUBJECT_PREDS = allSC().filter((c2) => c2.automatability !== "static" && SUBJECT_MATTER[c2.sc] !== void 0).map((c2) => [c2.sc, SUBJECT_MATTER[c2.sc]]);
 function newAccum() {
@@ -54659,6 +56060,8 @@ function newAccum() {
     uncertainStatic: /* @__PURE__ */ new Map(),
     allFindings: [],
     packFindings: [],
+    documents: [],
+    documentFindings: [],
     fileCount: 0,
     opaqueLibs: /* @__PURE__ */ new Set(),
     opaqueFiles: 0,
@@ -54680,6 +56083,10 @@ function primarySubtag(lang) {
   return m ? m[0].toLowerCase() : void 0;
 }
 function foldDoc(acc, doc, graph) {
+  if (doc.kind === "pdf") {
+    foldDocument(acc, doc);
+    return;
+  }
   if (!doc.capture?.page) {
     const id = snapshotPageId(doc.file);
     if (id) doc.capture = { v: 1, ...doc.capture ?? {}, page: id };
@@ -54795,6 +56202,44 @@ function foldDoc(acc, doc, graph) {
   if (subtag) acc.langCounts.set(subtag, (acc.langCounts.get(subtag) ?? 0) + 1);
   acc.fileCount++;
 }
+function foldDocument(acc, doc) {
+  const findings = runRules(doc);
+  const pages = doc.document?.pages ?? [];
+  for (const f of findings) {
+    if (pages.length) for (const page of pages) acc.documentFindings.push({ ...f, page });
+    else acc.documentFindings.push(f);
+  }
+  acc.documents.push(documentAudit(doc, new Set(findings.map((f) => f.ruleId))));
+  acc.subjectsSeen.add("downloadDocs");
+  for (const page of pages) {
+    const own = acc.pageSubjects.get(page) ?? /* @__PURE__ */ new Set();
+    own.add("downloadDocs");
+    acc.pageSubjects.set(page, own);
+  }
+  acc.fileCount++;
+}
+function documentAudit(doc, fired) {
+  const f = doc.pdf;
+  const text = !f?.readable || !f.contentScanned ? "unknown" : f.textOps > 0 ? "yes" : f.fonts > 0 ? "unknown" : "no";
+  return {
+    file: doc.file,
+    ...doc.document?.url ? { url: doc.document.url } : {},
+    ...doc.document?.pages?.length ? { pages: doc.document.pages } : {},
+    format: "pdf",
+    readable: f?.readable ?? false,
+    ...f?.unreadable ? { unreadable: f.unreadable } : {},
+    ...f?.detail ? { detail: f.detail } : {},
+    ...f?.version ? { version: f.version } : {},
+    pageCount: f?.pages ?? 0,
+    tagged: f?.tagged ?? false,
+    ...f?.lang ? { lang: f.lang } : {},
+    ...f?.title ? { title: f.title } : {},
+    displayDocTitle: f?.displayDocTitle ?? false,
+    text,
+    ...f?.structure ? { headings: f.structure.headings, tables: f.structure.tables, tablesWithoutTh: f.structure.tablesWithoutTh } : {},
+    checks: pdfCheckOutcomes(doc, fired)
+  };
+}
 function renderedProves(sc, acc) {
   return renderedProvesOn(sc, scopeCoverage(acc));
 }
@@ -54810,10 +56255,10 @@ function scopeCoverage(acc) {
 }
 function pageCoverageOf(acc) {
   const out2 = {};
-  const on = (m, page) => [...m.entries()].filter(([, pages]) => pages.has(page)).map(([k]) => k).sort();
+  const on2 = (m, page) => [...m.entries()].filter(([, pages]) => pages.has(page)).map(([k]) => k).sort();
   for (const id of [...acc.pageIds].sort()) {
-    const rules = on(acc.renderedRan, id);
-    const scs = on(acc.probedScs, id);
+    const rules = on2(acc.renderedRan, id);
+    const scs = on2(acc.probedScs, id);
     out2[id] = {
       // Its DOM was parsed and folded, so the whole static rule set ran against it.
       dom: true,
@@ -55035,13 +56480,15 @@ function finalize(acc, inputs, extra = {}) {
     criteria,
     findings: acc.allFindings,
     ...acc.packFindings.length ? { packFindings: acc.packFindings } : {},
+    ...acc.documents.length ? { documents: acc.documents } : {},
+    ...acc.documentFindings.length ? { documentFindings: acc.documentFindings } : {},
     residualRisks,
     conformancePct
   };
 }
 function hashContent(content, mode) {
   const norm6 = mode === "normalized" ? content.replace(/>\s+</g, "><").trim() : content;
-  return createHash4("sha1").update(norm6).digest("hex");
+  return createHash5("sha1").update(norm6).digest("hex");
 }
 function runAudit(opts) {
   const acc = newAccum();
@@ -55094,6 +56541,30 @@ function runAudit(opts) {
       break;
     }
     const file = files[i2];
+    if (isPdfPath(file)) {
+      let doc2;
+      try {
+        if (statSync12(file).size > PDF_MAX_BYTES) doc2 = loadPdfDoc(file);
+        else {
+          const bytes = readFileSync18(file);
+          if (dedupMode !== "off") {
+            const h2 = createHash5("sha1").update(bytes).digest("hex");
+            if (seen.has(h2)) {
+              duplicateFiles++;
+              continue;
+            }
+            seen.add(h2);
+          }
+          doc2 = pdfDocFromBytes(bytes, file, readDocumentOrigin(file));
+        }
+      } catch {
+        continue;
+      }
+      if (doc2.pdf && !doc2.pdf.readable)
+        opts.onWarn?.(`ultra11y: ${file}: PDF unreadable (${doc2.pdf.unreadable}) \u2014 reported as unreadable, never as conforming.`);
+      foldDoc(acc, doc2, graph);
+      continue;
+    }
     let content;
     const staged = useStaged ? stagedContent2?.get(file) : void 0;
     const reused = staged === void 0 ? carried?.get(file) : void 0;
@@ -55138,10 +56609,10 @@ function runAudit(opts) {
 
 // src/hook.ts
 import { execFileSync as execFileSync2 } from "child_process";
-import { createHash as createHash5 } from "crypto";
-import { existsSync as existsSync19, mkdirSync as mkdirSync5, writeFileSync as writeFileSync6 } from "fs";
+import { createHash as createHash6 } from "crypto";
+import { existsSync as existsSync20, mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
 import { tmpdir } from "os";
-import { join as join29 } from "path";
+import { join as join30 } from "path";
 
 // src/baseline.ts
 var RANK = { bloquant: 0, majeur: 1, mineur: 2 };
@@ -55185,11 +56656,11 @@ function baselineSummary(diff, lang = "fr") {
 }
 
 // src/config.ts
-import { existsSync as existsSync18, statSync as statSync12 } from "fs";
-import { join as join28, isAbsolute as isAbsolute2 } from "path";
+import { existsSync as existsSync19, statSync as statSync13 } from "fs";
+import { join as join29, isAbsolute as isAbsolute2 } from "path";
 
 // src/pack.ts
-import { existsSync as existsSync17 } from "fs";
+import { existsSync as existsSync18 } from "fs";
 
 // src/standards/pack.ts
 function localize(pack, s, lang) {
@@ -55368,7 +56839,7 @@ function checkGuidance(ds, pack) {
 function runPackCheck(packPath, guidancePath) {
   const errors = [];
   const warnings = [];
-  if (!existsSync17(packPath)) return { ok: false, errors: [`pack file not found: ${packPath}`], warnings };
+  if (!existsSync18(packPath)) return { ok: false, errors: [`pack file not found: ${packPath}`], warnings };
   let raw;
   try {
     raw = JSON.parse(readText(packPath));
@@ -55392,7 +56863,7 @@ function runPackCheck(packPath, guidancePath) {
     }
   }
   if (v.ok && v.pack && guidancePath) {
-    if (!existsSync17(guidancePath)) {
+    if (!existsSync18(guidancePath)) {
       errors.push(`guidance file not found: ${guidancePath}`);
     } else {
       let gRaw;
@@ -59314,8 +60785,8 @@ function getDataset(packKey) {
 // src/config.ts
 var CONFIG_FILE = ".ultra11yrc.json";
 function loadConfig(cwd) {
-  const p = join28(cwd, CONFIG_FILE);
-  if (!existsSync18(p)) return null;
+  const p = join29(cwd, CONFIG_FILE);
+  if (!existsSync19(p)) return null;
   let parsed;
   try {
     parsed = JSON.parse(readText(p));
@@ -59328,16 +60799,16 @@ function loadConfig(cwd) {
   return parsed;
 }
 function packPaths(path) {
-  if (!existsSync18(path)) return null;
-  if (statSync12(path).isDirectory()) {
-    const pack = join28(path, "pack.json");
-    if (!existsSync18(pack)) return null;
-    const glossary = join28(path, "glossary.json");
-    const guidance = join28(path, "guidance.json");
+  if (!existsSync19(path)) return null;
+  if (statSync13(path).isDirectory()) {
+    const pack = join29(path, "pack.json");
+    if (!existsSync19(pack)) return null;
+    const glossary = join29(path, "glossary.json");
+    const guidance = join29(path, "guidance.json");
     return {
       pack,
-      glossary: existsSync18(glossary) ? glossary : void 0,
-      guidance: existsSync18(guidance) ? guidance : void 0
+      glossary: existsSync19(glossary) ? glossary : void 0,
+      guidance: existsSync19(guidance) ? guidance : void 0
     };
   }
   return { pack: path };
@@ -59357,7 +60828,7 @@ function loadStandardsInto(cwd, packFlags, onWarn, override, opts) {
   }
   result.defaultStandard = config?.standard;
   for (const raw of [...config?.packs ?? [], ...packFlags]) {
-    const paths = packPaths(isAbsolute2(raw) ? raw : join28(cwd, raw));
+    const paths = packPaths(isAbsolute2(raw) ? raw : join29(cwd, raw));
     if (!paths) {
       result.errors.push(`--pack ${raw}: not found (expected a pack JSON file or a directory with pack.json)`);
       continue;
@@ -59387,7 +60858,7 @@ ${formatIssues(v.issues).join("\n")}`);
     result.loadedPacks.push(v.pack.key);
     if (paths.guidance) loadGuidanceFile(paths.guidance, result, onWarn);
   }
-  for (const g of config?.guidance ?? []) loadGuidanceFile(isAbsolute2(g) ? g : join28(cwd, g), result, onWarn);
+  for (const g of config?.guidance ?? []) loadGuidanceFile(isAbsolute2(g) ? g : join29(cwd, g), result, onWarn);
   for (const sm of config?.secondaryMappings ?? []) {
     if (!sm || typeof sm.standard !== "string" || typeof sm.ruleId !== "string" || typeof sm.criterion !== "string") {
       result.errors.push("secondaryMappings: each entry must be { standard, ruleId, criterion, note? }");
@@ -59402,7 +60873,7 @@ ${formatIssues(v.issues).join("\n")}`);
   return result;
 }
 function loadGuidanceFile(path, result, onWarn) {
-  if (!existsSync18(path)) {
+  if (!existsSync19(path)) {
     onWarn(`ultra11y: guidance ${path} not found \u2014 skipping.`);
     return;
   }
@@ -59505,18 +60976,18 @@ function resolveThreshold(cwd, env) {
   return "bloquant";
 }
 function loopKey(sessionId, intent, findings) {
-  const h2 = createHash5("sha256");
+  const h2 = createHash6("sha256");
   h2.update(`${sessionId}\0${intent}\0`);
   for (const id of findings.map(findingId).sort()) h2.update(`${id}\0`);
   return h2.digest("hex").slice(0, 32);
 }
 function firstSighting(key2) {
   try {
-    const dir = join29(tmpdir(), "ultra11y-hook");
-    mkdirSync5(dir, { recursive: true });
-    const marker = join29(dir, key2);
-    if (existsSync19(marker)) return false;
-    writeFileSync6(marker, "");
+    const dir = join30(tmpdir(), "ultra11y-hook");
+    mkdirSync6(dir, { recursive: true });
+    const marker = join30(dir, key2);
+    if (existsSync20(marker)) return false;
+    writeFileSync7(marker, "");
     return true;
   } catch {
     return false;
@@ -59598,12 +61069,12 @@ function decide(payload, deps = {}) {
 }
 
 // src/report.ts
-import { copyFileSync, existsSync as existsSync20, mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
-import { dirname as dirname11, join as join31, relative as relative3 } from "path";
+import { copyFileSync, existsSync as existsSync21, mkdirSync as mkdirSync8, writeFileSync as writeFileSync9 } from "fs";
+import { dirname as dirname12, join as join32, relative as relative3 } from "path";
 
 // src/prd.ts
-import { mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
-import { join as join30 } from "path";
+import { mkdirSync as mkdirSync7, writeFileSync as writeFileSync8 } from "fs";
+import { join as join31 } from "path";
 
 // src/standards/derive.ts
 function ruler(decided) {
@@ -59724,7 +61195,8 @@ function derivePackResults(audit2, packKey, pageId) {
       const inapplicable2 = status2 === INAPPLICABLE_STATUS && (scResults.length === 0 || scResults.every((r) => r.inapplicable));
       return { id: pc.id, theme: pc.theme, status: status2, findings: allFindings, scs: pc.wcag, ...inapplicable2 ? { inapplicable: true } : {} };
     }
-    const applicableFindings = allFindings.filter((f) => ruleMatches(f.ruleId, pc.appliesTo.ruleIds));
+    const docFindings = (audit2.documentFindings ?? []).filter((f) => ruleMatches(f.ruleId, pc.appliesTo.ruleIds)).map((f) => overrideFinding(f, overrides));
+    const applicableFindings = [...allFindings.filter((f) => ruleMatches(f.ruleId, pc.appliesTo.ruleIds)), ...docFindings];
     const contractFor = (ruleId) => pc.automation?.rules.find((rule) => ruleMatches(ruleId, [rule.id]));
     const candidateFindings = pc.automation ? applicableFindings.filter((f) => !f.advisory && contractFor(f.ruleId)?.effect === "candidate") : [];
     const findings = pc.automation ? applicableFindings.filter((f) => f.advisory || contractFor(f.ruleId)?.effect !== "candidate") : applicableFindings;
@@ -60355,7 +61827,9 @@ function pageView(result, page) {
     ...own ? { scope: { ...result.scope, subjectsSeen: own } } : {},
     criteria: page.criteria,
     findings: page.findings,
-    ...result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}
+    ...result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {},
+    // A document's findings are attributed to each page linking it (src/audit.ts foldDocument).
+    ...result.documentFindings ? { documentFindings: result.documentFindings.filter((f) => f.page === page.id) } : {}
   };
 }
 function pageGridModel(result, derived, standard, lang) {
@@ -61142,10 +62616,10 @@ function renderPrdDoc(r, lang = "en", standard = "wcag") {
   return out2.join("\n");
 }
 function writePrd(r, opts) {
-  mkdirSync6(opts.out, { recursive: true });
+  mkdirSync7(opts.out, { recursive: true });
   if (opts.format === "doc") {
-    const p2 = join30(opts.out, `prd-doc-${r.date}.md`);
-    writeFileSync7(p2, renderPrdDoc(r, opts.lang, opts.standard));
+    const p2 = join31(opts.out, `prd-doc-${r.date}.md`);
+    writeFileSync8(p2, renderPrdDoc(r, opts.lang, opts.standard));
     return [p2];
   }
   const remediation = opts.format === "remediation";
@@ -61154,14 +62628,14 @@ function writePrd(r, opts) {
     const files = remediation ? renderPerCriterion(r, opts.lang, opts.standard) : renderAuditorPerCriterion(r, opts.lang, opts.standard, { technical });
     const paths = [];
     for (const f of files) {
-      const p2 = join30(opts.out, f.name);
-      writeFileSync7(p2, f.content);
+      const p2 = join31(opts.out, f.name);
+      writeFileSync8(p2, f.content);
       paths.push(p2);
     }
     return paths;
   }
-  const p = join30(opts.out, `prd-${r.date}.md`);
-  writeFileSync7(p, remediation ? renderBacklog(r, opts.lang, opts.standard) : renderAuditorBacklog(r, opts.lang, opts.standard, { technical }));
+  const p = join31(opts.out, `prd-${r.date}.md`);
+  writeFileSync8(p, remediation ? renderBacklog(r, opts.lang, opts.standard) : renderAuditorBacklog(r, opts.lang, opts.standard, { technical }));
   return [p];
 }
 
@@ -62210,7 +63684,7 @@ function withReportAnnexes(md, reportPath, read) {
   let out2 = md;
   for (const name2 of names) {
     if (md.includes(annexMarker(name2))) continue;
-    const path = join31(dirname11(reportPath), name2);
+    const path = join32(dirname12(reportPath), name2);
     let annex;
     try {
       annex = read(path);
@@ -62294,6 +63768,49 @@ function renderReaderAdvisory(u, lang, resolver) {
   const suggestion = fixes.length ? ` \u2014 _${s.suggestion}_ : ${fixes.map(mdText).join(" ; ")}` : "";
   return `- \u{1F4A1} **${u.label}** \u2014 ${messages.map(mdText).join(" ; ")} (${where})${suggestion}`;
 }
+function renderDocuments(r, lang) {
+  const docs = r.documents ?? [];
+  if (!docs.length) return [];
+  const fr = lang === "fr";
+  const RULES17 = ["pdf-untagged", "pdf-lang-missing", "pdf-title-missing", "pdf-no-text", "pdf-structure-shallow"];
+  const head = fr ? {
+    "pdf-untagged": "Balis\xE9",
+    "pdf-lang-missing": "Langue",
+    "pdf-title-missing": "Titre affich\xE9",
+    "pdf-no-text": "Texte",
+    "pdf-structure-shallow": "Structure"
+  } : {
+    "pdf-untagged": "Tagged",
+    "pdf-lang-missing": "Language",
+    "pdf-title-missing": "Title shown",
+    "pdf-no-text": "Text",
+    "pdf-structure-shallow": "Structure"
+  };
+  const mark = (o) => o === "fail" ? fr ? "\u274C non" : "\u274C no" : o === "not-detected" ? fr ? "\u2014 rien relev\xE9" : "\u2014 none found" : fr ? "\xB7 non v\xE9rifi\xE9" : "\xB7 not checked";
+  const out2 = [
+    '<a id="documents"></a>',
+    `## \u{1F4CE} ${fr ? "Documents t\xE9l\xE9chargeables" : "Downloadable documents"}`,
+    "",
+    `> ${fr ? "Chaque document PDF lu, avec chacun de ses contr\xF4les. \xAB rien relev\xE9 \xBB ne veut pas dire conforme : ces contr\xF4les d\xE9tectent les d\xE9fauts grossiers (non balis\xE9, sans langue, sans titre, sans texte), jamais la conformit\xE9 PDF/UA, que seul un validateur (veraPDF, PAC) \xE9tablit. Le crit\xE8re reste \xE0 juger : une version alternative accessible peut exister." : "Every PDF document read, with each of its checks. \xAB none found \xBB does not mean conforming: these checks find the gross failures (untagged, no language, no title, no text), never PDF/UA conformance, which only a validator (veraPDF, PAC) establishes. The criterion remains to be judged: an accessible alternative version may exist."}`,
+    "",
+    `| ${fr ? "Document" : "Document"} | ${fr ? "Pages qui le lient" : "Linked from"} | ${RULES17.map((id) => head[id]).join(" | ")} |`,
+    `| --- | --- |${" --- |".repeat(RULES17.length)}`
+  ];
+  for (const d of docs) {
+    const name2 = mdText(d.url ?? d.file);
+    const label = d.title ? `${name2} \u2014 \xAB ${mdText(d.title.slice(0, 60))} \xBB` : name2;
+    const linked = d.pages?.length ? d.pages.map((p) => `\`${p}\``).join(", ") : "\u2014";
+    if (!d.readable) {
+      out2.push(
+        `| ${label} | ${linked} | ${fr ? `\u26A0\uFE0F illisible (${d.unreadable ?? "?"}) \u2014 \xE0 ouvrir et juger \xE0 la main` : `\u26A0\uFE0F unreadable (${d.unreadable ?? "?"}) \u2014 open and judge it by hand`} |${" |".repeat(RULES17.length - 1)}`
+      );
+      continue;
+    }
+    out2.push(`| ${label} | ${linked} | ${RULES17.map((id) => mark(d.checks[id])).join(" | ")} |`);
+  }
+  out2.push("");
+  return out2;
+}
 function render(r, lang, opts) {
   const s = L5[lang];
   const reportFile = reportFileName(opts.standard, r.date);
@@ -62338,6 +63855,7 @@ function render(r, lang, opts) {
     ...advisoryUnits.length ? [["recommendations", `\u{1F4A1} ${s.recTitle}`]] : [],
     ...derivedPages.length ? [["page-rates", `\u{1F4CB} ${s.pageRatesTitle}`]] : [],
     ...derivedPages.length ? [["page-findings", `\u{1F4C4} ${s.perPageTitle}`]] : [],
+    ...r.documents?.length ? [["documents", `\u{1F4CE} ${lang === "fr" ? "Documents t\xE9l\xE9chargeables" : "Downloadable documents"}`]] : [],
     ["conforming", s.cTitle],
     ["not-applicable", s.naTitle],
     ["to-assess", s.manualTitle]
@@ -62400,13 +63918,13 @@ function render(r, lang, opts) {
       out2.push(`- ${s.pageNcCriteria(failing.length)}${adv.length ? ` \xB7 ${adv.length} ${s.advCount}` : ""}`);
       const notes = pageScope.find((x) => x.id === pg.id)?.notes;
       if (notes) out2.push(`- _${notes}_`);
-      const shot = join31(PAGES_DIR, pg.id, "screen.png");
-      if (existsSync20(shot)) {
+      const shot = join32(PAGES_DIR, pg.id, "screen.png");
+      if (existsSync21(shot)) {
         let href = relative3(opts.outDir ?? ".", shot).split("\\").join("/");
         if (opts.outDir) {
           try {
-            mkdirSync7(join31(opts.outDir, "assets"), { recursive: true });
-            copyFileSync(shot, join31(opts.outDir, "assets", `${pg.id}.png`));
+            mkdirSync8(join32(opts.outDir, "assets"), { recursive: true });
+            copyFileSync(shot, join32(opts.outDir, "assets", `${pg.id}.png`));
             href = `./assets/${pg.id}.png`;
           } catch {
           }
@@ -62418,6 +63936,7 @@ function render(r, lang, opts) {
       out2.push("", "</details>", "");
     }
   }
+  out2.push(...renderDocuments(r, lang));
   out2.push('<a id="conforming"></a>', `## ${s.cTitle}`, "");
   const conform = rows.filter((x) => x.status === "C" && !x.inapplicable);
   const byEngine = conform.filter((x) => !isAdjudicated(x.decidedBy));
@@ -62673,11 +64192,11 @@ function renderPackReportDocuments(r, pack, lang = "en", outDir, cropFor) {
 }
 function writeReportFiles(r, opts) {
   const docs = isCore(opts.standard) ? renderReportDocuments(r, opts.lang, opts.out, opts.cropFor) : renderPackReportDocuments(r, loadPack(opts.standard), opts.lang, opts.out, opts.cropFor);
-  mkdirSync7(opts.out, { recursive: true });
-  const path = join31(opts.out, docs.reportFile);
-  const annexPath = join31(opts.out, docs.annexFile);
-  writeFileSync8(annexPath, docs.annex);
-  writeFileSync8(path, docs.report);
+  mkdirSync8(opts.out, { recursive: true });
+  const path = join32(opts.out, docs.reportFile);
+  const annexPath = join32(opts.out, docs.annexFile);
+  writeFileSync9(annexPath, docs.annex);
+  writeFileSync9(path, docs.report);
   return { path, annexPath };
 }
 
@@ -63915,12 +65434,12 @@ function renderCriteriaReference() {
 }
 
 // src/check.ts
-import { existsSync as existsSync23, readFileSync as readFileSync20, readdirSync as readdirSync5 } from "fs";
-import { dirname as dirname12, join as join33 } from "path";
+import { existsSync as existsSync24, readFileSync as readFileSync21, readdirSync as readdirSync6 } from "fs";
+import { dirname as dirname13, join as join34 } from "path";
 
 // src/verify.ts
-import { existsSync as existsSync21, mkdirSync as mkdirSync8, readFileSync as readFileSync18, writeFileSync as writeFileSync9 } from "fs";
-import { join as join32 } from "path";
+import { existsSync as existsSync22, mkdirSync as mkdirSync9, readFileSync as readFileSync19, writeFileSync as writeFileSync10 } from "fs";
+import { join as join33 } from "path";
 var VERIFY_MAX = 40;
 var plain = (s) => s.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
 function auditorCriterionLine(standard) {
@@ -64289,27 +65808,27 @@ function applyVerdicts(items, expected) {
 }
 var VERIFY_CONTEXT_FILE = "VERIFY.context.json";
 function writeVerifyContext(outDir, ctx) {
-  mkdirSync8(outDir, { recursive: true });
-  const p = join32(outDir, VERIFY_CONTEXT_FILE);
-  writeFileSync9(p, JSON.stringify(ctx, null, 2) + "\n");
+  mkdirSync9(outDir, { recursive: true });
+  const p = join33(outDir, VERIFY_CONTEXT_FILE);
+  writeFileSync10(p, JSON.stringify(ctx, null, 2) + "\n");
   return p;
 }
 function readVerifyContext(dir) {
   try {
-    const c2 = JSON.parse(readFileSync18(join32(dir, VERIFY_CONTEXT_FILE), "utf8"));
+    const c2 = JSON.parse(readFileSync19(join33(dir, VERIFY_CONTEXT_FILE), "utf8"));
     return c2 && c2.kind === "verify-context" && c2.conformities && c2.capped ? c2 : void 0;
   } catch {
     return void 0;
   }
 }
 function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") {
-  mkdirSync8(outDir, { recursive: true });
-  const todoPath = join32(outDir, "VERIFY.todo.json");
-  const mdPath = join32(outDir, "VERIFY.md");
+  mkdirSync9(outDir, { recursive: true });
+  const todoPath = join33(outDir, "VERIFY.todo.json");
+  const mdPath = join33(outDir, "VERIFY.md");
   let carried = items;
-  if (existsSync21(todoPath)) {
+  if (existsSync22(todoPath)) {
     try {
-      const previous = JSON.parse(readFileSync18(todoPath, "utf8"));
+      const previous = JSON.parse(readFileSync19(todoPath, "utf8"));
       const byClaim = new Map(previous.map((it) => [resumableItemKey(it), it]));
       const legacyConformities = new Map(
         previous.filter((it) => it.kind === "c" && !it.citations?.length).map((it) => [legacyConformityKey(it.criteriaId, it.file, it.line, it.selector, it.claim), it])
@@ -64333,13 +65852,13 @@ function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") 
     } catch {
     }
   }
-  writeFileSync9(todoPath, JSON.stringify(carried, null, 2) + "\n");
-  writeFileSync9(mdPath, formatWorklist(carried, semantic, standard, lang));
+  writeFileSync10(todoPath, JSON.stringify(carried, null, 2) + "\n");
+  writeFileSync10(mdPath, formatWorklist(carried, semantic, standard, lang));
   return { todoPath, mdPath, count: items.length };
 }
 
 // src/grounding.ts
-import { existsSync as existsSync22, readFileSync as readFileSync19 } from "fs";
+import { existsSync as existsSync23, readFileSync as readFileSync20 } from "fs";
 import { resolve as resolve10 } from "path";
 var WINDOW = 10;
 var norm2 = (s) => s.normalize("NFKC").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").replace(/>\s+/g, ">").replace(/\s+</g, "<").trim();
@@ -64360,10 +65879,10 @@ function selectorProbes(selector) {
 function groundFinding(g, opts = {}) {
   if (isUnresolvable(g.file)) return { ok: true, moved: false };
   const path = resolve10(opts.cwd ?? process.cwd(), g.file);
-  if (!existsSync22(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
+  if (!existsSync23(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
   let text;
   try {
-    text = readFileSync19(path, "utf8");
+    text = readFileSync20(path, "utf8");
   } catch {
     return { ok: false, moved: false, issue: `cited file unreadable: ${g.file}` };
   }
@@ -64584,11 +66103,11 @@ function checkSemantic(md, opts) {
   const standard = opts.standard ?? "wcag";
   const s = M[lang];
   const empty = { total: 0, grounded: 0, moved: 0, failed: 0 };
-  const artifact = opts.verdictsPath ?? join33(dirname12(opts.reportPath), "VERIFY.todo.json");
-  if (!existsSync23(artifact)) return { ok: false, issues: [s.semanticMissing(artifact)], ...empty };
+  const artifact = opts.verdictsPath ?? join34(dirname13(opts.reportPath), "VERIFY.todo.json");
+  if (!existsSync24(artifact)) return { ok: false, issues: [s.semanticMissing(artifact)], ...empty };
   let items;
   try {
-    const parsed = JSON.parse(readFileSync20(artifact, "utf8"));
+    const parsed = JSON.parse(readFileSync21(artifact, "utf8"));
     if (!Array.isArray(parsed)) throw new Error("not an array");
     items = parsed;
   } catch {
@@ -64654,10 +66173,10 @@ function sectionBody(md, n) {
 function checkSampleCaptured(root = ".", lang = "en") {
   const fr = lang === "fr";
   let declared = [];
-  const rc = join33(root, ".ultra11yrc.json");
+  const rc = join34(root, ".ultra11yrc.json");
   let raw;
   try {
-    raw = readFileSync20(rc, "utf8");
+    raw = readFileSync21(rc, "utf8");
   } catch {
     return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
   }
@@ -64679,7 +66198,7 @@ function checkSampleCaptured(root = ".", lang = "en") {
   let captured = /* @__PURE__ */ new Set();
   try {
     captured = new Set(
-      readdirSync5(join33(root, PAGES_DIR), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).filter((id) => existsSync23(join33(root, PAGES_DIR, id, "dom.html")))
+      readdirSync6(join34(root, PAGES_DIR), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).filter((id) => existsSync24(join34(root, PAGES_DIR, id, "dom.html")))
     );
   } catch {
   }
@@ -64825,8 +66344,8 @@ function openPerPage(audit2, standard, lang) {
 }
 
 // src/adjudicate.ts
-import { mkdirSync as mkdirSync9, statSync as statSync13, writeFileSync as writeFileSync10 } from "fs";
-import { isAbsolute as isAbsolute3, join as join34, relative as relative4, resolve as resolve11 } from "path";
+import { mkdirSync as mkdirSync10, statSync as statSync14, writeFileSync as writeFileSync11 } from "fs";
+import { isAbsolute as isAbsolute3, join as join35, relative as relative4, resolve as resolve11 } from "path";
 
 // src/data/adjudication.json
 var adjudication_default = {
@@ -65644,7 +67163,12 @@ function docsForAudit(audit2, cwd) {
   const docs = [];
   for (const f of files) {
     try {
-      const doc = parseSource(readText(cwd ? resolve11(cwd, f) : f), f);
+      const path = cwd ? resolve11(cwd, f) : f;
+      if (isPdfPath(f)) {
+        docs.push(loadPdfDoc(path, f));
+        continue;
+      }
+      const doc = parseSource(readText(path), f);
       attachSignals(doc);
       docs.push(doc);
     } catch {
@@ -65893,7 +67417,7 @@ function withinAuditInput(file, audit2, cwd) {
     if (input === "-" || input === "<stdin>") continue;
     const root = resolve11(cwd ?? process.cwd(), input);
     try {
-      if (statSync13(root).isDirectory()) {
+      if (statSync14(root).isDirectory()) {
         const rel2 = relative4(root, target);
         if (rel2 === "" || rel2 !== ".." && !rel2.startsWith("../") && !isAbsolute3(rel2)) return true;
       } else if (root === target) return true;
@@ -66724,10 +68248,10 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   return out2.join("\n");
 }
 function writeAdjudication(items, outDir, opts) {
-  mkdirSync9(outDir, { recursive: true });
+  mkdirSync10(outDir, { recursive: true });
   items = items.map(relativizeItem);
-  const todoPath = join34(outDir, "ADJUDICATE.todo.json");
-  const mdPath = join34(outDir, "ADJUDICATE.md");
+  const todoPath = join35(outDir, "ADJUDICATE.todo.json");
+  const mdPath = join35(outDir, "ADJUDICATE.md");
   const file = {
     tool: "ultra11y",
     kind: "adjudication",
@@ -66737,23 +68261,23 @@ function writeAdjudication(items, outDir, opts) {
     contract: adjudicationContract(),
     items
   };
-  writeFileSync10(todoPath, JSON.stringify(file, null, 2) + "\n");
-  writeFileSync10(
+  writeFileSync11(todoPath, JSON.stringify(file, null, 2) + "\n");
+  writeFileSync11(
     mdPath,
     formatAdjudication(items, opts.lang ?? "en", opts.standard, {
       ...opts.unrendered?.length ? { unrendered: opts.unrendered } : {},
       ...opts.web ? { web: true } : {}
     })
   );
-  const verdictsPath = join34(outDir, "ADJUDICATE.verdicts.json");
-  writeFileSync10(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
-  const itemsDir = join34(outDir, "adjudicate");
-  mkdirSync9(itemsDir, { recursive: true });
+  const verdictsPath = join35(outDir, "ADJUDICATE.verdicts.json");
+  writeFileSync11(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
+  const itemsDir = join35(outDir, "adjudicate");
+  mkdirSync10(itemsDir, { recursive: true });
   const unrendered = new Set(opts.unrendered ?? []);
   for (const it of items) {
     const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
-    writeFileSync10(
-      join34(itemsDir, `${it.criteriaId}.md`),
+    writeFileSync11(
+      join35(itemsDir, `${it.criteriaId}.md`),
       formatAdjudication([it], opts.lang ?? "en", opts.standard, {
         preamble: false,
         ...mine.length ? { unrendered: mine } : {},
@@ -66917,12 +68441,12 @@ function pruneRefuted(audit2, standard, items, lang = "en", untried = []) {
 }
 
 // src/ledger.ts
-import { createHash as createHash6 } from "crypto";
-import { existsSync as existsSync24, mkdirSync as mkdirSync10, readFileSync as readFileSync21, writeFileSync as writeFileSync11 } from "fs";
-import { dirname as dirname13, isAbsolute as isAbsolute4, join as join35, resolve as resolve12 } from "path";
+import { createHash as createHash7 } from "crypto";
+import { existsSync as existsSync25, mkdirSync as mkdirSync11, readFileSync as readFileSync23, writeFileSync as writeFileSync12 } from "fs";
+import { dirname as dirname14, isAbsolute as isAbsolute4, join as join36, resolve as resolve12 } from "path";
 var LEDGER_DIR = ".ultra11y/verdicts";
 function ledgerPath(standard, root = ".") {
-  return join35(root, LEDGER_DIR, `${standard}.json`);
+  return join36(root, LEDGER_DIR, `${standard}.json`);
 }
 var norm3 = (s) => s.replace(/\s+/g, " ").trim();
 var canonicalFile2 = (file) => {
@@ -66947,7 +68471,7 @@ var anchorKey2 = (e, root) => {
 };
 function evidenceFingerprint(evidence, root) {
   const keys = evidence.map((e) => anchorKey2(e, root)).sort();
-  return `sha256:${createHash6("sha256").update(`${keys.length}
+  return `sha256:${createHash7("sha256").update(`${keys.length}
 ${keys.join("\n")}`).digest("hex").slice(0, 32)}`;
 }
 function evidenceFilesOf(evidence, root) {
@@ -66958,7 +68482,7 @@ function evidenceAnchorsOf(evidence, root) {
   for (const e of evidence) out2.add(anchorHash(e, root));
   return [...out2].sort().join(",");
 }
-var anchorHash = (e, root) => createHash6("sha256").update(anchorKey2(e, root)).digest("hex").slice(0, 16);
+var anchorHash = (e, root) => createHash7("sha256").update(anchorKey2(e, root)).digest("hex").slice(0, 16);
 function verdictStillHolds(entry2, today2, opts) {
   const stale = (why) => ({ holds: false, why });
   const was = entry2.evidenceCount;
@@ -66993,7 +68517,7 @@ function verdictStillHolds(entry2, today2, opts) {
       `Ledger verdict is STALE \u2014 ${added.size} piece(s) of evidence are NEW since the verdict was recorded on ${entry2.date} (${was} item(s) then, ${today2.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`
     );
   }
-  const exists = opts.fileExists ?? ((f) => existsSync24(f));
+  const exists = opts.fileExists ?? ((f) => existsSync25(f));
   const contributing = /* @__PURE__ */ new Set([...evidenceFilesOf(today2), ...evidenceFilesOf(today2, root)]);
   const silent = (entry2.evidenceFiles ?? []).filter((f) => !contributing.has(f) && !contributing.has(identityFile(f, root)) && exists(f));
   if (silent.length > 0) {
@@ -67031,21 +68555,21 @@ function isLedger(v) {
   return !!o && typeof o === "object" && o.tool === "ultra11y" && o.kind === "verdict-ledger" && Array.isArray(o.entries);
 }
 function readLedger(path) {
-  if (!existsSync24(path)) return void 0;
+  if (!existsSync25(path)) return void 0;
   try {
-    const parsed = JSON.parse(readFileSync21(path, "utf8"));
+    const parsed = JSON.parse(readFileSync23(path, "utf8"));
     return isLedger(parsed) ? parsed : void 0;
   } catch {
     return void 0;
   }
 }
 function unreadableCaptures(audit2, cwd = ".") {
-  return (audit2.scope.pagesAudited ?? []).filter((id) => !existsSync24(join35(cwd, PAGES_DIR, id, "dom.html")));
+  return (audit2.scope.pagesAudited ?? []).filter((id) => !existsSync25(join36(cwd, PAGES_DIR, id, "dom.html")));
 }
 function writeLedger(path, ledger) {
-  mkdirSync10(dirname13(path), { recursive: true });
+  mkdirSync11(dirname14(path), { recursive: true });
   const sorted = { ...ledger, entries: [...ledger.entries].sort((a, b) => a.criteriaId.localeCompare(b.criteriaId, "en", { numeric: true })) };
-  writeFileSync11(path, `${JSON.stringify(sorted, null, 2)}
+  writeFileSync12(path, `${JSON.stringify(sorted, null, 2)}
 `);
 }
 function entriesFrom(adj, accepted, date, root) {
@@ -67135,12 +68659,12 @@ function replayLedger(audit2, ledger, opts = {}) {
   const root = opts.cwd ?? ".";
   const currentFiles = /* @__PURE__ */ new Map();
   for (const input of audit2.scope.inputs) currentFiles.set(identityFile(input, root), input);
-  const unreadable = (audit2.scope.pagesAudited ?? []).filter((id) => {
+  const unreadable2 = (audit2.scope.pagesAudited ?? []).filter((id) => {
     const canonical = `${PAGES_DIR}/${id}/dom.html`;
     const fromInputs = currentFiles.get(canonical);
-    return !(fromInputs && existsSync24(fromInputs)) && !existsSync24(join35(root, canonical));
+    return !(fromInputs && existsSync25(fromInputs)) && !existsSync25(join36(root, canonical));
   });
-  const harvestComplete = unreadable.length === 0;
+  const harvestComplete = unreadable2.length === 0;
   for (const e of ledger.entries) if (!open.has(e.criteriaId)) obsolete.push(e.criteriaId);
   for (const it of worklist) {
     const e = byId2.get(it.criteriaId);
@@ -67151,7 +68675,7 @@ function replayLedger(audit2, ledger, opts = {}) {
     }
     const held = verdictStillHolds(e, it.evidence, {
       harvestComplete,
-      fileExists: (f) => existsSync24(join35(root, f)),
+      fileExists: (f) => existsSync25(join36(root, f)),
       root
     });
     if (!held.holds) {
@@ -67184,8 +68708,8 @@ function replayLedger(audit2, ledger, opts = {}) {
 
 // src/agent-cli.ts
 import { spawn as spawn2 } from "child_process";
-import { existsSync as existsSync25 } from "fs";
-import { delimiter, join as join36 } from "path";
+import { existsSync as existsSync26 } from "fs";
+import { delimiter, join as join37 } from "path";
 
 // src/verdict-rules.ts
 var VERDICT_KINDS = `Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold, and its criterion goes back to \xAB to assess \xBB carrying the refusal):
@@ -67497,8 +69021,8 @@ function claudeBin() {
   if (pinned) return [pinned];
   for (const dir of (process.env.PATH ?? "").split(delimiter)) {
     if (!dir) continue;
-    const candidate = join36(dir, "claude");
-    if (existsSync25(candidate)) return [candidate];
+    const candidate = join37(dir, "claude");
+    if (existsSync26(candidate)) return [candidate];
   }
   return ["npx", "--yes", "@anthropic-ai/claude-code"];
 }
@@ -67656,9 +69180,9 @@ async function runCli2(argv, prompt, opts, extract) {
 
 // src/agent-codex.ts
 import { spawn as spawn3 } from "child_process";
-import { existsSync as existsSync26, mkdtempSync as mkdtempSync3, rmSync as rmSync4, writeFileSync as writeFileSync12 } from "fs";
+import { existsSync as existsSync27, mkdtempSync as mkdtempSync3, rmSync as rmSync4, writeFileSync as writeFileSync13 } from "fs";
 import { tmpdir as tmpdir2 } from "os";
-import { delimiter as delimiter2, dirname as dirname14, join as join37 } from "path";
+import { delimiter as delimiter2, dirname as dirname15, join as join38 } from "path";
 var MAX_ATTEMPTS3 = 4;
 var CODEX_EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh"];
 var DEFAULT_CODEX_TIMEOUT_MS = 10 * 6e4;
@@ -67694,8 +69218,8 @@ function codexBin() {
   if (pinned) return [pinned];
   for (const dir of (process.env.PATH ?? "").split(delimiter2)) {
     if (!dir) continue;
-    const candidate = join37(dir, "codex");
-    if (existsSync26(candidate)) return [candidate];
+    const candidate = join38(dir, "codex");
+    if (existsSync27(candidate)) return [candidate];
   }
   return ["npx", "--yes", "@openai/codex"];
 }
@@ -67722,7 +69246,7 @@ function codexArgv(opts, schemaPath) {
     "multi_agent",
     "--strict-config",
     "--cd",
-    dirname14(schemaPath),
+    dirname15(schemaPath),
     "--skip-git-repo-check",
     "--sandbox",
     "read-only",
@@ -67809,9 +69333,9 @@ function transient(message) {
 }
 async function runCodex(schema, prompt, opts, extract) {
   const run2 = opts.spawnImpl ?? realSpawn2;
-  const dir = mkdtempSync3(join37(tmpdir2(), "ultra11y-codex-"));
-  const schemaPath = join37(dir, "schema.json");
-  writeFileSync12(schemaPath, `${JSON.stringify(schema)}
+  const dir = mkdtempSync3(join38(tmpdir2(), "ultra11y-codex-"));
+  const schemaPath = join38(dir, "schema.json");
+  writeFileSync13(schemaPath, `${JSON.stringify(schema)}
 `, { mode: 384 });
   let lastError = "";
   try {
@@ -67864,10 +69388,10 @@ async function refuteBatchCodex(items, prompt, opts, lang = "en") {
 
 // src/scan.ts
 import { execFileSync as execFileSync6 } from "child_process";
-import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync13, existsSync as existsSync28, statSync as statSync14, readdirSync as readdirSync6, rmSync as rmSync5, readFileSync as readFileSync23 } from "fs";
+import { mkdtempSync as mkdtempSync4, writeFileSync as writeFileSync14, existsSync as existsSync29, statSync as statSync15, readdirSync as readdirSync7, rmSync as rmSync5, readFileSync as readFileSync24 } from "fs";
 import { tmpdir as tmpdir3 } from "os";
-import { join as join38, resolve as resolve13 } from "path";
-import { fileURLToPath as fileURLToPath3 } from "url";
+import { join as join39, resolve as resolve13 } from "path";
+import { fileURLToPath as fileURLToPath4 } from "url";
 
 // src/crawl.ts
 function parseSitemapUrls(xml) {
@@ -67972,7 +69496,7 @@ async function crawlUrls(start2, opts) {
 }
 
 // src/sample.ts
-import { existsSync as existsSync27 } from "fs";
+import { existsSync as existsSync28 } from "fs";
 function looksLikeTarget(u) {
   return /^https?:\/\//i.test(u) || /^(\.\.?[/\\]|[/\\])/.test(u) || /\.x?html?$/i.test(u);
 }
@@ -68008,7 +69532,7 @@ function validateSample(raw) {
     if (p.auth !== void 0 && typeof p.auth !== "boolean") err2(`sample.pages[${i2}].auth`, "auth must be a boolean");
     if (p.storageState !== void 0 && (typeof p.storageState !== "string" || p.storageState.trim() === "")) {
       err2(`sample.pages[${i2}].storageState`, "storageState must be a non-empty file path string");
-    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync27(p.storageState)) {
+    } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync28(p.storageState)) {
       warn(
         `sample.pages[${i2}].storageState`,
         `storageState path not found: "${p.storageState}" (resolved from the current directory) \u2014 the scan will not be able to load this session`
@@ -68207,11 +69731,11 @@ function imageExists(tag) {
 }
 var CTX_PREFIX = "ultra11y-dyn-";
 function buildImage(tag = IMAGE_TAG) {
-  const ctx = mkdtempSync4(join38(tmpdir3(), CTX_PREFIX));
+  const ctx = mkdtempSync4(join39(tmpdir3(), CTX_PREFIX));
   try {
-    writeFileSync13(join38(ctx, "runner.mjs"), RUNNER);
-    writeFileSync13(join38(ctx, "package.json"), PKG);
-    writeFileSync13(join38(ctx, "Dockerfile"), DOCKERFILE);
+    writeFileSync14(join39(ctx, "runner.mjs"), RUNNER);
+    writeFileSync14(join39(ctx, "package.json"), PKG);
+    writeFileSync14(join39(ctx, "Dockerfile"), DOCKERFILE);
     execFileSync6("docker", ["build", "-t", tag, ctx], { stdio: "inherit", timeout: 9e5 });
   } finally {
     rmSync5(ctx, { recursive: true, force: true });
@@ -68220,9 +69744,9 @@ function buildImage(tag = IMAGE_TAG) {
 function cleanTempContexts() {
   let removed = 0;
   const dir = tmpdir3();
-  for (const name2 of readdirSync6(dir)) {
+  for (const name2 of readdirSync7(dir)) {
     if (!name2.startsWith(CTX_PREFIX)) continue;
-    rmSync5(join38(dir, name2), { recursive: true, force: true });
+    rmSync5(join39(dir, name2), { recursive: true, force: true });
     removed++;
   }
   return removed;
@@ -68383,7 +69907,7 @@ function hostPageOf(url, target) {
   if (url === MOUNT) return target;
   if (url.startsWith("file://")) {
     try {
-      return fileURLToPath3(url);
+      return fileURLToPath4(url);
     } catch {
       return target;
     }
@@ -68448,7 +69972,7 @@ function toDynamicResult(out2, target, lang = "en", engine = "axe-core@playwrigh
 var DOCKER_TESTED_SCS = ["1.4.10"];
 function runScan(opts) {
   const isUrl3 = /^https?:\/\//i.test(opts.target);
-  if (!isUrl3 && !existsSync28(opts.target)) {
+  if (!isUrl3 && !existsSync29(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
   if (!dockerAvailable()) {
@@ -68456,7 +69980,7 @@ function runScan(opts) {
   }
   const tag = opts.tag ?? IMAGE_TAG;
   if (!imageExists(tag)) buildImage(tag);
-  const isFile = !isUrl3 && existsSync28(opts.target) && statSync14(opts.target).isFile();
+  const isFile = !isUrl3 && existsSync29(opts.target) && statSync15(opts.target).isFile();
   const out2 = runRunner(opts.target, isFile, tag, Boolean(opts.snapshotRoot));
   const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out2, opts.target) : void 0;
   return { ...toDynamicResult(out2, opts.target), testedScs: [...DOCKER_TESTED_SCS], ...id ? { snapshots: [id] } : {} };
@@ -68546,10 +70070,10 @@ async function runCrawlScan(opts) {
 var sevRank = { bloquant: 3, majeur: 2, mineur: 1 };
 function resolveHostAnchor(file, snippet2) {
   const s = snippet2?.trim();
-  if (!s || !existsSync28(file)) return null;
+  if (!s || !existsSync29(file)) return null;
   let source;
   try {
-    source = readFileSync23(file, "utf8");
+    source = readFileSync24(file, "utf8");
   } catch {
     return null;
   }
@@ -68725,6 +70249,25 @@ function mergeSnapshotAudit(base, snap) {
     }
     merged.packFindings = pack;
   }
+  if (snap.documents?.length) {
+    const docs = [...merged.documents ?? []];
+    const known = new Set(docs.map((d) => d.file));
+    for (const d of snap.documents) if (!known.has(d.file)) docs.push(d);
+    merged.documents = docs;
+  }
+  if (snap.documentFindings?.length) {
+    const docId = (f) => `${portableFindingId(f)}|${f.page ?? ""}|${f.msg?.id ?? ""}|${JSON.stringify(f.msg?.params ?? {})}`;
+    const list = [...merged.documentFindings ?? []];
+    const seenDoc = new Set(list.map(docId));
+    for (const finding of snap.documentFindings) {
+      const id = docId(finding);
+      if (!seenDoc.has(id)) {
+        seenDoc.add(id);
+        list.push(finding);
+      }
+    }
+    merged.documentFindings = list;
+  }
   for (const c2 of merged.criteria) {
     if (!c2.inapplicable) continue;
     const measured2 = snapById.get(c2.id);
@@ -68742,9 +70285,9 @@ function mergeSnapshotAudit(base, snap) {
 }
 
 // src/scan-local.ts
-import { existsSync as existsSync29, realpathSync as realpathSync3, statSync as statSync15 } from "fs";
+import { existsSync as existsSync30, realpathSync as realpathSync3, statSync as statSync16 } from "fs";
 import { createRequire } from "module";
-import { dirname as dirname15, join as join39, resolve as resolve14 } from "path";
+import { dirname as dirname16, join as join40, resolve as resolve14 } from "path";
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 function localTestedScs(interact) {
@@ -68793,7 +70336,7 @@ function localTierStatus(cwd, choice = {}) {
     const executable = choice.browserPath;
     let isFile = false;
     try {
-      isFile = statSync15(executable).isFile();
+      isFile = statSync16(executable).isFile();
     } catch {
       isFile = false;
     }
@@ -68809,9 +70352,9 @@ function localTierStatus(cwd, choice = {}) {
   try {
     const pw = requireRuntime(cwd, PW_SPEC);
     const bin = pw.chromium?.executablePath?.();
-    if (typeof bin === "string" && bin.length > 0 && !existsSync29(bin)) {
+    if (typeof bin === "string" && bin.length > 0 && !existsSync30(bin)) {
       const pw2 = resolvedPlaywright(cwd);
-      const cliJs = pw2 ? join39(dirname15(pw2.path), "cli.js") : void 0;
+      const cliJs = pw2 ? join40(dirname16(pw2.path), "cli.js") : void 0;
       return {
         ok: false,
         reason: `no browser binary at ${bin} for ${PW_SPEC}${pw2?.version ? `@${pw2.version}` : ""}${pw2 ? ` (${pw2.path})` : ""} \u2014 run \`${cliJs ? `node ${cliJs}` : "npx playwright"} install chromium\`, or pass --runtime local to fall back on an installed Google Chrome`
@@ -68903,7 +70446,7 @@ async function launchChromium(chromium, cwd = ".", warn = (m) => console.error(m
   const pw = resolvedPlaywright(cwd);
   const which = pw ? `${PW_SPEC}${pw.version ? `@${pw.version}` : ""} resolved at ${pw.path}` : `${PW_SPEC} (resolution path unknown)`;
   const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve14(cwd)) : false;
-  const cliJs = pw ? join39(dirname15(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
+  const cliJs = pw ? join40(dirname16(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
   throw new Error(
     `Could not launch Chromium: the browser for ${which} is not installed, and no installed Google Chrome was found either. Install the browser for THAT Playwright \u2014 \`node ${cliJs} install chromium\`${own ? " (this is ultra11y's own Playwright, not the audited project's)" : ""} \u2014 or install Google Chrome, or use --runtime docker. (${msg.split("\n")[0]})`
   );
@@ -69240,10 +70783,10 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
 }
 async function runScanLocal(opts) {
   const isUrl3 = /^https?:\/\//i.test(opts.target);
-  if (!isUrl3 && !existsSync29(opts.target)) {
+  if (!isUrl3 && !existsSync30(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
-  const isFile = !isUrl3 && statSync15(opts.target).isFile();
+  const isFile = !isUrl3 && statSync16(opts.target).isFile();
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
   const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
@@ -69586,7 +71129,7 @@ function diffSides(left, right) {
 }
 
 // src/fix.ts
-import { writeFileSync as writeFileSync14 } from "fs";
+import { writeFileSync as writeFileSync15 } from "fs";
 
 // src/fix/edits.ts
 function openTag(source, start2) {
@@ -69808,7 +71351,7 @@ function fixOne(file, source, opts, canWrite = true) {
     regression = after.length > findings.length || after.some((f) => !beforeKinds.has(f.ruleId));
     if (opts.write && !regression && file !== "<stdin>") {
       if (canWrite) {
-        writeFileSync14(file, output);
+        writeFileSync15(file, output);
         written = true;
       } else {
         skippedPartialStage = true;
@@ -69894,9 +71437,9 @@ function fixSummary(r, lang = "fr", write = false, standard = CORE2) {
 }
 
 // src/init.ts
-import { writeFileSync as writeFileSync15, mkdirSync as mkdirSync11, chmodSync as chmodSync2, realpathSync as realpathSync4 } from "fs";
+import { writeFileSync as writeFileSync16, mkdirSync as mkdirSync12, chmodSync as chmodSync2, realpathSync as realpathSync4 } from "fs";
 import { execFileSync as execFileSync7 } from "child_process";
-import { join as join40, relative as relative5, sep as sep4 } from "path";
+import { join as join41, relative as relative5, sep as sep4 } from "path";
 var EN_SEV = { bloquant: "blocking", majeur: "major", mineur: "minor" };
 function repoRoot() {
   try {
@@ -70014,24 +71557,24 @@ jobs:
 `;
 }
 function writeHook(root, enginePath, failOn, mode = "staged") {
-  const dir = join40(root, ".git", "hooks");
-  mkdirSync11(dir, { recursive: true });
-  const path = join40(dir, "pre-commit");
-  writeFileSync15(path, mode === "baseline" ? hookScript(enginePath, failOn) : stagedHookScript(enginePath, failOn));
+  const dir = join41(root, ".git", "hooks");
+  mkdirSync12(dir, { recursive: true });
+  const path = join41(dir, "pre-commit");
+  writeFileSync16(path, mode === "baseline" ? hookScript(enginePath, failOn) : stagedHookScript(enginePath, failOn));
   chmodSync2(path, 493);
   return path;
 }
 function writeCi(root, enginePath, failOn) {
-  const dir = join40(root, ".github", "workflows");
-  mkdirSync11(dir, { recursive: true });
-  const path = join40(dir, "a11y.yml");
-  writeFileSync15(path, ciWorkflow(enginePath, failOn));
+  const dir = join41(root, ".github", "workflows");
+  mkdirSync12(dir, { recursive: true });
+  const path = join41(dir, "a11y.yml");
+  writeFileSync16(path, ciWorkflow(enginePath, failOn));
   return path;
 }
 
 // src/install/json-edit.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync30, mkdirSync as mkdirSync12, readFileSync as readFileSync24, renameSync as renameSync3, rmSync as rmSync6, writeFileSync as writeFileSync16 } from "fs";
-import { dirname as dirname16 } from "path";
+import { copyFileSync as copyFileSync2, existsSync as existsSync31, mkdirSync as mkdirSync13, readFileSync as readFileSync25, renameSync as renameSync3, rmSync as rmSync6, writeFileSync as writeFileSync17 } from "fs";
+import { dirname as dirname17 } from "path";
 var SettingsParseError = class extends Error {
   constructor(path, cause) {
     super(`${path} is not valid JSON (${cause}) \u2014 fix or move it, then run install again. It has NOT been modified.`);
@@ -70044,16 +71587,16 @@ function stamp() {
   return (/* @__PURE__ */ new Date()).toISOString().replaceAll(/[:.]/g, "-");
 }
 function writeTextWithBackup(path, content, marker = "ultra11y") {
-  if (existsSync30(path) && readFileSync24(path, "utf8") === content) return { path, changed: false };
-  mkdirSync12(dirname16(path), { recursive: true });
+  if (existsSync31(path) && readFileSync25(path, "utf8") === content) return { path, changed: false };
+  mkdirSync13(dirname17(path), { recursive: true });
   let backup;
-  if (existsSync30(path)) {
+  if (existsSync31(path)) {
     backup = `${path}.${marker}-backup-${stamp()}`;
     copyFileSync2(path, backup);
   }
   const tmp = `${path}.${process.pid}.tmp`;
   try {
-    writeFileSync16(tmp, content, { mode: 420 });
+    writeFileSync17(tmp, content, { mode: 420 });
     renameSync3(tmp, path);
   } catch (e) {
     rmSync6(tmp, { force: true });
@@ -70063,8 +71606,8 @@ function writeTextWithBackup(path, content, marker = "ultra11y") {
 }
 function editJsonFile(path, mutate) {
   let root = {};
-  if (existsSync30(path)) {
-    const raw = readFileSync24(path, "utf8");
+  if (existsSync31(path)) {
+    const raw = readFileSync25(path, "utf8");
     if (raw.trim()) {
       let parsed;
       try {
@@ -70080,13 +71623,13 @@ function editJsonFile(path, mutate) {
   }
   const before = JSON.stringify(root);
   mutate(root);
-  if (JSON.stringify(root) === before && existsSync30(path)) return { path, changed: false };
+  if (JSON.stringify(root) === before && existsSync31(path)) return { path, changed: false };
   return writeTextWithBackup(path, `${JSON.stringify(root, null, 2)}
 `);
 }
 function readJsonSafe(path) {
   try {
-    const parsed = JSON.parse(readFileSync24(path, "utf8"));
+    const parsed = JSON.parse(readFileSync25(path, "utf8"));
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
   } catch {
     return null;
@@ -70127,7 +71670,7 @@ function claudeCodeWired(settingsPath) {
 }
 
 // src/install/text-edit.ts
-import { existsSync as existsSync31, readFileSync as readFileSync25, rmSync as rmSync7 } from "fs";
+import { existsSync as existsSync32, readFileSync as readFileSync26, rmSync as rmSync7 } from "fs";
 var BLOCK_BEGIN = "<!-- BEGIN ultra11y (managed by `ultra11y install --agents-md`; edit outside this block) -->";
 var BLOCK_END = "<!-- END ultra11y -->";
 var blockRe = () => new RegExp(`${escapeRe2(BLOCK_BEGIN)}[\\s\\S]*?${escapeRe2(BLOCK_END)}\\n?`);
@@ -70139,15 +71682,15 @@ function upsertManagedBlock(path, body3) {
 ${body3.trim()}
 ${BLOCK_END}
 `;
-  if (!existsSync31(path)) return writeTextWithBackup(path, block);
-  const current = readFileSync25(path, "utf8");
+  if (!existsSync32(path)) return writeTextWithBackup(path, block);
+  const current = readFileSync26(path, "utf8");
   if (blockRe().test(current)) return writeTextWithBackup(path, current.replace(blockRe(), block));
   const sep8 = current.endsWith("\n\n") ? "" : current.endsWith("\n") ? "\n" : "\n\n";
   return writeTextWithBackup(path, `${current}${sep8}${block}`);
 }
 function removeManagedBlock(path) {
-  if (!existsSync31(path)) return { path, changed: false };
-  const current = readFileSync25(path, "utf8");
+  if (!existsSync32(path)) return { path, changed: false };
+  const current = readFileSync26(path, "utf8");
   if (!blockRe().test(current)) return { path, changed: false };
   const rest = current.replace(blockRe(), "");
   if (rest.trim() === "") {
@@ -70157,13 +71700,13 @@ function removeManagedBlock(path) {
   return writeTextWithBackup(path, rest.replace(/\n+$/, "\n"));
 }
 function hasManagedBlock(path) {
-  return existsSync31(path) && blockRe().test(readFileSync25(path, "utf8"));
+  return existsSync32(path) && blockRe().test(readFileSync26(path, "utf8"));
 }
 
 // src/install/agents-md.ts
-import { join as join41 } from "path";
+import { join as join42 } from "path";
 function agentsMdPath(root) {
-  return join41(root, "AGENTS.md");
+  return join42(root, "AGENTS.md");
 }
 function agentsMdBlock(root) {
   const e = engineInvocation(root);
@@ -70218,25 +71761,25 @@ function agentsMdWired(root) {
 }
 
 // src/install/codex.ts
-import { existsSync as existsSync33, readFileSync as readFileSync27 } from "fs";
-import { join as join43 } from "path";
+import { existsSync as existsSync34, readFileSync as readFileSync28 } from "fs";
+import { join as join44 } from "path";
 
 // src/install/paths.ts
-import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync32, mkdirSync as mkdirSync13, readFileSync as readFileSync26, realpathSync as realpathSync5, statSync as statSync16 } from "fs";
+import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync33, mkdirSync as mkdirSync14, readFileSync as readFileSync27, realpathSync as realpathSync5, statSync as statSync17 } from "fs";
 import { homedir as homedir2 } from "os";
-import { dirname as dirname17, join as join42 } from "path";
+import { dirname as dirname18, join as join43 } from "path";
 function codexHome() {
-  return process.env.CODEX_HOME || join42(homedir2(), ".codex");
+  return process.env.CODEX_HOME || join43(homedir2(), ".codex");
 }
 function opencodeConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join42(xdg && xdg !== "" ? xdg : join42(homedir2(), ".config"), "opencode");
+  return join43(xdg && xdg !== "" ? xdg : join43(homedir2(), ".config"), "opencode");
 }
 function claudeSettingsPath(project, cwd = process.cwd()) {
-  return project ? join42(cwd, ".claude", "settings.json") : join42(homedir2(), ".claude", "settings.json");
+  return project ? join43(cwd, ".claude", "settings.json") : join43(homedir2(), ".claude", "settings.json");
 }
 function pinnedEnginePath() {
-  return join42(homedir2(), ".ultra11y", "bin", "ultra11y.mjs");
+  return join43(homedir2(), ".ultra11y", "bin", "ultra11y.mjs");
 }
 function installedCliCommand() {
   const override = process.env.ULTRA11Y_BIN;
@@ -70251,7 +71794,7 @@ function installedCliCommand() {
   if (source && !ephemeral) return `node ${JSON.stringify(source)}`;
   const pin = pinnedEnginePath();
   if (source) {
-    mkdirSync13(join42(pin, ".."), { recursive: true });
+    mkdirSync14(join43(pin, ".."), { recursive: true });
     copyFileSync3(source, pin);
   }
   return `node ${JSON.stringify(pin)}`;
@@ -70259,37 +71802,37 @@ function installedCliCommand() {
 function packageRoot() {
   let dir;
   try {
-    dir = dirname17(realpathSync5(process.argv[1] ?? ""));
+    dir = dirname18(realpathSync5(process.argv[1] ?? ""));
   } catch {
     return null;
   }
   for (let i2 = 0; i2 < 6 && dir && dir !== "/"; i2++) {
-    if (existsSync32(join42(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
-    dir = dirname17(dir);
+    if (existsSync33(join43(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
+    dir = dirname18(dir);
   }
   return null;
 }
 function bundledSkillsDir() {
   const root = packageRoot();
-  const p = root ? join42(root, "skills") : null;
-  return p && existsSync32(p) ? p : null;
+  const p = root ? join43(root, "skills") : null;
+  return p && existsSync33(p) ? p : null;
 }
 function bundledOpencodePlugin() {
   const root = packageRoot();
-  const p = root ? join42(root, ".opencode", "plugins", "ultra11y.js") : null;
-  return p && existsSync32(p) ? p : null;
+  const p = root ? join43(root, ".opencode", "plugins", "ultra11y.js") : null;
+  return p && existsSync33(p) ? p : null;
 }
 function copySkillsInto(source, dest) {
   const out2 = [];
   for (const name2 of ["ultra11y", "review-a11y"]) {
-    const from = join42(source, name2);
-    if (!existsSync32(from)) continue;
-    const to = join42(dest, name2);
-    const same = ["SKILL.md", join42("scripts", "ultra11y.mjs")].every((f) => {
-      const a = join42(from, f);
-      const b = join42(to, f);
+    const from = join43(source, name2);
+    if (!existsSync33(from)) continue;
+    const to = join43(dest, name2);
+    const same = ["SKILL.md", join43("scripts", "ultra11y.mjs")].every((f) => {
+      const a = join43(from, f);
+      const b = join43(to, f);
       try {
-        return existsSync32(b) && statSync16(a).size === statSync16(b).size && readFileSync26(a).equals(readFileSync26(b));
+        return existsSync33(b) && statSync17(a).size === statSync17(b).size && readFileSync27(a).equals(readFileSync27(b));
       } catch {
         return false;
       }
@@ -70339,7 +71882,7 @@ function featuresBody(content) {
 function installCodex({ codexDir, command, skillsSource }) {
   const reports = [];
   reports.push(
-    editJsonFile(join43(codexDir, "hooks.json"), (root) => {
+    editJsonFile(join44(codexDir, "hooks.json"), (root) => {
       const hooks = root.hooks ??= {};
       hooks.PreToolUse = [
         ...withoutOurs2(hooks.PreToolUse),
@@ -70347,11 +71890,11 @@ function installCodex({ codexDir, command, skillsSource }) {
       ];
     })
   );
-  const configPath = join43(codexDir, "config.toml");
-  const current = existsSync33(configPath) ? readFileSync27(configPath, "utf8") : "";
+  const configPath = join44(codexDir, "config.toml");
+  const current = existsSync34(configPath) ? readFileSync28(configPath, "utf8") : "";
   const edit = enableHooksFeature(current);
   if (edit.changed) reports.push(writeTextWithBackup(configPath, edit.content));
-  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join43(codexDir, "skills")));
+  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join44(codexDir, "skills")));
   return {
     reports,
     guidance: [
@@ -70366,8 +71909,8 @@ function installCodex({ codexDir, command, skillsSource }) {
 }
 function uninstallCodex({ codexDir }) {
   const reports = [];
-  const hooksPath = join43(codexDir, "hooks.json");
-  if (existsSync33(hooksPath)) {
+  const hooksPath = join44(codexDir, "hooks.json");
+  if (existsSync34(hooksPath)) {
     reports.push(
       editJsonFile(hooksPath, (root) => {
         const hooks = root.hooks;
@@ -70382,33 +71925,33 @@ function uninstallCodex({ codexDir }) {
   return { reports, guidance: ["codex: `[features] hooks = true` was left enabled \u2014 other hooks may depend on it."] };
 }
 function codexWired(codexDir) {
-  const root = readJsonSafe(join43(codexDir, "hooks.json"));
+  const root = readJsonSafe(join44(codexDir, "hooks.json"));
   const groups = root?.hooks?.PreToolUse;
   if (!Array.isArray(groups)) return 0;
   return groups.reduce((n, g) => n + (g.hooks ?? []).filter((h2) => String(h2.command ?? "").includes(CODEX_MARKER)).length, 0);
 }
 function codexHooksEnabled(codexDir) {
-  const p = join43(codexDir, "config.toml");
-  return existsSync33(p) && HOOKS_ON.test(featuresBody(readFileSync27(p, "utf8")));
+  const p = join44(codexDir, "config.toml");
+  return existsSync34(p) && HOOKS_ON.test(featuresBody(readFileSync28(p, "utf8")));
 }
 
 // src/install/opencode.ts
-import { existsSync as existsSync34, readFileSync as readFileSync28, rmSync as rmSync8 } from "fs";
-import { join as join44 } from "path";
+import { existsSync as existsSync35, readFileSync as readFileSync29, rmSync as rmSync8 } from "fs";
+import { join as join45 } from "path";
 var OPENCODE_MARKER = "ULTRA11Y_OPENCODE_PLUGIN";
 function pluginTarget(configDir) {
-  return join44(configDir, "plugin", "ultra11y.js");
+  return join45(configDir, "plugin", "ultra11y.js");
 }
 function installOpencode({ configDir, pluginSource, skillsSource, enginePath }) {
   const target = pluginTarget(configDir);
-  if (existsSync34(target) && !readFileSync28(target, "utf8").includes(OPENCODE_MARKER)) {
+  if (existsSync35(target) && !readFileSync29(target, "utf8").includes(OPENCODE_MARKER)) {
     throw new Error(`refusing to overwrite ${target}: it is not a file ultra11y wrote. Remove it manually if you want the plugin here.`);
   }
-  const reports = [writeTextWithBackup(target, readFileSync28(pluginSource, "utf8"))];
-  if (enginePath && existsSync34(enginePath)) {
-    reports.push(writeTextWithBackup(join44(configDir, "plugin", "ultra11y.mjs"), readFileSync28(enginePath, "utf8")));
+  const reports = [writeTextWithBackup(target, readFileSync29(pluginSource, "utf8"))];
+  if (enginePath && existsSync35(enginePath)) {
+    reports.push(writeTextWithBackup(join45(configDir, "plugin", "ultra11y.mjs"), readFileSync29(enginePath, "utf8")));
   }
-  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join44(configDir, "skills")));
+  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join45(configDir, "skills")));
   return {
     reports,
     guidance: [
@@ -70421,13 +71964,13 @@ function installOpencode({ configDir, pluginSource, skillsSource, enginePath }) 
 function uninstallOpencode({ configDir }) {
   const reports = [];
   const target = pluginTarget(configDir);
-  if (existsSync34(target) && readFileSync28(target, "utf8").includes(OPENCODE_MARKER)) {
+  if (existsSync35(target) && readFileSync29(target, "utf8").includes(OPENCODE_MARKER)) {
     rmSync8(target, { force: true });
-    rmSync8(join44(configDir, "plugin", "ultra11y.mjs"), { force: true });
+    rmSync8(join45(configDir, "plugin", "ultra11y.mjs"), { force: true });
     reports.push({ path: target, changed: true });
   }
-  const configPath = join44(configDir, "opencode.json");
-  if (existsSync34(configPath)) {
+  const configPath = join45(configDir, "opencode.json");
+  if (existsSync35(configPath)) {
     reports.push(
       editJsonFile(configPath, (root) => {
         if (!Array.isArray(root.plugin)) return;
@@ -70441,9 +71984,9 @@ function uninstallOpencode({ configDir }) {
 }
 function opencodeWired(configDir) {
   const target = pluginTarget(configDir);
-  if (existsSync34(target) && readFileSync28(target, "utf8").includes(OPENCODE_MARKER)) return true;
+  if (existsSync35(target) && readFileSync29(target, "utf8").includes(OPENCODE_MARKER)) return true;
   try {
-    const cfg = JSON.parse(readFileSync28(join44(configDir, "opencode.json"), "utf8"));
+    const cfg = JSON.parse(readFileSync29(join45(configDir, "opencode.json"), "utf8"));
     return Array.isArray(cfg.plugin) && cfg.plugin.some((p) => /^ultra11y(@|$)/.test(String(p)));
   } catch {
     return false;
@@ -70451,8 +71994,8 @@ function opencodeWired(configDir) {
 }
 
 // src/install/index.ts
-import { existsSync as existsSync35 } from "fs";
-import { join as join45 } from "path";
+import { existsSync as existsSync36 } from "fs";
+import { join as join46 } from "path";
 var ALL_TARGETS = ["claude-code", "codex", "opencode"];
 function parseTargets(flags2) {
   const picked = /* @__PURE__ */ new Set();
@@ -70491,7 +72034,7 @@ function installForTargets(opts) {
             const out3 = installCodex({ codexDir: codexHome(), command: cmd(), skillsSource: opts.skills === false ? null : bundledSkillsDir() });
             r.reports.push(...out3.reports);
             r.guidance.push(...out3.guidance);
-          } else r.reports.push({ path: join45(codexHome(), "hooks.json"), changed: false });
+          } else r.reports.push({ path: join46(codexHome(), "hooks.json"), changed: false });
           break;
         }
         case "opencode": {
@@ -70500,18 +72043,18 @@ function installForTargets(opts) {
             r.error = "opencode: this engine was not run from a package carrying .opencode/plugins/ultra11y.js \u2014 install ultra11y from npm and retry.";
             break;
           }
-          const configDir = opts.project === true ? join45(cwd, ".opencode") : opencodeConfigDir();
+          const configDir = opts.project === true ? join46(cwd, ".opencode") : opencodeConfigDir();
           if (!opts.dryRun) {
-            const engine = existsSync35(pinnedEnginePath()) ? pinnedEnginePath() : join45(packageRoot() ?? "", "scripts", "ultra11y.mjs");
+            const engine = existsSync36(pinnedEnginePath()) ? pinnedEnginePath() : join46(packageRoot() ?? "", "scripts", "ultra11y.mjs");
             const out3 = installOpencode({
               configDir,
               pluginSource: source,
               skillsSource: opts.skills === false ? null : bundledSkillsDir(),
-              enginePath: existsSync35(engine) ? engine : null
+              enginePath: existsSync36(engine) ? engine : null
             });
             r.reports.push(...out3.reports);
             r.guidance.push(...out3.guidance);
-          } else r.reports.push({ path: join45(configDir, "plugin", "ultra11y.js"), changed: false });
+          } else r.reports.push({ path: join46(configDir, "plugin", "ultra11y.js"), changed: false });
           break;
         }
         case "agents-md": {
@@ -70549,7 +72092,7 @@ function uninstallForTargets(opts) {
           break;
         }
         case "opencode": {
-          const out3 = uninstallOpencode({ configDir: opts.project === true ? join45(cwd, ".opencode") : opencodeConfigDir() });
+          const out3 = uninstallOpencode({ configDir: opts.project === true ? join46(cwd, ".opencode") : opencodeConfigDir() });
           r.reports.push(...out3.reports);
           r.guidance.push(...out3.guidance);
           break;
@@ -70570,18 +72113,18 @@ function statusReport(opts = {}) {
   const claudePath = claudeSettingsPath(opts.project === true, cwd);
   const root = projectRoot(cwd);
   const codexDir = codexHome();
-  const ocDir = opts.project === true ? join45(cwd, ".opencode") : opencodeConfigDir();
+  const ocDir = opts.project === true ? join46(cwd, ".opencode") : opencodeConfigDir();
   const codexOn = codexWired(codexDir) > 0;
   return [
     { target: "claude-code", wired: claudeCodeWired(claudePath) > 0, path: claudePath, note: "the plugin route wires this separately and does not show here" },
     {
       target: "codex",
       wired: codexOn,
-      path: join45(codexDir, "hooks.json"),
+      path: join46(codexDir, "hooks.json"),
       // A wired hook behind a disabled feature flag never fires and looks fine. Say so.
       note: codexOn && !codexHooksEnabled(codexDir) ? "WIRED BUT INERT: `[features] hooks = true` is not set in config.toml" : void 0
     },
-    { target: "opencode", wired: opencodeWired(ocDir), path: join45(ocDir, "plugin", "ultra11y.js") },
+    { target: "opencode", wired: opencodeWired(ocDir), path: join46(ocDir, "plugin", "ultra11y.js") },
     { target: "agents-md", wired: agentsMdWired(root), path: agentsMdPath(root) }
   ];
 }
@@ -71487,9 +73030,9 @@ function pagesComment(result, opts = {}) {
 }
 
 // src/evidence.ts
-import { createHash as createHash7 } from "crypto";
-import { existsSync as existsSync36, mkdirSync as mkdirSync14, readFileSync as readFileSync29, writeFileSync as writeFileSync17 } from "fs";
-import { join as join46 } from "path";
+import { createHash as createHash8 } from "crypto";
+import { existsSync as existsSync37, mkdirSync as mkdirSync15, readFileSync as readFileSync30, writeFileSync as writeFileSync18 } from "fs";
+import { join as join47 } from "path";
 var DEFAULT_GEOMETRY = { pad: 24, minWidth: 320, minHeight: 120, maxWidth: 960, maxHeight: 540 };
 var DEFAULT_CAPS = { perRule: 6, perPage: 12, total: 200 };
 var HALO = { r: 255, g: 255, b: 255, a: 0.92 };
@@ -71506,7 +73049,7 @@ function pageIdOfSnapshot(file) {
 }
 function readJson3(file) {
   try {
-    return JSON.parse(readFileSync29(file, "utf8"));
+    return JSON.parse(readFileSync30(file, "utf8"));
   } catch {
     return void 0;
   }
@@ -71522,21 +73065,21 @@ function resolveScale(img, viewport, boxes) {
 }
 function loadPageEvidence(root, pageId) {
   const dir = snapshotDir(root, pageId);
-  const domFile = join46(dir, "dom.html");
-  const shotFile = join46(dir, "screen.png");
-  if (!existsSync36(domFile)) return { skip: "no-snapshot" };
-  if (!existsSync36(shotFile)) return { skip: "no-screenshot" };
+  const domFile = join47(dir, "dom.html");
+  const shotFile = join47(dir, "screen.png");
+  if (!existsSync37(domFile)) return { skip: "no-snapshot" };
+  if (!existsSync37(shotFile)) return { skip: "no-screenshot" };
   let dom;
   let shot;
   try {
-    dom = readFileSync29(domFile, "utf8");
-    shot = readFileSync29(shotFile);
+    dom = readFileSync30(domFile, "utf8");
+    shot = readFileSync30(shotFile);
   } catch {
     return { skip: "no-snapshot" };
   }
   const img = decodePng(shot);
   if (!img) return { skip: "unreadable-image" };
-  const digest = readJson3(join46(dir, "boxes.json"));
+  const digest = readJson3(join47(dir, "boxes.json"));
   if (!digest) return { skip: "no-boxes" };
   const doc = parseHtml(dom, domFile);
   const boxes = alignedBoxes(dom, digest, doc);
@@ -71552,7 +73095,7 @@ function loadPageEvidence(root, pageId) {
   return { pageId, img, scale, viewport, ordinalOf, boxes, truncated: Boolean(digest.truncated) };
 }
 function metaOf(dir) {
-  const raw = readJson3(join46(dir, "meta.json"));
+  const raw = readJson3(join47(dir, "meta.json"));
   if (raw === void 0) return void 0;
   const v = validateSnapshotMeta(raw);
   return v.ok && v.meta ? v.meta : void 0;
@@ -71684,7 +73227,7 @@ function bump(t3, reason) {
   t3.skipped[reason] = (t3.skipped[reason] ?? 0) + 1;
 }
 function cropName(f) {
-  return `${createHash7("sha1").update(findingId(f)).digest("hex").slice(0, 12)}.png`;
+  return `${createHash8("sha1").update(findingId(f)).digest("hex").slice(0, 12)}.png`;
 }
 function writeEvidence(result, opts) {
   const root = opts.root ?? process.cwd();
@@ -71717,7 +73260,7 @@ function writeEvidence(result, opts) {
       }
       continue;
     }
-    const dir = join46(opts.outDir, "assets", pageId);
+    const dir = join47(opts.outDir, "assets", pageId);
     let wrote = false;
     const perRule = /* @__PURE__ */ new Map();
     const seen = /* @__PURE__ */ new Set();
@@ -71742,13 +73285,13 @@ function writeEvidence(result, opts) {
         continue;
       }
       const name2 = cropName(f);
-      const path = join46(dir, name2);
+      const path = join47(dir, name2);
       try {
         if (!wrote) {
-          mkdirSync14(dir, { recursive: true });
+          mkdirSync15(dir, { recursive: true });
           wrote = true;
         }
-        writeFileSync17(path, crop.png);
+        writeFileSync18(path, crop.png);
       } catch {
         manifest.skipped.set(id, "no-screenshot");
         bump(tally, "no-screenshot");
@@ -71780,8 +73323,8 @@ function writeEvidence(result, opts) {
 }
 
 // src/html-emit.ts
-import { mkdirSync as mkdirSync15, readFileSync as readFileSync30, statSync as statSync17, writeFileSync as writeFileSync18 } from "fs";
-import { join as join47 } from "path";
+import { mkdirSync as mkdirSync16, readFileSync as readFileSync31, statSync as statSync18, writeFileSync as writeFileSync19 } from "fs";
+import { join as join48 } from "path";
 
 // src/html.ts
 var MARK4 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
@@ -72084,13 +73627,13 @@ function headline(result, standard, lang) {
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
   const rate = core ? null : conformanceRate(reportTotals(groups));
   const pct2 = rate ? rate.pct : result.conformancePct;
-  const num3 = rate ? rate.validated : decided;
+  const num4 = rate ? rate.validated : decided;
   const den = rate ? rate.applicable : total;
   return {
     runs: [
       { text: result.date, mono: true },
       { text: ` \xB7 ${result.scope.files} ${t3.files} \xB7 ` },
-      { text: `${formatRate(den === 0 ? null : pct2, num3, den)}${agentRuled ? "*" : ""}`, strong: true },
+      { text: `${formatRate(den === 0 ? null : pct2, num4, den)}${agentRuled ? "*" : ""}`, strong: true },
       { text: ` ${core ? t3.rate : t3.conformityRate}` }
     ],
     agentRuled,
@@ -72504,14 +74047,14 @@ var T5 = {
 var mb = (n) => (n / (1024 * 1024)).toFixed(1);
 function inlineSize(path) {
   try {
-    return Math.ceil(statSync17(path).size / 3) * 4;
+    return Math.ceil(statSync18(path).size / 3) * 4;
   } catch {
     return 0;
   }
 }
 function dataUri(path) {
   try {
-    return `data:image/png;base64,${readFileSync30(path).toString("base64")}`;
+    return `data:image/png;base64,${readFileSync31(path).toString("base64")}`;
   } catch {
     return void 0;
   }
@@ -72550,7 +74093,7 @@ function writeHtml(result, opts) {
   const t3 = T5[lang];
   const budget = opts.inlineBudget ?? DEFAULT_INLINE_BUDGET;
   const stdKey = isCore(standard) ? "wcag" : loadPack(standard).key;
-  mkdirSync15(opts.outDir, { recursive: true });
+  mkdirSync16(opts.outDir, { recursive: true });
   const crops = [...opts.evidence?.crops.values() ?? []];
   const shots = [...opts.screenshots?.values() ?? []];
   const rung = pickRung(
@@ -72582,7 +74125,7 @@ function writeHtml(result, opts) {
     return drawn;
   };
   const flat = opts.layout === "pages";
-  const sheetDir = flat ? opts.outDir : join47(opts.outDir, "pages");
+  const sheetDir = flat ? opts.outDir : join48(opts.outDir, "pages");
   const up = flat ? "./" : "../";
   const compositeName = `ultra11y-${stdKey}-${result.date}.html`;
   const nav = flat ? [{ href: "./index.html", text: t3.pagesTitle }] : [
@@ -72601,26 +74144,26 @@ function writeHtml(result, opts) {
       nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` }))
     });
     if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
-    compositePath = join47(opts.outDir, compositeName);
-    writeFileSync18(compositePath, renderHtmlDocument(composite));
+    compositePath = join48(opts.outDir, compositeName);
+    writeFileSync19(compositePath, renderHtmlDocument(composite));
   }
   const fileCrops = cropLookup(opts.evidence, lang, (_p, href) => href.replace(/^\.\//, up));
   const indexNav = nav.map((n) => ({ ...n, current: n.href === "./index.html" }));
   const index = flat ? pagesIndexDoc(result, { standard, lang, nav: indexNav, sheetHref: (id) => `./page-${id}.html` }) : indexDoc(result, { standard, lang, nav: indexNav, links: nav.filter((n) => n.href !== "./index.html") });
-  const indexPath = join47(opts.outDir, "index.html");
-  writeFileSync18(indexPath, renderHtmlDocument(index));
+  const indexPath = join48(opts.outDir, "index.html");
+  writeFileSync19(indexPath, renderHtmlDocument(index));
   const sheets = [];
   if (opts.pages) {
     const derived = derivePages(result, pagesOf(result));
-    mkdirSync15(sheetDir, { recursive: true });
+    mkdirSync16(sheetDir, { recursive: true });
     const sheetNav = flat ? [{ href: "./index.html", text: t3.pagesTitle }] : [
       { href: `${up}index.html`, text: t3.indexTitle },
       { href: `${up}${compositeName}`, text: t3.docTitle },
       { href: "./index.html", text: t3.pagesTitle }
     ];
     if (!flat) {
-      writeFileSync18(
-        join47(sheetDir, "index.html"),
+      writeFileSync19(
+        join48(sheetDir, "index.html"),
         renderHtmlDocument(
           pagesIndexDoc(result, {
             standard,
@@ -72630,7 +74173,7 @@ function writeHtml(result, opts) {
           })
         )
       );
-      sheets.push(join47(sheetDir, "index.html"));
+      sheets.push(join48(sheetDir, "index.html"));
     }
     for (const p of derived) {
       const doc = pageDoc(result, p, {
@@ -72643,8 +74186,8 @@ function writeHtml(result, opts) {
         // beside the entry point, seen from wherever this sheet sits.
         ...opts.screenshots?.has(p.id) ? { screenshot: `${up}assets/${p.id}.png` } : {}
       });
-      const path = join47(sheetDir, `page-${p.id}.html`);
-      writeFileSync18(path, renderHtmlDocument(doc));
+      const path = join48(sheetDir, `page-${p.id}.html`);
+      writeFileSync19(path, renderHtmlDocument(doc));
       sheets.push(path);
     }
   }
@@ -72664,8 +74207,8 @@ function noticeRuns(notices) {
 
 // src/dev.ts
 import { createServer } from "http";
-import { mkdirSync as mkdirSync16, readFileSync as readFileSync31, writeFileSync as writeFileSync19 } from "fs";
-import { dirname as dirname18, join as join48 } from "path";
+import { mkdirSync as mkdirSync17, readFileSync as readFileSync32, writeFileSync as writeFileSync20 } from "fs";
+import { dirname as dirname19, join as join49 } from "path";
 var DEV_DEFAULT_PORT = 4111;
 function criterionLabel3(f, standard) {
   if (isCore(standard)) return `WCAG ${f.criteriaId}`;
@@ -72887,13 +74430,13 @@ function auditCollected(root, payload) {
     ...payload.css ? { css: payload.css } : {},
     ...shot ? { screenshotBase64: shot } : {}
   });
-  return { ok: true, result: runAudit({ inputs: [join48(dir, "dom.html")] }) };
+  return { ok: true, result: runAudit({ inputs: [join49(dir, "dom.html")] }) };
 }
 function projectPages(root) {
   const snaps = readSnapshots(root);
   if (!snaps.length) return { result: null, pages: [] };
   const scope = pageScopesFrom(snaps);
-  const result = runAudit({ inputs: [join48(root, ".ultra11y/pages")] });
+  const result = runAudit({ inputs: [join49(root, ".ultra11y/pages")] });
   result.scope.pages = scope;
   attributePages(result, scope);
   foldRecordedAdjudication(root, result);
@@ -72907,7 +74450,7 @@ function judgePages(result) {
 function foldRecordedAdjudication(root, fresh) {
   let prior;
   try {
-    prior = JSON.parse(readFileSync31(join48(root, "audits", "audit-latest.json"), "utf8"));
+    prior = JSON.parse(readFileSync32(join49(root, "audits", "audit-latest.json"), "utf8"));
   } catch {
     return;
   }
@@ -73023,9 +74566,9 @@ function startDevServer(opts) {
           });
           let auditPath;
           if (applied.ok) {
-            auditPath = join48(opts.root, "audits", "audit-latest.json");
-            mkdirSync16(dirname18(auditPath), { recursive: true });
-            writeFileSync19(auditPath, `${JSON.stringify(applied.audit, null, 2)}
+            auditPath = join49(opts.root, "audits", "audit-latest.json");
+            mkdirSync17(dirname19(auditPath), { recursive: true });
+            writeFileSync20(auditPath, `${JSON.stringify(applied.audit, null, 2)}
 `);
           }
           res.writeHead(200, { "content-type": "application/json" }).end(
@@ -73343,11 +74886,11 @@ function e2eSetupPlan(runners, paths, lang = "en") {
 }
 
 // src/orchestrate.ts
-import { existsSync as existsSync37, mkdirSync as mkdirSync17, readFileSync as readFileSync32, rmSync as rmSync9, writeFileSync as writeFileSync20 } from "fs";
-import { join as join50, resolve as resolve15 } from "path";
+import { existsSync as existsSync38, mkdirSync as mkdirSync18, readFileSync as readFileSync33, rmSync as rmSync9, writeFileSync as writeFileSync21 } from "fs";
+import { join as join51, resolve as resolve15 } from "path";
 
 // src/orchestrate-templates.ts
-import { join as join49 } from "path";
+import { join as join50 } from "path";
 var ONE_WRITER_FOOTER = `
 ## Return, don't write
 
@@ -73453,7 +74996,7 @@ function toBatches(ids2, batchSize) {
 }
 function phaseWorkflowScript(ph, runAbs, engineAbs, batchSize) {
   const spec = phaseSpec(ph.name);
-  const scriptPath = join49(runAbs, "orchestration", `${ph.name}.workflow.mjs`);
+  const scriptPath = join50(runAbs, "orchestration", `${ph.name}.workflow.mjs`);
   const meta2 = { name: `ultra11y-${ph.name}`, description: spec.description(ph.items), phases: [{ title: spec.title }] };
   return [
     `export const meta = ${JSON.stringify(meta2)}`,
@@ -73499,8 +75042,8 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 
 ## Which files \u2014 your prompt decides, and it wins over this document
 
-- **With a shell.** Read \`${join49(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join49(runAbs, "ADJUDICATE.todo.json")} --in ${join49(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
-- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join49(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join49(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
+- **With a shell.** Read \`${join50(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join50(runAbs, "ADJUDICATE.todo.json")} --in ${join50(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
+- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join50(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join50(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
 
 ## For EACH criterion
 
@@ -73517,7 +75060,7 @@ function ecoRefuterContract(runAbs, verify) {
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
 
-There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join49(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
+There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join50(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
 
 For EACH entry:
 
@@ -73530,24 +75073,24 @@ For EACH entry:
    When unsure, choose the HARSHER verdict \u2014 a false pass is worse than a false fail.
 3. \`note\` is REQUIRED \u2014 one line grounded in what you read (quote or paraphrase the decisive code).
 
-Then fold: \`ultra11y verify --apply ${join49(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
+Then fold: \`ultra11y verify --apply ${join50(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
 `;
 }
 function agentContracts(runAbs, opts = {}) {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
-  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join49(runAbs, "audit-latest.json")}` };
+  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join50(runAbs, "audit-latest.json")}` };
   if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs, verify) };
   return {
     adjudicator: `# Contract: adjudicator
 
 You adjudicate the residual judgment criteria of an ultra11y audit \u2014 the ones the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order\u2026). The ACTIVE STANDARD is recorded in the worklist's \`standard\` field: under a country standard (e.g. \`rgaa\`) the items are that standard's OWN criteria, each carrying its numbered tests \u2014 not WCAG success criteria.
 
-Worklist: \`${join49(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,\u2026>\`).
+Worklist: \`${join50(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,\u2026>\`).
 
 For EACH of your criteria:
 
 1. Read its worklist entry for the EVIDENCE: \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide.
-1b. Read \`${join49(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF \u2014 its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
+1b. Read \`${join50(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF \u2014 its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
 2. Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold):
    - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this item's own \`evidence[]\`; an anchor that is not in that list is treated as fabricated). A criterion whose \`evidence[]\` is empty cannot be \`C\` at all \u2014 it is \`manual\` (\`undecidable\`), or \`NA\` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate \u2014 an uncited NA is put on trial by \`verify\`.
    - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the item's OWN tests, which its brief lists for you under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
@@ -73561,7 +75104,7 @@ ${footer}`,
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
 
-Worklist: \`${join49(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`). Handle ONLY the entries whose \`n\` is named in your prompt (\`ITEMS=<n,\u2026>\`).
+Worklist: \`${join50(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`). Handle ONLY the entries whose \`n\` is named in your prompt (\`ITEMS=<n,\u2026>\`).
 
 For EACH of your entries:
 
@@ -73590,8 +75133,8 @@ function runbookMd(manifest, unrendered = []) {
 > no model in the loop \u2014 then re-emit this runbook:
 >
 > \`\`\`
-> ${engine} scan <url> --runtime local --merge ${join49(runAbs, "audit-latest.json")} --out ${runAbs}
-> ${engine} verify --manual --in ${join49(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} scan <url> --runtime local --merge ${join50(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} verify --manual --in ${join50(runAbs, "audit-latest.json")} --out ${runAbs}
 > ${engine} orchestrate --run ${runAbs}
 > \`\`\`
 >
@@ -73613,14 +75156,14 @@ ${status}
 
 ## The loop (play every role yourself, one item at a time)
 
-1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join49(runAbs, "audit-latest.json")}\`.
-2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join49(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join49(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
+1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join50(runAbs, "audit-latest.json")}\`.
+2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join50(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join50(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`${cmd("report")}\`.
-4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join49(runAbs, "VERIFY.todo.json")}\` (and \`${join49(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join49(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
+4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join50(runAbs, "VERIFY.todo.json")}\` (and \`${join50(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join50(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
 5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
 6. **Fix & re-audit**: \`${cmd("fix")}\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
-With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join49(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` \u2014 you stay the sole writer either way.
+With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join50(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` \u2014 you stay the sole writer either way.
 `;
 }
 
@@ -73633,7 +75176,7 @@ function runStandard(run2) {
   if (ctx?.standard) return ctx.standard;
   for (const f of ["ADJUDICATE.todo.json", "audit-latest.json"]) {
     try {
-      const std = JSON.parse(readFileSync32(join50(run2, f), "utf8")).standard;
+      const std = JSON.parse(readFileSync33(join51(run2, f), "utf8")).standard;
       if (typeof std === "string" && std) return std;
     } catch {
     }
@@ -73644,7 +75187,7 @@ function verifyRunContext(runDir) {
   const run2 = resolve15(runDir);
   const ctx = readVerifyContext(run2);
   const standard = runStandard(run2);
-  const flagArgs = ["--in", ctx?.in ?? join50(run2, "audit-latest.json")];
+  const flagArgs = ["--in", ctx?.in ?? join51(run2, "audit-latest.json")];
   if (standard) flagArgs.push("--standard", standard);
   if (ctx?.conformities.source === "file") flagArgs.push("--conformities", ctx.conformities.path);
   if (ctx?.conformities.source === "disabled") flagArgs.push("--no-conformities");
@@ -73658,16 +75201,16 @@ function verifyRunContext(runDir) {
 var GLOBS_PLACEHOLDER = "<globs>";
 var REPORT_PLACEHOLDER = "<report.md>";
 function engineArgs(run2) {
-  const audit2 = join50(run2, "audit-latest.json");
+  const audit2 = join51(run2, "audit-latest.json");
   const v = verifyRunContext(run2);
   return {
     audit: ["audit", GLOBS_PLACEHOLDER, "--graph", "--out", run2],
     "adjudicate-worklist": ["verify", "--manual", "--in", audit2, "--out", run2],
-    "adjudicate-fold": ["verify", "--apply", join50(run2, "ADJUDICATE.todo.json"), "--in", audit2, "--out", run2],
+    "adjudicate-fold": ["verify", "--apply", join51(run2, "ADJUDICATE.todo.json"), "--in", audit2, "--out", run2],
     report: ["report", "--in", audit2, "--out", run2],
     "verify-worklist": ["verify", "--report", v.report, ...v.flagArgs, "--out", run2],
-    "verify-fold": ["verify", "--apply", join50(run2, "VERIFY.todo.json"), "--report", v.report, ...v.flagArgs],
-    gate: ["check", "--report", v.report, ...v.standard ? ["--standard", v.standard] : [], "--semantic", "--verdicts", join50(run2, "VERIFY.todo.json")],
+    "verify-fold": ["verify", "--apply", join51(run2, "VERIFY.todo.json"), "--report", v.report, ...v.flagArgs],
+    gate: ["check", "--report", v.report, ...v.standard ? ["--standard", v.standard] : [], "--semantic", "--verdicts", join51(run2, "VERIFY.todo.json")],
     fix: ["fix", GLOBS_PLACEHOLDER, "--write", "--iterate"]
   };
 }
@@ -73676,12 +75219,12 @@ function renderCommand(engineAbs, args2) {
 }
 function listPhases(runDir, engineAbs) {
   const run2 = resolve15(runDir);
-  const adjPath = join50(run2, "ADJUDICATE.todo.json");
+  const adjPath = join51(run2, "ADJUDICATE.todo.json");
   let adjIds = [];
   let adjReady = false;
-  if (existsSync37(adjPath)) {
+  if (existsSync38(adjPath)) {
     try {
-      const f = JSON.parse(readFileSync32(adjPath, "utf8"));
+      const f = JSON.parse(readFileSync33(adjPath, "utf8"));
       if (f && f.kind === "adjudication" && Array.isArray(f.items)) {
         adjReady = true;
         adjIds = f.items.map((i2) => i2.criteriaId);
@@ -73689,12 +75232,12 @@ function listPhases(runDir, engineAbs) {
     } catch {
     }
   }
-  const verPath = join50(run2, "VERIFY.todo.json");
+  const verPath = join51(run2, "VERIFY.todo.json");
   let verIds = [];
   let verReady = false;
-  if (existsSync37(verPath)) {
+  if (existsSync38(verPath)) {
     try {
-      const items = JSON.parse(readFileSync32(verPath, "utf8"));
+      const items = JSON.parse(readFileSync33(verPath, "utf8"));
       if (Array.isArray(items)) {
         verReady = true;
         verIds = items.map((i2) => String(i2.n));
@@ -73730,11 +75273,11 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
   const args2 = engineArgs(run2);
   const phases = listPhases(run2, engineAbs);
   const v = verifyRunContext(run2);
-  const audit2 = join50(run2, "audit-latest.json");
-  const adjTodo = join50(run2, "ADJUDICATE.todo.json");
-  const verTodo = join50(run2, "VERIFY.todo.json");
+  const audit2 = join51(run2, "audit-latest.json");
+  const adjTodo = join51(run2, "ADJUDICATE.todo.json");
+  const verTodo = join51(run2, "VERIFY.todo.json");
   const placeholder = (f) => f === GLOBS_PLACEHOLDER || f === REPORT_PLACEHOLDER;
-  const ready = (inputs) => inputs.every((f) => placeholder(f) || existsSync37(f));
+  const ready = (inputs) => inputs.every((f) => placeholder(f) || existsSync38(f));
   const engine = (id, title, inputs, outputs, exit, next) => ({
     id,
     kind: "engine",
@@ -73752,7 +75295,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
     kind: "judgment",
     title,
     role,
-    contract: join50(run2, "orchestration", "agents", `${role}.md`),
+    contract: join51(run2, "orchestration", "agents", `${role}.md`),
     worklist: ph.worklist,
     items: ph.items,
     batches: toBatches(ph.ids, batchSize),
@@ -73788,7 +75331,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
         "adjudicate-worklist",
         "Adjudication worklist \u2014 the criteria the engine could not decide",
         [audit2],
-        [adjTodo, join50(run2, "ADJUDICATE.md"), join50(run2, "ADJUDICATE.verdicts.json"), join50(run2, "adjudicate")],
+        [adjTodo, join51(run2, "ADJUDICATE.md"), join51(run2, "ADJUDICATE.verdicts.json"), join51(run2, "adjudicate")],
         { "0": "worklist written (possibly empty: nothing to adjudicate)", "2": EXIT_USAGE },
         "adjudicate"
       ),
@@ -73797,7 +75340,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
         adj,
         "adjudicator",
         "Adjudicate \u2014 fill every item's verdict (C/NC/NA/manual)",
-        [adjTodo, join50(run2, "adjudicate")],
+        [adjTodo, join51(run2, "adjudicate")],
         "adjudicate-fold"
       ),
       engine(
@@ -73824,7 +75367,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
         "verify-worklist",
         "Trial worklist \u2014 the report's non-conformities and the audit's claimed conformities",
         [v.report, verAudit],
-        [verTodo, join50(run2, "VERIFY.md"), join50(run2, "VERIFY.context.json")],
+        [verTodo, join51(run2, "VERIFY.md"), join51(run2, "VERIFY.context.json")],
         { "0": "worklist written", "2": EXIT_USAGE },
         "verify"
       ),
@@ -73858,8 +75401,8 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
 }
 function unrenderedInRun(run2) {
   try {
-    const audit2 = JSON.parse(readFileSync32(join50(run2, "audit-latest.json"), "utf8"));
-    const todo = JSON.parse(readFileSync32(join50(run2, "ADJUDICATE.todo.json"), "utf8"));
+    const audit2 = JSON.parse(readFileSync33(join51(run2, "audit-latest.json"), "utf8"));
+    const todo = JSON.parse(readFileSync33(join51(run2, "ADJUDICATE.todo.json"), "utf8"));
     return unrenderedResidual(audit2, todo.items ?? []);
   } catch {
     return [];
@@ -73867,7 +75410,7 @@ function unrenderedInRun(run2) {
 }
 function orchestrateRun(runDir, engineAbs, opts = {}) {
   const run2 = resolve15(runDir);
-  if (!existsSync37(run2)) {
+  if (!existsSync38(run2)) {
     return { exitCode: 2, written: [], notices: [], errors: [`run dir not found: ${run2}`], phases: [] };
   }
   const phases = listPhases(run2, engineAbs);
@@ -73894,22 +75437,22 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
     }
     selected = [ph];
   }
-  const orchDir = join50(run2, "orchestration");
-  const agentsDir = join50(orchDir, "agents");
-  mkdirSync17(join50(orchDir, "out"), { recursive: true });
-  mkdirSync17(agentsDir, { recursive: true });
+  const orchDir = join51(run2, "orchestration");
+  const agentsDir = join51(orchDir, "agents");
+  mkdirSync18(join51(orchDir, "out"), { recursive: true });
+  mkdirSync18(agentsDir, { recursive: true });
   const written = [];
   const notices = [];
   for (const [name2, content] of Object.entries(agentContracts(run2, { eco: opts.eco === true, verify: verifyRunContext(run2) }))) {
-    const p = join50(agentsDir, `${name2}.md`);
-    writeFileSync20(p, content);
+    const p = join51(agentsDir, `${name2}.md`);
+    writeFileSync21(p, content);
     written.push(p);
   }
   const emitted = new Set(opts.eco ? [] : selected.filter((p) => p.items > 0).map((p) => p.name));
   for (const ph of phases) {
     if (emitted.has(ph.name)) continue;
-    const stale = join50(orchDir, `${ph.name}.workflow.mjs`);
-    if (existsSync37(stale)) {
+    const stale = join51(orchDir, `${ph.name}.workflow.mjs`);
+    if (existsSync38(stale)) {
       rmSync9(stale, { force: true });
       notices.push(`phase "${ph.name}": stale workflow removed \u2014 its worklist ${ph.ready ? "is now empty" : "no longer exists"}.`);
     }
@@ -73923,21 +75466,21 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
       if (ph.items <= SMALL_WORKLIST) {
         notices.push(`phase "${ph.name}": only ${ph.items} item(s) \u2014 the sequential --eco path is equivalent and cheaper.`);
       }
-      const p = join50(orchDir, `${ph.name}.workflow.mjs`);
-      writeFileSync20(p, phaseWorkflowScript(ph, run2, engineAbs, BATCH_SIZE2));
+      const p = join51(orchDir, `${ph.name}.workflow.mjs`);
+      writeFileSync21(p, phaseWorkflowScript(ph, run2, engineAbs, BATCH_SIZE2));
       written.push(p);
     }
   }
-  const rb = join50(orchDir, "RUNBOOK.md");
-  writeFileSync20(rb, runbookMd(buildManifest(run2, engineAbs), unrenderedInRun(run2)));
+  const rb = join51(orchDir, "RUNBOOK.md");
+  writeFileSync21(rb, runbookMd(buildManifest(run2, engineAbs), unrenderedInRun(run2)));
   written.push(rb);
   return { exitCode: 0, written, notices, errors: [], phases };
 }
 
 // src/trial-summary.ts
-import { createHash as createHash8 } from "crypto";
-import { readFileSync as readFileSync33 } from "fs";
-var sha256 = (path) => createHash8("sha256").update(readFileSync33(path)).digest("hex");
+import { createHash as createHash9 } from "crypto";
+import { readFileSync as readFileSync34 } from "fs";
+var sha256 = (path) => createHash9("sha256").update(readFileSync34(path)).digest("hex");
 var entry = (it) => ({
   n: it.n,
   kind: it.kind ?? "nc",
@@ -74188,8 +75731,8 @@ ${xs.map(line).join("\n")}` : t3.none;
 import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
-import { existsSync as existsSync38, mkdirSync as mkdirSync18, readFileSync as readFileSync34, realpathSync as realpathSync6, statSync as statSync18, writeFileSync as writeFileSync21 } from "fs";
-import { isAbsolute as isAbsolute5, join as join51, resolve as resolve16, sep as sep5 } from "path";
+import { existsSync as existsSync39, mkdirSync as mkdirSync19, readFileSync as readFileSync35, realpathSync as realpathSync6, statSync as statSync19, writeFileSync as writeFileSync22 } from "fs";
+import { isAbsolute as isAbsolute5, join as join52, resolve as resolve16, sep as sep5 } from "path";
 
 // src/criteria-view.ts
 var CriteriaLookupError = class extends Error {
@@ -74652,7 +76195,7 @@ var REFERENCE_TOOL_NAMES = /* @__PURE__ */ new Set(["ultra11y_criteria", "ultra1
 function str2(v) {
   return typeof v === "string" && v.trim() !== "" ? v : void 0;
 }
-function num2(v) {
+function num3(v) {
   const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
   return Number.isFinite(n) ? n : void 0;
 }
@@ -74664,7 +76207,7 @@ function strArray2(v) {
   return a?.length ? a : void 0;
 }
 function positive(v, key2) {
-  const n = num2(v);
+  const n = num3(v);
   if (n === void 0) return void 0;
   if (n <= 0) throw new ToolError(`\`${key2}\` must be greater than 0.`);
   return n;
@@ -74673,8 +76216,8 @@ function requiredCwd(args2, defaults) {
   const cwd = str2(args2.cwd) ?? defaults.defaultCwd;
   if (!cwd) throw new ToolError("`cwd` is required: an absolute path to the project root.");
   const abs = resolve16(cwd);
-  if (!existsSync38(abs)) throw new ToolError(`project root not found: ${abs}`);
-  if (!statSync18(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
+  if (!existsSync39(abs)) throw new ToolError(`project root not found: ${abs}`);
+  if (!statSync19(abs).isDirectory()) throw new ToolError(`\`cwd\` is not a directory: ${abs}`);
   return abs;
 }
 function optionalCwd(args2, defaults) {
@@ -74786,7 +76329,7 @@ function audit(args2, cwd) {
     process.chdir(cwd);
     const inputs = strArray2(args2.globs) ?? DEFAULT_GLOBS;
     const scopedToDiff = bool(args2.changed) || bool(args2.staged) || str2(args2.since) !== void 0;
-    const extra = [CAPTURES_DIR, PAGES_DIR].filter((d) => !scopedToDiff && existsSync38(d) && !inputs.includes(d));
+    const extra = [CAPTURES_DIR, PAGES_DIR].filter((d) => !scopedToDiff && existsSync39(d) && !inputs.includes(d));
     const result = runAudit({
       inputs: [...inputs, ...extra],
       include: strArray2(args2.include),
@@ -74905,13 +76448,13 @@ function handlePackCheck(args2, cwd) {
   return { cwd, ...res };
 }
 function handleSampleCheck(cwd, standard) {
-  const file = join51(cwd, ".ultra11yrc.json");
-  if (!existsSync38(file)) {
+  const file = join52(cwd, ".ultra11yrc.json");
+  if (!existsSync39(file)) {
     throw new ToolError(`no .ultra11yrc.json at ${cwd} \u2014 a page sample must be declared before it can be linted.`);
   }
   let raw;
   try {
-    raw = JSON.parse(readFileSync34(file, "utf8"));
+    raw = JSON.parse(readFileSync35(file, "utf8"));
   } catch (e) {
     throw new ToolError(`.ultra11yrc.json is not valid JSON: ${e.message}`);
   }
@@ -75009,7 +76552,7 @@ function handleFold(args2, cwd) {
   if (auditFile) {
     const path = resolve16(cwd, auditFile);
     try {
-      base = unwrapAudit(JSON.parse(readFileSync34(path, "utf8")));
+      base = unwrapAudit(JSON.parse(readFileSync35(path, "utf8")));
     } catch {
       throw new ToolError(`\`audit_file\` not found or not valid JSON: ${path}`);
     }
@@ -75038,9 +76581,9 @@ function handleFold(args2, cwd) {
     };
   }
   const outDir = resolve16(cwd, str2(args2.out) ?? ".");
-  mkdirSync18(outDir, { recursive: true });
-  const auditPath = join51(outDir, "audit-latest.json");
-  writeFileSync21(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
+  mkdirSync19(outDir, { recursive: true });
+  const auditPath = join52(outDir, "audit-latest.json");
+  writeFileSync22(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
 `);
   let ledger;
   if (bool(args2.ledger)) {
@@ -75066,7 +76609,7 @@ function adjudicationArg(args2) {
   if (file) {
     if (!isAbsolute5(file)) throw new ToolError("`adjudication_file` must be an absolute path.");
     try {
-      v = JSON.parse(readFileSync34(file, "utf8"));
+      v = JSON.parse(readFileSync35(file, "utf8"));
     } catch {
       throw new ToolError(`\`adjudication_file\` not found or not valid JSON: ${file}`);
     }
@@ -75089,7 +76632,7 @@ function handleInit(args2, cwd) {
   const enginePath = resolve16("scripts/ultra11y.mjs");
   const written = [];
   if (bool(args2.hook)) written.push(writeHook(cwd, enginePath, failOn));
-  if (bool(args2.ci)) written.push(join51(cwd, ".github/workflows/a11y.yml"));
+  if (bool(args2.ci)) written.push(join52(cwd, ".github/workflows/a11y.yml"));
   if (!written.length) {
     throw new ToolError("nothing to install \u2014 pass hook:true and/or ci:true.");
   }
@@ -75109,9 +76652,9 @@ function reportText(args2, tool) {
   if (inline) return inline;
   if (!file) throw new ToolError(`\`report_text\` is required \u2014 the report markdown for ultra11y_${tool} to work on.`);
   if (!isAbsolute5(file)) throw new ToolError("`report_file` must be an absolute path.");
-  if (!existsSync38(file)) throw new ToolError(`report file not found: ${file}`);
+  if (!existsSync39(file)) throw new ToolError(`report file not found: ${file}`);
   try {
-    return withReportAnnexes(readFileSync34(file, "utf8"), file, (p) => readFileSync34(p, "utf8"));
+    return withReportAnnexes(readFileSync35(file, "utf8"), file, (p) => readFileSync35(p, "utf8"));
   } catch (e) {
     throw new ToolError(e instanceof Error ? e.message : String(e));
   }
@@ -75122,7 +76665,7 @@ function handleCriteria(args2) {
   const includeGuidance = bool(args2.include_guidance);
   const id = str2(args2.criterion) ?? str2(args2.sc);
   const glossary = args2.glossary;
-  const theme = num2(args2.theme);
+  const theme = num3(args2.theme);
   try {
     if (glossary !== void 0 && glossary !== false) {
       return glossaryView(standard, typeof glossary === "string" ? glossary : void 0, lang);
@@ -75181,7 +76724,7 @@ function handleMethod(args2) {
 function handleRead(args2, cwd) {
   const raw = str2(args2.path);
   if (!raw) throw new ToolError("`path` is required \u2014 relative to the project root, or an absolute path inside it.");
-  const target = isAbsolute5(raw) ? raw : join51(cwd, raw);
+  const target = isAbsolute5(raw) ? raw : join52(cwd, raw);
   let real;
   try {
     real = realpathSync6(target);
@@ -75192,14 +76735,14 @@ function handleRead(args2, cwd) {
   if (real !== root && !real.startsWith(root + sep5)) {
     throw new ToolError(`path is outside the project: ${raw}. Use your own file tool for anything else.`);
   }
-  const st = statSync18(real);
+  const st = statSync19(real);
   if (!st.isFile()) throw new ToolError(`not a file: ${raw}`);
   if (st.size > MAX_READ_BYTES) throw new ToolError(`file is too large to read (${st.size} bytes): ${raw}`);
-  const lines = readFileSync34(real, "utf8").split("\n");
+  const lines = readFileSync35(real, "utf8").split("\n");
   const total = lines.length;
-  const start2 = Math.max(1, Math.floor(num2(args2.start_line) ?? 1));
+  const start2 = Math.max(1, Math.floor(num3(args2.start_line) ?? 1));
   if (start2 > total) throw new ToolError(`start_line ${start2} is past the end of the file (${total} lines).`);
-  const requestedEnd = Math.floor(num2(args2.end_line) ?? total);
+  const requestedEnd = Math.floor(num3(args2.end_line) ?? total);
   const end = Math.min(total, Math.max(start2, requestedEnd), start2 + MAX_READ_LINES - 1);
   return {
     path: isAbsolute5(raw) ? real : raw,
@@ -75887,25 +77430,25 @@ function str3(v) {
 var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
-import { existsSync as existsSync39, readdirSync as readdirSync7, readFileSync as readFileSync35, realpathSync as realpathSync7, statSync as statSync19 } from "fs";
-import { basename as basename4, dirname as dirname19, join as join52, resolve as resolve17, sep as sep6 } from "path";
-import { fileURLToPath as fileURLToPath4 } from "url";
+import { existsSync as existsSync40, readdirSync as readdirSync8, readFileSync as readFileSync36, realpathSync as realpathSync7, statSync as statSync20 } from "fs";
+import { basename as basename4, dirname as dirname20, join as join53, resolve as resolve17, sep as sep6 } from "path";
+import { fileURLToPath as fileURLToPath5 } from "url";
 var SKILL_NAME = "ultra11y";
 var URI_SCHEME = "skill://";
 function resolveSkillRoot(moduleDir) {
-  const here = moduleDir ?? dirname19(fileURLToPath4(import.meta.url));
+  const here = moduleDir ?? dirname20(fileURLToPath5(import.meta.url));
   const candidates2 = [resolve17(here, ".."), resolve17(here, "..", "skills", SKILL_NAME), resolve17(here, "..", "..", "skills", SKILL_NAME)];
-  return candidates2.find((dir) => existsSync39(join52(dir, "SKILL.md")));
+  return candidates2.find((dir) => existsSync40(join53(dir, "SKILL.md")));
 }
 function listResources(moduleDir) {
   const root = resolveSkillRoot(moduleDir);
   if (!root) return [];
   const out2 = [describe(root, "SKILL.md", `${SKILL_NAME}: the skill`)];
-  const refDir = join52(root, "references");
-  if (!existsSync39(refDir)) return out2;
-  for (const file of readdirSync7(refDir).sort()) {
+  const refDir = join53(root, "references");
+  if (!existsSync40(refDir)) return out2;
+  for (const file of readdirSync8(refDir).sort()) {
     if (!file.endsWith(".md")) continue;
-    out2.push(describe(root, join52("references", file), `${SKILL_NAME} reference: ${basename4(file, ".md")}`));
+    out2.push(describe(root, join53("references", file), `${SKILL_NAME} reference: ${basename4(file, ".md")}`));
   }
   return out2;
 }
@@ -75928,8 +77471,8 @@ function readResource(uri, moduleDir) {
   if (targetReal !== rootReal && !targetReal.startsWith(rootReal + sep6)) {
     throw new ResourceError(`resource path escapes the skill root: ${uri}`);
   }
-  if (!statSync19(targetReal).isFile()) throw new ResourceError(`not a file: ${uri}`);
-  return { uri, mimeType: "text/markdown", text: readFileSync35(targetReal, "utf8") };
+  if (!statSync20(targetReal).isFile()) throw new ResourceError(`not a file: ${uri}`);
+  return { uri, mimeType: "text/markdown", text: readFileSync36(targetReal, "utf8") };
 }
 var ResourceError = class extends Error {
 };
@@ -75940,14 +77483,14 @@ function describe(root, rel2, fallbackTitle) {
     title: fallbackTitle,
     mimeType: "text/markdown"
   };
-  const summary = firstProse(join52(root, rel2));
+  const summary = firstProse(join53(root, rel2));
   if (summary) decl.description = summary;
   return decl;
 }
 function firstProse(file) {
   let text;
   try {
-    text = readFileSync35(file, "utf8");
+    text = readFileSync36(file, "utf8");
   } catch {
     return void 0;
   }
@@ -76516,7 +78059,7 @@ Usage:
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
   ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate manual criteria \u2014 api needs ANTHROPIC_API_KEY; claude/codex reuse their CLI login; cli aliases claude)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
-  ultra11y scan     <url|file\u2026> [--runtime auto|local|docker] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
+  ultra11y scan     <url|file\u2026> [--runtime auto|local|docker] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime \u2026] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime \u2026] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
   ultra11y scan     --clean        (remove the dynamic-tier Docker image + temp contexts)
@@ -76901,6 +78444,12 @@ Options:
                      Snapshots are ON by default: the browser is already on the page, and
                      without one the page can never be re-audited offline nor earn a
                      per-page verdict (its criteria stay \xAB to assess \xBB forever)
+  --no-pdf           scan: do NOT download the same-origin PDF documents the scanned pages
+                     link to (into .ultra11y/documents/<sha256>.pdf, with a sidecar naming
+                     the URL and the pages linking it). audit: do not ingest that directory.
+                     PDF inputs named explicitly are always audited
+  --max-pdf <n>      scan: most PDF documents downloaded per run (default 20; each one
+                     capped at 20 MiB)
   --clean            scan: remove the dynamic-tier image + temp contexts, then exit
   --api-key <key>    judge: the Anthropic API key. Defaults to $ANTHROPIC_API_KEY. This is
                      the ONLY place in the tool that takes one \u2014 the engine needs no key
@@ -76996,6 +78545,8 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "crawl",
   "depth",
   "max",
+  // `scan`: most linked PDF documents downloaded per run.
+  "max-pdf",
   // `import`: which external audit tool the report comes from, and (with `--from file`) which
   // adapter should read it. `pages --diff`: the imported audit to hold the grid against.
   "from",
@@ -77116,6 +78667,8 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "no-interact",
   "interact-clicks",
   "no-snapshot",
+  // `scan`/`audit`: do not download (scan) or ingest (audit) the PDF documents pages link to.
+  "no-pdf",
   "clean",
   "sample",
   "eco",
@@ -77362,12 +78915,14 @@ async function cmdAudit(p) {
   const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
   const capturesDir = capturesFlag ?? CAPTURES_DIR;
   const scopedToDiff = p.flags.changed === true || p.flags.staged === true || since !== void 0;
-  const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync40(capturesDir));
+  const capturesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync41(capturesDir));
   const useCaptures = capturesWanted && !scopedToDiff && !inputs.includes(capturesDir);
-  const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync40(PAGES_DIR);
+  const pagesWanted = p.flags["no-captures"] !== true && !inputs.includes("-") && existsSync41(PAGES_DIR);
   const usePages = pagesWanted && !scopedToDiff && !inputs.includes(PAGES_DIR);
   const pagesInScope = pagesWanted && !scopedToDiff;
-  const auditInputs = [...inputs, ...useCaptures ? [capturesDir] : [], ...usePages ? [PAGES_DIR] : []];
+  const documentsGlob = `${DOCUMENTS_DIR}/*.pdf`;
+  const useDocuments = p.flags["no-pdf"] !== true && !inputs.includes("-") && !scopedToDiff && existsSync41(DOCUMENTS_DIR) && !inputs.includes(documentsGlob) && !inputs.includes(DOCUMENTS_DIR);
+  const auditInputs = [...inputs, ...useCaptures ? [capturesDir] : [], ...usePages ? [PAGES_DIR] : [], ...useDocuments ? [documentsGlob] : []];
   if (useCaptures)
     console.error(
       lang === "fr" ? `ultra11y audit : captures rendues ing\xE9r\xE9es depuis ${capturesDir}.` : `ultra11y audit: ingesting rendered captures from ${capturesDir}.`
@@ -77375,6 +78930,10 @@ async function cmdAudit(p) {
   if (usePages)
     console.error(
       lang === "fr" ? `ultra11y audit : instantan\xE9s de page ing\xE9r\xE9s depuis ${PAGES_DIR}.` : `ultra11y audit: ingesting page snapshots from ${PAGES_DIR}.`
+    );
+  if (useDocuments)
+    console.error(
+      lang === "fr" ? `ultra11y audit : documents PDF ing\xE9r\xE9s depuis ${DOCUMENTS_DIR}.` : `ultra11y audit: ingesting PDF documents from ${DOCUMENTS_DIR}.`
     );
   const result = runAudit({
     inputs: auditInputs,
@@ -77407,10 +78966,10 @@ async function cmdAudit(p) {
   if (typeof p.flags.out === "string") {
     const out2 = p.flags.out;
     const asFile = out2.toLowerCase().endsWith(".json");
-    const target = asFile ? out2 : join53(out2, "audit-latest.json");
+    const target = asFile ? out2 : join54(out2, "audit-latest.json");
     try {
-      mkdirSync19(asFile ? dirname20(out2) : out2, { recursive: true });
-      writeFileSync22(target, JSON.stringify(document, null, 2) + "\n");
+      mkdirSync20(asFile ? dirname21(out2) : out2, { recursive: true });
+      writeFileSync23(target, JSON.stringify(document, null, 2) + "\n");
       console.error(lang === "fr" ? `\u2192 audit \xE9crit dans ${target}` : `\u2192 audit written to ${target}`);
     } catch {
     }
@@ -77429,7 +78988,7 @@ async function cmdAudit(p) {
   const baselineFlag = p.flags.baseline;
   if (typeof baselineFlag === "string" && baselineFlag) {
     let baseline = null;
-    if (existsSync40(baselineFlag)) {
+    if (existsSync41(baselineFlag)) {
       try {
         const parsed = unwrapAudit(JSON.parse(readText(baselineFlag)));
         if (isCurrentAudit(parsed)) baseline = parsed;
@@ -77483,11 +79042,11 @@ async function cmdDev(p) {
     return 2;
   }
   if (p.flags.next === true) {
-    const dir = join53(root, ".ultra11y", "next");
+    const dir = join54(root, ".ultra11y", "next");
     const rel2 = ".ultra11y/next/overlay.jsx";
     try {
-      mkdirSync19(dir, { recursive: true });
-      writeFileSync22(join53(dir, "overlay.jsx"), nextOverlayComponent(port));
+      mkdirSync20(dir, { recursive: true });
+      writeFileSync23(join54(dir, "overlay.jsx"), nextOverlayComponent(port));
     } catch (e) {
       console.error(`ultra11y dev: could not write ${rel2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -77536,7 +79095,7 @@ async function cmdPagesDiscover(p) {
     const snaps = sampleFromSnapshots(readSnapshots(root));
     if (!snaps.length) {
       console.error(
-        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join53(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join53(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
+        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join54(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join54(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
       );
       return 1;
     }
@@ -77617,9 +79176,9 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
     }
     return 0;
   }
-  const file = join53(process.cwd(), ".ultra11yrc.json");
+  const file = join54(process.cwd(), ".ultra11yrc.json");
   let doc = {};
-  if (existsSync40(file)) {
+  if (existsSync41(file)) {
     try {
       doc = JSON.parse(readText(file));
     } catch {
@@ -77628,7 +79187,7 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
     }
   }
   doc.sample = v.sample;
-  writeFileSync22(file, `${JSON.stringify(doc, null, 2)}
+  writeFileSync23(file, `${JSON.stringify(doc, null, 2)}
 `);
   if (!p.flags.json)
     console.log(
@@ -77683,8 +79242,8 @@ async function cmdPages(p) {
     console.log(json);
     const outDir2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "";
     if (outDir2) {
-      mkdirSync19(outDir2, { recursive: true });
-      writeFileSync22(join53(outDir2, "pages.json"), `${json}
+      mkdirSync20(outDir2, { recursive: true });
+      writeFileSync23(join54(outDir2, "pages.json"), `${json}
 `);
     }
     return 0;
@@ -77710,27 +79269,27 @@ async function cmdPages(p) {
   const derived = derivePages(result, scope);
   const split = p.flags.split === "page";
   const outDir = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : void 0;
-  const shotOf = (id) => join53(PAGES_DIR, id, "screen.png");
+  const shotOf = (id) => join54(PAGES_DIR, id, "screen.png");
   const shotsRelative = (fileDir) => {
     const m = /* @__PURE__ */ new Map();
     for (const pg of derived) {
-      if (existsSync40(shotOf(pg.id))) m.set(pg.id, relative6(fileDir, shotOf(pg.id)).split("\\").join("/"));
+      if (existsSync41(shotOf(pg.id))) m.set(pg.id, relative6(fileDir, shotOf(pg.id)).split("\\").join("/"));
     }
     return m;
   };
   const shotPaths = (pages) => {
     const m = /* @__PURE__ */ new Map();
-    for (const pg of pages) if (existsSync40(shotOf(pg.id))) m.set(pg.id, shotOf(pg.id));
+    for (const pg of pages) if (existsSync41(shotOf(pg.id))) m.set(pg.id, shotOf(pg.id));
     return m;
   };
   const shotsCopiedInto = (dir) => {
     const m = /* @__PURE__ */ new Map();
-    const assets = join53(dir, "assets");
+    const assets = join54(dir, "assets");
     for (const pg of derived) {
       const src = shotOf(pg.id);
-      if (!existsSync40(src)) continue;
-      mkdirSync19(assets, { recursive: true });
-      copyFileSync4(src, join53(assets, `${pg.id}.png`));
+      if (!existsSync41(src)) continue;
+      mkdirSync20(assets, { recursive: true });
+      copyFileSync4(src, join54(assets, `${pg.id}.png`));
       m.set(pg.id, `./assets/${pg.id}.png`);
     }
     return m;
@@ -77747,7 +79306,7 @@ async function cmdPages(p) {
     console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsRelative(".") }));
     return 0;
   }
-  mkdirSync19(outDir, { recursive: true });
+  mkdirSync20(outDir, { recursive: true });
   const manifest = wantEvidence ? writeEvidence(result, { outDir, ...evidenceCapsOf(p) }) : void 0;
   const cropFor = manifest ? (f) => {
     const c2 = manifest.crops.get(findingId(f));
@@ -77756,7 +79315,7 @@ async function cmdPages(p) {
   if (manifest) {
     const total = evidenceNotice(manifest, null, lang);
     console.error(
-      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join53(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join53(outDir, "assets")}.`
+      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join54(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join54(outDir, "assets")}.`
     );
     for (const line of total) console.error(line);
   }
@@ -77765,8 +79324,8 @@ async function cmdPages(p) {
     ...manifest ? { evidenceNotice: (id) => evidenceNotice(manifest, id, lang) } : {}
   };
   if (!split) {
-    const file = join53(outDir, `pages-${result.date}.md`);
-    writeFileSync22(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
+    const file = join54(outDir, `pages-${result.date}.md`);
+    writeFileSync23(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
 `);
     const html2 = wantHtml ? emitHtml(result, {
       outDir,
@@ -77785,11 +79344,11 @@ async function cmdPages(p) {
   const sheet = (id) => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    writeFileSync22(join53(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
+    writeFileSync23(join54(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
 `);
   }
-  const index = join53(outDir, "index.md");
-  writeFileSync22(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
+  const index = join54(outDir, "index.md");
+  writeFileSync23(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
 `);
   const html = wantHtml ? emitHtml(result, {
     outDir,
@@ -77840,7 +79399,7 @@ async function cmdSnapshot(p) {
           2
         )
       );
-    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join53(root, PAGES_DIR)}.` : `No snapshot in ${join53(root, PAGES_DIR)}.`);
+    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join54(root, PAGES_DIR)}.` : `No snapshot in ${join54(root, PAGES_DIR)}.`);
     else for (const s of snaps) console.log(`${s.meta.id}	${s.meta.name}	${s.meta.url}${s.meta.auth ? "	[auth]" : ""}`);
     return 0;
   }
@@ -77894,7 +79453,7 @@ async function cmdSnapshot(p) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
-  const result = runAudit({ inputs: [join53(dir, "dom.html")], onWarn: (m) => console.error(m) });
+  const result = runAudit({ inputs: [join54(dir, "dom.html")], onWarn: (m) => console.error(m) });
   const failOnRaw = p.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
@@ -77926,9 +79485,9 @@ function cmdInit(p) {
   if (want.baseline) {
     const inputs = p.positionals.length ? p.positionals : ["."];
     const result = runAudit({ inputs, onWarn: (m) => console.error(m) });
-    mkdirSync19(join53(root, "audits"), { recursive: true });
-    const bp = join53(root, "audits", "baseline.json");
-    writeFileSync22(bp, JSON.stringify(result, null, 2) + "\n");
+    mkdirSync20(join54(root, "audits"), { recursive: true });
+    const bp = join54(root, "audits", "baseline.json");
+    writeFileSync23(bp, JSON.stringify(result, null, 2) + "\n");
     wrote.push(bp);
   }
   if (want.hook) wrote.push(writeHook(root, engineRel, failOn, legacy ? "baseline" : "staged"));
@@ -78239,8 +79798,8 @@ async function cmdTickets(p) {
   const ticketsOut = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : void 0;
   let setPath;
   if (ticketsOut) {
-    mkdirSync19(ticketsOut, { recursive: true });
-    setPath = join53(ticketsOut, `issues-${result.date}.json`);
+    mkdirSync20(ticketsOut, { recursive: true });
+    setPath = join54(ticketsOut, `issues-${result.date}.json`);
     const payload = {
       tool: "ultra11y",
       kind: "issues",
@@ -78251,7 +79810,7 @@ async function cmdTickets(p) {
       count: plan.tickets.length,
       issues: plan.tickets
     };
-    writeFileSync22(setPath, `${JSON.stringify(payload, null, 2)}
+    writeFileSync23(setPath, `${JSON.stringify(payload, null, 2)}
 `);
     if (!json) console.log(setPath);
   }
@@ -78341,8 +79900,8 @@ async function cmdTickets(p) {
   return pushed.failed > 0 ? 1 : 0;
 }
 function depsAt(root) {
-  const pkgPath = join53(root, "package.json");
-  if (!existsSync40(pkgPath)) return {};
+  const pkgPath = join54(root, "package.json");
+  if (!existsSync41(pkgPath)) return {};
   try {
     const pkg = JSON.parse(readText(pkgPath));
     return { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
@@ -78368,24 +79927,24 @@ function cmdRender(p) {
       console.error(`ultra11y render: --runner must be playwright|cypress|auto (got "${forced}").`);
       return 2;
     }
-    const detected = detectE2eRunner(depsAt(root), (f) => existsSync40(join53(root, f)));
+    const detected = detectE2eRunner(depsAt(root), (f) => existsSync41(join54(root, f)));
     const runners = forced && forced !== "auto" ? [forced] : detected;
     if (!runners.length) {
       console.error(e2eSetupPlan([], {}, lang));
       return 1;
     }
     const engineRef = engineRefFor(root);
-    const dir = join53(root, ".ultra11y", "e2e");
+    const dir = join54(root, ".ultra11y", "e2e");
     const paths = {};
     try {
-      mkdirSync19(dir, { recursive: true });
+      mkdirSync20(dir, { recursive: true });
       if (runners.includes("playwright")) {
-        writeFileSync22(join53(dir, "playwright.mjs"), playwrightFixture(engineRef));
+        writeFileSync23(join54(dir, "playwright.mjs"), playwrightFixture(engineRef));
         paths.playwright = ".ultra11y/e2e/playwright.mjs";
       }
       if (runners.includes("cypress")) {
-        writeFileSync22(join53(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
-        writeFileSync22(join53(dir, "cypress-commands.mjs"), cypressCommands());
+        writeFileSync23(join54(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
+        writeFileSync23(join54(dir, "cypress-commands.mjs"), cypressCommands());
         paths.cypressPlugin = ".ultra11y/e2e/cypress-plugin.mjs";
         paths.cypressCommands = ".ultra11y/e2e/cypress-commands.mjs";
       }
@@ -78400,7 +79959,7 @@ function cmdRender(p) {
   if (p.flags.scaffold === true) {
     const out2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "ultra11y-render.tsx";
     try {
-      writeFileSync22(out2, ssrHarness());
+      writeFileSync23(out2, ssrHarness());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -78414,29 +79973,29 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
   }
   if (p.flags.setup === true) {
     const rel2 = ".ultra11y/capture-setup.mjs";
-    const out2 = join53(root, rel2);
+    const out2 = join54(root, rel2);
     try {
-      mkdirSync19(dirname20(out2), { recursive: true });
-      writeFileSync22(out2, captureSetup());
+      mkdirSync20(dirname21(out2), { recursive: true });
+      writeFileSync23(out2, captureSetup());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
     }
     let setupDeps = {};
-    const setupPkg = join53(root, "package.json");
-    if (existsSync40(setupPkg)) {
+    const setupPkg = join54(root, "package.json");
+    if (existsSync41(setupPkg)) {
       try {
         const pkg = JSON.parse(readText(setupPkg));
         setupDeps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
       } catch {
       }
     }
-    const tr = detectTestRunner(setupDeps, (f) => existsSync40(join53(root, f)));
+    const tr = detectTestRunner(setupDeps, (f) => existsSync41(join54(root, f)));
     console.log(captureSetupPlan(tr, rel2, lang));
     const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
-    const gaPath = join53(root, ".gitattributes");
+    const gaPath = join54(root, ".gitattributes");
     try {
-      const existing = existsSync40(gaPath) ? readFileSync36(gaPath, "utf8") : "";
+      const existing = existsSync41(gaPath) ? readFileSync37(gaPath, "utf8") : "";
       if (!existing.includes(".ultra11y/captures/")) {
         appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
         console.log(lang === "fr" ? `.gitattributes : ajout\xE9 \xAB ${gaLine} \xBB` : `.gitattributes: added "${gaLine}"`);
@@ -78444,8 +80003,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     } catch {
     }
     try {
-      const giPath = join53(root, ".gitignore");
-      if (existsSync40(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync36(giPath, "utf8")))
+      const giPath = join54(root, ".gitignore");
+      if (existsSync41(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync37(giPath, "utf8")))
         console.error(
           lang === "fr" ? "\u26A0\uFE0F .ultra11y semble ignor\xE9 par .gitignore \u2014 les captures doivent \xEAtre committ\xE9es pour le gate (ajoutez \xAB !.ultra11y/captures/ \xBB)." : '\u26A0\uFE0F .ultra11y appears gitignored \u2014 captures must be committed for the gate (add "!.ultra11y/captures/").'
         );
@@ -78455,8 +80014,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
   }
   if (p.flags.storybook === true || typeof p.flags.storybook === "string") {
     const sbDir = p.positionals[0] ?? "storybook-static";
-    const indexPath = existsSync40(join53(sbDir, "index.json")) ? join53(sbDir, "index.json") : join53(sbDir, "stories.json");
-    if (!existsSync40(indexPath)) {
+    const indexPath = existsSync41(join54(sbDir, "index.json")) ? join54(sbDir, "index.json") : join54(sbDir, "stories.json");
+    if (!existsSync41(indexPath)) {
       console.error(
         lang === "fr" ? `ultra11y render : aucun index Storybook (index.json/stories.json) dans ${sbDir}.` : `ultra11y render: no Storybook index (index.json/stories.json) in ${sbDir}.`
       );
@@ -78466,7 +80025,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const provById = new Map(stories.map((s) => [s.id, storyProvenance(s)]));
     const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
     const htmlDir = capturesFlag ?? sbDir;
-    const htmlFiles = existsSync40(htmlDir) ? discover([htmlDir]).files.filter((f) => /\.html?$/i.test(f)) : [];
+    const htmlFiles = existsSync41(htmlDir) ? discover([htmlDir]).files.filter((f) => /\.html?$/i.test(f)) : [];
     const outDir = ".ultra11y/captures";
     let attributed = 0;
     let skipped = 0;
@@ -78488,8 +80047,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
         continue;
       }
       try {
-        mkdirSync19(outDir, { recursive: true });
-        writeFileSync22(join53(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
+        mkdirSync20(outDir, { recursive: true });
+        writeFileSync23(join54(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
 ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
         attributed++;
       } catch {
@@ -78511,11 +80070,11 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   }
   if (p.flags.coverage === true) {
     const capturesFlag = typeof p.flags.captures === "string" && p.flags.captures ? p.flags.captures : void 0;
-    const capturesDir = capturesFlag ?? join53(root, ".ultra11y/captures");
+    const capturesDir = capturesFlag ?? join54(root, ".ultra11y/captures");
     const graphExt = [...GRAPH_ONLY_EXT, ...asList(p.flags.ext) ?? []];
     const sourceFiles = discover([root], { include: asList(p.flags.include), exclude: asList(p.flags.exclude), ext: graphExt }).files;
     const graph = buildGraphStreaming(sourceFiles);
-    const capFiles = existsSync40(capturesDir) ? discover([capturesDir]).files : [];
+    const capFiles = existsSync41(capturesDir) ? discover([capturesDir]).files : [];
     const entries = capFiles.map((f) => ({ file: toPosix(f), provenance: parseCaptureProvenance(readText(f)) }));
     const cov = computeCaptureCoverage(graph, entries);
     if (p.flags.json) console.log(JSON.stringify(cov, null, 2));
@@ -78523,15 +80082,15 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
     return 0;
   }
   let deps = {};
-  const pkgPath = join53(root, "package.json");
-  if (existsSync40(pkgPath)) {
+  const pkgPath = join54(root, "package.json");
+  if (existsSync41(pkgPath)) {
     try {
       const pkg = JSON.parse(readText(pkgPath));
       deps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
     } catch {
     }
   }
-  const detection = detectFrameworks(deps, (f) => existsSync40(join53(root, f)));
+  const detection = detectFrameworks(deps, (f) => existsSync41(join54(root, f)));
   if (p.flags.json) console.log(JSON.stringify(detection, null, 2));
   else console.log(renderPlan(detection, lang));
   return 0;
@@ -78701,7 +80260,7 @@ function cmdVerify(p) {
     const trial = conformityTrial(p, standard, lang);
     const expected = [...expectedNc, ...buildConformityWorklist(trial.claims, expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items, expected);
-    const ctx = readVerifyContext(dirname20(resolve18(apply)));
+    const ctx = readVerifyContext(dirname21(resolve18(apply)));
     const absentItems = r.failures.filter((f) => !items.includes(f));
     const absentC = absentItems.filter((f) => f.kind === "c").length;
     const sourceDiffers = ctx ? !sameConformitySource(ctx.conformities, trial.source) : absentC > 0 && !items.some((it) => it.kind === "c");
@@ -78819,9 +80378,9 @@ function cmdVerifySummary(p) {
     return 0;
   }
   const out2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : ".";
-  mkdirSync19(out2, { recursive: true });
-  const mdPath = join53(out2, "TRIAL.md");
-  writeFileSync22(mdPath, formatTrialSummary(summary, lang));
+  mkdirSync20(out2, { recursive: true });
+  const mdPath = join54(out2, "TRIAL.md");
+  writeFileSync23(mdPath, formatTrialSummary(summary, lang));
   console.log(
     summary.validated ? lang === "fr" ? `\u2713 Bilan de contre-expertise \u2192 ${mdPath} \u2014 gate s\xE9mantique vert.` : `\u2713 Counter-review summary \u2192 ${mdPath} \u2014 semantic gate green.` : lang === "fr" ? `Bilan de contre-expertise \u2192 ${mdPath} \u2014 audit NON valid\xE9 (gate ${summary.gate.ok ? "vert" : "en \xE9chec"}, ${summary.contestedEngine.length} d\xE9cision(s) moteur contest\xE9e(s), ${summary.untried.length} jamais mise(s) \xE0 l'\xE9preuve, ${summary.foreign.length} \xE9trang\xE8re(s)).` : `Counter-review summary \u2192 ${mdPath} \u2014 audit NOT validated (gate ${summary.gate.ok ? "green" : "failing"}, ${summary.contestedEngine.length} contested engine decision(s), ${summary.untried.length} never tried, ${summary.foreign.length} foreign).`
   );
@@ -78847,7 +80406,7 @@ function applyPrune(p, standard, items, lang, untried = []) {
   let ledgerRepair;
   if (ledgerFile) {
     let ledger = readLedger(ledgerFile);
-    if (!ledger && !existsSync40(ledgerFile)) {
+    if (!ledger && !existsSync41(ledgerFile)) {
       ledger = emptyLedger(standard);
       console.error(
         lang === "fr" ? `\u26A0 Aucun registre en ${ledgerFile} \u2014 un registre vide est cr\xE9\xE9. Les verdicts d\xE9j\xE0 repli\xE9s n'y figurent pas : repliez-les avec \`verify --apply <ADJUDICATE.todo.json> --ledger\` pour qu'ils soient rejouables.` : `\u26A0 No ledger at ${ledgerFile} \u2014 creating an empty one. Verdicts folded earlier are not in it: fold them with \`verify --apply <ADJUDICATE.todo.json> --ledger\` to make them replayable.`
@@ -78863,8 +80422,8 @@ function applyPrune(p, standard, items, lang, untried = []) {
     ledgerRepair = pruneLedger(ledger, items, pruned.reopenedCriteria, pruned.clearedConformities, root);
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
-  mkdirSync19(out2, { recursive: true });
-  writeFileSync22(join53(out2, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
+  mkdirSync20(out2, { recursive: true });
+  writeFileSync23(join54(out2, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
   if (ledgerFile && ledgerRepair) {
     writeLedger(ledgerFile, ledgerRepair.ledger);
     if (!p.flags.json)
@@ -79025,7 +80584,7 @@ function conformityTrial(p, standard, lang) {
   }
   const path = named3 ?? ledgerPath(standard);
   const source = { source: named3 ? "file" : "ledger", path: resolve18(path) };
-  if (!existsSync40(path)) {
+  if (!existsSync41(path)) {
     if (named3) {
       console.error(
         lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named3}.` : `ultra11y verify: --conformities file not found: ${named3}.`
@@ -79105,9 +80664,9 @@ function replayLedgerFile(p, ledger, lang) {
     return 1;
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
-  mkdirSync19(out2, { recursive: true });
-  const auditPath = join53(out2, "audit-latest.json");
-  writeFileSync22(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, standard, lang), null, 2)}
+  mkdirSync20(out2, { recursive: true });
+  const auditPath = join54(out2, "audit-latest.json");
+  writeFileSync23(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, standard, lang), null, 2)}
 `);
   if (p.flags.json)
     console.log(
@@ -79184,9 +80743,9 @@ function applyAdjudicationFile(p, adj, lang) {
     for (const i2 of r.issues) console.error(`  \u2717 ${i2}`);
   }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
-  mkdirSync19(out2, { recursive: true });
-  const auditPath = join53(out2, "audit-latest.json");
-  writeFileSync22(auditPath, JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2) + "\n");
+  mkdirSync20(out2, { recursive: true });
+  const auditPath = join54(out2, "audit-latest.json");
+  writeFileSync23(auditPath, JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2) + "\n");
   const ledgerOut = ledgerTarget(p, adj.standard);
   if (ledgerOut) {
     const blind = unreadableCaptures(r.audit);
@@ -79323,7 +80882,7 @@ async function cmdRefute(p, todoPath) {
           `ultra11y judge: batch #${batch.map((item) => item.n).join(", #")} (${batch.map((item) => item.criteriaId).join(", ")}) \u2014 ${e instanceof Error ? e.message : String(e)}`
         );
       }
-      writeFileSync22(todoPath, JSON.stringify(items, null, 2) + "\n");
+      writeFileSync23(todoPath, JSON.stringify(items, null, 2) + "\n");
     }
   };
   await Promise.all(Array.from({ length: Math.min(lanes, queue.length) }, worker));
@@ -79438,7 +80997,7 @@ async function cmdJudge(p) {
         { cwd }
       );
       if (partial.applied > 0)
-        writeFileSync22(join53(outDir, "audit-latest.json"), `${JSON.stringify(auditDocumentFor(partial.audit, standard, lang), null, 2)}
+        writeFileSync23(join54(outDir, "audit-latest.json"), `${JSON.stringify(auditDocumentFor(partial.audit, standard, lang), null, 2)}
 `);
     } catch {
     }
@@ -79507,9 +81066,9 @@ async function cmdJudge(p) {
     for (const i2 of r.issues.slice(0, 40)) console.error(`  \u2717 ${i2}`);
     if (r.issues.length > 40) console.error(`  \u2026 +${r.issues.length - 40}`);
   }
-  mkdirSync19(out2, { recursive: true });
-  const auditPath = join53(out2, "audit-latest.json");
-  writeFileSync22(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
+  mkdirSync20(out2, { recursive: true });
+  const auditPath = join54(out2, "audit-latest.json");
+  writeFileSync23(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
 `);
   const ledgerOut = ledgerTarget(p, adj.standard);
   if (ledgerOut) {
@@ -79602,7 +81161,7 @@ async function cmdScan(p) {
     return 0;
   }
   for (const target of p.positionals.filter((a) => a !== "-")) {
-    if (/^https?:\/\//i.test(target) || existsSync40(target)) continue;
+    if (/^https?:\/\//i.test(target) || existsSync41(target)) continue;
     console.error(
       lang === "fr" ? `ultra11y scan : fichier introuvable (file not found) : ${target}. Passez une URL http(s):// ou un fichier HTML existant.` : `ultra11y scan: File not found: ${target}. Pass an http(s):// URL or an existing HTML file.`
     );
@@ -79734,6 +81293,22 @@ async function cmdScan(p) {
     } catch {
     }
   }
+  let documentFiles = [];
+  if (dynamic.snapshots?.length && p.flags["no-pdf"] !== true) {
+    const maxPdf = typeof p.flags["max-pdf"] === "string" ? Number(p.flags["max-pdf"]) : void 0;
+    const docs = await downloadSnapshotDocuments(snapshotRoot ?? ".", dynamic.snapshots, {
+      ...maxPdf !== void 0 && Number.isFinite(maxPdf) && maxPdf >= 0 ? { maxCount: maxPdf } : {}
+    });
+    documentFiles = docs.files;
+    if (docs.files.length)
+      console.error(
+        lang === "fr" ? `ultra11y scan : ${docs.files.length} document(s) PDF t\xE9l\xE9charg\xE9(s) dans ${DOCUMENTS_DIR}/.` : `ultra11y scan: ${docs.files.length} PDF document(s) downloaded to ${DOCUMENTS_DIR}/.`
+      );
+    for (const s of docs.skipped)
+      console.error(
+        lang === "fr" ? `\u26A0\uFE0F ultra11y scan : document non t\xE9l\xE9charg\xE9 \u2014 ${s.url} : ${s.reason}.` : `\u26A0\uFE0F ultra11y scan: document not downloaded \u2014 ${s.url}: ${s.reason}.`
+      );
+  }
   const out2 = typeof p.flags.out === "string" ? p.flags.out : "audits";
   const mergeIn = p.flags.merge;
   if (typeof mergeIn === "string" && mergeIn) {
@@ -79756,9 +81331,9 @@ async function cmdScan(p) {
     }
     let merged = mergeDynamic(audit2, dynamic, lang);
     if (dynamic.snapshots?.length) {
-      const doms = dynamic.snapshots.map((id) => join53(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync40(f));
+      const doms = dynamic.snapshots.map((id) => join54(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync41(f));
       if (doms.length) {
-        const snapAudit = runAudit({ inputs: doms, onWarn: (m) => console.error(m) });
+        const snapAudit = runAudit({ inputs: [...doms, ...documentFiles], onWarn: (m) => console.error(m) });
         merged = mergeSnapshotAudit(merged, snapAudit);
       }
       const scope = pageScopesFrom(readSnapshots(snapshotRoot ?? "."));
@@ -79767,9 +81342,9 @@ async function cmdScan(p) {
         attributePages(merged, scope);
       }
     }
-    mkdirSync19(out2, { recursive: true });
+    mkdirSync20(out2, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);
-    writeFileSync22(join53(out2, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
+    writeFileSync23(join54(out2, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
     if (p.flags.json)
       console.log(
         JSON.stringify(
@@ -79785,7 +81360,7 @@ async function cmdScan(p) {
       );
     else {
       console.log(
-        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join53(out2, "audit-latest.json")} (${merged.conformancePct}% r\xE9ussite, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join53(out2, "audit-latest.json")} (${merged.conformancePct}% pass rate, ${merged.findings.length} findings).`
+        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join54(out2, "audit-latest.json")} (${merged.conformancePct}% r\xE9ussite, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join54(out2, "audit-latest.json")} (${merged.conformancePct}% pass rate, ${merged.findings.length} findings).`
       );
       if (dynamic.snapshots?.length)
         console.log(
@@ -80027,9 +81602,9 @@ async function cmdImport(p) {
       return 1;
     }
     if (outDir) {
-      mkdirSync19(outDir, { recursive: true });
-      const rawFile = join53(outDir, `external-${adapterId}-${arg}.raw.json`);
-      writeFileSync22(rawFile, rawText.endsWith("\n") ? rawText : `${rawText}
+      mkdirSync20(outDir, { recursive: true });
+      const rawFile = join54(outDir, `external-${adapterId}-${arg}.raw.json`);
+      writeFileSync23(rawFile, rawText.endsWith("\n") ? rawText : `${rawText}
 `);
       if (!p.flags.json) console.log(rawFile);
     }
@@ -80063,9 +81638,9 @@ async function cmdImport(p) {
     return 0;
   }
   if (outDir) {
-    mkdirSync19(outDir, { recursive: true });
-    const file = join53(outDir, "external-latest.json");
-    writeFileSync22(file, `${JSON.stringify(audit2, null, 2)}
+    mkdirSync20(outDir, { recursive: true });
+    const file = join54(outDir, "external-latest.json");
+    writeFileSync23(file, `${JSON.stringify(audit2, null, 2)}
 `);
     console.log(file);
   } else {
@@ -80168,9 +81743,9 @@ function cmdOrchestrate(p) {
     );
     return 2;
   }
-  const engineAbs = realpathSync8(fileURLToPath5(import.meta.url));
+  const engineAbs = realpathSync8(fileURLToPath6(import.meta.url));
   if (p.flags.list === true) {
-    if (!existsSync40(runFlag)) {
+    if (!existsSync41(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }
@@ -80178,7 +81753,7 @@ function cmdOrchestrate(p) {
     return 0;
   }
   if (p.flags.manifest === true) {
-    if (!existsSync40(runFlag)) {
+    if (!existsSync41(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }
@@ -80205,7 +81780,7 @@ function cmdOrchestrate(p) {
     );
   } else {
     console.log(
-      lang === "fr" ? `Suivez ${join53(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join53(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
+      lang === "fr" ? `Suivez ${join54(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join54(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
     );
   }
   if (p.flags.phase === void 0 && workflows.length === 0 && p.flags.eco !== true) {
@@ -80325,7 +81900,7 @@ async function main(argv) {
 function isInvokedDirectly() {
   const argv1 = process.argv[1];
   if (argv1 === void 0) return false;
-  const modulePath = fileURLToPath5(import.meta.url);
+  const modulePath = fileURLToPath6(import.meta.url);
   try {
     if (realpathSync8(argv1) === realpathSync8(modulePath)) return true;
   } catch {

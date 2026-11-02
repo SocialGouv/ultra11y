@@ -81,15 +81,15 @@
     "levels": {
       "det": 2,
       "nc": 22,
-      "hint": 29,
-      "llm": 53
+      "hint": 30,
+      "llm": 52
     },
     "provable": 24,
     "deterministic": [
       "8.3",
       "8.5"
     ],
-    "touched": 53,
+    "touched": 54,
     "cNeedsJudgment": 104
   },
   "wcag": {
@@ -99,7 +99,7 @@
     "judgment": 38
   },
   "engine": {
-    "staticRules": 97,
+    "staticRules": 102,
     "crossRules": 7,
     "renderedRules": 6,
     "packRules": 4,
@@ -109,9 +109,9 @@
   "sources": [
     {
       "key": "static",
-      "touched": 43,
+      "touched": 44,
       "decisive": 20,
-      "signalOnly": 23
+      "signalOnly": 24
     },
     {
       "key": "axe",
@@ -165,7 +165,7 @@
     "overallPct": 47
   },
   "tests": {
-    "fixtures": 138
+    "fixtures": 147
   },
   "criteria": [
     {
@@ -1763,11 +1763,19 @@
       "id": "13.3",
       "theme": 13,
       "title": "Dans chaque page web, chaque document bureautique en téléchargement possède-t-il, si nécessaire, une version accessible (hors cas particuliers) ?",
-      "level": "llm",
-      "sources": [],
+      "level": "hint",
+      "sources": [
+        "static"
+      ],
       "decisiveSources": [],
       "decisive": [],
-      "signals": [],
+      "signals": [
+        "pdf-lang-missing",
+        "pdf-no-text",
+        "pdf-structure-shallow",
+        "pdf-title-missing",
+        "pdf-untagged"
+      ],
       "advisory": [],
       "tests": 1
     },

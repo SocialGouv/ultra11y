@@ -23,6 +23,82 @@ interface MsgEntry {
 }
 
 export const MSG_CATALOG: Record<string, MsgEntry> = {
+  // ---- Document rules (src/rules/pdf.ts) ----
+  "pdf-untagged": {
+    message: {
+      fr: (p) =>
+        `Document PDF non balisé (PDF ${p.version}) — ${p.marked === "yes" ? "/MarkInfo déclare le balisage" : "pas de /MarkInfo << /Marked true >>"}, ${p.structTree === "yes" ? "un arbre de structure existe" : "pas d'arbre de structure (/StructTreeRoot)"} : une technologie d'assistance lit un flux de texte sans titres, listes ni tableaux.`,
+      en: (p) =>
+        `Untagged PDF document (PDF ${p.version}) — ${p.marked === "yes" ? "/MarkInfo declares it marked" : "no /MarkInfo << /Marked true >>"}, ${p.structTree === "yes" ? "a structure tree exists" : "no structure tree (/StructTreeRoot)"}: assistive technology reads a flat stream of text with no headings, lists or tables.`,
+    },
+    remediation: {
+      fr: () =>
+        `Produisez un PDF balisé (PDF/UA-1) depuis l'outil source, ou proposez une version alternative accessible (HTML ou document balisé) ; vérifiez le résultat avec veraPDF ou PAC.`,
+      en: () =>
+        `Produce a tagged PDF (PDF/UA-1) from the source tool, or offer an accessible alternative version (HTML or a tagged document); check the result with veraPDF or PAC.`,
+    },
+  },
+  "pdf-lang-missing": {
+    message: {
+      fr: () => `Le document PDF ne déclare pas de langue (/Lang absent du catalogue) — la synthèse vocale ne sait pas dans quelle langue le lire.`,
+      en: () => `The PDF document declares no language (no /Lang in the catalog) — speech synthesis cannot tell which language to read it in.`,
+    },
+    remediation: {
+      fr: () => `Déclarez la langue du document (ex. /Lang (fr-FR)) dans l'outil qui produit le PDF.`,
+      en: () => `Declare the document language (e.g. /Lang (en-GB)) in the tool that produces the PDF.`,
+    },
+  },
+  "pdf-title-missing": {
+    message: {
+      fr: (p) =>
+        p.titleState === "not-displayed"
+          ? `Le document PDF a un titre (« ${p.title} ») mais /ViewerPreferences /DisplayDocTitle n'est pas vrai — le lecteur affiche le nom du fichier à la place.`
+          : `Le document PDF n'a pas de titre (ni /Title dans les métadonnées, ni dc:title XMP).`,
+      en: (p) =>
+        p.titleState === "not-displayed"
+          ? `The PDF document has a title ("${p.title}") but /ViewerPreferences /DisplayDocTitle is not true — the viewer shows the file name instead.`
+          : `The PDF document has no title (no /Title in its metadata, no XMP dc:title).`,
+    },
+    remediation: {
+      fr: () => `Renseignez un titre pertinent dans les métadonnées du document et activez l'affichage du titre (DisplayDocTitle).`,
+      en: () => `Set a relevant title in the document metadata and turn on title display (DisplayDocTitle).`,
+    },
+  },
+  "pdf-no-text": {
+    message: {
+      fr: (p) =>
+        `Document PDF sans texte extractible (${p.pages} page(s), ${p.images} image(s), aucune police ni opérateur de texte) — un document numérisé dont le contenu est inaccessible à une technologie d'assistance.`,
+      en: (p) =>
+        `PDF document with no extractable text (${p.pages} page(s), ${p.images} image(s), no font and no text operator) — a scanned document whose content assistive technology cannot reach.`,
+    },
+    remediation: {
+      fr: () =>
+        `Fournissez le document source en texte réel (ou passez-le en reconnaissance de caractères puis balisez-le), ou proposez une version alternative accessible.`,
+      en: () => `Provide the source document as real text (or OCR it and then tag it), or offer an accessible alternative version.`,
+    },
+  },
+  "pdf-structure-shallow": {
+    message: {
+      fr: (p) =>
+        p.gap === "table-no-th"
+          ? `Le document PDF est balisé, mais ${p.without} tableau(x) sur ${p.tables} n'a(ont) aucune cellule d'en-tête (TH).`
+          : `Le document PDF est balisé, mais son arbre de structure (${p.elements} élément(s)) ne contient aucun titre (H, H1–H6).`,
+      en: (p) =>
+        p.gap === "table-no-th"
+          ? `The PDF document is tagged, but ${p.without} of its ${p.tables} table(s) have no header cell (TH).`
+          : `The PDF document is tagged, but its structure tree (${p.elements} element(s)) holds no heading (H, H1–H6).`,
+    },
+    remediation: {
+      fr: (p) =>
+        p.gap === "table-no-th"
+          ? `Balisez les cellules d'en-tête des tableaux de données en TH (avec /Scope), si le tableau en a.`
+          : `Balisez les intertitres du document en titres (H1–H6), s'il en comporte.`,
+      en: (p) =>
+        p.gap === "table-no-th"
+          ? `Tag data-table header cells as TH (with /Scope), where the table has them.`
+          : `Tag the document's headings as H1–H6, where it has any.`,
+    },
+  },
   "document-language-missing": {
     message: {
       fr: () => `La page n'a pas de langue par défaut sur <html> et au moins un texte visible n'hérite d'aucun attribut lang/xml:lang.`,

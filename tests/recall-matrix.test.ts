@@ -197,7 +197,9 @@ const firesWithCss = (ruleId: string, seed: { html: string; css: { selector: str
 
 // Seeded in tests/rendered-rules.test.ts instead: it needs a real PNG on disk, and this file
 // is deliberately I/O-free. Named here so the gap is DECLARED, never silent.
-const COVERED_ELSEWHERE = new Set(["rendered-contrast-pixel"]);
+// The DOCUMENT rules read a PDF, not markup, so no HTML seed can reach them: their seeds are the
+// veraPDF-ruled fixtures under tests/fixtures/pdf, asserted rule by rule in tests/pdf.test.ts.
+const COVERED_ELSEWHERE = new Set(["rendered-contrast-pixel", "pdf-untagged", "pdf-lang-missing", "pdf-title-missing", "pdf-no-text", "pdf-structure-shallow"]);
 
 const firesWithSignals = (ruleId: string, seed: SignalSeed): boolean => {
   const doc = parseSource(seed.html, `${ruleId}.html`);

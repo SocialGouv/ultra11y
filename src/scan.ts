@@ -968,6 +968,31 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
     merged.packFindings = pack;
   }
 
+  // Downloadable documents the snapshot run read (the PDFs `scan` fetched from these pages):
+  // outside the WCAG verdict like the pack findings, carried over so the report lists them and a
+  // pack projection routes their findings.
+  if (snap.documents?.length) {
+    const docs = [...(merged.documents ?? [])];
+    const known = new Set(docs.map((d) => d.file));
+    for (const d of snap.documents) if (!known.has(d.file)) docs.push(d);
+    merged.documents = docs;
+  }
+  if (snap.documentFindings?.length) {
+    // One document raises several findings at the same anchor (its header), once per linking
+    // page — so the identity carries the page and the message variant too.
+    const docId = (f: Finding): string => `${portableFindingId(f)}|${f.page ?? ""}|${f.msg?.id ?? ""}|${JSON.stringify(f.msg?.params ?? {})}`;
+    const list = [...(merged.documentFindings ?? [])];
+    const seenDoc = new Set(list.map(docId));
+    for (const finding of snap.documentFindings) {
+      const id = docId(finding);
+      if (!seenDoc.has(id)) {
+        seenDoc.add(id);
+        list.push(finding);
+      }
+    }
+    merged.documentFindings = list;
+  }
+
   // A criterion the static pass closed for want of a subject, which the snapshot then MEASURED.
   // Both read `C`, so the discriminator is the FLAG, not the status — and testing the status
   // is exactly what this loop used to do. The snapshot pages have no time-based media either,

@@ -95,6 +95,7 @@ import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, judgeBatchCli, refuteBatchCli } from 
 import { CODEX_EFFORT_LEVELS, judgeBatchCodex, refuteBatchCodex } from "./agent-codex.js";
 import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, batchWorklist, isProviderUnavailableError, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
 import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable, scanPageSummary } from "./scan.js";
+import { DOCUMENTS_DIR, downloadSnapshotDocuments } from "./documents.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
 import { createAdapter } from "./external/registry.js";
@@ -176,7 +177,7 @@ Usage:
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
   ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate manual criteria — api needs ANTHROPIC_API_KEY; claude/codex reuse their CLI login; cli aliases claude)
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
-  ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--merge <audit.json>] [--out <dir>] [--json]
+  ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--runtime …] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime …] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
   ultra11y scan     --clean        (remove the dynamic-tier Docker image + temp contexts)
@@ -561,6 +562,12 @@ Options:
                      Snapshots are ON by default: the browser is already on the page, and
                      without one the page can never be re-audited offline nor earn a
                      per-page verdict (its criteria stay « to assess » forever)
+  --no-pdf           scan: do NOT download the same-origin PDF documents the scanned pages
+                     link to (into .ultra11y/documents/<sha256>.pdf, with a sidecar naming
+                     the URL and the pages linking it). audit: do not ingest that directory.
+                     PDF inputs named explicitly are always audited
+  --max-pdf <n>      scan: most PDF documents downloaded per run (default 20; each one
+                     capped at 20 MiB)
   --clean            scan: remove the dynamic-tier image + temp contexts, then exit
   --api-key <key>    judge: the Anthropic API key. Defaults to $ANTHROPIC_API_KEY. This is
                      the ONLY place in the tool that takes one — the engine needs no key
@@ -660,6 +667,8 @@ const VALUE_FLAGS = new Set([
   "crawl",
   "depth",
   "max",
+  // `scan`: most linked PDF documents downloaded per run.
+  "max-pdf",
   // `import`: which external audit tool the report comes from, and (with `--from file`) which
   // adapter should read it. `pages --diff`: the imported audit to hold the grid against.
   "from",
@@ -793,6 +802,8 @@ const BOOLEAN_FLAGS = new Set([
   "no-interact",
   "interact-clicks",
   "no-snapshot",
+  // `scan`/`audit`: do not download (scan) or ingest (audit) the PDF documents pages link to.
+  "no-pdf",
   "clean",
   "sample",
   "eco",
@@ -1203,7 +1214,17 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   // most page-centric thing a caller can do, and what the e2e plugins' report option does —
   // silently produced an audit with no pages in scope, so `pages` then refused to render.
   const pagesInScope = pagesWanted && !scopedToDiff;
-  const auditInputs = [...inputs, ...(useCaptures ? [capturesDir] : []), ...(usePages ? [PAGES_DIR] : [])];
+  // DOWNLOADED DOCUMENTS (.ultra11y/documents/*.pdf, written by `scan`): the PDFs the captured
+  // pages link to, re-read offline like the snapshots themselves. `--no-pdf` opts out.
+  const documentsGlob = `${DOCUMENTS_DIR}/*.pdf`;
+  const useDocuments =
+    p.flags["no-pdf"] !== true &&
+    !inputs.includes("-") &&
+    !scopedToDiff &&
+    existsSync(DOCUMENTS_DIR) &&
+    !inputs.includes(documentsGlob) &&
+    !inputs.includes(DOCUMENTS_DIR);
+  const auditInputs = [...inputs, ...(useCaptures ? [capturesDir] : []), ...(usePages ? [PAGES_DIR] : []), ...(useDocuments ? [documentsGlob] : [])];
   if (useCaptures)
     console.error(
       lang === "fr" ? `ultra11y audit : captures rendues ingérées depuis ${capturesDir}.` : `ultra11y audit: ingesting rendered captures from ${capturesDir}.`,
@@ -1211,6 +1232,10 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   if (usePages)
     console.error(
       lang === "fr" ? `ultra11y audit : instantanés de page ingérés depuis ${PAGES_DIR}.` : `ultra11y audit: ingesting page snapshots from ${PAGES_DIR}.`,
+    );
+  if (useDocuments)
+    console.error(
+      lang === "fr" ? `ultra11y audit : documents PDF ingérés depuis ${DOCUMENTS_DIR}.` : `ultra11y audit: ingesting PDF documents from ${DOCUMENTS_DIR}.`,
     );
 
   const result = runAudit({
@@ -4627,6 +4652,29 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       /* unknown standard for lint — skip advisory */
     }
   }
+  // THE DOCUMENTS THE PAGES LINK TO. Same-origin PDFs only, bounded in count and size, stored by
+  // content hash under .ultra11y/documents with a sidecar naming the URL and the linking pages —
+  // so the snapshot audit below reads them, and a later `audit` re-reads them offline.
+  let documentFiles: string[] = [];
+  if (dynamic.snapshots?.length && p.flags["no-pdf"] !== true) {
+    const maxPdf = typeof p.flags["max-pdf"] === "string" ? Number(p.flags["max-pdf"]) : undefined;
+    const docs = await downloadSnapshotDocuments(snapshotRoot ?? ".", dynamic.snapshots, {
+      ...(maxPdf !== undefined && Number.isFinite(maxPdf) && maxPdf >= 0 ? { maxCount: maxPdf } : {}),
+    });
+    documentFiles = docs.files;
+    if (docs.files.length)
+      console.error(
+        lang === "fr"
+          ? `ultra11y scan : ${docs.files.length} document(s) PDF téléchargé(s) dans ${DOCUMENTS_DIR}/.`
+          : `ultra11y scan: ${docs.files.length} PDF document(s) downloaded to ${DOCUMENTS_DIR}/.`,
+      );
+    for (const s of docs.skipped)
+      console.error(
+        lang === "fr"
+          ? `⚠️ ultra11y scan : document non téléchargé — ${s.url} : ${s.reason}.`
+          : `⚠️ ultra11y scan: document not downloaded — ${s.url}: ${s.reason}.`,
+      );
+  }
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : "audits";
   const mergeIn = p.flags.merge;
   if (typeof mergeIn === "string" && mergeIn) {
@@ -4655,7 +4703,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     if (dynamic.snapshots?.length) {
       const doms = dynamic.snapshots.map((id) => join(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f) => existsSync(f));
       if (doms.length) {
-        const snapAudit = runAudit({ inputs: doms, onWarn: (m) => console.error(m) });
+        const snapAudit = runAudit({ inputs: [...doms, ...documentFiles], onWarn: (m) => console.error(m) });
         merged = mergeSnapshotAudit(merged, snapAudit);
       }
       // Record the pages in scope so the per-page grid rebuilds from this JSON alone, and

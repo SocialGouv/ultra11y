@@ -20,7 +20,9 @@
 // a fresh clone should not be stopped by a 150 MB download, and CI installs it explicitly (see
 // the `browser-tier` job in ci.yml, which also asserts these tests actually ran).
 import { createServer, type Server } from "node:http";
-import { mkdtempSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdtempSync, existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -720,4 +722,101 @@ describe("the collector's ordinals line up with a reparse of its own serialisati
     expect(r.styles, "style digest refused").not.toBeNull();
     expect(r.boxes, "box digest refused").not.toBeNull();
   });
+});
+
+// `scan` DOWNLOADS THE PDF DOCUMENTS ITS PAGES LINK TO (issue #90), end to end through the CLI:
+// a real Chromium records the page, the same-origin PDF it links is fetched into
+// .ultra11y/documents with its sidecar, the off-origin one is never requested, and the merged
+// audit carries the document's findings attributed to the page that links it — the evidence the
+// RGAA 13.3 brief is built from.
+describe("scan downloads the same-origin PDFs a captured page links to", () => {
+  let site: Server | undefined;
+  let siteOrigin = "";
+  const requested: string[] = [];
+  const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const RECEIPT = readFileSync(join(REPO, "tests", "fixtures", "pdf", "untagged.pdf"));
+
+  beforeAll(async () => {
+    if (!browserAvailable) return;
+    site = createServer((req, res) => {
+      requested.push(req.url ?? "");
+      if (req.url === "/docs/recepisse.pdf") {
+        res.writeHead(200, { "content-type": "application/pdf" });
+        res.end(RECEIPT);
+        return;
+      }
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(
+        `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Déclaration transmise</title></head><body><main><h1>Déclaration transmise</h1>` +
+          `<p><a href="/docs/recepisse.pdf">Télécharger le récépissé (PDF)</a></p>` +
+          `<p><a href="https://example.invalid/tiers.pdf">Document d'un tiers (PDF)</a></p></main></body></html>`,
+      );
+    });
+    await new Promise<void>((resolve) => site?.listen(0, "127.0.0.1", resolve));
+    const addr = site.address();
+    siteOrigin = typeof addr === "object" && addr ? `http://127.0.0.1:${addr.port}` : "";
+  }, 120_000);
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => (site ? site.close(() => resolve()) : resolve()));
+  });
+
+  it("stores the document, attributes its findings to the page, and hands 13.3 the evidence", async () => {
+    if (!browserAvailable) return;
+    const work = mkdtempSync(join(tmpdir(), "u11y-scan-pdf-"));
+    const base = join(work, "base.json");
+    writeFileSync(base, JSON.stringify(runAudit({ inputs: [join(REPO, "tests", "fixtures", "conforming")] })));
+    const cli = join(REPO, "scripts", "ultra11y.mjs");
+    // ASYNC on purpose: the site is served from this very process, and a synchronous child
+    // would block the event loop the server answers on.
+    await promisify(execFile)(
+      process.execPath,
+      [
+        cli,
+        "scan",
+        `${siteOrigin}/declaration`,
+        "--runtime",
+        "local",
+        "--cwd",
+        REPO,
+        "--root",
+        work,
+        "--no-interact",
+        "--merge",
+        base,
+        "--out",
+        join(work, "audits"),
+        "--lang",
+        "fr",
+      ],
+      { cwd: work, timeout: 170_000 },
+    );
+
+    const docsDir = join(work, ".ultra11y", "documents");
+    const pdfs = readdirSync(docsDir).filter((f) => f.endsWith(".pdf"));
+    expect(pdfs, "the linked PDF was not downloaded").toHaveLength(1);
+    expect(readFileSync(join(docsDir, pdfs[0]!))).toEqual(RECEIPT);
+    const sidecar = JSON.parse(readFileSync(join(docsDir, pdfs[0]!.replace(/\.pdf$/, ".json")), "utf8"));
+    expect(sidecar.url).toBe(`${siteOrigin}/docs/recepisse.pdf`);
+    expect(sidecar.pages).toHaveLength(1);
+    expect(
+      requested.some((u) => u.includes("tiers")),
+      "an off-origin document was requested",
+    ).toBe(false);
+
+    const merged = JSON.parse(readFileSync(join(work, "audits", "audit-latest.json"), "utf8"));
+    const audit = merged.audit ?? merged;
+    expect(audit.documents).toHaveLength(1);
+    expect(audit.documents[0]).toMatchObject({ url: `${siteOrigin}/docs/recepisse.pdf`, tagged: false });
+    const ids = new Set((audit.documentFindings ?? []).map((f: { ruleId: string }) => f.ruleId));
+    expect(ids).toEqual(new Set(["pdf-untagged", "pdf-lang-missing", "pdf-title-missing"]));
+    expect(new Set(audit.documentFindings.map((f: { page?: string }) => f.page))).toEqual(new Set(sidecar.pages));
+    // No WCAG criterion of the page is decided by the document.
+    expect(audit.findings.some((f: { ruleId: string }) => f.ruleId.startsWith("pdf-"))).toBe(false);
+
+    const { derivePackResults } = await import("../src/standards/index.js");
+    const row = derivePackResults(audit, "rgaa").find((r) => r.id === "13.3")!;
+    expect(row.status).toBe("manual");
+    expect((row.candidateFindings ?? []).map((f) => f.ruleId).sort()).toEqual(["pdf-lang-missing", "pdf-title-missing", "pdf-untagged"]);
+  }, 180_000);
 });

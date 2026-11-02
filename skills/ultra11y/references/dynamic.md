@@ -246,6 +246,22 @@ screenshot). The browser is already on the page, so this costs one `evaluate`. `
 opts out; `--root <dir>` relocates the tree (default: the working directory — `--cwd` is
 where Playwright resolves from, not where snapshots land).
 
+### …and the PDF documents those pages link to
+
+After the pages are recorded, `scan` downloads the **same-origin PDF links** of each captured page
+(a link whose path ends in `.pdf`, or that declares `type="application/pdf"`, resolved against the
+page URL and its `<base>`) into `.ultra11y/documents/<sha256>.pdf`, beside a `<sha256>.json`
+sidecar naming the URL and **every page that links it**. Bounded: at most 20 documents per run
+(`--max-pdf <n>`), 20 MiB each, and only bytes starting with `%PDF-` are kept — a link answering
+with a login page is reported « not a PDF », never audited as one. Third-party links are never
+requested. `--no-pdf` opts out. Each refusal is printed with its reason.
+
+The snapshot audit then reads them with the engine's own zero-dependency PDF reader
+(`src/parse/pdf.ts`), and a later `audit` re-ingests `.ultra11y/documents/*.pdf` offline. Every
+document finding is attributed to the pages linking the document — under RGAA, candidate evidence
+for 13.3 on those pages (`references/rgaa-review.md`). No credential is ever sent: an
+authenticated document is out of reach of the download and stays to be judged by hand.
+
 ### …and what it MEASURED, not only what it saw
 
 The snapshot also carries `probes.json` and `axe.json`: which success criteria the live probes
