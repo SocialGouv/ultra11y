@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.55.1](https://github.com/SocialGouv/ultra11y/compare/v5.55.0...v5.55.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **report:** the CLI partial-audit warning and report --json say what the report says, with a remedy that fits the run ([#110](https://github.com/SocialGouv/ultra11y/issues/110)) ([d74601f](https://github.com/SocialGouv/ultra11y/commit/d74601ff81da61cb6ae2c7658e0fb3b343a9d7b1))
+
 # [5.55.0](https://github.com/SocialGouv/ultra11y/compare/v5.54.4...v5.55.0) (2026-11-02)
 
 
