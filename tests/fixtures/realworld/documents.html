@@ -50,6 +50,14 @@
       <button type="button" aria-label="Consulter">Télécharger les archives</button>
     </form>
 
+    <!-- field-label-in-name-mismatch · RGAA 11.2 (test 5) · WCAG 2.5.3 — l'aria-label du champ
+         fichier remplace l'étiquette visible associée par for/id (egapro#4919). -->
+    <form action="/documents/deposer" method="post">
+      <label for="depot-avis">Déposer l'avis du comité social et économique</label>
+      <input type="file" id="depot-avis" aria-label="Sélectionner des fichiers">
+      <button type="submit">Envoyer</button>
+    </form>
+
     <footer>
       <nav aria-label="Navigation de pied de page">
         <ul>

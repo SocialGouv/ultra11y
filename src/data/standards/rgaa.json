@@ -4562,18 +4562,26 @@
       ],
       "wcag": ["2.4.6", "2.5.3", "3.3.2"],
       "appliesTo": {
-        "ruleIds": []
+        "ruleIds": ["field-label-in-name-mismatch"]
       },
+      "judgment": true,
       "automation": {
         "tests": {
           "1": "judgment",
           "2": "judgment",
           "3": "judgment",
           "4": "judgment",
-          "5": "judgment",
+          "5": "static",
           "6": "judgment"
         },
-        "rules": []
+        "rules": [
+          {
+            "id": "field-label-in-name-mismatch",
+            "tests": ["5"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {

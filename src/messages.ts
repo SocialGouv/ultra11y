@@ -164,6 +164,17 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
       en: (p) => `Start aria-label with the visible text ("${p.visible} …"), or drop aria-label and let the text name the control.`,
     },
   },
+  "field-label-in-name-mismatch": {
+    message: {
+      fr: (p) =>
+        `L'étiquette visible du champ « ${p.visible} » n'est pas contenue dans son nom accessible « ${p.name} » : l'aria-label la remplace (test RGAA 11.2.5).`,
+      en: (p) => `The field's visible label "${p.visible}" is not contained in its accessible name "${p.name}": the aria-label replaces it.`,
+    },
+    remediation: {
+      fr: () => `Retirez l'aria-label pour que le <label> nomme le champ, ou faites-le contenir l'étiquette visible.`,
+      en: () => `Drop the aria-label so the <label> names the field, or make it contain the visible label.`,
+    },
+  },
   "headers-attr-dangling": {
     message: {
       fr: (p) => `headers="${p.ids}" ne désigne aucune cellule d'en-tête de ce tableau — l'association n'existe pas.`,

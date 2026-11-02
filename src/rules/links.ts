@@ -1,8 +1,18 @@
 // Theme 6 / 7 — Links & buttons: accessible-name presence (empty-name + icon-only).
 import type { Doc, El } from "../parse/html.js";
-import { attr, boundAttr, hasAttr, hasBoundAttr, ancestors, descendants, visibleText } from "../parse/html.js";
+import { attr, boundAttr, hasAttr, hasBoundAttr, hasDynamicSpread, ancestors, descendants, visibleText } from "../parse/html.js";
 import { isIntrinsic } from "../parse/jsx-bridge.js";
-import { accessibleName, mayInjectContent, isButtonInput, isFormField, controlLabel, isNameExempt, visibleLabelText } from "../name.js";
+import {
+  accessibleName,
+  mayInjectContent,
+  isButtonInput,
+  isFormField,
+  controlLabel,
+  isHiddenFromAT,
+  isNameExempt,
+  primaryLabelText,
+  visibleLabelText,
+} from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 function hasIconChild(el: El): boolean {
@@ -255,6 +265,42 @@ const formLabelInNameMismatch: Rule = {
   run: (doc) => labelInNameMismatchFindings(doc, "form"),
 };
 
+// RGAA 11.2.5 (condition 1) / WCAG 2.5.3 for FORM FIELDS. A field's visible label is not its own
+// content but the <label> associated with it (by `for`, or by wrapping); when a literal
+// aria-label replaces that label, the name must still contain it. egapro#4919 shipped exactly
+// this: a file input named « Sélectionner des fichiers » under a label asking for the CSE
+// opinion — a screen-reader user hears a generic control, a voice-control user cannot say what
+// they see. Same conservatism as the three rules above: literal text on both sides, no
+// aria-labelledby (which wins over aria-label and is a different question), no spread, labels
+// of a glyph's length are symbols (a particular case of 11.2.5), hidden labels or fields prove
+// nothing.
+const fieldLabelInNameMismatch: Rule = {
+  id: "field-label-in-name-mismatch",
+  criteria: ["2.5.3"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const el of doc.elements) {
+      if (!isFormField(el) || isHiddenFromAT(el) || hasDynamicSpread(el)) continue;
+      const ariaLabel = (attr(el, "aria-label") ?? "").trim();
+      if (!ariaLabel || ariaLabel.includes("{") || hasAttr(el, "aria-labelledby") || hasBoundAttr(el, "aria-labelledby")) continue;
+      const id = attr(el, "id");
+      const forLabel = id && !id.includes("{") ? doc.elements.find((e) => e.tag === "label" && attr(e, "for") === id) : undefined;
+      const label = forLabel ?? ancestors(el).find((a) => a.tag === "label");
+      if (!label || isHiddenFromAT(label)) continue;
+      // A child component or slot may render more label text than the parse can see.
+      if (descendants(label).some((d) => d.tag === "slot" || (d.tag !== "#fragment" && !isIntrinsic(d.tag)))) continue;
+      const visible = primaryLabelText(label);
+      if (!visible || visible.includes("{") || visible.length < 3) continue;
+      const name = normalizeName(ariaLabel);
+      const intitule = normalizeName(visible);
+      if (!intitule || !name || name.includes(intitule)) continue;
+      out.push({ criteriaId: "2.5.3", el, msgId: "field-label-in-name-mismatch", params: { visible, name: ariaLabel } });
+    }
+    return out;
+  },
+};
+
 const linkLabelInNameMismatch: Rule = {
   id: "link-label-in-name-mismatch",
   criteria: ["2.5.3"],
@@ -271,4 +317,5 @@ export const linksRules: Rule[] = [
   labelInNameMismatch,
   formLabelInNameMismatch,
   linkLabelInNameMismatch,
+  fieldLabelInNameMismatch,
 ];

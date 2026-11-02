@@ -952,7 +952,7 @@ var wcag_default = {
       level: "A",
       addedIn: "2.1",
       automatability: "judgment",
-      ruleIds: ["label-in-name-mismatch", "form-label-in-name-mismatch", "link-label-in-name-mismatch"],
+      ruleIds: ["label-in-name-mismatch", "form-label-in-name-mismatch", "link-label-in-name-mismatch", "field-label-in-name-mismatch"],
       understanding: "https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html",
       techniques: [
         "ARIA14",
@@ -38856,6 +38856,16 @@ var MSG_CATALOG = {
       en: (p) => `Start aria-label with the visible text ("${p.visible} \u2026"), or drop aria-label and let the text name the control.`
     }
   },
+  "field-label-in-name-mismatch": {
+    message: {
+      fr: (p) => `L'\xE9tiquette visible du champ \xAB ${p.visible} \xBB n'est pas contenue dans son nom accessible \xAB ${p.name} \xBB : l'aria-label la remplace (test RGAA 11.2.5).`,
+      en: (p) => `The field's visible label "${p.visible}" is not contained in its accessible name "${p.name}": the aria-label replaces it.`
+    },
+    remediation: {
+      fr: () => `Retirez l'aria-label pour que le <label> nomme le champ, ou faites-le contenir l'\xE9tiquette visible.`,
+      en: () => `Drop the aria-label so the <label> names the field, or make it contain the visible label.`
+    }
+  },
   "headers-attr-dangling": {
     message: {
       fr: (p) => `headers="${p.ids}" ne d\xE9signe aucune cellule d'en-t\xEAte de ce tableau \u2014 l'association n'existe pas.`,
@@ -45383,18 +45393,26 @@ var rgaa_default = {
       ],
       wcag: ["2.4.6", "2.5.3", "3.3.2"],
       appliesTo: {
-        ruleIds: []
+        ruleIds: ["field-label-in-name-mismatch"]
       },
+      judgment: true,
       automation: {
         tests: {
           "1": "judgment",
           "2": "judgment",
           "3": "judgment",
           "4": "judgment",
-          "5": "judgment",
+          "5": "static",
           "6": "judgment"
         },
-        rules: []
+        rules: [
+          {
+            id: "field-label-in-name-mismatch",
+            tests: ["5"],
+            effect: "decisive-nc",
+            rationale: "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {
@@ -49823,6 +49841,23 @@ function visibleLabelText(el) {
   }
   return collapse(out2);
 }
+var NOT_INTITULE_CLASS = /(^|\s)(fr-hint-text|fr-sr-only|sr-only|visually-hidden|visuallyhidden|hint-text|help-text)(\s|$)/;
+var FIELD_DESCENDANT = /* @__PURE__ */ new Set(["input", "select", "textarea", "button", "datalist", "output"]);
+function primaryLabelText(label) {
+  let out2 = "";
+  const nonText = /* @__PURE__ */ new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img", "svg"]);
+  const walk3 = (n) => {
+    if (n.type === "text") {
+      out2 += n.data;
+      return;
+    }
+    if (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true" || nonText.has(n.tag) || FIELD_DESCENDANT.has(n.tag)) return;
+    if (NOT_INTITULE_CLASS.test(attr(n, "class") ?? "")) return;
+    for (const child of n.children) walk3(child);
+  };
+  for (const child of label.children) walk3(child);
+  return collapse(out2);
+}
 function visuallyRenderedText(el) {
   let out2 = "";
   const nonText = /* @__PURE__ */ new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img"]);
@@ -51982,6 +52017,31 @@ var formLabelInNameMismatch = {
   severity: "majeur",
   run: (doc) => labelInNameMismatchFindings(doc, "form")
 };
+var fieldLabelInNameMismatch = {
+  id: "field-label-in-name-mismatch",
+  criteria: ["2.5.3"],
+  severity: "majeur",
+  run(doc) {
+    const out2 = [];
+    for (const el of doc.elements) {
+      if (!isFormField2(el) || isHiddenFromAT(el) || hasDynamicSpread(el)) continue;
+      const ariaLabel = (attr(el, "aria-label") ?? "").trim();
+      if (!ariaLabel || ariaLabel.includes("{") || hasAttr(el, "aria-labelledby") || hasBoundAttr(el, "aria-labelledby")) continue;
+      const id = attr(el, "id");
+      const forLabel = id && !id.includes("{") ? doc.elements.find((e) => e.tag === "label" && attr(e, "for") === id) : void 0;
+      const label = forLabel ?? ancestors(el).find((a) => a.tag === "label");
+      if (!label || isHiddenFromAT(label)) continue;
+      if (descendants(label).some((d) => d.tag === "slot" || d.tag !== "#fragment" && !isIntrinsic(d.tag))) continue;
+      const visible2 = primaryLabelText(label);
+      if (!visible2 || visible2.includes("{") || visible2.length < 3) continue;
+      const name2 = normalizeName(ariaLabel);
+      const intitule = normalizeName(visible2);
+      if (!intitule || !name2 || name2.includes(intitule)) continue;
+      out2.push({ criteriaId: "2.5.3", el, msgId: "field-label-in-name-mismatch", params: { visible: visible2, name: ariaLabel } });
+    }
+    return out2;
+  }
+};
 var linkLabelInNameMismatch = {
   id: "link-label-in-name-mismatch",
   criteria: ["2.5.3"],
@@ -51996,7 +52056,8 @@ var linksRules = [
   controlNameTitleOnly,
   labelInNameMismatch,
   formLabelInNameMismatch,
-  linkLabelInNameMismatch
+  linkLabelInNameMismatch,
+  fieldLabelInNameMismatch
 ];
 
 // src/autofill.ts

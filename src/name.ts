@@ -195,6 +195,33 @@ export function visibleLabelText(el: El): string {
   return collapse(out);
 }
 
+// A hint or a visually hidden span inside a <label> is not what the user reads as the field's
+// intitulé: the DSFR renders `.fr-hint-text` as a second, smaller line under it, and an sr-only
+// span is not visible at all. Comparing an aria-label against them would demand that the name
+// repeat help text, which neither RGAA 11.2.5 nor WCAG 2.5.3 asks.
+const NOT_INTITULE_CLASS = /(^|\s)(fr-hint-text|fr-sr-only|sr-only|visually-hidden|visuallyhidden|hint-text|help-text)(\s|$)/;
+const FIELD_DESCENDANT = new Set(["input", "select", "textarea", "button", "datalist", "output"]);
+
+/** The PRIMARY visible text of a `<label>` — its intitulé — for the label-in-name comparison of
+ *  a form field: hidden subtrees, aria-hidden decoration, hint/sr-only spans and the nested
+ *  field itself (a wrapping label contains the <select> whose options are not label text) are
+ *  left out. Literal text only; a caller must still refuse an interpolated result. */
+export function primaryLabelText(label: El): string {
+  let out = "";
+  const nonText = new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img", "svg"]);
+  const walk = (n: HNode): void => {
+    if (n.type === "text") {
+      out += n.data;
+      return;
+    }
+    if (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true" || nonText.has(n.tag) || FIELD_DESCENDANT.has(n.tag)) return;
+    if (NOT_INTITULE_CLASS.test(attr(n, "class") ?? "")) return;
+    for (const child of n.children) walk(child);
+  };
+  for (const child of label.children) walk(child);
+  return collapse(out);
+}
+
 /** Literal text that can visibly paint, regardless of accessibility-tree exposure.
  * `aria-hidden` removes semantics, not pixels; only rendering-hidden subtrees are excluded. */
 export function visuallyRenderedText(el: El): string {
