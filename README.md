@@ -359,9 +359,11 @@ The generated [106-criterion / 258-test matrix](skills/ultra11y/references/rgaa-
 is the source of truth; CI rebuilds it from the vendored DINUM data and rejects drift.
 
 **Downloadable PDF documents (RGAA 13.3).** The engine reads PDFs with its own zero-dependency
-reader (Node `zlib` only): `audit report.pdf` / `audit "public/**/*.pdf"`, and `scan` downloads
-the same-origin PDFs each captured page links to (bounded, `--no-pdf` to opt out) into
-`.ultra11y/documents/`. Five document checks — `pdf-untagged`, `pdf-lang-missing`,
+reader (Node `zlib` only): `audit report.pdf` / `audit "public/**/*.pdf"`, and `scan` — or the
+Playwright fixture, through the test's own session — downloads the same-origin PDFs each captured
+page links to into `.ultra11y/documents/`: a `.pdf` path, a `download` link, a link or route
+naming PDF (`/api/declaration-pdf`), kept only when the response is a PDF; `scan --storage-state`
+sends the session's matching cookies (bounded, `--no-pdf` / `pdf: false` to opt out). Five document checks — `pdf-untagged`, `pdf-lang-missing`,
 `pdf-title-missing` (title + `DisplayDocTitle`), `pdf-no-text` (image-only scan) and the advisory
 `pdf-structure-shallow` — are listed per document in the report and reach RGAA 13.3 as
 **candidate** evidence: an accessible alternative version may exist, so they never decide a

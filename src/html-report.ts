@@ -35,6 +35,7 @@ import {
   ownerLabel,
   averageConformanceRate,
   conformanceRate,
+  documentsModel,
   packReportGroups,
   reportCoverage,
   reportGroups,
@@ -591,6 +592,33 @@ function pageGridBlocks(result: AuditResult, page: PageResult, standard: Standar
   return out;
 }
 
+/** « Documents téléchargeables » — the same rows and outcomes as the Markdown report, because
+ *  both print `documentsModel` (src/report.ts). The caveat travels with the table: a row with
+ *  nothing found must not read as a conforming document. `downloadable-documents`, not
+ *  `documents`: the index already uses that anchor for its links to the other deliverables. */
+export function documentsBlocks(result: AuditResult, lang: Lang): Block[] {
+  const m = documentsModel(result, lang);
+  if (!m) return [];
+  return [
+    { kind: "heading", level: 2, text: m.title, id: "downloadable-documents" },
+    { kind: "note", tone: "info", runs: ticks(m.note) },
+    {
+      kind: "table",
+      caption: m.title,
+      columns: m.columns.map((text) => ({ text })),
+      rows: m.rows.map((row) =>
+        row.unreadable
+          ? [
+              { text: row.cells[0]!, header: true },
+              { text: row.cells[1]!, mono: true },
+              { text: row.cells[2]!, colspan: m.columns.length - 2 },
+            ]
+          : row.cells.map((text, i) => (i === 0 ? { text, header: true } : i === 1 ? { text, mono: true } : { text })),
+      ),
+    },
+  ];
+}
+
 /** THE ENTRY POINT. Dashboard only: identity, rate, synthesis, scoreboard, and the links out.
  *  It carries no image, so an artifact viewer opens it instantly however heavy the evidence. */
 export function indexDoc(result: AuditResult, opts: HtmlReportOpts & { links?: { href: string; text: string }[] } = {}): Doc {
@@ -608,6 +636,7 @@ export function indexDoc(result: AuditResult, opts: HtmlReportOpts & { links?: {
   blocks.push(...criteriaGridBlocks(result, standard, lang));
   if (h.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
   blocks.push(...scoreboardBlocks(result, standard, lang));
+  blocks.push(...documentsBlocks(result, lang));
   return { lang, title: `${t.indexTitle} — ${stdName(standard)}`, subtitle: h.runs, ...(opts.nav ? { nav: opts.nav } : {}), blocks };
 }
 
@@ -629,6 +658,7 @@ export function compositeDoc(result: AuditResult, opts: HtmlReportOpts = {}): Do
   blocks.push(...scoreboardBlocks(result, standard, lang));
   const scope = pagesOf(result);
   if (scope.length) blocks.push(...crossGridBlocks(result, derivePages(result, scope), standard, lang));
+  blocks.push(...documentsBlocks(result, lang));
   // The file opens on the summary (the level, what to fix); the index of the sections that
   // follow sits right after it, and lists only headings that carry an anchor to land on.
   const contents: Run[][] = blocks

@@ -151,6 +151,8 @@ cy.ultra11y({ as: "accueil" });
 | `auth` | mark the page as sitting behind authentication |
 | `sources` | source files that rendered it — findings are then reported against **your code** |
 | `notes` | reproduction notes carried into the auditor ticket |
+| `pdf` | Playwright: download the PDF documents the page links to (default `true`; `false` is `scan --no-pdf`) — see below |
+| `maxPdf` | Playwright: most documents downloaded per test worker (default 20, 20 MiB each) — `scan --max-pdf` |
 
 `failOn: false` is the useful one for adoption: record every page first, look at the real
 backlog, then turn the gate on.
@@ -186,6 +188,27 @@ the criterion stays undecided, exactly as before, and is never guessed.
 
 Everything else — the DOM, the computed styles, the boxes and the stylesheets — is identical
 between the two.
+
+## The documents the page links to (Playwright)
+
+`checkA11y` — and so every `sweepSample` page — downloads the **same-origin PDF documents** the
+recorded page links to, the way `scan` does, but through the page's own request context
+(`page.context().request`): the test's session goes with the request, so a document generated
+behind the login is reached. A link is a **candidate** when its path ends in `.pdf`, it declares
+`type="application/pdf"` or `download`, its text / `aria-label` / `title` names PDF as a word, or
+its path or query names it as a token (`/api/declaration-pdf?year=2026`, `?format=pdf`). The
+links are read in the browser, so `a.href` is already resolved against the page and its `<base>`.
+A candidate is kept only when the response is `Content-Type: application/pdf` or starts with
+`%PDF-`; anything else is printed « not a PDF » with the response type, never audited. Every
+redirect hop is checked before it is followed (same origin, or the http→https upgrade of it; at
+most 5), so no request leaves the audited origin.
+
+They land in `.ultra11y/documents/<sha256>.pdf` with the same sidecar `scan` writes (`kind`,
+`v`, the URL and **every page linking it** — a header link on every page is fetched once per
+worker and its sidecar grows), and `audit` / the `report: true` option re-read them. Bounded
+like `scan`: at most `maxPdf` (default 20) documents per test worker, 20 MiB each. `pdf: false`
+turns it off. A failed download is a `console.warn`, never a failed test. Cypress does not
+download documents.
 
 ## A report straight out of the test run
 

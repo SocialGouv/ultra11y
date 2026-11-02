@@ -97,7 +97,9 @@ repo. Declare that sample once in `.ultra11yrc.json`:
 (Node built-ins only — `zlib` for object and xref streams; classic and stream xrefs, incremental
 updates, a repair scan when the offsets lie). A directory input never pulls in the PDFs it holds:
 a PDF is audited when it is named, matched by a glob ending in `.pdf`, or downloaded by `scan`
-into `.ultra11y/documents/` (re-ingested automatically; `--no-pdf` opts out). Five document checks
+or by the Playwright fixture into `.ultra11y/documents/` (re-ingested automatically; `--no-pdf`
+opts out — see `references/dynamic.md` for which links count and how a session reaches them).
+Five document checks
 run on each file:
 
 | Rule | What it observes | WCAG |
@@ -110,7 +112,7 @@ run on each file:
 
 The audit JSON lists every document under `documents[]` with each check's outcome — `fail`,
 `not-detected` or `not-checked` — and the report renders them in a « Documents téléchargeables »
-section. **`not-detected` is not a pass**: these checks prove the absence of the gross failures,
+section, the Markdown and the HTML (`report --html`) alike, from one model. **`not-detected` is not a pass**: these checks prove the absence of the gross failures,
 never PDF/UA conformance, which a validator (veraPDF, PAC) establishes. An encrypted, malformed,
 truncated or oversized file is reported **unreadable**, never as conforming.
 

@@ -66,13 +66,15 @@ export type Glossary = Record<string, GlossaryEntry>;
 // every page), NOT the whole file tree. The REQUIRED page KINDS a given standard mandates
 // live in the pack (`sampleMethodology`, src/standards/types.ts), never here.
 // SECURITY: `storageState` is a FILE PATH (a Playwright session file) — its CONTENT is
-// never read into any output/report/finding; only the path is ever cited.
+// never read into any output/report/finding; only the path is ever cited. The one reader is
+// the document download (src/documents.ts), which puts the cookies matching a linked
+// document's URL on the request for it, to the audited origin only, and writes them nowhere.
 export interface SamplePage {
   id: string; // stable slug used for per-page provenance, e.g. "accueil"
   name: string; // human page name shown in the report, e.g. "Page d'accueil"
   url: string; // served URL (http(s)://) or a local HTML file path
   auth?: boolean; // the page sits behind authentication (renders an auth badge)
-  storageState?: string; // Playwright storageState FILE PATH (content never read) — per-page auth
+  storageState?: string; // Playwright storageState FILE PATH (content never reported) — per-page auth
   notes?: string; // reproduction steps / required state, surfaced in the ticket repro block
   // Source files that RENDER this page. A finding raised on the page's DOM is then reported
   // against your component instead of against `dom.html`, which is the difference between a

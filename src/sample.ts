@@ -8,6 +8,8 @@
 // SECURITY: `storageState` values are FILE PATHS (Playwright session files). Their CONTENT
 // is NEVER read here nor embedded in any output/finding/report — only the path is validated
 // as a non-empty string (plus an existsSync advisory that cites the path, never the content).
+// (The document download reads a page's cookies to fetch the documents it links —
+// src/documents.ts — and sends them to the audited origin only.)
 // The required-kinds LIST is standard-specific and lives in the pack
 // (src/standards/types.ts SampleMethodology), never in this core module.
 import { existsSync } from "node:fs";
@@ -72,7 +74,7 @@ export function validateSample(raw: unknown): SampleValidation {
     if (p.storageState !== undefined && (typeof p.storageState !== "string" || p.storageState.trim() === "")) {
       err(`sample.pages[${i}].storageState`, "storageState must be a non-empty file path string");
     } else if (typeof p.storageState === "string" && p.storageState.trim() !== "" && !existsSync(p.storageState)) {
-      // Path string only in the message — the file's content is never read here or anywhere.
+      // Path string only in the message — the file's content is never read here.
       warn(
         `sample.pages[${i}].storageState`,
         `storageState path not found: "${p.storageState}" (resolved from the current directory) — the scan will not be able to load this session`,

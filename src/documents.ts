@@ -9,38 +9,41 @@
 //
 // The download is deliberately narrow: same-origin links only (a third-party PDF is not the
 // audited site's document), http(s) or a local file next to a local page, bounded in count and
-// in size, and only bytes that start with `%PDF-` are kept. Anything refused is reported, never
-// silently dropped. No credential is ever sent: an authenticated document that answers with a
-// login page is skipped as « not a PDF », which is the honest outcome when the session is the
-// browser's and not this process's.
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+// in size. A link is a CANDIDATE (src/document-store.ts — the extension, `download`, a text or a
+// route naming PDF), and only a response that proves a PDF (`application/pdf` or a `%PDF-`
+// header) is kept. Anything refused is reported, never silently dropped.
+//
+// The only credential ever sent is the one the caller handed `scan`: with `--storage-state`, the
+// cookies of that Playwright session file that match the document URL (domain, path, `secure`,
+// expiry) — the same ones the browser sent for the page that links it. They go to the audited
+// origin only (a redirect off it is refused before it is requested) and are never written
+// anywhere. Without a session, an authenticated document answers its login page and is skipped
+// as « not a PDF ». The Playwright fixture downloads through its own request context instead
+// (src/integrations/playwright.ts), which carries the test's session by construction.
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { attr, elementsByTag, parseHtml, type Doc } from "./parse/html.js";
+import {
+  DOCUMENT_MAX_BYTES,
+  DOCUMENT_MAX_COUNT,
+  DOCUMENT_TIMEOUT_MS,
+  type DocFetcher,
+  documentCandidate,
+  fetchDocument,
+  hasPdfHeader,
+  readDocumentOrigin,
+  storeDocument,
+} from "./document-store.js";
+import { attr, elementsByTag, hasAttr, parseHtml, visibleText, type Doc } from "./parse/html.js";
 import { PDF_MAX_BYTES, readPdf } from "./parse/pdf.js";
 import { PAGES_DIR } from "./snapshot.js";
 import type { DocumentOrigin } from "./types.js";
 
-export const DOCUMENTS_DIR = ".ultra11y/documents";
+export { DOCUMENTS_DIR, readDocumentOrigin } from "./document-store.js";
 
 /** The engine reads a PDF from its extension; content sniffing would mean reading every file. */
 export function isPdfPath(file: string): boolean {
   return /\.pdf$/i.test(file);
-}
-
-/** The sidecar `scan` wrote beside a downloaded document, when there is one. */
-export function readDocumentOrigin(pdfPath: string): DocumentOrigin | undefined {
-  const side = pdfPath.replace(/\.pdf$/i, ".json");
-  if (side === pdfPath || !existsSync(side)) return undefined;
-  try {
-    const raw = JSON.parse(readFileSync(side, "utf8")) as { url?: unknown; pages?: unknown };
-    const url = typeof raw.url === "string" ? raw.url : undefined;
-    const pages = Array.isArray(raw.pages) ? raw.pages.filter((p): p is string => typeof p === "string") : undefined;
-    return { ...(url ? { url } : {}), ...(pages?.length ? { pages: [...new Set(pages)].sort() } : {}) };
-  } catch {
-    return undefined;
-  }
 }
 
 /** A document Doc from the file's bytes: no markup, its facts in `pdf`. `source` is the file's
@@ -78,9 +81,10 @@ export function loadPdfDoc(path: string, file = path): Doc {
 // Links → downloads
 // ---------------------------------------------------------------------------------------------
 
-/** Same-origin links to a PDF in a page's DOM, resolved against the page URL (and its
- *  `<base href>`). A link counts when its path ends in `.pdf` or it declares
- *  `type="application/pdf"`. */
+/** Same-origin document CANDIDATES in a page's DOM, resolved against the page URL (and its
+ *  `<base href>`): a path ending in `.pdf`, `type="application/pdf"`, `<a download>`, a visible
+ *  text / `aria-label` / `title` naming PDF as a word, or a path or query naming it as a token
+ *  (src/document-store.ts `documentCandidate`, the one decision the fixture shares). */
 export function pdfLinksIn(html: string, pageUrl: string): string[] {
   let page: URL;
   try {
@@ -102,21 +106,19 @@ export function pdfLinksIn(html: string, pageUrl: string): string[] {
   }
   const out = new Set<string>();
   for (const a of elementsByTag(doc, "a")) {
-    const href = (attr(a, "href") ?? "").trim();
-    if (!href || href.startsWith("#") || /^(?:javascript|mailto|tel|data|blob):/i.test(href)) continue;
-    let u: URL;
-    try {
-      u = new URL(href, base);
-    } catch {
-      continue;
-    }
-    const isPdf = /\.pdf$/i.test(u.pathname) || (attr(a, "type") ?? "").trim().toLowerCase() === "application/pdf";
-    if (!isPdf) continue;
-    if (u.protocol !== page.protocol) continue;
-    if ((u.protocol === "http:" || u.protocol === "https:") && u.host !== page.host) continue;
-    if (u.protocol !== "http:" && u.protocol !== "https:" && u.protocol !== "file:") continue;
-    u.hash = "";
-    out.add(u.href);
+    const url = documentCandidate(
+      {
+        href: attr(a, "href") ?? "",
+        download: hasAttr(a, "download"),
+        type: attr(a, "type") ?? "",
+        text: visibleText(a),
+        ariaLabel: attr(a, "aria-label") ?? "",
+        title: attr(a, "title") ?? "",
+      },
+      page,
+      base,
+    );
+    if (url) out.add(url);
   }
   return [...out].sort();
 }
@@ -128,6 +130,12 @@ export interface DocumentDownloadOpts {
   maxBytes?: number;
   /** Per-request timeout (default 20 s). */
   timeoutMs?: number;
+  /** A Playwright storageState FILE (`scan --storage-state`): its cookies that match a document
+   *  URL are sent with the request for it. */
+  storageState?: string;
+  /** A page's own storageState (a sample page's), overriding `storageState` for the documents
+   *  that page links. */
+  storageStateFor?: (pageId: string) => string | undefined;
 }
 
 export interface DocumentDownloadResult {
@@ -137,52 +145,133 @@ export interface DocumentDownloadResult {
   skipped: { url: string; reason: string }[];
 }
 
-interface Fetched {
-  bytes: Buffer;
+// ---------------------------------------------------------------------------------------------
+// The storage state's cookies
+// ---------------------------------------------------------------------------------------------
+
+/** A cookie as Playwright's storageState records it. */
+export interface StorageCookie {
+  name: string;
+  value: string;
+  domain: string;
+  path?: string;
+  /** Seconds since the epoch; `-1` (or absent) for a session cookie. */
+  expires?: number;
+  secure?: boolean;
 }
 
-async function fetchBounded(url: string, maxBytes: number, timeoutMs: number): Promise<Fetched | { reason: string }> {
-  const u = new URL(url);
-  if (u.protocol === "file:") {
-    const path = fileURLToPath(u);
-    if (!existsSync(path)) return { reason: "not found" };
-    const size = statSync(path).size;
-    if (size > maxBytes) return { reason: `larger than ${maxBytes} bytes` };
-    return { bytes: readFileSync(path) };
-  }
-  let res: Response;
+/** The well-formed cookies of a storageState file — none when it cannot be read. The values are
+ *  only ever put on a request to the origin they match; nothing here logs or writes them. */
+export function readStorageCookies(path: string): StorageCookie[] {
+  let raw: unknown;
   try {
-    res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(timeoutMs) });
-  } catch (e) {
-    return { reason: `request failed: ${e instanceof Error ? e.message : String(e)}` };
-  }
-  if (!res.ok) return { reason: `HTTP ${res.status}` };
-  // A redirect that LEAVES the origin is a third-party document after all.
-  try {
-    if (new URL(res.url || url).host !== u.host) return { reason: `redirected off-origin to ${res.url}` };
+    raw = JSON.parse(readFileSync(path, "utf8"));
   } catch {
-    /* keep going: res.url is informational */
+    return [];
   }
-  const declared = Number(res.headers.get("content-length") ?? "");
-  if (Number.isFinite(declared) && declared > maxBytes) return { reason: `larger than ${maxBytes} bytes` };
-  const chunks: Buffer[] = [];
-  let total = 0;
-  const reader = res.body?.getReader();
-  if (!reader) return { reason: "empty response" };
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel().catch(() => undefined);
-      return { reason: `larger than ${maxBytes} bytes` };
-    }
-    chunks.push(Buffer.from(value));
-  }
-  return { bytes: Buffer.concat(chunks) };
+  const cookies = (raw as { cookies?: unknown })?.cookies;
+  if (!Array.isArray(cookies)) return [];
+  return cookies.filter(
+    (c): c is StorageCookie =>
+      !!c && typeof c === "object" && typeof c.name === "string" && typeof c.value === "string" && typeof c.domain === "string" && c.domain !== "",
+  );
 }
 
-/** Download the same-origin PDFs the given pages link to, into `<root>/.ultra11y/documents`.
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+/** The `Cookie` header a browser would send for `url` from these cookies (RFC 6265 §5.4):
+ *  domain-match (a host-only cookie on its host exactly, a `.domain` one on it and its
+ *  subdomains), path-match on a segment boundary, `secure` over https only (a loopback host
+ *  counts, as it does for a browser), expired ones dropped, the longest path first. */
+export function cookieHeaderFor(cookies: readonly StorageCookie[], url: string, nowMs = Date.now()): string | undefined {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return undefined;
+  }
+  const host = u.hostname.toLowerCase();
+  const path = u.pathname || "/";
+  const matched = cookies.filter((c) => {
+    let d = c.domain.toLowerCase();
+    if (d.startsWith(".")) {
+      d = d.slice(1);
+      if (host !== d && !host.endsWith(`.${d}`)) return false;
+    } else if (host !== d) return false;
+    const cp = c.path || "/";
+    if (path !== cp && !(path.startsWith(cp) && (cp.endsWith("/") || path[cp.length] === "/"))) return false;
+    if (c.secure && u.protocol !== "https:" && !LOOPBACK.has(host)) return false;
+    if (typeof c.expires === "number" && c.expires > 0 && c.expires * 1000 <= nowMs) return false;
+    return true;
+  });
+  if (!matched.length) return undefined;
+  return matched
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => (b.c.path || "/").length - (a.c.path || "/").length || a.i - b.i)
+    .map(({ c }) => `${c.name}=${c.value}`)
+    .join("; ");
+}
+
+/** Node's `fetch`, one hop at a time, the matching cookies on each hop, the body read up to the
+ *  bound and no further. */
+function nodeFetcher(timeoutMs: number, cookies: readonly StorageCookie[]): DocFetcher {
+  return async (url) => {
+    const cookie = cookies.length ? cookieHeaderFor(cookies, url) : undefined;
+    const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs), ...(cookie ? { headers: { cookie } } : {}) });
+    return {
+      status: res.status,
+      header: (name) => res.headers.get(name) ?? undefined,
+      discard: async () => {
+        await res.body?.cancel().catch(() => undefined);
+      },
+      body: async (maxBytes) => {
+        const reader = res.body?.getReader();
+        if (!reader) return Buffer.alloc(0);
+        const chunks: Buffer[] = [];
+        let total = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > maxBytes) {
+            await reader.cancel().catch(() => undefined);
+            return undefined;
+          }
+          chunks.push(Buffer.from(value));
+        }
+        return Buffer.concat(chunks);
+      },
+    };
+  };
+}
+
+/** A local page's local document: read from disk, same bounds, same proof — and only from the
+ *  directory of a page that links it (its subdirectories included). « Next to the page » is the
+ *  documented reach; `../../x.pdf` or `/abs/x.pdf` would otherwise copy any `%PDF-` file on the
+ *  disk into the audit. Symlinks are resolved before the check, so one cannot point out of it. */
+function readLocal(url: string, pageUrls: readonly string[], maxBytes: number): { bytes: Buffer; url: string } | { reason: string } {
+  const path = fileURLToPath(url);
+  if (!existsSync(path)) return { reason: "not found" };
+  const real = realpathSync(path);
+  const inside = pageUrls.some((pageUrl) => {
+    try {
+      const dir = realpathSync(dirname(fileURLToPath(pageUrl)));
+      const rel = relative(dir, real);
+      return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+    } catch {
+      return false;
+    }
+  });
+  if (!inside) return { reason: "outside the linking page's directory" };
+  const st = statSync(real);
+  if (!st.isFile()) return { reason: "not a file" };
+  if (st.size > maxBytes) return { reason: `larger than ${maxBytes} bytes` };
+  const bytes = readFileSync(real);
+  if (!hasPdfHeader(bytes)) return { reason: "not a PDF — the file has no %PDF- header" };
+  return { bytes, url };
+}
+
+/** Download the same-origin documents the given pages link to, into `<root>/.ultra11y/documents`.
  *  Each file is named by the SHA-256 of its bytes, so the same document linked from many pages
  *  (or re-fetched on the next run) is one file, and its sidecar lists every page that links it. */
 export async function downloadLinkedDocuments(
@@ -190,19 +279,33 @@ export async function downloadLinkedDocuments(
   pages: { id: string; url: string; html: string }[],
   opts: DocumentDownloadOpts = {},
 ): Promise<DocumentDownloadResult> {
-  const maxCount = opts.maxCount ?? 20;
-  const maxBytes = opts.maxBytes ?? 20 * 1024 * 1024;
-  const timeoutMs = opts.timeoutMs ?? 20_000;
-  // url → page ids linking it, in page order.
+  const maxCount = opts.maxCount ?? DOCUMENT_MAX_COUNT;
+  const maxBytes = opts.maxBytes ?? DOCUMENT_MAX_BYTES;
+  const timeoutMs = opts.timeoutMs ?? DOCUMENT_TIMEOUT_MS;
+  // url → page ids linking it, in page order (and those pages' URLs, which bound a local read).
   const linked = new Map<string, Set<string>>();
+  const linkedFrom = new Map<string, string[]>();
   for (const p of pages) {
     for (const url of pdfLinksIn(p.html, p.url)) {
       const set = linked.get(url) ?? new Set<string>();
       set.add(p.id);
       linked.set(url, set);
+      linkedFrom.set(url, [...(linkedFrom.get(url) ?? []), p.url]);
     }
   }
-  const dir = join(root, DOCUMENTS_DIR);
+  // Each session file is read once, whichever pages share it.
+  const jars = new Map<string, StorageCookie[]>();
+  const jarOf = (ids: Set<string>): StorageCookie[] => {
+    let path: string | undefined;
+    for (const id of ids) {
+      path = opts.storageStateFor?.(id);
+      if (path) break;
+    }
+    path ??= opts.storageState;
+    if (!path) return [];
+    if (!jars.has(path)) jars.set(path, readStorageCookies(path));
+    return jars.get(path)!;
+  };
   const files: string[] = [];
   const skipped: DocumentDownloadResult["skipped"] = [];
   let fetched = 0;
@@ -212,24 +315,22 @@ export async function downloadLinkedDocuments(
       continue;
     }
     fetched++;
-    const r = await fetchBounded(url, maxBytes, timeoutMs);
-    if ("reason" in r) {
-      skipped.push({ url, reason: r.reason });
-      continue;
+    // ONE BAD LINK IS ONE SKIPPED ENTRY, never the end of the scan: a `file://otherhost/x.pdf`
+    // (ERR_INVALID_FILE_URL_HOST), a directory (EISDIR), an unwritable store — each is reported
+    // with its reason, and the pages and the other documents are still kept.
+    try {
+      const r = url.startsWith("file:")
+        ? readLocal(url, linkedFrom.get(url) ?? [], maxBytes)
+        : await fetchDocument(url, nodeFetcher(timeoutMs, jarOf(ids)), { maxBytes });
+      if ("reason" in r) {
+        skipped.push({ url, reason: r.reason });
+        continue;
+      }
+      const file = storeDocument(root, url, r.bytes, ids);
+      if (!files.includes(file)) files.push(file);
+    } catch (e) {
+      skipped.push({ url, reason: `failed: ${e instanceof Error ? e.message : String(e)}` });
     }
-    if (!r.bytes.toString("latin1", 0, Math.min(r.bytes.length, 1024)).includes("%PDF-")) {
-      skipped.push({ url, reason: "the response is not a PDF (a login page, an error page?)" });
-      continue;
-    }
-    const sha = createHash("sha256").update(r.bytes).digest("hex");
-    const file = join(dir, `${sha}.pdf`);
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, r.bytes);
-    // Merge with a previous run's sidecar: pages accumulate, the first URL seen is kept.
-    const prev = readDocumentOrigin(file);
-    const allPages = [...new Set([...(prev?.pages ?? []), ...ids])].sort();
-    writeFileSync(join(dir, `${sha}.json`), `${JSON.stringify({ v: 1, url: prev?.url ?? url, pages: allPages }, null, 2)}\n`);
-    if (!files.includes(file)) files.push(file);
   }
   return { files, skipped };
 }

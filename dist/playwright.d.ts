@@ -25,6 +25,22 @@ interface PlaywrightPage {
     mouse?: {
         move(x: number, y: number): Promise<void>;
     };
+    context?(): {
+        request?: PlaywrightRequest;
+    };
+}
+/** Playwright's APIRequestContext, to exactly what the document download uses. */
+interface PlaywrightRequest {
+    get(url: string, opts: {
+        timeout?: number;
+        maxRedirects?: number;
+        failOnStatusCode?: boolean;
+    }): Promise<{
+        status(): number;
+        headers(): Record<string, string>;
+        body(): Promise<Buffer>;
+        dispose?(): Promise<void>;
+    }>;
 }
 interface PlaywrightCheckOptions extends CheckOptions {
     /** Also write the per-page report once this page is recorded. Off by default: a report
@@ -34,7 +50,22 @@ interface PlaywrightCheckOptions extends CheckOptions {
         standard?: string;
         lang?: string;
     };
+    /** Download the same-origin PDF documents this page links to (on by default, as in `scan`;
+     *  `false` is `--no-pdf`). A candidate — a `.pdf` path, `download`, a text / `aria-label` /
+     *  `title` or a route naming PDF — is fetched with the page's own request context, so the
+     *  test's session goes with it, and kept only when the response is `application/pdf` or
+     *  starts `%PDF-`. Stored in `.ultra11y/documents/<sha256>.pdf` with a sidecar naming the URL
+     *  and every page linking it; `audit` re-reads them. Never fails the test: a refusal is
+     *  printed with its reason. */
+    pdf?: boolean;
+    /** Most documents downloaded per test worker (default 20, each capped at 20 MiB) — `--max-pdf`. */
+    maxPdf?: number;
 }
+/** Download the documents a recorded page links to. Returns the files it holds for this page. */
+declare function downloadPageDocuments(page: PlaywrightPage, pageId: string, opts?: {
+    maxPdf?: number;
+    root?: string;
+}): Promise<string[]>;
 /** Collect the current page, persist it as a snapshot, audit it, and fail on the threshold. */
 declare function checkA11y(page: PlaywrightPage, opts?: PlaywrightCheckOptions): Promise<AuditLike>;
 /** Optional fixture form. Import `test` from here instead of `@playwright/test`.
@@ -122,4 +153,4 @@ declare function sweepCheckOptions(check?: SweepOptions["check"]): SweepOptions[
 };
 declare function sweepSample(opts?: SweepOptions): void;
 
-export { AuditLike, CheckOptions, type PlaywrightCheckOptions, type SamplePageLike, type SweepOptions, checkA11y, samplePagesFor, sweepCheckOptions, sweepSample, sweepTarget, test };
+export { AuditLike, CheckOptions, type PlaywrightCheckOptions, type SamplePageLike, type SweepOptions, checkA11y, downloadPageDocuments, samplePagesFor, sweepCheckOptions, sweepSample, sweepTarget, test };

@@ -1,7 +1,7 @@
 // src/integrations/playwright.ts
-import { readFileSync } from "fs";
+import { existsSync as existsSync2, readFileSync as readFileSync2 } from "fs";
 import { createRequire as createRequire2 } from "module";
-import { join } from "path";
+import { join as join2 } from "path";
 
 // src/collector.ts
 var COLLECTED_CSS = [
@@ -160,6 +160,139 @@ var COLLECT_SNAPSHOT = `(() => {
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };
 })()`;
+
+// src/document-store.ts
+import { createHash } from "crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { join } from "path";
+var DOCUMENTS_DIR = ".ultra11y/documents";
+var DOCUMENT_MAX_COUNT = 20;
+var DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
+var DOCUMENT_TIMEOUT_MS = 2e4;
+var PDF_WORD = /(?:^|[^\p{L}\p{N}])pdf(?:$|[^\p{L}\p{N}])/iu;
+function namesPdf(s) {
+  return !!s && PDF_WORD.test(s);
+}
+function urlNamesPdf(u) {
+  let s = `${u.pathname}${u.search}`;
+  try {
+    s = decodeURIComponent(s);
+  } catch {
+  }
+  return s.split(/[^\p{L}\p{N}]+/u).some((tok) => tok.toLowerCase() === "pdf");
+}
+function documentCandidate(link, page, base = page) {
+  const href = (link.href ?? "").trim();
+  if (!href || href.startsWith("#") || /^(?:javascript|mailto|tel|data|blob):/i.test(href)) return void 0;
+  let u;
+  try {
+    u = new URL(href, base);
+  } catch {
+    return void 0;
+  }
+  if (u.protocol !== page.protocol) return void 0;
+  if (u.protocol !== "http:" && u.protocol !== "https:" && u.protocol !== "file:") return void 0;
+  if ((u.protocol === "http:" || u.protocol === "https:") && u.host !== page.host) return void 0;
+  const candidate = /\.pdf$/i.test(u.pathname) || (link.type ?? "").trim().toLowerCase() === "application/pdf" || link.download === true || namesPdf(link.text) || namesPdf(link.ariaLabel) || namesPdf(link.title) || urlNamesPdf(u);
+  if (!candidate) return void 0;
+  u.hash = "";
+  return u.href;
+}
+function hasPdfHeader(bytes) {
+  return bytes.toString("latin1", 0, Math.min(bytes.length, 1024)).includes("%PDF-");
+}
+function looksLikePdf(contentType, bytes) {
+  const ct = (contentType ?? "").split(";")[0].trim().toLowerCase();
+  return ct === "application/pdf" || hasPdfHeader(bytes);
+}
+function sameOriginHop(start, next) {
+  if (next.protocol !== "http:" && next.protocol !== "https:") return false;
+  if (next.origin === start.origin) return true;
+  return start.protocol === "http:" && next.protocol === "https:" && next.hostname === start.hostname;
+}
+async function fetchDocument(url, fetcher, opts = {}) {
+  const maxBytes = opts.maxBytes ?? DOCUMENT_MAX_BYTES;
+  const maxRedirects = opts.maxRedirects ?? 5;
+  let start;
+  try {
+    start = new URL(url);
+  } catch {
+    return { reason: `unreadable URL ${url}` };
+  }
+  let current = url;
+  for (let hop = 0; ; hop++) {
+    let res;
+    try {
+      res = await fetcher(current);
+    } catch (e) {
+      return { reason: `request failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    if (res.status >= 300 && res.status < 400 && res.header("location")) {
+      await res.discard?.().catch(() => void 0);
+      if (hop >= maxRedirects) return { reason: `more than ${maxRedirects} redirects` };
+      let next;
+      try {
+        next = new URL(res.header("location"), current);
+      } catch {
+        return { reason: `unreadable redirect to ${res.header("location")}` };
+      }
+      if (!sameOriginHop(start, next)) return { reason: `redirected off-origin to ${next.href}` };
+      current = next.href;
+      continue;
+    }
+    if (res.status < 200 || res.status >= 300) {
+      await res.discard?.().catch(() => void 0);
+      return { reason: `HTTP ${res.status}` };
+    }
+    const declared = Number(res.header("content-length") ?? "");
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      await res.discard?.().catch(() => void 0);
+      return { reason: `larger than ${maxBytes} bytes` };
+    }
+    let bytes;
+    try {
+      bytes = await res.body(maxBytes);
+    } catch (e) {
+      return { reason: `request failed: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    if (!bytes) return { reason: `larger than ${maxBytes} bytes` };
+    const type = res.header("content-type");
+    if (!looksLikePdf(type, bytes))
+      return { reason: `not a PDF \u2014 the response is ${type ? type.split(";")[0].trim() : "untyped"} with no %PDF- header (a login page, an error page?)` };
+    return { bytes, url: current };
+  }
+}
+var SIDECAR_KIND = "ultra11y-document";
+var SIDECAR_VERSION = 1;
+function readDocumentOrigin(pdfPath) {
+  const side = pdfPath.replace(/\.pdf$/i, ".json");
+  if (side === pdfPath || !existsSync(side)) return void 0;
+  try {
+    const raw = JSON.parse(readFileSync(side, "utf8"));
+    if (!raw || typeof raw !== "object" || raw.v !== SIDECAR_VERSION) return void 0;
+    if (raw.kind !== SIDECAR_KIND && !(raw.kind === void 0 && /(?:^|[\\/])[0-9a-f]{64}\.pdf$/i.test(pdfPath))) return void 0;
+    const url = typeof raw.url === "string" ? raw.url : void 0;
+    const pages = Array.isArray(raw.pages) ? raw.pages.filter((p) => typeof p === "string") : void 0;
+    return { ...url ? { url } : {}, ...pages?.length ? { pages: [...new Set(pages)].sort() } : {} };
+  } catch {
+    return void 0;
+  }
+}
+function recordDocumentPages(file, url, pageIds) {
+  const prev = readDocumentOrigin(file);
+  const pages = [.../* @__PURE__ */ new Set([...prev?.pages ?? [], ...pageIds])].sort();
+  writeFileSync(file.replace(/\.pdf$/i, ".json"), `${JSON.stringify({ kind: SIDECAR_KIND, v: SIDECAR_VERSION, url: prev?.url ?? url, pages }, null, 2)}
+`);
+}
+function storeDocument(root, url, bytes, pageIds) {
+  const dir = join(root, DOCUMENTS_DIR);
+  const sha = createHash("sha256").update(bytes).digest("hex");
+  const file = join(dir, `${sha}.pdf`);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, bytes);
+  recordDocumentPages(file, url, pageIds);
+  return file;
+}
 
 // src/probes.ts
 var PROBES_VERSION = 2;
@@ -1052,6 +1185,82 @@ function writePagesReport(opts = {}, engine = enginePath()) {
 }
 
 // src/integrations/playwright.ts
+var LINKS_SCRIPT = `(() => Array.from(document.querySelectorAll("a[href]"), (a) => ({
+  href: a.href,
+  download: a.hasAttribute("download"),
+  type: a.getAttribute("type") || "",
+  text: (a.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 500),
+  ariaLabel: a.getAttribute("aria-label") || "",
+  title: a.getAttribute("title") || "",
+})))()`;
+var storedDocuments = /* @__PURE__ */ new Map();
+function requestFetcher(request) {
+  return async (url) => {
+    const res = await request.get(url, { timeout: DOCUMENT_TIMEOUT_MS, maxRedirects: 0, failOnStatusCode: false });
+    const headers = res.headers();
+    return {
+      status: res.status(),
+      header: (name) => headers[name.toLowerCase()],
+      discard: async () => {
+        await res.dispose?.();
+      },
+      // The request context buffers the whole body; the declared length is checked first, and a
+      // body over the bound is still never kept.
+      body: async (maxBytes) => {
+        const bytes = await res.body();
+        await res.dispose?.();
+        return bytes.length > maxBytes ? void 0 : bytes;
+      }
+    };
+  };
+}
+async function downloadPageDocuments(page, pageId, opts = {}) {
+  const request = page.context?.()?.request;
+  if (!request) return [];
+  const root = opts.root ?? process.cwd();
+  const max = opts.maxPdf ?? DOCUMENT_MAX_COUNT;
+  let pageUrl;
+  try {
+    pageUrl = new URL(page.url());
+  } catch {
+    return [];
+  }
+  if (pageUrl.protocol !== "http:" && pageUrl.protocol !== "https:") return [];
+  const links = await page.evaluate(LINKS_SCRIPT) ?? [];
+  const candidates = [...new Set(links.map((l) => documentCandidate(l, pageUrl)).filter((u) => !!u))].sort();
+  const files = [];
+  const inRoot = (url) => `${root}
+${url}`;
+  let attempts = 0;
+  for (const url of candidates) {
+    const known = storedDocuments.get(inRoot(url));
+    if (known && existsSync2(known)) {
+      recordDocumentPages(known, url, [pageId]);
+      files.push(known);
+      continue;
+    }
+    const held = [...storedDocuments.keys()].filter((k) => k.startsWith(`${root}
+`)).length;
+    if (held >= max || attempts >= max) {
+      console.warn(`ultra11y: document not downloaded \u2014 ${url}: document cap reached (${max}).`);
+      continue;
+    }
+    attempts++;
+    try {
+      const r = await fetchDocument(url, requestFetcher(request), { maxBytes: DOCUMENT_MAX_BYTES });
+      if ("reason" in r) {
+        console.warn(`ultra11y: document not downloaded \u2014 ${url}: ${r.reason}.`);
+        continue;
+      }
+      const file = storeDocument(root, url, r.bytes, [pageId]);
+      storedDocuments.set(inRoot(url), file);
+      files.push(file);
+    } catch (e) {
+      console.warn(`ultra11y: document not downloaded \u2014 ${url}: failed: ${e instanceof Error ? e.message : String(e)}.`);
+    }
+  }
+  return files;
+}
 function probeOptions(p) {
   if (p === true || p === void 0) return fromConfig();
   if (p === false) return {};
@@ -1061,7 +1270,7 @@ function probeOptions(p) {
 }
 function fromConfig() {
   try {
-    const cfg = JSON.parse(readFileSync(join(process.cwd(), ".ultra11yrc.json"), "utf8"));
+    const cfg = JSON.parse(readFileSync2(join2(process.cwd(), ".ultra11yrc.json"), "utf8"));
     if (!cfg.probes) return {};
     const { only, ...limits } = cfg.probes;
     return { ...only ? { only } : {}, limits };
@@ -1074,7 +1283,7 @@ async function runAxe(page, mode) {
   const demanded = mode === true;
   let AxeBuilder;
   let lastError;
-  for (const from of [join(process.cwd(), "package.json"), import.meta.url]) {
+  for (const from of [join2(process.cwd(), "package.json"), import.meta.url]) {
     try {
       const mod = createRequire2(from)("@axe-core/playwright");
       AxeBuilder = mod.default ?? mod;
@@ -1133,6 +1342,13 @@ async function checkA11y(page, opts = {}) {
   const axe = await runAxe(page, opts.axe ?? "auto");
   const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe);
   const result = auditSnapshot(payload);
+  if (opts.pdf !== false) {
+    try {
+      await downloadPageDocuments(page, String(payload.meta.id), { ...opts.maxPdf !== void 0 ? { maxPdf: opts.maxPdf } : {} });
+    } catch (e) {
+      console.warn(`ultra11y: the document download failed on this page \u2014 ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded.`);
+    }
+  }
   if (opts.report) writePagesReport(typeof opts.report === "object" ? opts.report : {});
   gate(result, String(payload.meta.name), opts.failOn);
   return result;
@@ -1158,7 +1374,7 @@ function samplePagesFor(opts = {}) {
   const cwd = opts.cwd ?? process.cwd();
   let declared;
   try {
-    const raw = readFileSync(join(cwd, ".ultra11yrc.json"), "utf8");
+    const raw = readFileSync2(join2(cwd, ".ultra11yrc.json"), "utf8");
     declared = JSON.parse(raw).sample?.pages ?? [];
   } catch {
     throw new Error(`ultra11y: no readable .ultra11yrc.json in ${cwd} \u2014 sweepSample reads the page sample from it.`);
@@ -1206,6 +1422,7 @@ function sweepSample(opts = {}) {
 }
 export {
   checkA11y,
+  downloadPageDocuments,
   samplePagesFor,
   sweepCheckOptions,
   sweepSample,

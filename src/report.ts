@@ -1498,12 +1498,23 @@ function renderReaderAdvisory(u: PrdUnit, lang: Lang, resolver: PageResolver): s
 // audit — `file:line`, selectors, the tool's method, its automatic rate, its commands, the S/R/J
 // contract — is in the annex. Both come out of the same units, pages and tallies, computed once
 // here.
+/** The « Documents téléchargeables » section, decided ONCE for every renderer — the Markdown
+ *  report below and the HTML one (src/html-report.ts) print these rows, never their own. */
+export interface DocumentsModel {
+  title: string;
+  /** The caveat: a row with nothing found is not a pass. */
+  note: string;
+  columns: string[];
+  rows: { cells: string[]; unreadable: boolean }[];
+}
+
 /** « Documents téléchargeables » — every PDF the run read, one row each, with the outcome of
  *  every document check. Worded so that a row with nothing found cannot be read as a pass: the
- *  checks prove the absence of gross failures, and PDF/UA conformance is a validator's verdict. */
-function renderDocuments(r: AuditResult, lang: Lang): string[] {
+ *  checks prove the absence of gross failures, and PDF/UA conformance is a validator's verdict.
+ *  `undefined` when the run read no document. Cells are plain text; each renderer escapes. */
+export function documentsModel(r: AuditResult, lang: Lang): DocumentsModel | undefined {
   const docs = r.documents ?? [];
-  if (!docs.length) return [];
+  if (!docs.length) return undefined;
   const fr = lang === "fr";
   const RULES = ["pdf-untagged", "pdf-lang-missing", "pdf-title-missing", "pdf-no-text", "pdf-structure-shallow"] as const;
   const head: Record<(typeof RULES)[number], string> = fr
@@ -1523,31 +1534,57 @@ function renderDocuments(r: AuditResult, lang: Lang): string[] {
       };
   const mark = (o: string | undefined): string =>
     o === "fail" ? (fr ? "❌ non" : "❌ no") : o === "not-detected" ? (fr ? "— rien relevé" : "— none found") : fr ? "· non vérifié" : "· not checked";
+  const rows = docs.map((d) => {
+    const name = d.url ?? d.file;
+    const label = d.title ? `${name} — « ${d.title.slice(0, 60)} »` : name;
+    const linked = d.pages?.length ? d.pages.join(", ") : "—";
+    if (!d.readable)
+      return {
+        unreadable: true,
+        cells: [
+          label,
+          linked,
+          fr ? `⚠️ illisible (${d.unreadable ?? "?"}) — à ouvrir et juger à la main` : `⚠️ unreadable (${d.unreadable ?? "?"}) — open and judge it by hand`,
+          ...RULES.slice(1).map(() => ""),
+        ],
+      };
+    return { unreadable: false, cells: [label, linked, ...RULES.map((id) => mark(d.checks[id]))] };
+  });
+  return {
+    title: fr ? "Documents téléchargeables" : "Downloadable documents",
+    note: fr
+      ? "Chaque document PDF lu, avec chacun de ses contrôles. « rien relevé » ne veut pas dire conforme : ces contrôles détectent les défauts grossiers (non balisé, sans langue, sans titre, sans texte), jamais la conformité PDF/UA, que seul un validateur (veraPDF, PAC) établit. Le critère reste à juger : une version alternative accessible peut exister."
+      : "Every PDF document read, with each of its checks. « none found » does not mean conforming: these checks find the gross failures (untagged, no language, no title, no text), never PDF/UA conformance, which only a validator (veraPDF, PAC) establishes. The criterion remains to be judged: an accessible alternative version may exist.",
+    columns: [fr ? "Document" : "Document", fr ? "Pages qui le lient" : "Linked from", ...RULES.map((id) => head[id])],
+    rows,
+  };
+}
+
+function renderDocuments(r: AuditResult, lang: Lang): string[] {
+  const m = documentsModel(r, lang);
+  if (!m) return [];
+  const docs = r.documents ?? [];
   const out: string[] = [
     '<a id="documents"></a>',
-    `## 📎 ${fr ? "Documents téléchargeables" : "Downloadable documents"}`,
+    `## 📎 ${m.title}`,
     "",
-    `> ${
-      fr
-        ? "Chaque document PDF lu, avec chacun de ses contrôles. « rien relevé » ne veut pas dire conforme : ces contrôles détectent les défauts grossiers (non balisé, sans langue, sans titre, sans texte), jamais la conformité PDF/UA, que seul un validateur (veraPDF, PAC) établit. Le critère reste à juger : une version alternative accessible peut exister."
-        : "Every PDF document read, with each of its checks. « none found » does not mean conforming: these checks find the gross failures (untagged, no language, no title, no text), never PDF/UA conformance, which only a validator (veraPDF, PAC) establishes. The criterion remains to be judged: an accessible alternative version may exist."
-    }`,
+    `> ${m.note}`,
     "",
-    `| ${fr ? "Document" : "Document"} | ${fr ? "Pages qui le lient" : "Linked from"} | ${RULES.map((id) => head[id]).join(" | ")} |`,
-    `| --- | --- |${" --- |".repeat(RULES.length)}`,
+    `| ${m.columns.join(" | ")} |`,
+    `| --- | --- |${" --- |".repeat(m.columns.length - 2)}`,
   ];
-  for (const d of docs) {
+  m.rows.forEach((row, i) => {
+    const d = docs[i]!;
+    // The Markdown dresses the same cells: the URL and title escaped, page ids as code.
     const name = mdText(d.url ?? d.file);
     const label = d.title ? `${name} — « ${mdText(d.title.slice(0, 60))} »` : name;
     const linked = d.pages?.length ? d.pages.map((p) => `\`${p}\``).join(", ") : "—";
-    if (!d.readable) {
-      out.push(
-        `| ${label} | ${linked} | ${fr ? `⚠️ illisible (${d.unreadable ?? "?"}) — à ouvrir et juger à la main` : `⚠️ unreadable (${d.unreadable ?? "?"}) — open and judge it by hand`} |${" |".repeat(RULES.length - 1)}`,
-      );
-      continue;
+    if (row.unreadable) {
+      out.push(`| ${label} | ${linked} | ${row.cells[2]} |${" |".repeat(m.columns.length - 3)}`);
+      return;
     }
-    out.push(`| ${label} | ${linked} | ${RULES.map((id) => mark(d.checks[id])).join(" | ")} |`);
-  }
+    out.push(`| ${label} | ${linked} | ${row.cells.slice(2).join(" | ")} |`);
+  });
   out.push("");
   return out;
 }

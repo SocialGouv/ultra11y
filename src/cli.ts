@@ -531,7 +531,9 @@ Options:
                      distribution's /usr/bin/chromium) instead of the one Playwright resolves.
                      Explicit: never replaced by a fallback. Env: ULTRA11Y_BROWSER_PATH
   --storage-state <file>  scan: --runtime local — Playwright storageState JSON for
-                     authenticated pages (e.g. test-results/.auth/user.json)
+                     authenticated pages (e.g. test-results/.auth/user.json). Its cookies
+                     that match a linked document's URL (domain, path, secure, expiry) are
+                     also sent when downloading it — to the audited origin only
   --no-interact      scan: --runtime local — disable the STATEFUL probes (fill inputs,
                      open dialogs, live-region). Default is ON; the interactions are
                      strictly non-navigating (fill text inputs, toggle checkbox/radio,
@@ -566,8 +568,13 @@ Options:
                      per-page verdict (its criteria stay « to assess » forever)
   --no-pdf           scan: do NOT download the same-origin PDF documents the scanned pages
                      link to (into .ultra11y/documents/<sha256>.pdf, with a sidecar naming
-                     the URL and the pages linking it). audit: do not ingest that directory.
-                     PDF inputs named explicitly are always audited
+                     the URL and the pages linking it). A link is a candidate when its path
+                     ends in .pdf, it declares type=application/pdf or download, its text /
+                     aria-label / title names PDF, or its path or query does (/api/x-pdf);
+                     it is kept only if the response is application/pdf or starts %PDF-.
+                     With --storage-state, the session's matching cookies are sent.
+                     audit: do not ingest that directory. PDF inputs named explicitly are
+                     always audited
   --max-pdf <n>      scan: most PDF documents downloaded per run (default 20; each one
                      capped at 20 MiB)
   --clean            scan: remove the dynamic-tier image + temp contexts, then exit
@@ -4663,14 +4670,21 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       /* unknown standard for lint — skip advisory */
     }
   }
-  // THE DOCUMENTS THE PAGES LINK TO. Same-origin PDFs only, bounded in count and size, stored by
-  // content hash under .ultra11y/documents with a sidecar naming the URL and the linking pages —
-  // so the snapshot audit below reads them, and a later `audit` re-reads them offline.
+  // THE DOCUMENTS THE PAGES LINK TO. Same-origin candidates (a `.pdf` path, `download`, a text or
+  // a route naming PDF) that answer a PDF, bounded in count and size, stored by content hash under
+  // .ultra11y/documents with a sidecar naming the URL and the linking pages — so the snapshot audit
+  // below reads them, and a later `audit` re-reads them offline. The session that opened the pages
+  // opens their documents: `--storage-state` (or a sample page's own) sends its matching cookies.
   let documentFiles: string[] = [];
   if (dynamic.snapshots?.length && p.flags["no-pdf"] !== true) {
     const maxPdf = typeof p.flags["max-pdf"] === "string" ? Number(p.flags["max-pdf"]) : undefined;
+    const pageStates = new Map(
+      (useSample && sampleConfig ? sampleConfig.pages : []).flatMap((pg) => (pg.storageState ? [[pg.id, pg.storageState] as const] : [])),
+    );
     const docs = await downloadSnapshotDocuments(snapshotRoot ?? ".", dynamic.snapshots, {
       ...(maxPdf !== undefined && Number.isFinite(maxPdf) && maxPdf >= 0 ? { maxCount: maxPdf } : {}),
+      ...(storageState ? { storageState } : {}),
+      ...(pageStates.size ? { storageStateFor: (id: string) => pageStates.get(id) } : {}),
     });
     documentFiles = docs.files;
     if (docs.files.length)

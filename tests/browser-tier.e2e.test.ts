@@ -829,3 +829,185 @@ describe("scan downloads the same-origin PDFs a captured page links to", () => {
     expect((row.candidateFindings ?? []).map((f) => f.ruleId).sort()).toEqual(["pdf-lang-missing", "pdf-title-missing", "pdf-untagged"]);
   }, 180_000);
 });
+
+// THE FIXTURE REACHES THE DOCUMENTS `scan` CANNOT (issue #111). egapro's documents are generated
+// behind its login, from routes with no extension:
+// `<a download href="/api/declaration-pdf?year=2026" aria-label="Télécharger la déclaration (PDF)">`.
+// The suite has the session; `checkA11y` downloads them through the page's own request context,
+// into the same .ultra11y/documents/<sha256>.pdf + sidecar `scan` writes, so `audit` re-reads them.
+describe("the Playwright fixture downloads the documents its page links, through the test's own session", () => {
+  let site: Server | undefined;
+  let siteOrigin = "";
+  const requested: { url: string; cookie: string }[] = [];
+  const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const RECEIPT = readFileSync(join(REPO, "tests", "fixtures", "pdf", "untagged.pdf"));
+  const PAGE_HTML =
+    `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Déclaration</title></head><body><main><h1>Déclaration</h1>` +
+    `<p><a download href="/api/declaration-pdf?year=2026" aria-label="Télécharger la déclaration 2026 (PDF)">Télécharger</a></p>` +
+    `<p><a href="/guide-pdf">Le guide (PDF)</a></p>` +
+    `<p><a href="https://example.invalid/tiers.pdf">Document d'un tiers (PDF)</a></p></main></body></html>`;
+
+  beforeAll(async () => {
+    if (!browserAvailable) return;
+    site = createServer((req, res) => {
+      const cookie = req.headers.cookie ?? "";
+      requested.push({ url: req.url ?? "", cookie });
+      if ((req.url ?? "").startsWith("/api/declaration-pdf")) {
+        if (!/(?:^|; )session=ok(?:;|$)/.test(cookie)) {
+          res.writeHead(302, { location: "/login" });
+          res.end();
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/pdf" });
+        res.end(RECEIPT);
+        return;
+      }
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(req.url === "/declaration" ? PAGE_HTML : "<!doctype html><html lang=fr><head><title>Autre</title></head><body><h1>Autre</h1></body></html>");
+    });
+    await new Promise<void>((resolve) => site?.listen(0, "127.0.0.1", resolve));
+    const addr = site.address();
+    siteOrigin = typeof addr === "object" && addr ? `http://127.0.0.1:${addr.port}` : "";
+  }, 120_000);
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => (site ? site.close(() => resolve()) : resolve()));
+  });
+
+  async function record(work: string, opts: Record<string, unknown>, session: boolean) {
+    const { checkA11y } = await import("../src/integrations/playwright.js");
+    const context = await browser!.newContext();
+    if (session) await context.addCookies([{ name: "session", value: "ok", url: siteOrigin }]);
+    const page = await context.newPage();
+    const cwd = process.cwd();
+    process.chdir(work);
+    try {
+      await page.goto(`${siteOrigin}/declaration`);
+      return await checkA11y(page as any, { as: "declaration", name: "Déclaration", failOn: false, axe: false, screenshot: false, ...opts });
+    } finally {
+      process.chdir(cwd);
+      await context.close();
+    }
+  }
+  const docsIn = (work: string): string[] => {
+    const dir = join(work, ".ultra11y", "documents");
+    return existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".pdf")) : [];
+  };
+
+  it("downloads the session-gated document a route serves, with its sidecar, and `audit` re-reads it", async () => {
+    if (!browserAvailable) return;
+    const work = mkdtempSync(join(tmpdir(), "u11y-fixture-pdf-"));
+    requested.length = 0;
+    await record(work, {}, true);
+    const pdfs = docsIn(work);
+    expect(pdfs, "the linked PDF was not downloaded").toHaveLength(1);
+    const file = join(work, ".ultra11y", "documents", pdfs[0]!);
+    expect(readFileSync(file)).toEqual(RECEIPT);
+    const sidecar = JSON.parse(readFileSync(file.replace(/\.pdf$/, ".json"), "utf8"));
+    expect(sidecar).toMatchObject({ url: `${siteOrigin}/api/declaration-pdf?year=2026`, pages: ["declaration"] });
+    // Through the page's own request context: the session cookie travelled with it.
+    expect(requested.find((r) => r.url.startsWith("/api/declaration-pdf"))?.cookie).toContain("session=ok");
+    // The candidate that answered HTML was fetched and refused; the third party was never asked.
+    expect(requested.some((r) => r.url === "/guide-pdf")).toBe(true);
+    expect(requested.some((r) => r.url.includes("tiers"))).toBe(false);
+
+    const audit = runAudit({ inputs: [join(work, PAGES_DIR, "declaration", "dom.html"), file] });
+    expect(audit.documents).toHaveLength(1);
+    expect(audit.documents![0]).toMatchObject({ url: `${siteOrigin}/api/declaration-pdf?year=2026`, pages: ["declaration"], tagged: false });
+  });
+
+  it("without the session the login page is refused « not a PDF », and `pdf: false` downloads nothing", async () => {
+    if (!browserAvailable) return;
+    const anon = mkdtempSync(join(tmpdir(), "u11y-fixture-pdf-anon-"));
+    await record(anon, {}, false);
+    expect(docsIn(anon)).toEqual([]);
+
+    const off = mkdtempSync(join(tmpdir(), "u11y-fixture-pdf-off-"));
+    requested.length = 0;
+    await record(off, { pdf: false }, true);
+    expect(docsIn(off)).toEqual([]);
+    expect(requested.some((r) => r.url.startsWith("/api/") || r.url === "/guide-pdf")).toBe(false);
+  });
+});
+
+// `scan --storage-state` sends the session's cookies that match the document URL, so the
+// authenticated scan reaches the document its authenticated page links.
+describe("an authenticated scan downloads the documents behind the same login", () => {
+  let site: Server | undefined;
+  let siteOrigin = "";
+  const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const RECEIPT = readFileSync(join(REPO, "tests", "fixtures", "pdf", "untagged.pdf"));
+
+  beforeAll(async () => {
+    if (!browserAvailable) return;
+    site = createServer((req, res) => {
+      const authed = /(?:^|; )session=ok(?:;|$)/.test(req.headers.cookie ?? "");
+      if ((req.url ?? "").startsWith("/api/declaration-pdf")) {
+        if (!authed) {
+          res.writeHead(302, { location: "/login" });
+          res.end();
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/pdf" });
+        res.end(RECEIPT);
+        return;
+      }
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(
+        `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Déclaration</title></head><body><main><h1>Déclaration</h1>` +
+          `<p><a download href="/api/declaration-pdf?year=2026" aria-label="Télécharger la déclaration 2026 (PDF)">Télécharger</a></p></main></body></html>`,
+      );
+    });
+    await new Promise<void>((resolve) => site?.listen(0, "127.0.0.1", resolve));
+    const addr = site.address();
+    siteOrigin = typeof addr === "object" && addr ? `http://127.0.0.1:${addr.port}` : "";
+  }, 120_000);
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => (site ? site.close(() => resolve()) : resolve()));
+  });
+
+  const scan = async (work: string, extra: string[]) =>
+    promisify(execFile)(
+      process.execPath,
+      [
+        join(REPO, "scripts", "ultra11y.mjs"),
+        "scan",
+        `${siteOrigin}/declaration`,
+        "--runtime",
+        "local",
+        "--cwd",
+        REPO,
+        "--root",
+        work,
+        "--no-interact",
+        "--out",
+        join(work, "audits"),
+        ...extra,
+      ],
+      { cwd: work, timeout: 170_000 },
+    );
+
+  it("reaches the cookie-gated PDF with --storage-state, and is refused it without", async () => {
+    if (!browserAvailable) return;
+    const authed = mkdtempSync(join(tmpdir(), "u11y-scan-auth-pdf-"));
+    const state = join(authed, "state.json");
+    writeFileSync(
+      state,
+      JSON.stringify({
+        cookies: [{ name: "session", value: "ok", domain: "127.0.0.1", path: "/", expires: -1, httpOnly: true, secure: false, sameSite: "Lax" }],
+        origins: [],
+      }),
+    );
+    await scan(authed, ["--storage-state", state]);
+    const dir = join(authed, ".ultra11y", "documents");
+    const pdfs = readdirSync(dir).filter((f) => f.endsWith(".pdf"));
+    expect(pdfs).toHaveLength(1);
+    expect(readFileSync(join(dir, pdfs[0]!))).toEqual(RECEIPT);
+
+    const anon = mkdtempSync(join(tmpdir(), "u11y-scan-anon-pdf-"));
+    const { stderr } = await scan(anon, []);
+    expect(existsSync(join(anon, ".ultra11y", "documents"))).toBe(false);
+    expect(stderr).toMatch(/not a PDF/);
+  }, 360_000);
+});
