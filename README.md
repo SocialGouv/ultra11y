@@ -238,8 +238,10 @@ pinned when the tool list was built would reject a pack that is perfectly valid 
 project being asked about. The handler validates against the registry and names what it knows.
 
 `--allow-write` additionally exposes `ultra11y_fix` (safe codemods, dry-run by
-default) and `ultra11y_init` (hook/CI/baseline) — the tools that change **your**
-project. `ultra11y_scan` is declared but declines over MCP: it drives a headless
+default), `ultra11y_fold` (lands the verdicts you wrote on the `ultra11y_adjudicate`
+worklist — `verify --apply` over MCP: same gate, partial by default with every refusal
+listed, dry-run unless `write: true`, `ledger: true` to record the accepted verdicts) and
+`ultra11y_init` (hook/CI/baseline) — the tools that change **your** project. `ultra11y_scan` is declared but declines over MCP: it drives a headless
 browser and may pull a Docker image, which is not a subprocess lifecycle a
 long-lived server should own. It tells you to run it from the CLI and re-audit.
 

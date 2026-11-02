@@ -97,6 +97,7 @@ describe("annotations", () => {
     ultra11y_pages: { readOnlyHint: true, openWorldHint: false },
     ultra11y_read: { readOnlyHint: true, openWorldHint: false },
     ultra11y_fix: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    ultra11y_fold: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     ultra11y_scan: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     ultra11y_init: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   };
@@ -114,14 +115,14 @@ describe("annotations", () => {
 
   it("marks exactly the tools that change the user's project", () => {
     const writers = ALL.filter((t) => TOOL_META[t.name]!.write).map((t) => t.name);
-    expect(writers.sort()).toEqual(["ultra11y_fix", "ultra11y_init", "ultra11y_scan"]);
+    expect(writers.sort()).toEqual(["ultra11y_fix", "ultra11y_fold", "ultra11y_init", "ultra11y_scan"]);
   });
 });
 
 describe("toolsFor", () => {
   it("hides the write tools unless the server was started with --allow-write", () => {
     const readOnly = toolsFor("2025-06-18").map((t) => t.name);
-    for (const w of ["ultra11y_fix", "ultra11y_scan", "ultra11y_init"]) expect(readOnly).not.toContain(w);
+    for (const w of ["ultra11y_fix", "ultra11y_fold", "ultra11y_scan", "ultra11y_init"]) expect(readOnly).not.toContain(w);
     expect(toolsFor("2025-06-18", { allowWrite: true }).map((t) => t.name)).toContain("ultra11y_fix");
   });
 
@@ -164,6 +165,7 @@ describe("declared schemas accept what the handlers expect", () => {
       ultra11y_pages: { cwd: "/p", standard: "rgaa", format: "report", lang: "fr" },
       ultra11y_read: { cwd: "/p", path: "index.html", start_line: 1, end_line: 20 },
       ultra11y_fix: { cwd: "/p", write: true, only: ["img-alt"] },
+      ultra11y_fold: { cwd: "/p", adjudication: { kind: "adjudication", standard: "rgaa", items: [] }, write: true, ledger: true, out: "audits" },
       ultra11y_scan: { cwd: "/p", target: "https://example.com", runtime: "docker" },
       ultra11y_init: { cwd: "/p", hook: true, fail_on: "error" },
     };
