@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.50.1](https://github.com/SocialGouv/ultra11y/compare/v5.50.0...v5.50.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **orchestrate:** generate and apply the report trial from one run context ([#89](https://github.com/SocialGouv/ultra11y/issues/89)) ([47a5d69](https://github.com/SocialGouv/ultra11y/commit/47a5d691c6b1f0edb1c9e582ce590a7aab4c2249))
+
 # [5.50.0](https://github.com/SocialGouv/ultra11y/compare/v5.49.1...v5.50.0) (2026-11-02)
 
 
