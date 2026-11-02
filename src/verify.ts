@@ -620,6 +620,47 @@ export function applyVerdicts(items: VerifyItem[], expected?: VerifyItem[]): App
   };
 }
 
+/** WHERE THE CLAIMED CONFORMITIES ON TRIAL CAME FROM — the half of a worklist's identity the
+ *  array itself cannot carry. `in` = the audit under `--in`; `file` = `--conformities <file>`;
+ *  `ledger` = the standard's ledger in the working directory; `none` = no source was found;
+ *  `disabled` = `--no-conformities`. */
+export type ConformitySource = { source: "in" | "file" | "ledger"; path: string } | { source: "none" | "disabled" };
+
+/** The context a `VERIFY.todo.json` was generated from, written beside it as
+ *  `VERIFY.context.json` (#59). The worklist stays a bare array — every list and verdicts file
+ *  written before this still reads unchanged — and the sidecar is read for two things only:
+ *  `orchestrate` builds the apply from the SAME context the list was generated from, and
+ *  `verify --apply` tells a coverage gap caused by a different claim source apart from one a cap
+ *  caused. It never gates anything. Paths are absolute. */
+export interface VerifyContext {
+  kind: "verify-context";
+  standard: string;
+  report: string;
+  in?: string;
+  conformities: ConformitySource;
+  /** Claims the cap left out of the list, per half — 0/0 means the list was exhaustive. */
+  capped: { nc: number; c: number };
+}
+
+export const VERIFY_CONTEXT_FILE = "VERIFY.context.json";
+
+export function writeVerifyContext(outDir: string, ctx: VerifyContext): string {
+  mkdirSync(outDir, { recursive: true });
+  const p = join(outDir, VERIFY_CONTEXT_FILE);
+  writeFileSync(p, JSON.stringify(ctx, null, 2) + "\n");
+  return p;
+}
+
+/** Best-effort: an absent or malformed sidecar answers undefined (a list written before #59). */
+export function readVerifyContext(dir: string): VerifyContext | undefined {
+  try {
+    const c = JSON.parse(readFileSync(join(dir, VERIFY_CONTEXT_FILE), "utf8")) as VerifyContext;
+    return c && c.kind === "verify-context" && c.conformities && c.capped ? c : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface WriteWorklistResult {
   todoPath: string;
   mdPath: string;

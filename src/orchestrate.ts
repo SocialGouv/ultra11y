@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { unrenderedResidual, type AdjudicationFile, type AdjudicationItem } from "./adjudicate.js";
 import type { AuditResult } from "./types.js";
 import { agentContracts, phaseWorkflowScript, runbookMd } from "./orchestrate-templates.js";
-import type { VerifyItem } from "./verify.js";
+import { readVerifyContext, type VerifyItem } from "./verify.js";
 
 // ---------------------------------------------------------------------------
 // `ultra11y orchestrate` — emit the run's multi-agent orchestration from its
@@ -33,6 +33,45 @@ export interface PhaseInfo {
   ids: string[];
   /** The engine command that produces the worklist when it is missing. */
   prerequisite: string;
+  /** The engine command that folds the filled worklist back — built from the SAME run context
+   *  as `prerequisite`, so the list and its apply always try the same claims (#59). */
+  apply: string;
+}
+
+/** The run's active standard, best effort: the context the verify list was generated with, the
+ *  adjudication worklist, then the audit itself. Undefined when the run says nothing yet. */
+function runStandard(run: string): string | undefined {
+  const ctx = readVerifyContext(run);
+  if (ctx?.standard) return ctx.standard;
+  for (const f of ["ADJUDICATE.todo.json", "audit-latest.json"]) {
+    try {
+      const std = (JSON.parse(readFileSync(join(run, f), "utf8")) as { standard?: unknown }).standard;
+      if (typeof std === "string" && std) return std;
+    } catch {
+      /* not there yet */
+    }
+  }
+  return undefined;
+}
+
+/** THE ONE CONTEXT THE VERIFY-REPORT PHASE RUNS IN (#59): the run's audit, its standard, and
+ *  whatever explicit conformity source the list was generated with. Every command the phase
+ *  emits — generation, apply, the contracts' fold line, the semantic gate — is built from it.
+ *  Without it the RUNBOOK generated `verify --report <md>` alone: in a directory with no ledger
+ *  that list tried the engine's NCs and silently skipped every adjudicated conformity.
+ *
+ *  `report` is the report the list was generated from once there is one (recorded beside it),
+ *  the `<report.md>` placeholder before. `flags` holds no engine path, so the contracts — which
+ *  name the engine through the injected `ENGINE` constant — can reuse it verbatim. */
+export function verifyRunContext(runDir: string): { report: string; flags: string; standard?: string } {
+  const run = resolve(runDir);
+  const ctx = readVerifyContext(run);
+  const standard = runStandard(run);
+  const flags = [`--in ${ctx?.in ?? join(run, "audit-latest.json")}`];
+  if (standard) flags.push(`--standard ${standard}`);
+  if (ctx?.conformities.source === "file") flags.push(`--conformities ${ctx.conformities.path}`);
+  if (ctx?.conformities.source === "disabled") flags.push("--no-conformities");
+  return { report: ctx && ctx.report !== "-" ? ctx.report : "<report.md>", flags: flags.join(" "), ...(standard ? { standard } : {}) };
 }
 
 export function listPhases(runDir: string, engineAbs: string): PhaseInfo[] {
@@ -68,6 +107,7 @@ export function listPhases(runDir: string, engineAbs: string): PhaseInfo[] {
     }
   }
 
+  const vctx = verifyRunContext(run);
   return [
     {
       name: "adjudicate",
@@ -76,6 +116,7 @@ export function listPhases(runDir: string, engineAbs: string): PhaseInfo[] {
       items: adjIds.length,
       ids: adjIds,
       prerequisite: `node ${engineAbs} verify --manual --in ${join(run, "audit-latest.json")} --out ${run}`,
+      apply: `node ${engineAbs} verify --apply ${adjPath} --in ${join(run, "audit-latest.json")} --out ${run}`,
     },
     {
       name: "verify-report",
@@ -83,7 +124,8 @@ export function listPhases(runDir: string, engineAbs: string): PhaseInfo[] {
       worklist: verPath,
       items: verIds.length,
       ids: verIds,
-      prerequisite: `node ${engineAbs} verify --report <report.md> --out ${run}`,
+      prerequisite: `node ${engineAbs} verify --report ${vctx.report} ${vctx.flags} --out ${run}`,
+      apply: `node ${engineAbs} verify --apply ${verPath} --report ${vctx.report} ${vctx.flags}`,
     },
   ];
 }
@@ -165,7 +207,7 @@ export function orchestrateRun(runDir: string, engineAbs: string, opts: Orchestr
   // exists on the sequential path — least of all in CI, where the adjudicator has no shell and
   // writes a file. Emitting the fan-out text there and then telling an agent to obey it VERBATIM
   // is two contradictory sets of instructions, which is what a small model breaks on.
-  for (const [name, content] of Object.entries(agentContracts(run, { eco: opts.eco === true }))) {
+  for (const [name, content] of Object.entries(agentContracts(run, { eco: opts.eco === true, verify: verifyRunContext(run) }))) {
     const p = join(agentsDir, `${name}.md`);
     writeFileSync(p, content);
     written.push(p);
@@ -201,7 +243,7 @@ export function orchestrateRun(runDir: string, engineAbs: string, opts: Orchestr
   }
 
   const rb = join(orchDir, "RUNBOOK.md");
-  writeFileSync(rb, runbookMd(phases, run, engineAbs, unrenderedInRun(run)));
+  writeFileSync(rb, runbookMd(phases, run, engineAbs, unrenderedInRun(run), verifyRunContext(run)));
   written.push(rb);
 
   return { exitCode: 0, written, notices, errors: [], phases };

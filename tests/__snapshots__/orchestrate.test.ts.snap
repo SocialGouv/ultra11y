@@ -14,15 +14,15 @@ fail-closed gates; only wall-clock differs. Fan-out is an optimization, not a re
 | Phase | Worklist | Status | Produce it with |
 |---|---|---|---|
 | adjudicate | \`<RUN>/ADJUDICATE.todo.json\` | ready (4 item(s)) | \`node <ENGINE> verify --manual --in <RUN>/audit-latest.json --out <RUN>\` |
-| verify-report | \`<RUN>/VERIFY.todo.json\` | ready (2 item(s)) | \`node <ENGINE> verify --report <report.md> --out <RUN>\` |
+| verify-report | \`<RUN>/VERIFY.todo.json\` | ready (2 item(s)) | \`node <ENGINE> verify --report <report.md> --in <RUN>/audit-latest.json --standard wcag --out <RUN>\` |
 
 ## The loop (play every role yourself, one item at a time)
 
 1. **Audit** (if not done): \`node <ENGINE> audit "<globs>" --graph --out <RUN>\` → \`<RUN>/audit-latest.json\`.
 2. **Adjudicate the residual criteria** — \`node <ENGINE> verify --manual --in <RUN>/audit-latest.json --out <RUN>\` writes \`<RUN>/ADJUDICATE.todo.json\`. For EVERY item, apply \`<RUN>/orchestration/agents/adjudicator.md\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold — gated per verdict, so a refusal costs its own criterion and no other: \`node <ENGINE> verify --apply <RUN>/ADJUDICATE.todo.json --in <RUN>/audit-latest.json --out <RUN>\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`node <ENGINE> report --in <RUN>/audit-latest.json --out <RUN>\`.
-4. **Verify the report's claims** — \`node <ENGINE> verify --report <the report .md> --out <RUN>\` writes \`<RUN>/VERIFY.todo.json\`. For EVERY entry, apply \`<RUN>/orchestration/agents/refuter.md\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`node <ENGINE> verify --apply <RUN>/VERIFY.todo.json --report <the report .md>\`.
-5. **Gate**: \`node <ENGINE> check --report <the report .md> --semantic\` must exit 0 before presenting anything.
+4. **Verify the report's claims** — \`node <ENGINE> verify --report <report.md> --in <RUN>/audit-latest.json --standard wcag --out <RUN>\` writes \`<RUN>/VERIFY.todo.json\` (and \`<RUN>/VERIFY.context.json\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`<RUN>/orchestration/agents/refuter.md\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`node <ENGINE> verify --apply <RUN>/VERIFY.todo.json --report <report.md> --in <RUN>/audit-latest.json --standard wcag\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that — regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
+5. **Gate**: \`node <ENGINE> check --report <report.md> --standard wcag --semantic --verdicts <RUN>/VERIFY.todo.json\` must exit 0 before presenting anything.
 6. **Fix & re-audit**: \`node <ENGINE> fix <globs> --write --iterate\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
 With subagents available, prefer the emitted workflows instead: \`orchestrate --run <RUN> --phase <p>\` then \`Workflow({ scriptPath: "<RUN>/orchestration/<p>.workflow.mjs" })\` — you stay the sole writer either way.

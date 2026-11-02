@@ -105,8 +105,6 @@ interface PhaseSpec {
   title: string;
   schema: unknown;
   description: (items: number) => string;
-  /** The orchestrator's fold step, shown as a comment in the workflow tail + in the runbook. */
-  applyHint: (engineAbs: string, worklist: string, runAbs: string) => string;
 }
 
 const PHASE_SPECS: Record<string, PhaseSpec> = {
@@ -115,14 +113,12 @@ const PHASE_SPECS: Record<string, PhaseSpec> = {
     title: "Adjudicate",
     schema: ADJUDICATE_SCHEMA,
     description: (n) => `Adjudicate the ${n} residual judgment criterion(ia) of an ultra11y audit (fan-out, fail-closed fold)`,
-    applyHint: (engine, worklist, run) => `node ${engine} verify --apply ${worklist} --in ${join(run, "audit-latest.json")} --out ${run}`,
   },
   "verify-report": {
     role: "refuter",
     title: "Verify",
     schema: VERIFY_SCHEMA,
     description: (n) => `Adversarially verify the ${n} non-conformity claim(s) of an ultra11y report (skeptic fan-out)`,
-    applyHint: (engine, worklist) => `node ${engine} verify --apply ${worklist} --report <report.md>`,
   },
 };
 
@@ -173,7 +169,7 @@ export function phaseWorkflowScript(ph: PhaseInfo, runAbs: string, engineAbs: st
     ``,
     `// One-writer rule: this workflow only COLLECTS verdict fragments. The main agent folds`,
     `// them into WORKLIST (fill each item's fields from the matching fragment), then runs:`,
-    `//   ${spec.applyHint(engineAbs, ph.worklist, runAbs)}`,
+    `//   ${ph.apply}`,
     `return { phase: ${JSON.stringify(ph.name)}, worklist: WORKLIST, results: results.filter(Boolean) }`,
     ``,
   ].join("\n");
@@ -225,8 +221,15 @@ Do not edit any other file, do not touch the audited source, do not commit, and 
 `;
 }
 
+/** The verify-report phase's run context (src/orchestrate.ts `verifyRunContext`): the report
+ *  and the `--in`/`--standard`/conformity-source flags every command of the phase carries. */
+export interface VerifyCommandContext {
+  report: string;
+  flags: string;
+}
+
 /** The sequential refuter — same removals: no ITEMS, no structured output, no orchestrator. */
-function ecoRefuterContract(runAbs: string): string {
+function ecoRefuterContract(runAbs: string, verify: VerifyCommandContext): string {
   return `# Contract: refuter (sequential / --eco)
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
@@ -244,16 +247,17 @@ For EACH entry:
    When unsure, choose the HARSHER verdict — a false pass is worse than a false fail.
 3. \`note\` is REQUIRED — one line grounded in what you read (quote or paraphrase the decisive code).
 
-Then fold: \`ultra11y verify --apply ${join(runAbs, "VERIFY.todo.json")} --report <the report .md>\`. Without a shell, leave the fold to whoever gave you the file.
+Then fold: \`ultra11y verify --apply ${join(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` — the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
 `;
 }
 
 // `engineAbs` is deliberately NOT a parameter: the emitted workflow injects `ENGINE` as a
 // constant and the contract refers to it by name, so a second copy of the path here could only
 // ever disagree with the one the agent is actually handed.
-export function agentContracts(runAbs: string, opts: { eco?: boolean } = {}): Record<string, string> {
+export function agentContracts(runAbs: string, opts: { eco?: boolean; verify?: VerifyCommandContext } = {}): Record<string, string> {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
-  if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs) };
+  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join(runAbs, "audit-latest.json")}` };
+  if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs, verify) };
   return {
     adjudicator: `# Contract: adjudicator
 
@@ -296,11 +300,21 @@ ${footer}`,
   };
 }
 
-export function runbookMd(phases: PhaseInfo[], runAbs: string, engineAbs: string, unrendered: string[] = []): string {
+export function runbookMd(
+  phases: PhaseInfo[],
+  runAbs: string,
+  engineAbs: string,
+  unrendered: string[] = [],
+  verify: VerifyCommandContext & { standard?: string } = { report: "<report.md>", flags: `--in ${join(runAbs, "audit-latest.json")}` },
+): string {
   const status = phases
     .map((p) => `| ${p.name} | \`${p.worklist}\` | ${p.ready ? `ready (${p.items} item(s))` : "not ready"} | \`${p.prerequisite}\` |`)
     .join("\n");
   const engine = `node ${engineAbs}`;
+  const vr = phases.find((p) => p.name === "verify-report");
+  const verifyGen = vr?.prerequisite ?? `${engine} verify --report ${verify.report} ${verify.flags} --out ${runAbs}`;
+  const verifyApply = vr?.apply ?? `${engine} verify --apply ${join(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}`;
+  const std = verify.standard ? ` --standard ${verify.standard}` : "";
   // RENDER FIRST, WHEN NOTHING HAS BEEN RENDERED — at the top, above the phase table, because
   // it is the one step that changes what every phase below costs. Measured on a real cascade:
   // 80 criteria to adjudicate from source alone, 41 once one page was scanned. Three passes and
@@ -340,8 +354,8 @@ ${status}
 1. **Audit** (if not done): \`${engine} audit "<globs>" --graph --out ${runAbs}\` → \`${join(runAbs, "audit-latest.json")}\`.
 2. **Adjudicate the residual criteria** — \`${engine} verify --manual --in ${join(runAbs, "audit-latest.json")} --out ${runAbs}\` writes \`${join(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold — gated per verdict, so a refusal costs its own criterion and no other: \`${engine} verify --apply ${join(runAbs, "ADJUDICATE.todo.json")} --in ${join(runAbs, "audit-latest.json")} --out ${runAbs}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`${engine} report --in ${join(runAbs, "audit-latest.json")} --out ${runAbs}\`.
-4. **Verify the report's claims** — \`${engine} verify --report <the report .md> --out ${runAbs}\` writes \`${join(runAbs, "VERIFY.todo.json")}\`. For EVERY entry, apply \`${join(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${engine} verify --apply ${join(runAbs, "VERIFY.todo.json")} --report <the report .md>\`.
-5. **Gate**: \`${engine} check --report <the report .md> --semantic\` must exit 0 before presenting anything.
+4. **Verify the report's claims** — \`${verifyGen}\` writes \`${join(runAbs, "VERIFY.todo.json")}\` (and \`${join(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${verifyApply}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that — regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
+5. **Gate**: \`${engine} check --report ${verify.report}${std} --semantic --verdicts ${join(runAbs, "VERIFY.todo.json")}\` must exit 0 before presenting anything.
 6. **Fix & re-audit**: \`${engine} fix <globs> --write --iterate\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
 With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` — you stay the sole writer either way.
