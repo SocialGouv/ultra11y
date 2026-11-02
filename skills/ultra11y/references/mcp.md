@@ -205,7 +205,8 @@ decisions only (`criteriaId`, `verdict`, `justification`, `citations`, `findings
 the server re-derives the evidence from the audit (`audit_file`, or a fresh audit of `globs`)
 and applies the same gate: a `C` cites the evidence it cleared, an `NC` carries groundable
 findings. Partial by default — a refused verdict stays « to assess » and is named in
-`rejectedCriteria` with its reason in `issues`; `strict: true` lands nothing if anything is
+`rejectedCriteria` with its reason in `issues` (an open criterion the file never mentions is not a
+refusal: it is named apart in `notInWorklist`); `strict: true` lands nothing if anything is
 refused. It is a dry run unless `write: true`, which writes `<out>/audit-latest.json` (default
 the project root, like the CLI); `ledger: true` also merges the **accepted** verdicts into
 `.ultra11y/verdicts/<standard>.json`, never a refused one. A verdict a named human auditor

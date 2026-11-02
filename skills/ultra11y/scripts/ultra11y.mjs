@@ -68627,6 +68627,11 @@ function applyAdjudication(audit2, adj, opts = {}) {
     else itemIssues.set(criteriaId, [issue]);
   };
   const uncovered = (criteriaId) => notFolded.add(criteriaId);
+  const gapIssues = /* @__PURE__ */ new Map();
+  const gap = (criteriaId) => {
+    notFolded.add(criteriaId);
+    gapIssues.set(criteriaId, `criterion ${criteriaId}: missing from the adjudication (coverage gap)`);
+  };
   canonicalizeAdjudication(adj);
   const itemCounts = /* @__PURE__ */ new Map();
   for (const item of adj.items) itemCounts.set(item.criteriaId, (itemCounts.get(item.criteriaId) ?? 0) + 1);
@@ -68642,14 +68647,14 @@ function applyAdjudication(audit2, adj, opts = {}) {
       open.add(item.criteriaId);
       if (byId2.has(item.criteriaId)) continue;
       if (Object.hasOwn(expected, item.criteriaId)) uncovered(item.criteriaId);
-      else blame(item.criteriaId, `criterion ${item.criteriaId}: missing from the adjudication (coverage gap)`);
+      else gap(item.criteriaId);
     }
   } else {
     for (const r of audit2.residualRisks) {
       open.add(r.criteriaId);
       if (byId2.has(r.criteriaId)) continue;
       if (Object.hasOwn(expected, r.criteriaId)) uncovered(r.criteriaId);
-      else blame(r.criteriaId, `criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+      else gap(r.criteriaId);
     }
   }
   for (const it of adj.items) {
@@ -68832,13 +68837,25 @@ function applyAdjudication(audit2, adj, opts = {}) {
       }
     }
   }
-  if (opts.strict && issues.length) {
-    return { ok: false, audit: audit2, issues, applied: 0, stillManual: 0, rejected: 0, rejectedCriteria: [], grounding };
+  const notInWorklist = [...gapIssues.keys()];
+  if (opts.strict && (issues.length || notInWorklist.length)) {
+    return {
+      ok: false,
+      audit: audit2,
+      issues: [...gapIssues.values(), ...issues],
+      applied: 0,
+      stillManual: 0,
+      rejected: 0,
+      rejectedCriteria: [],
+      notInWorklist,
+      grounding
+    };
   }
   const rejectedCriteria = adj.items.map((it) => it.criteriaId).filter((id) => itemIssues.has(id));
   for (const id of itemIssues.keys()) if (!rejectedCriteria.includes(id)) rejectedCriteria.push(id);
   const rejectedSet = notFolded;
-  const rejectedWhy = (id) => expected[id] ?? residualRejectedReason(itemIssues.get(id)?.[0] ?? "refused by the gate");
+  const rejectedWhy = (id) => expected[id] ?? (gapIssues.has(id) ? residualNotInWorklistReason() : residualRejectedReason(itemIssues.get(id)?.[0] ?? "refused by the gate"));
+  const complete = issues.length === 0 && notInWorklist.length === 0;
   const next = structuredClone(audit2);
   const critById = new Map(next.criteria.map((c2) => [c2.id, c2]));
   const newFindings = [];
@@ -68898,7 +68915,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
     next.packAdjudication = { standard: adj.standard, criteria: [...carried.values()] };
     next.findings = [...next.findings, ...newFindings];
     next.adjudicated = { date: adj.auditDate, applied, stillManual, ...rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {} };
-    return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
+    return { ok: complete, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, notInWorklist, grounding };
   }
   for (const it of adj.items) {
     const c2 = critById.get(it.criteriaId);
@@ -68942,7 +68959,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
   next.residualRisks = next.residualRisks.filter((r) => byId2.get(r.criteriaId)?.verdict === "manual" || rejectedSet.has(r.criteriaId)).map((r) => rejectedSet.has(r.criteriaId) ? { ...r, reason: rejectedWhy(r.criteriaId) } : r);
   recomputeTallies(next);
   next.adjudicated = { date: adj.auditDate, applied, stillManual, ...rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {} };
-  return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
+  return { ok: complete, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, notInWorklist, grounding };
 }
 function agentSeverity(v, advisory) {
   if (v === "bloquant" || v === "majeur" || v === "mineur") return v;
@@ -69008,6 +69025,7 @@ function recomputeTallies(a) {
 }
 var residualScanReason = () => "Rendering criterion \u2014 decide on the rendered DOM (`scan`).";
 var residualUndecidableReason = () => "Left as an explicit residual risk (not decidable from the available evidence).";
+var residualNotInWorklistReason = () => "Not in the adjudication that was folded (coverage gap) \u2014 no verdict was offered, so none was refused. Adjudicate this criterion.";
 var residualRejectedReason = (why) => `Adjudication refused by the gate \u2014 ${why.replace(/^criterion \S+: /, "")}. Re-adjudicate this criterion.`;
 var SNIPPET_SHOWN = 200;
 var CAPTURE_FILES = ["dom.html", "styles.json", "boxes.json", "css.json", "probes.json", "axe.json", "axtree.json", "screen.png"];
@@ -77799,6 +77817,7 @@ function handleFold(args2, cwd) {
     stillManual: r.stillManual,
     rejected: r.rejected,
     rejectedCriteria: r.rejectedCriteria,
+    notInWorklist: r.notInWorklist,
     issues: r.issues,
     conformancePct: r.audit.conformancePct,
     grounding: r.grounding
@@ -78335,7 +78354,7 @@ var WRITE_TOOLS = [
   {
     name: "ultra11y_fold",
     title: "Fold an adjudication into the audit",
-    description: "WRITES TO THE PROJECT (with write:true): land the verdicts you wrote on the ultra11y_adjudicate worklist \u2014 the counterpart of `verify --apply`. Send the decisions only (criteriaId, verdict, justification, citations, findings, reason): the server re-derives the evidence and applies the SAME gate \u2014 a C must cite the evidence it cleared, an NC must carry groundable findings. Partial by default: a refused verdict stays \xAB to assess \xBB and is listed in rejectedCriteria with its reason; strict:true lands nothing if anything is refused. Dry-run by default (the gate's verdict, nothing written); write:true writes <out>/audit-latest.json, and ledger:true records the ACCEPTED verdicts in the verdict ledger.",
+    description: "WRITES TO THE PROJECT (with write:true): land the verdicts you wrote on the ultra11y_adjudicate worklist \u2014 the counterpart of `verify --apply`. Send the decisions only (criteriaId, verdict, justification, citations, findings, reason): the server re-derives the evidence and applies the SAME gate \u2014 a C must cite the evidence it cleared, an NC must carry groundable findings. Partial by default: a refused verdict stays \xAB to assess \xBB and is listed in rejectedCriteria with its reason; an open criterion the file never mentions is not a refusal and is listed apart in notInWorklist; strict:true lands nothing if anything is refused. Dry-run by default (the gate's verdict, nothing written); write:true writes <out>/audit-latest.json, and ledger:true records the ACCEPTED verdicts in the verdict ledger.",
     inputSchema: {
       type: "object",
       properties: {
@@ -81964,6 +81983,7 @@ function replayLedgerFile(p, ledger, lang) {
           stillManual: r.stillManual,
           rejected: r.rejected,
           rejectedCriteria: r.rejectedCriteria,
+          notInWorklist: r.notInWorklist,
           replayed: rp.fresh.length,
           stale: rp.stale,
           obsolete: rp.obsolete,
@@ -81995,6 +82015,13 @@ function replayLedgerFile(p, ledger, lang) {
   }
   return 0;
 }
+function reportNotInWorklist(ids2, lang) {
+  if (!ids2.length) return;
+  const shown = ids2.slice(0, 40).join(", ") + (ids2.length > 40 ? ` \u2026 +${ids2.length - 40}` : "");
+  console.error(
+    lang === "fr" ? `\u2139 ${ids2.length} crit\xE8re(s) hors de la liste \u2014 absent(s) de ce fichier, rien n'a \xE9t\xE9 refus\xE9 ; ils restent \xE0 \xE9valuer : ${shown}` : `\u2139 ${ids2.length} criterion(ia) not in this worklist \u2014 absent from this file, nothing was refused; they stay to assess: ${shown}`
+  );
+}
 function applyAdjudicationFile(p, adj, lang) {
   const inFlag = p.flags.in;
   if (typeof inFlag !== "string" || !inFlag) {
@@ -82019,6 +82046,7 @@ function applyAdjudicationFile(p, adj, lang) {
     else {
       console.error(lang === "fr" ? `\u2717 Adjudication rejet\xE9e (${r.issues.length} probl\xE8me(s)) :` : `\u2717 Adjudication rejected (${r.issues.length} issue(s)):`);
       for (const i2 of r.issues) console.error(`  \u2717 ${i2}`);
+      reportNotInWorklist(r.notInWorklist, lang);
     }
     return 1;
   }
@@ -82028,6 +82056,7 @@ function applyAdjudicationFile(p, adj, lang) {
     );
     for (const i2 of r.issues) console.error(`  \u2717 ${i2}`);
   }
+  if (!p.flags.json) reportNotInWorklist(r.notInWorklist, lang);
   const out2 = typeof p.flags.out === "string" ? p.flags.out : ".";
   mkdirSync20(out2, { recursive: true });
   const auditPath = join56(out2, "audit-latest.json");
@@ -82058,6 +82087,7 @@ function applyAdjudicationFile(p, adj, lang) {
           stillManual: r.stillManual,
           rejected: r.rejected,
           rejectedCriteria: r.rejectedCriteria,
+          notInWorklist: r.notInWorklist,
           issues: r.issues,
           conformancePct: r.audit.conformancePct,
           findings: r.audit.findings.length,
@@ -82069,7 +82099,7 @@ function applyAdjudicationFile(p, adj, lang) {
     );
   else
     console.log(
-      lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel${r.rejected ? `, ${r.rejected} refus\xE9(s)` : ""} \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} \u2192 ${auditPath}`
+      lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel${r.rejected ? `, ${r.rejected} refus\xE9(s)` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} hors de la liste` : ""} \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} not in this worklist` : ""} \u2192 ${auditPath}`
     );
   return 0;
 }
@@ -82343,6 +82373,7 @@ async function cmdJudge(p) {
     console.error(lang === "fr" ? `\u2717 Adjudication rejet\xE9e (${r.issues.length} probl\xE8me(s)) :` : `\u2717 Adjudication rejected (${r.issues.length} issue(s)):`);
     for (const i2 of r.issues.slice(0, 40)) console.error(`  \u2717 ${i2}`);
     if (r.issues.length > 40) console.error(`  \u2026 +${r.issues.length - 40}`);
+    reportNotInWorklist(r.notInWorklist, lang);
     return 1;
   }
   if (r.rejected > 0) {
@@ -82352,6 +82383,7 @@ async function cmdJudge(p) {
     for (const i2 of r.issues.slice(0, 40)) console.error(`  \u2717 ${i2}`);
     if (r.issues.length > 40) console.error(`  \u2026 +${r.issues.length - 40}`);
   }
+  reportNotInWorklist(r.notInWorklist, lang);
   mkdirSync20(out2, { recursive: true });
   const auditPath = join56(out2, "audit-latest.json");
   writeFileSync23(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
@@ -82372,7 +82404,7 @@ async function cmdJudge(p) {
     );
   }
   console.log(
-    lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel${r.rejected ? `, ${r.rejected} refus\xE9(s)` : ""} \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} \u2192 ${auditPath}`
+    lang === "fr" ? `\u2713 ${r.applied} crit\xE8re(s) adjug\xE9(s), ${r.stillManual} laiss\xE9(s) en r\xE9siduel${r.rejected ? `, ${r.rejected} refus\xE9(s)` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} hors de la liste` : ""} \u2192 ${auditPath}` : `\u2713 ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} not in this worklist` : ""} \u2192 ${auditPath}`
   );
   return 0;
 }

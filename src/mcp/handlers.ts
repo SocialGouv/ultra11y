@@ -549,6 +549,7 @@ function handleFold(args: Record<string, unknown>, cwd: string): unknown {
     stillManual: r.stillManual,
     rejected: r.rejected,
     rejectedCriteria: r.rejectedCriteria,
+    notInWorklist: r.notInWorklist,
     issues: r.issues,
     conformancePct: r.audit.conformancePct,
     grounding: r.grounding,
