@@ -5,11 +5,17 @@
 import { ownPackSubjects, subjectsAbsent, subjectsForPackCriterion } from "../adjudicate-subjects.js";
 import { findingId } from "../baseline.js";
 import { coverageFor, criterionMeasuredOn, unionCoverage } from "../coverage.js";
-import type { AuditResult, CriterionResult, PageCoverage, Status, Finding, Severity } from "../types.js";
+import type { AuditResult, Auditor, CriterionResult, DecidedBy, PageCoverage, PackCriterionAdjudication, Status, Finding, Severity } from "../types.js";
 import { CORE_KEY, loadPack } from "./registry.js";
 import { knownScStatus } from "../wcag.js";
 import type { LocaleString, PackCriterion, PackOverride, SecondaryMapping, StandardPack } from "./types.js";
-import { INAPPLICABLE_STATUS } from "../types.js";
+import { INAPPLICABLE_STATUS, isAdjudicated } from "../types.js";
+
+/** Who a recorded pack verdict reads as ruled by. A record with no `decidedBy` (a refusal the
+ *  gate left behind) has always read as the agent's here; only a named human is anyone else. */
+function ruler(decided: PackCriterionAdjudication): { decidedBy: "agent" | "human"; auditor?: Auditor } {
+  return decided.decidedBy === "human" && decided.auditor ? { decidedBy: "human", auditor: decided.auditor } : { decidedBy: "agent" };
+}
 
 export interface PackCriterionResult {
   id: string;
@@ -39,7 +45,9 @@ export interface PackCriterionResult {
   // granularity wins over the derivation). Declared here because renderings distinguish a
   // conformity the engine PROVED from one an agent RULED — they are not the same claim.
   justification?: string;
-  decidedBy?: "engine" | "agent" | "scan";
+  decidedBy?: DecidedBy;
+  /** Who ruled, when a named human auditor did (`decidedBy: "human"`). */
+  auditor?: Auditor;
   /** Conforming because nothing of its kind is in scope, not because anything was verified.
    *  Mirrors CriterionResult.inapplicable — see INAPPLICABLE_STATUS. */
   inapplicable?: boolean;
@@ -52,7 +60,7 @@ export interface PackCriterionResult {
  * result intact for that worklist, while report/page projections use this predicate to show
  * the row as open until an agent has confirmed `NA`. */
 export function isProvisionalJudgmentInapplicable(result: PackCriterionResult, criterion?: PackCriterion): boolean {
-  if (result.status !== INAPPLICABLE_STATUS || result.inapplicable !== true || result.decidedBy === "agent") return false;
+  if (result.status !== INAPPLICABLE_STATUS || result.inapplicable !== true || isAdjudicated(result.decidedBy)) return false;
   // `derivePackResults` stamps the fact on the result so downstream arithmetic that only
   // receives the derived rows (not the pack) can make the same publication decision as the
   // report. Keep the criterion lookup as a compatibility fallback for callers holding a row
@@ -124,7 +132,7 @@ export function packConformancePct(derived: PackCriterionResult[]): number {
   // Subject harvesting may only PROVISIONALLY conclude that a judgment criterion is
   // inapplicable. The report publishes that row as manual until the agent confirms NA, so the
   // headline arithmetic must use the same status rather than credit a hidden conformity.
-  const c = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent" && !isProvisionalJudgmentInapplicable(d)).length;
+  const c = derived.filter((d) => d.status === "C" && !isAdjudicated(d.decidedBy) && !isProvisionalJudgmentInapplicable(d)).length;
   const nc = derived.filter((d) => d.status === "NC").length;
   return c + nc === 0 ? 100 : Math.round((c / (c + nc)) * 100);
 }
@@ -479,7 +487,7 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
         ...open,
         status: measured.status === "NC" ? "NC" : "manual",
         ...(decided.justification ? { justification: decided.justification } : {}),
-        decidedBy: "agent" as const,
+        ...ruler(decided),
       };
     }
     if (decided) {
@@ -497,7 +505,7 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
         findings: decided.findings,
         scs: pc.wcag,
         ...(decided.justification ? { justification: decided.justification } : {}),
-        decidedBy: "agent" as const,
+        ...ruler(decided),
       };
     }
     // Preserve the raw absence-derived `C` for the adjudication worklist, but carry enough

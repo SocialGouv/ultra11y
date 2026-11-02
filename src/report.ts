@@ -6,7 +6,8 @@
 // (never silently C).
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import type { AuditResult, Finding, Lang, PageResult, Severity, Status } from "./types.js";
+import type { AuditResult, Auditor, DecidedBy, Finding, Lang, PageResult, Severity, Status } from "./types.js";
+import { isAdjudicated } from "./types.js";
 import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits, type PrdUnit } from "./prd.js";
 import { auditorUnitModel, renderAuditorUnit, type AuditorCropLookup } from "./auditor.js";
@@ -102,7 +103,8 @@ const L = {
     decidedNote: (c: number, nc: number, na: number, open: number) =>
       `${c} conforme(s), ${nc} non conforme(s), ${na} conforme(s) faute de sujet, ${open} à évaluer`,
     provenance: "Provenance des décisions",
-    provenanceNote: (engine: number, scan: number, agent: number) => `${engine} moteur · ${scan} navigateur · ${agent} adjudication`,
+    provenanceNote: (engine: number, scan: number, agent: number, human = 0) =>
+      `${engine} moteur · ${scan} navigateur · ${agent} adjudication${human ? ` · ${human} auditeur humain` : ""}`,
     autoRateNote: (c: number, d: number) => `critères validés par le moteur seul ÷ critères décidés sans l'agent (${c} ÷ ${d})`,
     warn: "Ce rapport couvre le sous-ensemble de critères vérifiables automatiquement. Les critères « à évaluer » (rendu / jugement) sont adjugés par l'agent IA (`verify --manual`, de façon gatée) ; le rendu passe par `scan` (voir la section 5).",
     derived: (std: string) =>
@@ -123,6 +125,9 @@ const L = {
     cAgentTitle: "Conformes par adjudication de l'agent (jugement, non prouvé par le moteur)",
     cAgentNote:
       "Ces critères ont été tranchés par l'agent IA à partir des évidences citées, non décidés par le moteur déterministe. Ils sont gatés (chaque verdict cite une évidence résolvable) mais restent un jugement : ils ne sont pas comptés dans le taux de réussite automatique ci-dessus.",
+    cHumanTitle: "Conformes par décision de l'auditeur (jugement humain, non prouvé par le moteur)",
+    cHumanNote:
+      "Ces critères ont été tranchés par un auditeur humain nommé, à partir des évidences citées et sous le même gate que l'agent (chaque verdict cite une évidence résolvable). L'auditeur est le second lecteur : ces verdicts ne passent pas par la contre-expertise automatique (`verify --report`), et ne sont pas comptés dans le taux de réussite automatique.",
     pageRatesTitle: "Taux par page",
     pageRatesNote: "Une ligne par page : la base sur laquelle elle a été jugée, et son taux avec le dénominateur sur lequel il est calculé.",
     pageCol: "Page",
@@ -199,7 +204,7 @@ const L = {
     statusCol: "Statut",
     automationCol: "Tests S / R / J",
     decidedByCol: "Décidé par",
-    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "à adjuger" },
+    owner: { engine: "moteur", scan: "scan", agent: "IA", human: "auditeur", pending: "à adjuger" },
     // THE SUMMARY — what a reader who stops after one screen must take away: the level, what to
     // fix, and what separates the site from the next level.
     methodTitle: "Méthode, couverture et avertissements",
@@ -337,7 +342,8 @@ const L = {
     decidedNote: (c: number, nc: number, na: number, open: number) =>
       `${c} conforming, ${nc} non-conforming, ${na} conforming for want of a subject, ${open} to assess`,
     provenance: "Where the decisions came from",
-    provenanceNote: (engine: number, scan: number, agent: number) => `${engine} engine · ${scan} browser · ${agent} adjudication`,
+    provenanceNote: (engine: number, scan: number, agent: number, human = 0) =>
+      `${engine} engine · ${scan} browser · ${agent} adjudication${human ? ` · ${human} human auditor` : ""}`,
     autoRateNote: (c: number, d: number) => `criteria validated by the engine alone ÷ criteria decided without the agent (${c} ÷ ${d})`,
     warn: "This report covers the subset of criteria checkable automatically. The “to assess” criteria (rendering / judgment) are adjudicated by the AI agent (`verify --manual`, gated); rendering goes through `scan` (see section 5).",
     derived: (std: string) =>
@@ -358,6 +364,9 @@ const L = {
     cAgentTitle: "Conforming by agent adjudication (judgement, not proven by the engine)",
     cAgentNote:
       "These criteria were ruled on by the AI agent from the evidence it cited, not decided by the deterministic engine. They are gated (every verdict cites resolvable evidence) but remain a judgement: they are not counted in the automatic pass rate above.",
+    cHumanTitle: "Conforming by auditor decision (human judgement, not proven by the engine)",
+    cHumanNote:
+      "These criteria were ruled on by a named human auditor from the evidence they cited, under the agent's gate (every verdict cites resolvable evidence). The auditor is the second reader: these verdicts are not sent to the automatic refutation trial (`verify --report`), and are not counted in the automatic pass rate.",
     pageRatesTitle: "Per-page rate",
     pageRatesNote: "One row per page: the basis it was judged on, and its rate with the denominator it was computed over.",
     pageCol: "Page",
@@ -425,7 +434,7 @@ const L = {
     statusCol: "Status",
     automationCol: "S / R / J tests",
     decidedByCol: "Decided by",
-    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" },
+    owner: { engine: "engine", scan: "scan", agent: "AI", human: "auditor", pending: "to adjudicate" },
     methodTitle: "Method, coverage and caveats",
     conformanceShort: (v: number, a: number) => `validated criteria ÷ applicable criteria (${v} ÷ ${a})`,
     denominatorLine: "How the rate is computed",
@@ -594,7 +603,7 @@ export function untestedNeedsRendering(r: AuditResult, established: ReadonlySet<
 export function establishedScs(derived: readonly PackCriterionResult[]): Set<string> {
   const out = new Set<string>();
   for (const d of derived) {
-    if (d.status !== "NC" && d.decidedBy !== "agent") continue;
+    if (d.status !== "NC" && !isAdjudicated(d.decidedBy)) continue;
     // THE SC THE CONSTAT CARRIES, not every SC the criterion happens to map to. RGAA 10.7
     // projects from 1.4.1 AND 2.4.7; one `dyn-focus-visible` hit fails it on 2.4.7 alone, and
     // crediting 1.4.1 with it would delete « information par la couleur » from the banner on
@@ -627,8 +636,10 @@ export interface ReportRow {
   // Who decided this criterion. Absent/"engine" = the deterministic engine; "agent" = an
   // adjudication (gated, but a judgement call); "scan" = the rendered tier. Rendered so a
   // conformity the engine PROVED is never presented as the same thing as one an agent
-  // RULED — see the split in section 3 and the header rate.
-  decidedBy?: "engine" | "agent" | "scan";
+  // RULED — see the split in section 3 and the header rate. "human" = the same adjudication by
+  // the named `auditor`, reported under their name and never as the AI.
+  decidedBy?: DecidedBy;
+  auditor?: Auditor;
   /** Conforming because nothing of its kind is in scope — see INAPPLICABLE_STATUS. Section 4
    *  collects these, so section 3 stays the criteria something was actually verified about. */
   inapplicable?: boolean;
@@ -795,13 +806,26 @@ export function pageConformanceCell(p: Pick<PageConformance, "pct" | "validated"
 /** Who settled each criterion — the engine's own tests, a browser measurement, or an
  *  adjudication. Published beside the rate because « 80 % » means something different when
  *  half of it was ruled by a model than when the engine proved it. */
-export function decisionProvenance(rows: ReportRow[]): { engine: number; scan: number; agent: number } {
+export function decisionProvenance(rows: ReportRow[]): { engine: number; scan: number; agent: number; human: number } {
   const decided = rows.filter((r) => r.status !== "manual");
   return {
     engine: decided.filter((r) => !r.decidedBy || r.decidedBy === "engine").length,
     scan: decided.filter((r) => r.decidedBy === "scan").length,
     agent: decided.filter((r) => r.decidedBy === "agent").length,
+    human: decided.filter((r) => r.decidedBy === "human").length,
   };
+}
+
+/** Who decided a row, as the « Décidé par » cell prints it: the named auditor for a human
+ *  verdict — « auditeur (Jeanne Dupont, Access42) » — and the tier's own word otherwise. Raw
+ *  text: each surface escapes it its own way. `check` keys on the leading word to keep a ruled
+ *  conformity out of the automatic rate. */
+export function ownerLabel(row: Pick<ReportRow, "status" | "decidedBy" | "auditor">, owner: Record<DecidedBy | "pending", string>): string {
+  if (row.status === "manual") return owner.pending;
+  const by = row.decidedBy ?? "engine";
+  if (by !== "human" || !row.auditor) return owner[by];
+  const who = [row.auditor.name, row.auditor.organisation].filter(Boolean).join(", ");
+  return `${owner.human} (${who})`;
 }
 
 /** One step of a standard's conformity scale, resolved to the report language. */
@@ -926,7 +950,7 @@ function exhaustiveGrid(groups: ReportGroup[], standard: StandardId, lang: Lang,
     "| --- | :---: | :---: | --- |",
   ];
   for (const row of rows) {
-    const owner = row.status === "manual" ? s.owner.pending : s.owner[row.decidedBy ?? "engine"];
+    const owner = cell(ownerLabel(row, s.owner));
     out.push(`| ${row.label} | ${row.inapplicable ? "NA" : row.status === "manual" ? "?" : row.status} | ${automationCell(standard, row.id)} | ${owner} |`);
   }
   out.push("", "</details>", "");
@@ -1243,7 +1267,7 @@ interface RenderOpts {
   /** The country standard's OWN conformity rate, which leads the header when a pack report
    *  supplies it. Absent for the core WCAG report, which is a different document for a
    *  different reader and keeps its automatic rate as the headline. */
-  conformance?: { rate: ConformanceRate; provenance: { engine: number; scan: number; agent: number }; autoDecided: number; autoValidated: number };
+  conformance?: { rate: ConformanceRate; provenance: ReturnType<typeof decisionProvenance>; autoDecided: number; autoValidated: number };
   // Where this report will be WRITTEN. Only used to resolve the per-page screenshots
   // relatively; absent ⇒ paths relative to the CWD, which is what stdout wants.
   outDir?: string;
@@ -1623,8 +1647,9 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   // agent ruled on are both "C", but they are not the same claim. Both lists fold.
   out.push('<a id="conforming"></a>', `## ${s.cTitle}`, "");
   const conform = rows.filter((x) => x.status === "C" && !x.inapplicable);
-  const byEngine = conform.filter((x) => x.decidedBy !== "agent");
+  const byEngine = conform.filter((x) => !isAdjudicated(x.decidedBy));
   const byAgent = conform.filter((x) => x.decidedBy === "agent");
+  const byHuman = conform.filter((x) => x.decidedBy === "human");
   if (!conform.length) out.push(s.nothing, "");
   else {
     if (byEngine.length)
@@ -1640,6 +1665,15 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
         ...folded(
           s.showCriteria(byAgent.length),
           byAgent.map((x) => `- ${x.label}${x.justification ? ` — _${x.justification}_` : ""}`),
+        ),
+      );
+    }
+    if (byHuman.length) {
+      out.push(`### ${s.cHumanTitle}`, "", `> ${s.cHumanNote}`, "");
+      out.push(
+        ...folded(
+          s.showCriteria(byHuman.length),
+          byHuman.map((x) => `- ${x.label} — ${mdText(ownerLabel(x, s.owner))}${x.justification ? ` — _${x.justification}_` : ""}`),
         ),
       );
     }
@@ -1696,7 +1730,7 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
     ax.push(
       `- **${s.decidedLine}** : ${rate.decided}/${rate.total} — ${s.decidedNote(rate.validated, rate.total - rate.validated - rate.na - rate.open, rate.na, rate.open)}`,
     );
-    ax.push(`- **${s.provenance}** : ${s.provenanceNote(provenance.engine, provenance.scan, provenance.agent)}`);
+    ax.push(`- **${s.provenance}** : ${s.provenanceNote(provenance.engine, provenance.scan, provenance.agent, provenance.human)}`);
     // Checked by `check` like every header rate: its operands must be a pair the grid licenses.
     ax.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% — ${s.autoRateNote(autoValidated, autoDecided)}`);
   }
@@ -1830,6 +1864,7 @@ export function reportGroups(r: AuditResult, lang: Lang = "en"): ReportGroup[] {
       findings: c.findings,
       justification: c.justification,
       decidedBy: c.decidedBy,
+      ...(c.auditor ? { auditor: c.auditor } : {}),
       ...(c.inapplicable ? { inapplicable: true } : {}),
     };
     (byGuideline.get(c.guideline) ?? byGuideline.set(c.guideline, []).get(c.guideline)!).push(row);
@@ -1868,6 +1903,7 @@ export function packReportGroups(r: AuditResult, pack: StandardPack, lang: Lang 
       status: provisionalNa ? "manual" : pr.status,
       findings: pr.findings,
       ...(pr.decidedBy ? { decidedBy: pr.decidedBy } : {}),
+      ...(pr.auditor ? { auditor: pr.auditor } : {}),
       ...(pr.inapplicable && !provisionalNa ? { inapplicable: true } : {}),
       // outOfScope / scopedOut criteria are "manual" with their own dedicated justification —
       // never mixed with the "nothing of that kind here" reason (see the manual section above).
@@ -1916,7 +1952,7 @@ export function renderPackReportDocuments(
   // The automatic rate's own two operands, computed exactly as `packConformancePct` computes
   // its ratio — one formula, published with its numerator and its denominator so a reader can
   // tell it apart from the conformity rate above it at a glance.
-  const autoValidated = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent" && !isProvisionalJudgmentInapplicable(d)).length;
+  const autoValidated = derived.filter((d) => d.status === "C" && !isAdjudicated(d.decidedBy) && !isProvisionalJudgmentInapplicable(d)).length;
   const autoDecided = autoValidated + derived.filter((d) => d.status === "NC").length;
   return render(r, lang, {
     std,

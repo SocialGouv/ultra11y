@@ -8,6 +8,9 @@ import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from
 // src/types.ts
 var VERSION = "5.51.2";
 var SCHEMA_VERSION = 2;
+function isAdjudicated(by) {
+  return by === "agent" || by === "human";
+}
 var INAPPLICABLE_STATUS = "C";
 
 // src/audit.ts
@@ -59478,8 +59481,11 @@ import { mkdirSync as mkdirSync6, writeFileSync as writeFileSync7 } from "fs";
 import { join as join30 } from "path";
 
 // src/standards/derive.ts
+function ruler(decided) {
+  return decided.decidedBy === "human" && decided.auditor ? { decidedBy: "human", auditor: decided.auditor } : { decidedBy: "agent" };
+}
 function isProvisionalJudgmentInapplicable(result, criterion) {
-  if (result.status !== INAPPLICABLE_STATUS || result.inapplicable !== true || result.decidedBy === "agent") return false;
+  if (result.status !== INAPPLICABLE_STATUS || result.inapplicable !== true || isAdjudicated(result.decidedBy)) return false;
   return result.judgment === true || Object.values(criterion?.automation?.tests ?? {}).includes("judgment");
 }
 function aggregate2(results) {
@@ -59505,7 +59511,7 @@ function packCriteriaForFinding(pack, finding) {
   }).map((pc) => pc.id);
 }
 function packConformancePct(derived) {
-  const c2 = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent" && !isProvisionalJudgmentInapplicable(d)).length;
+  const c2 = derived.filter((d) => d.status === "C" && !isAdjudicated(d.decidedBy) && !isProvisionalJudgmentInapplicable(d)).length;
   const nc = derived.filter((d) => d.status === "NC").length;
   return c2 + nc === 0 ? 100 : Math.round(c2 / (c2 + nc) * 100);
 }
@@ -59635,7 +59641,7 @@ function derivePackResults(audit2, packKey, pageId) {
         ...open,
         status: measured2.status === "NC" ? "NC" : "manual",
         ...decided.justification ? { justification: decided.justification } : {},
-        decidedBy: "agent"
+        ...ruler(decided)
       };
     }
     if (decided) {
@@ -59648,7 +59654,7 @@ function derivePackResults(audit2, packKey, pageId) {
         findings: decided.findings,
         scs: pc.wcag,
         ...decided.justification ? { justification: decided.justification } : {},
-        decidedBy: "agent"
+        ...ruler(decided)
       };
     }
     return isProvisionalJudgmentInapplicable(measured2, pc) ? { ...measured2, judgment: true } : measured2;
@@ -60071,7 +60077,7 @@ function pageStatus(c2, pageFindings, basis, coverage) {
   if (c2.status === "manual") return "manual";
   if (c2.status === "NA") return "NA";
   if (c2.inapplicable) return c2.status;
-  if (c2.decidedBy === "agent" || c2.decidedBy === "scan") return c2.status;
+  if (c2.decidedBy === "agent" || c2.decidedBy === "human" || c2.decidedBy === "scan") return c2.status;
   if (automatability(c2.id) !== "static") return "manual";
   return basis === "snapshot" ? "C" : "manual";
 }
@@ -60146,6 +60152,7 @@ var L = {
     notAudited: "non audit\xE9",
     notAuditedNote: "Une page marqu\xE9e \xAB non audit\xE9 \xBB a bien un instantan\xE9, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformit\xE9 \u2014 relancez l'audit en incluant `.ultra11y/pages`.",
     agentMark: "`C*` : conformit\xE9 tranch\xE9e par l'agent IA \xE0 partir des \xE9vidences cit\xE9es (gat\xE9), et non prouv\xE9e par le moteur d\xE9terministe.",
+    humanMark: "`C\u2020` : conformit\xE9 tranch\xE9e par un auditeur humain nomm\xE9 \xE0 partir des \xE9vidences cit\xE9es (m\xEAme gate que l'agent), et non prouv\xE9e par le moteur d\xE9terministe.",
     originNote: (o) => `Les colonnes sont les URL des pages, relatives \xE0 \`${o}\`.`
   },
   en: {
@@ -60162,6 +60169,7 @@ var L = {
     notAudited: "not audited",
     notAuditedNote: 'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming \u2014 re-run the audit with `.ultra11y/pages` in scope.',
     agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
+    humanMark: "`C\u2020`: conformity ruled by a named human auditor from the evidence they cited (the agent's gate), not proven by the deterministic engine.",
     originNote: (o) => `Columns are the pages' URLs, relative to \`${o}\`.`
   }
 };
@@ -60170,6 +60178,13 @@ function formatRate(rate, decided, total) {
 }
 function agentMarkNote(lang) {
   return L[lang].agentMark;
+}
+function humanMarkNote(lang) {
+  return L[lang].humanMark;
+}
+function ruledMark(decidedBy, status) {
+  if (status !== "C") return "";
+  return decidedBy === "agent" ? "*" : decidedBy === "human" ? "\u2020" : "";
 }
 function pageBasisWarning(basis, lang) {
   if (basis === "snapshot") return void 0;
@@ -60220,6 +60235,7 @@ function pageView(result, page) {
 }
 function pageGridModel(result, derived, standard, lang) {
   const status = /* @__PURE__ */ new Map();
+  const human = /* @__PURE__ */ new Set();
   const put = (rowId, pageId, s) => {
     const m = status.get(rowId) ?? /* @__PURE__ */ new Map();
     m.set(pageId, s);
@@ -60227,8 +60243,12 @@ function pageGridModel(result, derived, standard, lang) {
   };
   if (isCore(standard)) {
     const rows2 = [...result.criteria].sort((a, b) => compareSC(a.id, b.id)).map((c2) => ({ id: c2.id, label: `${c2.id} ${scTitle(c2.id, lang) ?? ""}`.trim(), group: c2.guideline }));
-    for (const p of derived) for (const c2 of p.criteria) put(c2.id, p.id, c2.status);
-    return { rows: rows2, status };
+    for (const p of derived)
+      for (const c2 of p.criteria) {
+        put(c2.id, p.id, c2.status);
+        if (c2.decidedBy === "human") human.add(`${c2.id}|${p.id}`);
+      }
+    return { rows: rows2, status, human };
   }
   const pack = loadPack(standard);
   const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
@@ -60236,9 +60256,10 @@ function pageGridModel(result, derived, standard, lang) {
     for (const pc of derivePackResults(pageView(result, p), standard, p.id)) {
       const criterion = pack.criteria.find((row) => row.id === pc.id);
       put(pc.id, p.id, isProvisionalJudgmentInapplicable(pc, criterion) ? "manual" : pc.status);
+      if (pc.decidedBy === "human") human.add(`${pc.id}|${p.id}`);
     }
   }
-  return { rows, status };
+  return { rows, status, human };
 }
 function renderRedirected(redirected, lang = "en") {
   const fr = lang === "fr";
@@ -60281,19 +60302,26 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   if (originNote) out2.push(`> ${originNote}`, "");
   const head = [s.criterion, ...derived.map((p) => pageColumnLabel(p, origin))];
   out2.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
-  const { rows, status } = pageGridModel(result, derived, standard, lang);
+  const { rows, status, human } = pageGridModel(result, derived, standard, lang);
   out2.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id))}**`).join(" | ")} |`);
   out2.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
   let group = "";
+  let humanRuled = false;
   for (const row of rows) {
     if (row.group !== group) {
       group = row.group;
       out2.push(`| **${group}** | ${derived.map(() => "").join(" | ")} |`);
     }
-    const cells = derived.map((p) => MARK[status.get(row.id)?.get(p.id) ?? "manual"]);
+    const cells = derived.map((p) => {
+      const st = status.get(row.id)?.get(p.id) ?? "manual";
+      const mark = human.has(`${row.id}|${p.id}`) ? ruledMark("human", st) : "";
+      if (mark) humanRuled = true;
+      return `${MARK[st]}${mark}`;
+    });
     out2.push(`| ${row.label} | ${cells.join(" | ")} |`);
   }
   out2.push("");
+  if (humanRuled) out2.push(`> ${humanMarkNote(lang)}`, "");
   const orphans = unattributedFindings(result);
   if (orphans.length) out2.push(`> ${s.unattributed(orphans.length)}`, "");
   return out2.join("\n");
@@ -61211,12 +61239,13 @@ function renderPageReport(result, page, opts = {}) {
       group = row.group;
       out2.push(withTests ? `| **${group}** | | |` : `| **${group}** | |`);
     }
-    const mark = row.decidedBy === "agent" && row.status === "C" ? `${MARK2[row.status]}*` : MARK2[row.status];
+    const mark = `${MARK2[row.status]}${ruledMark(row.decidedBy, row.status)}`;
     if (withTests) out2.push(`| ${row.label} | ${row.tests.map((t4) => `\`${t4}\``).join(" ")} | ${mark} |`);
     else out2.push(`| ${row.label} | ${mark} |`);
   }
   out2.push("", `> ${s.manualWarn}`, "");
   if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out2.push(`> ${agentMarkNote(lang)}`, "");
+  if (rows.some((r) => r.decidedBy === "human" && r.status === "C")) out2.push(`> ${humanMarkNote(lang)}`, "");
   const units = prdUnits(pageView(result, page), standard, lang);
   const ncUnits = units.filter((u) => !u.advisory);
   const advUnits = units.filter((u) => u.advisory);
@@ -61319,7 +61348,7 @@ var L5 = {
     decidedLine: "D\xE9cid\xE9s",
     decidedNote: (c2, nc, na, open) => `${c2} conforme(s), ${nc} non conforme(s), ${na} conforme(s) faute de sujet, ${open} \xE0 \xE9valuer`,
     provenance: "Provenance des d\xE9cisions",
-    provenanceNote: (engine, scan2, agent) => `${engine} moteur \xB7 ${scan2} navigateur \xB7 ${agent} adjudication`,
+    provenanceNote: (engine, scan2, agent, human = 0) => `${engine} moteur \xB7 ${scan2} navigateur \xB7 ${agent} adjudication${human ? ` \xB7 ${human} auditeur humain` : ""}`,
     autoRateNote: (c2, d) => `crit\xE8res valid\xE9s par le moteur seul \xF7 crit\xE8res d\xE9cid\xE9s sans l'agent (${c2} \xF7 ${d})`,
     warn: "Ce rapport couvre le sous-ensemble de crit\xE8res v\xE9rifiables automatiquement. Les crit\xE8res \xAB \xE0 \xE9valuer \xBB (rendu / jugement) sont adjug\xE9s par l'agent IA (`verify --manual`, de fa\xE7on gat\xE9e) ; le rendu passe par `scan` (voir la section 5).",
     derived: (std) => `Rapport ${std}. Chaque crit\xE8re est jug\xE9 sur ses propres tests ; la v\xE9rification d'int\xE9grit\xE9 (\`check\`/\`verify\`) op\xE8re sur le m\xEAme p\xE9rim\xE8tre.`,
@@ -61338,6 +61367,8 @@ var L5 = {
     cTitle: "3. Crit\xE8res conformes (C)",
     cAgentTitle: "Conformes par adjudication de l'agent (jugement, non prouv\xE9 par le moteur)",
     cAgentNote: "Ces crit\xE8res ont \xE9t\xE9 tranch\xE9s par l'agent IA \xE0 partir des \xE9vidences cit\xE9es, non d\xE9cid\xE9s par le moteur d\xE9terministe. Ils sont gat\xE9s (chaque verdict cite une \xE9vidence r\xE9solvable) mais restent un jugement : ils ne sont pas compt\xE9s dans le taux de r\xE9ussite automatique ci-dessus.",
+    cHumanTitle: "Conformes par d\xE9cision de l'auditeur (jugement humain, non prouv\xE9 par le moteur)",
+    cHumanNote: "Ces crit\xE8res ont \xE9t\xE9 tranch\xE9s par un auditeur humain nomm\xE9, \xE0 partir des \xE9vidences cit\xE9es et sous le m\xEAme gate que l'agent (chaque verdict cite une \xE9vidence r\xE9solvable). L'auditeur est le second lecteur : ces verdicts ne passent pas par la contre-expertise automatique (`verify --report`), et ne sont pas compt\xE9s dans le taux de r\xE9ussite automatique.",
     pageRatesTitle: "Taux par page",
     pageRatesNote: "Une ligne par page : la base sur laquelle elle a \xE9t\xE9 jug\xE9e, et son taux avec le d\xE9nominateur sur lequel il est calcul\xE9.",
     pageCol: "Page",
@@ -61400,7 +61431,7 @@ var L5 = {
     statusCol: "Statut",
     automationCol: "Tests S / R / J",
     decidedByCol: "D\xE9cid\xE9 par",
-    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "\xE0 adjuger" },
+    owner: { engine: "moteur", scan: "scan", agent: "IA", human: "auditeur", pending: "\xE0 adjuger" },
     // THE SUMMARY — what a reader who stops after one screen must take away: the level, what to
     // fix, and what separates the site from the next level.
     methodTitle: "M\xE9thode, couverture et avertissements",
@@ -61523,7 +61554,7 @@ var L5 = {
     decidedLine: "Decided",
     decidedNote: (c2, nc, na, open) => `${c2} conforming, ${nc} non-conforming, ${na} conforming for want of a subject, ${open} to assess`,
     provenance: "Where the decisions came from",
-    provenanceNote: (engine, scan2, agent) => `${engine} engine \xB7 ${scan2} browser \xB7 ${agent} adjudication`,
+    provenanceNote: (engine, scan2, agent, human = 0) => `${engine} engine \xB7 ${scan2} browser \xB7 ${agent} adjudication${human ? ` \xB7 ${human} human auditor` : ""}`,
     autoRateNote: (c2, d) => `criteria validated by the engine alone \xF7 criteria decided without the agent (${c2} \xF7 ${d})`,
     warn: "This report covers the subset of criteria checkable automatically. The \u201Cto assess\u201D criteria (rendering / judgment) are adjudicated by the AI agent (`verify --manual`, gated); rendering goes through `scan` (see section 5).",
     derived: (std) => `${std} report. Every criterion is judged on its own tests; the integrity gates (\`check\`/\`verify\`) operate on the same scope.`,
@@ -61542,6 +61573,8 @@ var L5 = {
     cTitle: "3. Conforming criteria (C)",
     cAgentTitle: "Conforming by agent adjudication (judgement, not proven by the engine)",
     cAgentNote: "These criteria were ruled on by the AI agent from the evidence it cited, not decided by the deterministic engine. They are gated (every verdict cites resolvable evidence) but remain a judgement: they are not counted in the automatic pass rate above.",
+    cHumanTitle: "Conforming by auditor decision (human judgement, not proven by the engine)",
+    cHumanNote: "These criteria were ruled on by a named human auditor from the evidence they cited, under the agent's gate (every verdict cites resolvable evidence). The auditor is the second reader: these verdicts are not sent to the automatic refutation trial (`verify --report`), and are not counted in the automatic pass rate.",
     pageRatesTitle: "Per-page rate",
     pageRatesNote: "One row per page: the basis it was judged on, and its rate with the denominator it was computed over.",
     pageCol: "Page",
@@ -61597,7 +61630,7 @@ var L5 = {
     statusCol: "Status",
     automationCol: "S / R / J tests",
     decidedByCol: "Decided by",
-    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" },
+    owner: { engine: "engine", scan: "scan", agent: "AI", human: "auditor", pending: "to adjudicate" },
     methodTitle: "Method, coverage and caveats",
     conformanceShort: (v, a) => `validated criteria \xF7 applicable criteria (${v} \xF7 ${a})`,
     denominatorLine: "How the rate is computed",
@@ -61711,7 +61744,7 @@ function untestedNeedsRendering(r, established = /* @__PURE__ */ new Set()) {
 function establishedScs(derived) {
   const out2 = /* @__PURE__ */ new Set();
   for (const d of derived) {
-    if (d.status !== "NC" && d.decidedBy !== "agent") continue;
+    if (d.status !== "NC" && !isAdjudicated(d.decidedBy)) continue;
     const carried = new Set(d.findings.map((f) => f.criteriaId).filter((id) => d.scs.includes(id)));
     if (carried.size === 0 && d.scs.length === 1) carried.add(d.scs[0]);
     for (const sc of carried) out2.add(sc);
@@ -61793,8 +61826,16 @@ function decisionProvenance(rows) {
   return {
     engine: decided.filter((r) => !r.decidedBy || r.decidedBy === "engine").length,
     scan: decided.filter((r) => r.decidedBy === "scan").length,
-    agent: decided.filter((r) => r.decidedBy === "agent").length
+    agent: decided.filter((r) => r.decidedBy === "agent").length,
+    human: decided.filter((r) => r.decidedBy === "human").length
   };
+}
+function ownerLabel(row, owner) {
+  if (row.status === "manual") return owner.pending;
+  const by = row.decidedBy ?? "engine";
+  if (by !== "human" || !row.auditor) return owner[by];
+  const who = [row.auditor.name, row.auditor.organisation].filter(Boolean).join(", ");
+  return `${owner.human} (${who})`;
 }
 function conformityScale(standard, lang) {
   if (isCore(standard)) return [];
@@ -61866,7 +61907,7 @@ function exhaustiveGrid(groups, standard, lang, title) {
     "| --- | :---: | :---: | --- |"
   ];
   for (const row of rows) {
-    const owner = row.status === "manual" ? s.owner.pending : s.owner[row.decidedBy ?? "engine"];
+    const owner = cell(ownerLabel(row, s.owner));
     out2.push(`| ${row.label} | ${row.inapplicable ? "NA" : row.status === "manual" ? "?" : row.status} | ${automationCell(standard, row.id)} | ${owner} |`);
   }
   out2.push("", "</details>", "");
@@ -62254,8 +62295,9 @@ function render(r, lang, opts) {
   }
   out2.push('<a id="conforming"></a>', `## ${s.cTitle}`, "");
   const conform = rows.filter((x) => x.status === "C" && !x.inapplicable);
-  const byEngine = conform.filter((x) => x.decidedBy !== "agent");
+  const byEngine = conform.filter((x) => !isAdjudicated(x.decidedBy));
   const byAgent = conform.filter((x) => x.decidedBy === "agent");
+  const byHuman = conform.filter((x) => x.decidedBy === "human");
   if (!conform.length) out2.push(s.nothing, "");
   else {
     if (byEngine.length)
@@ -62271,6 +62313,15 @@ function render(r, lang, opts) {
         ...folded(
           s.showCriteria(byAgent.length),
           byAgent.map((x) => `- ${x.label}${x.justification ? ` \u2014 _${x.justification}_` : ""}`)
+        )
+      );
+    }
+    if (byHuman.length) {
+      out2.push(`### ${s.cHumanTitle}`, "", `> ${s.cHumanNote}`, "");
+      out2.push(
+        ...folded(
+          s.showCriteria(byHuman.length),
+          byHuman.map((x) => `- ${x.label} \u2014 ${mdText(ownerLabel(x, s.owner))}${x.justification ? ` \u2014 _${x.justification}_` : ""}`)
         )
       );
     }
@@ -62316,7 +62367,7 @@ function render(r, lang, opts) {
     ax.push(
       `- **${s.decidedLine}** : ${rate.decided}/${rate.total} \u2014 ${s.decidedNote(rate.validated, rate.total - rate.validated - rate.na - rate.open, rate.na, rate.open)}`
     );
-    ax.push(`- **${s.provenance}** : ${s.provenanceNote(provenance.engine, provenance.scan, provenance.agent)}`);
+    ax.push(`- **${s.provenance}** : ${s.provenanceNote(provenance.engine, provenance.scan, provenance.agent, provenance.human)}`);
     ax.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% \u2014 ${s.autoRateNote(autoValidated, autoDecided)}`);
   }
   ax.push(`- **${s.renderedPages(pagesRead)}**${pagesRead === 0 ? ` \u2014 ${s.noRenderedPages}` : ""}`);
@@ -62429,6 +62480,7 @@ function reportGroups(r, lang = "en") {
       findings: c2.findings,
       justification: c2.justification,
       decidedBy: c2.decidedBy,
+      ...c2.auditor ? { auditor: c2.auditor } : {},
       ...c2.inapplicable ? { inapplicable: true } : {}
     };
     (byGuideline.get(c2.guideline) ?? byGuideline.set(c2.guideline, []).get(c2.guideline)).push(row);
@@ -62456,6 +62508,7 @@ function packReportGroups(r, pack, lang = "en") {
       status: provisionalNa ? "manual" : pr.status,
       findings: pr.findings,
       ...pr.decidedBy ? { decidedBy: pr.decidedBy } : {},
+      ...pr.auditor ? { auditor: pr.auditor } : {},
       ...pr.inapplicable && !provisionalNa ? { inapplicable: true } : {},
       // outOfScope / scopedOut criteria are "manual" with their own dedicated justification —
       // never mixed with the "nothing of that kind here" reason (see the manual section above).
@@ -62475,7 +62528,7 @@ function renderPackReportDocuments(r, pack, lang = "en", outDir, cropFor) {
   const groups = packReportGroups(r, pack, lang);
   const rows = groups.flatMap((g) => g.rows);
   const tally = reportTotals(groups);
-  const autoValidated = derived.filter((d) => d.status === "C" && d.decidedBy !== "agent" && !isProvisionalJudgmentInapplicable(d)).length;
+  const autoValidated = derived.filter((d) => d.status === "C" && !isAdjudicated(d.decidedBy) && !isProvisionalJudgmentInapplicable(d)).length;
   const autoDecided = autoValidated + derived.filter((d) => d.status === "NC").length;
   return render(r, lang, {
     std,
@@ -64435,7 +64488,8 @@ function agentConformities(md) {
   for (const line of md.split("\n")) {
     if (!line.startsWith("|")) continue;
     const cells = line.slice(1, line.endsWith("|") ? -1 : void 0).split("|").map((cell3) => cell3.trim());
-    if (cells.length === 4 && (cells[1] === "C" || cells[1] === "NA") && (cells[3] === "AI" || cells[3] === "IA")) count++;
+    if (cells.length === 4 && (cells[1] === "C" || cells[1] === "NA") && (cells[3] === "AI" || cells[3] === "IA" || /^audit(?:eur|or)\b/.test(cells[3])))
+      count++;
   }
   return count;
 }
@@ -64590,6 +64644,7 @@ function checkDecided(audit2, standard = CORE2, lang = "en", opts = {}) {
     engine: settled.filter((r) => r.decidedBy === void 0 || r.decidedBy === "engine").length,
     scan: settled.filter((r) => r.decidedBy === "scan").length,
     agent: settled.filter((r) => r.decidedBy === "agent").length,
+    human: settled.filter((r) => r.decidedBy === "human").length,
     declared: allowed.length,
     undecided: undecided.length
   };
@@ -65452,7 +65507,8 @@ function adjudicationContract() {
       C: "a non-empty justification AND citations[] naming the harvested evidence it cleared (each anchor resolvable and drawn from this criterion's own evidence, and about the same kind of element the harvest recorded there \u2014 copy the evidence's own `snippet` rather than retyping the element); a criterion with no harvested evidence cannot be C at all",
       NA: "a non-empty justification, and citations[] whenever evidence was presented \u2014 a criterion whose subject exists NOWHERE in the audited scope is NA, never NC",
       NC: "at least one groundable finding, each naming the `file` it was observed in (an NC with no location is refused as flatly as an uncited C \u2014 and a non-conformity that rests on an ABSENCE is still observed on an element of a page, so cite that element) and each citing a normativeRef that resolves against the active standard",
-      manual: `a reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`
+      manual: `a reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`,
+      human: `decidedBy "human" (a human auditor's verdict, instead of the default "agent") requires auditor: { name, organisation? } \u2014 the same evidence gate applies, and the verdict is reported under the auditor's name`
     }
   };
 }
@@ -65933,6 +65989,12 @@ function applyAdjudication(audit2, adj, opts = {}) {
   };
   for (const it of adj.items) {
     if (!open.has(it.criteriaId)) continue;
+    const by = it.decidedBy;
+    if (by !== void 0 && by !== "agent" && by !== "human") {
+      blame(it.criteriaId, `criterion ${it.criteriaId}: decidedBy must be "agent" or "human" (got ${JSON.stringify(by)})`);
+    } else if (by === "human" && !auditorOf(it)) {
+      blame(it.criteriaId, `criterion ${it.criteriaId}: a decidedBy "human" verdict must name its auditor \u2014 auditor: { name, organisation? }`);
+    }
     const v = it.verdict;
     if (v === null) {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
@@ -66100,7 +66162,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
           reason: it.reason === "needs-rendered-dom" ? "needs-rendered-dom" : "undecidable",
           justification: it.reason === "needs-rendered-dom" ? residualScanReason() : residualUndecidableReason(),
           findings: [],
-          decidedBy: "agent"
+          ...ruledBy(it)
         });
         continue;
       }
@@ -66113,7 +66175,7 @@ function applyAdjudication(audit2, adj, opts = {}) {
         status: it.verdict,
         ...it.verdict === "C" || it.verdict === "NA" ? { justification: it.justification.trim(), ...citationsOf(it) } : {},
         findings: [...fs2, ...recs],
-        decidedBy: "agent"
+        ...ruledBy(it)
       });
     }
     const alreadyDecided = new Set(
@@ -66140,14 +66202,14 @@ function applyAdjudication(audit2, adj, opts = {}) {
     if (rejectedSet.has(it.criteriaId)) continue;
     if (it.verdict === "manual") {
       c2.status = "manual";
-      c2.decidedBy = "agent";
+      stampRuledBy(c2, it);
       c2.justification = it.reason === "needs-rendered-dom" ? residualScanReason() : residualUndecidableReason();
       stillManual++;
       continue;
     }
     applied++;
     c2.status = it.verdict === "NA" ? INAPPLICABLE_STATUS : it.verdict;
-    c2.decidedBy = "agent";
+    stampRuledBy(c2, it);
     delete c2.inapplicable;
     if (it.verdict === "C" || it.verdict === "NA") {
       c2.justification = it.justification.trim();
@@ -66191,6 +66253,23 @@ function citationsOf(it) {
   const cites = (it.citations ?? []).map((c2) => typeof c2 === "string" ? readCitation(c2) : c2).filter((c2) => c2 !== null && c2 !== void 0).map(({ file, line, selector, snippet: snippet2, note }) => ({ file, line, selector, snippet: snippet2, ...note ? { note } : {} }));
   return cites.length ? { citations: cites } : {};
 }
+function auditorOf(it) {
+  const a = it.auditor;
+  const name2 = typeof a?.name === "string" ? a.name.trim() : "";
+  if (!name2) return void 0;
+  const organisation = typeof a?.organisation === "string" ? a.organisation.trim() : "";
+  return { name: name2, ...organisation ? { organisation } : {} };
+}
+function ruledBy(it) {
+  const auditor = it.decidedBy === "human" ? auditorOf(it) : void 0;
+  return auditor ? { decidedBy: "human", auditor } : { decidedBy: "agent" };
+}
+function stampRuledBy(c2, it) {
+  const r = ruledBy(it);
+  c2.decidedBy = r.decidedBy;
+  if (r.auditor) c2.auditor = r.auditor;
+  else delete c2.auditor;
+}
 function agentFinding(criteriaId, f, advisory = false) {
   return {
     ruleId: `agent:${criteriaId}`,
@@ -66219,7 +66298,7 @@ function recomputeTallies(a) {
     g.na = inG.filter((c2) => c2.status === "NA").length;
     g.manual = inG.filter((c2) => c2.status === "manual").length;
   }
-  const decided = a.criteria.filter((c2) => c2.status === "NC" || c2.status === "C" && c2.decidedBy !== "agent");
+  const decided = a.criteria.filter((c2) => c2.status === "NC" || c2.status === "C" && !isAdjudicated(c2.decidedBy));
   const conform = decided.filter((c2) => c2.status === "C").length;
   a.conformancePct = decided.length === 0 ? 100 : Math.round(conform / decided.length * 100);
 }
@@ -66638,8 +66717,10 @@ function pruneRefuted(audit2, standard, items, lang = "en", untried = []) {
   let removedFindings = 0;
   const deleted = /* @__PURE__ */ new Set();
   const acted = /* @__PURE__ */ new Set();
+  const human = /* @__PURE__ */ new Set();
   const prune = (rec, setOpen) => {
     const isAgent = rec.decidedBy === "agent";
+    if (rec.decidedBy === "human") human.add(rec.id);
     const drop = removedNc.get(rec.id);
     if (drop?.size) {
       if (isAgent) {
@@ -66691,11 +66772,23 @@ function pruneRefuted(audit2, standard, items, lang = "en", untried = []) {
       });
     }
   }
-  const skippedEngineClaims = withdrawn.filter((it) => !acted.has(it.criteriaId));
+  const skippedHumanClaims = withdrawn.filter((it) => human.has(it.criteriaId));
+  const skippedHuman = skippedHumanClaims.length;
+  const skippedEngineClaims = withdrawn.filter((it) => !acted.has(it.criteriaId) && !human.has(it.criteriaId));
   const skippedEngine = skippedEngineClaims.length;
   if (deleted.size) next.findings = next.findings.filter((f) => !deleted.has(`${f.criteriaId}|${findingKey(f)}`));
   if (isCore(standard)) recomputeTallies(next);
-  return { audit: next, removedFindings, reopenedCriteria, clearedConformities, untriedConformities, skippedEngine, skippedEngineClaims };
+  return {
+    audit: next,
+    removedFindings,
+    reopenedCriteria,
+    clearedConformities,
+    untriedConformities,
+    skippedEngine,
+    skippedEngineClaims,
+    skippedHuman,
+    skippedHumanClaims
+  };
 }
 
 // src/ledger.ts
@@ -66851,10 +66944,14 @@ function entriesFrom(adj, accepted, date, root) {
       evidenceFiles: evidenceFilesOf(it.evidence, root),
       evidenceCount: it.evidence.length,
       date,
-      decidedBy: "agent"
+      ...whoRuled(it)
     });
   }
   return out2;
+}
+function whoRuled(x) {
+  const auditor = x.decidedBy === "human" ? auditorOf(x) : void 0;
+  return auditor ? { decidedBy: "human", auditor } : { decidedBy: "agent" };
 }
 function mergeLedger(existing, standard, fresh) {
   const base = existing && existing.standard === standard ? existing : emptyLedger(standard);
@@ -66946,7 +67043,8 @@ function replayLedger(audit2, ledger, opts = {}) {
       findings: reanchor(e.findings, it.evidence, currentFiles, root) ?? [],
       ...e.citations ? { citations: reanchor(e.citations, it.evidence, currentFiles, root) ?? [] } : {},
       ...e.recommendations ? { recommendations: reanchor(e.recommendations, it.evidence, currentFiles, root) ?? [] } : {},
-      decidedBy: "agent"
+      // Who ruled travels with the decision; the fold re-checks the auditor's name.
+      ...whoRuled(e)
     });
   }
   return {
@@ -68438,7 +68536,7 @@ function recomputeTallies2(merged) {
       manual: inG.filter((c2) => c2.status === "manual").length
     };
   });
-  const decided = merged.criteria.filter((c2) => c2.status === "NC" || c2.status === "C" && c2.decidedBy !== "agent");
+  const decided = merged.criteria.filter((c2) => c2.status === "NC" || c2.status === "C" && !isAdjudicated(c2.decidedBy));
   const conform = decided.filter((c2) => c2.status === "C").length;
   merged.conformancePct = decided.length === 0 ? 100 : Math.round(conform / decided.length * 100);
   merged.findings.sort((a, b) => sevRank[b.severity] - sevRank[a.severity]);
@@ -70407,6 +70505,7 @@ function packAuditDocument(input, packKey, lang) {
       findings: d.findings.map((f) => packFinding(f, [d.id])),
       ...provisionalNa ? { justification: provisionalNaReason } : d.justification ? { justification: d.justification } : {},
       ...d.decidedBy && !provisionalNa ? { decidedBy: d.decidedBy } : {},
+      ...d.auditor && !provisionalNa ? { auditor: d.auditor } : {},
       ...d.inapplicable && !provisionalNa ? { inapplicable: true } : {},
       ...pc?.automation ? { automation: pc.automation } : {}
     };
@@ -70714,7 +70813,7 @@ var S = {
     files: "fichiers",
     coverage: (decided, total) => `${decided}/${total} crit\xE8res tranch\xE9s dans ce run`,
     remaining: (n) => `${n} \xE0 compl\xE9ter par scan ou adjudication`,
-    provenance: { engine: "moteur", scan: "scan", agent: "agent" },
+    provenance: { engine: "moteur", scan: "scan", agent: "agent", human: "auditeur" },
     none: "\u2705 Aucune non-conformit\xE9 d\xE9tect\xE9e par le moteur statique.",
     findings: "Non-conformit\xE9s",
     severity: "S\xE9v\xE9rit\xE9",
@@ -70792,7 +70891,7 @@ var S = {
     files: "files",
     coverage: (decided, total) => `${decided}/${total} criteria decided in this run`,
     remaining: (n) => `${n} still to complete by scan or adjudication`,
-    provenance: { engine: "engine", scan: "scan", agent: "agent" },
+    provenance: { engine: "engine", scan: "scan", agent: "agent", human: "auditor" },
     none: "\u2705 No non-conformity detected by the static engine.",
     findings: "Non-conformities",
     severity: "Severity",
@@ -70929,10 +71028,11 @@ function runCoverage(result, standard, lang) {
   const by = {
     engine: decidedRows.filter((r) => !r.decidedBy || r.decidedBy === "engine").length,
     scan: decidedRows.filter((r) => r.decidedBy === "scan").length,
-    agent: decidedRows.filter((r) => r.decidedBy === "agent").length
+    agent: decidedRows.filter((r) => r.decidedBy === "agent").length,
+    human: decidedRows.filter((r) => r.decidedBy === "human").length
   };
   const s = S[lang];
-  const provenance = ["engine", "scan", "agent"].filter((key2) => by[key2] > 0).map((key2) => `${by[key2]} ${s.provenance[key2]}`);
+  const provenance = ["engine", "scan", "agent", "human"].filter((key2) => by[key2] > 0).map((key2) => `${by[key2]} ${s.provenance[key2]}`);
   const remaining = Math.max(0, total - decided);
   const agentRuled = groups.some((g) => g.rows.some((r) => r.decidedBy === "agent" && r.status === "C"));
   return {
@@ -71783,7 +71883,7 @@ var T4 = {
     exhaustiveCaption: "Une ligne par crit\xE8re ; S/R/J indique le nombre de tests static, rendered et judgment.",
     automationCol: "Tests S / R / J",
     decidedBy: "D\xE9cid\xE9 par",
-    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "\xE0 adjuger" }
+    owner: { engine: "moteur", scan: "scan", agent: "IA", human: "auditeur", pending: "\xE0 adjuger" }
   },
   en: {
     contents: "Contents",
@@ -71844,7 +71944,7 @@ var T4 = {
     exhaustiveCaption: "One row per criterion; S/R/J is the number of static, rendered and judgment tests.",
     automationCol: "S / R / J tests",
     decidedBy: "Decided by",
-    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" }
+    owner: { engine: "engine", scan: "scan", agent: "AI", human: "auditor", pending: "to adjudicate" }
   }
 };
 function ticks(text) {
@@ -72056,7 +72156,7 @@ function criteriaGridBlocks(result, standard, lang) {
     const tiers = Object.values(criterion?.automation?.tests ?? {});
     const n = (tier) => tiers.filter((value) => value === tier).length;
     const status = row.inapplicable ? "NA" : row.status;
-    const owner = row.status === "manual" ? t3.owner.pending : t3.owner[row.decidedBy ?? "engine"];
+    const owner = ownerLabel(row, t3.owner);
     rows.push([
       { text: pack && criterion ? `${pack.name} ${row.id} \u2014 ${titlePlain(pack, criterion, lang)}` : row.label },
       { status, text: "" },
@@ -72147,7 +72247,7 @@ function pageGridBlocks(result, page, standard, lang) {
       group = row.group;
       table.rows.push([{ text: group, colspan: 2 }]);
     }
-    table.rows.push([{ text: row.label }, { status: row.status, text: row.decidedBy === "agent" && row.status === "C" ? "*" : "" }]);
+    table.rows.push([{ text: row.label }, { status: row.status, text: ruledMark(row.decidedBy, row.status) }]);
   }
   const out2 = [
     { kind: "heading", level: 2, text: t3.grid },
@@ -72163,6 +72263,7 @@ function pageGridBlocks(result, page, standard, lang) {
     table
   ];
   if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out2.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
+  if (rows.some((r) => r.decidedBy === "human" && r.status === "C")) out2.push({ kind: "note", tone: "info", runs: ticks(humanMarkNote(lang)) });
   return out2;
 }
 function indexDoc(result, opts = {}) {
@@ -72689,11 +72790,12 @@ function foldRecordedAdjudication(root, fresh) {
   if (prior.adjudicated) fresh.adjudicated = prior.adjudicated;
   const byId2 = new Map(fresh.criteria.map((c2) => [c2.id, c2]));
   for (const c2 of prior.criteria) {
-    if (c2.decidedBy !== "agent") continue;
+    if (c2.decidedBy !== "agent" && c2.decidedBy !== "human") continue;
     const target = byId2.get(c2.id);
     if (target?.status !== "manual") continue;
     target.status = c2.status;
-    target.decidedBy = "agent";
+    target.decidedBy = c2.decidedBy;
+    if (c2.auditor) target.auditor = c2.auditor;
     if (c2.justification) target.justification = c2.justification;
   }
   fresh.residualRisks = fresh.residualRisks.filter((r) => byId2.get(r.criteriaId)?.status === "manual");
@@ -73600,7 +73702,7 @@ function buildTrialSummary(input) {
   for (const it of missingItems) (it.kind === "c" ? claims.c : claims.nc).missing++;
   const untriedForPrune = r.failures.filter((f) => !["refuted", "unsupported"].includes(norm5(f.verdict) ?? ""));
   const dry = pruneRefuted(audit2, standard, verdicts, input.lang, untriedForPrune);
-  const contested = new Set(dry.skippedEngineClaims);
+  const contested = /* @__PURE__ */ new Set([...dry.skippedEngineClaims, ...dry.skippedHumanClaims]);
   const foreign = new Set(foreignItems);
   const withdrawnAgent = verdicts.filter((it) => !foreign.has(it) && !contested.has(it) && ["refuted", "unsupported"].includes(norm5(it.verdict) ?? ""));
   const applied = [];
@@ -78135,7 +78237,7 @@ function cmdCheck(p) {
         );
       const pv = decided.provenance;
       console.log(
-        lang === "fr" ? `  ${pv.total} crit\xE8res \u2014 ${pv.engine} moteur, ${pv.scan} mesure (scan), ${pv.agent} agent, ${pv.declared} d\xE9clar\xE9(s) ind\xE9cidable(s), ${pv.undecided} sans verdict.` : `  ${pv.total} criteria \u2014 ${pv.engine} engine, ${pv.scan} measured (scan), ${pv.agent} agent, ${pv.declared} declared undecidable, ${pv.undecided} with no verdict.`
+        lang === "fr" ? `  ${pv.total} crit\xE8res \u2014 ${pv.engine} moteur, ${pv.scan} mesure (scan), ${pv.agent} agent, ${pv.human ? `${pv.human} auditeur humain, ` : ""}${pv.declared} d\xE9clar\xE9(s) ind\xE9cidable(s), ${pv.undecided} sans verdict.` : `  ${pv.total} criteria \u2014 ${pv.engine} engine, ${pv.scan} measured (scan), ${pv.agent} agent, ${pv.human ? `${pv.human} human auditor, ` : ""}${pv.declared} declared undecidable, ${pv.undecided} with no verdict.`
       );
     }
     if (covered?.ok) {
@@ -78383,6 +78485,10 @@ function applyPrune(p, standard, items, lang, untried = []) {
     if (pruned.skippedEngine)
       console.error(
         lang === "fr" ? `\u26A0 ${pruned.skippedEngine} verdict(s) r\xE9fut\xE9(s) visent une d\xE9cision du moteur \u2014 non modifi\xE9s : un crit\xE8re que le moteur tranche est recalcul\xE9 \xE0 chaque run, et un faux positif se corrige dans la r\xE8gle.` : `\u26A0 ${pruned.skippedEngine} refuted verdict(s) name an ENGINE decision \u2014 left untouched: a criterion the engine decides is recomputed every run, and a false positive is fixed in the rule.`
+      );
+    if (pruned.skippedHuman)
+      console.error(
+        lang === "fr" ? `\u26A0 ${pruned.skippedHuman} verdict(s) r\xE9fut\xE9(s) visent une d\xE9cision d'un auditeur humain nomm\xE9 \u2014 non modifi\xE9s : l'auditeur est le second lecteur ; soumettez-lui la contre-expertise.` : `\u26A0 ${pruned.skippedHuman} refuted verdict(s) name a named human auditor's decision \u2014 left untouched: the auditor is the second reader; put the refutation to them.`
       );
   }
   return pruned;

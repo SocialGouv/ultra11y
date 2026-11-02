@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AuditResult, DynamicEngine, DynamicFinding, DynamicResult, Finding, Lang, SamplePage, ScanRedirect, Severity } from "./types.js";
+import { isAdjudicated } from "./types.js";
 import { lineStartsOf, lineColAt } from "./parse/html.js";
 import { allGuidelines } from "./wcag.js";
 import { PROBE_SEVERITY, PROBE_WCAG, scForAxe, severityFromImpact, isAxeAdvisory } from "./axe-map.js";
@@ -855,7 +856,7 @@ export function recomputeTallies(merged: AuditResult): void {
   // and denominator, exactly as adjudication and checkReport define it; agent NC still counts
   // because evidenced failure safely lowers the rate. A later scan merge must not re-credit
   // human/model judgments as automatic checks.
-  const decided = merged.criteria.filter((c) => c.status === "NC" || (c.status === "C" && c.decidedBy !== "agent"));
+  const decided = merged.criteria.filter((c) => c.status === "NC" || (c.status === "C" && !isAdjudicated(c.decidedBy)));
   const conform = decided.filter((c) => c.status === "C").length;
   merged.conformancePct = decided.length === 0 ? 100 : Math.round((conform / decided.length) * 100);
   merged.findings.sort((a, b) => sevRank[b.severity] - sevRank[a.severity]);

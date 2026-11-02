@@ -31,6 +31,26 @@ export type Status = "C" | "NC" | "NA" | "manual";
  *  `NA` stays in the type because the outside world still speaks it — a verdict ledger written
  *  before this change, an Ara export, a model's adjudication — and every one of those is folded
  *  to this value on the way in rather than rejected. */
+/** Who decided a criterion's status. Absent/"engine" = the deterministic engine; "scan" = the
+ *  dynamic tier's measurement; "agent" = an AI adjudication; "human" = a NAMED human auditor's
+ *  adjudication (`auditor` says who). The last two are both rulings on evidence rather than
+ *  measurements — see `isAdjudicated`. */
+export type DecidedBy = "engine" | "agent" | "scan" | "human";
+
+/** The human who ruled a `decidedBy: "human"` verdict. A legally meaningful audit (the RGAA
+ *  « déclaration d'accessibilité ») names its auditor, so the name is required. */
+export interface Auditor {
+  name: string;
+  organisation?: string;
+}
+
+/** Ruled by an adjudication — an AI agent or a named human auditor — rather than decided by the
+ *  engine or measured by the scan. Both count as decided in the conformity rate and neither
+ *  enters the AUTOMATIC rate, which measures what the engine settled alone. */
+export function isAdjudicated(by: DecidedBy | undefined): boolean {
+  return by === "agent" || by === "human";
+}
+
 export const INAPPLICABLE_STATUS = "C" as const satisfies Status;
 export type Automatability = "static" | "needs-rendering" | "judgment";
 export type ParserKind = "html" | "css" | "jsx" | "cross";
@@ -320,7 +340,10 @@ export interface CriterionResult {
   // justification; an NC carries groundable findings). "scan" = the dynamic tier upgraded
   // a needs-rendering residual to C/NC (src/scan.ts mergeDynamic). Optional/additive — no
   // SCHEMA_VERSION bump; older AuditResult JSON (no `decidedBy`) reads as engine-decided.
-  decidedBy?: "engine" | "agent" | "scan";
+  // "human" = the same adjudication, ruled by the named `auditor` instead of an AI.
+  decidedBy?: DecidedBy;
+  /** Who ruled, when `decidedBy` is "human". */
+  auditor?: Auditor;
   /** This criterion is conforming because NOTHING OF ITS KIND IS IN SCOPE, not because
    *  anything was verified — see INAPPLICABLE_STATUS.
    *
@@ -566,8 +589,10 @@ export interface PackCriterionAdjudication {
   // Absent when the partial fold REFUSED this criterion's verdict: the entry then exists only
   // to carry the refusal as the criterion's `justification`, and claiming the agent decided it
   // would be the exact laundering the gate just prevented. Present ("agent") on every verdict
-  // that actually landed, including a deliberate still-`manual` one.
-  decidedBy?: "agent";
+  // that actually landed, including a deliberate still-`manual` one. "human" when a named
+  // auditor ruled it (`auditor` says who).
+  decidedBy?: "agent" | "human";
+  auditor?: Auditor;
 }
 
 export interface GuidelineTally {
@@ -823,7 +848,8 @@ export interface PackCriterionEntry {
   status: Status;
   findings: PackFinding[];
   justification?: string;
-  decidedBy?: "engine" | "agent" | "scan";
+  decidedBy?: DecidedBy;
+  auditor?: Auditor;
   inapplicable?: boolean;
   /** The exact test-level contract used to route deterministic checks and adjudication.
    *  Persisted in the pack audit so the JSON artifact is independently exhaustive. */

@@ -11,7 +11,18 @@
 // decisions are the AGENT's, statically, gated — not a deferral to a human.
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import type { AuditResult, Automatability, CriterionCitation, Finding, Lang, PackCriterionAdjudication, ResidualRisk, Severity, Status } from "./types.js";
+import type {
+  AuditResult,
+  Auditor,
+  Automatability,
+  CriterionCitation,
+  Finding,
+  Lang,
+  PackCriterionAdjudication,
+  ResidualRisk,
+  Severity,
+  Status,
+} from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
 import { readText } from "./util.js";
@@ -51,7 +62,7 @@ import {
 } from "./standards/index.js";
 import { guidanceForCriterion } from "./guidance/index.js";
 import { guidanceExampleBlock } from "./prd.js";
-import { INAPPLICABLE_STATUS } from "./types.js";
+import { INAPPLICABLE_STATUS, isAdjudicated } from "./types.js";
 import { derivePages, pageGridModel } from "./pages.js";
 
 /** Cap on CONTENT CLASSES shown per criterion — not on anchors.
@@ -189,7 +200,11 @@ export interface AdjudicationItem {
   // audit as ADVISORY findings (grounded exactly like an NC finding, but never affecting
   // status: they cannot flip the criterion to NC nor enter conformancePct). Optional.
   recommendations?: AgentFinding[];
-  decidedBy: "agent";
+  // Who rules: "agent" (the default every worklist is written with) or "human" — a named
+  // auditor adjudicating through the same worklist, who then also fills `auditor`. A human
+  // verdict passes the SAME gate (a name is not evidence) and lands as `decidedBy: "human"`.
+  decidedBy: "agent" | "human";
+  auditor?: Auditor;
 }
 
 export interface AdjudicationFile {
@@ -225,6 +240,7 @@ export function adjudicationContract(): AdjudicationContract {
       NA: "a non-empty justification, and citations[] whenever evidence was presented — a criterion whose subject exists NOWHERE in the audited scope is NA, never NC",
       NC: "at least one groundable finding, each naming the `file` it was observed in (an NC with no location is refused as flatly as an uncited C — and a non-conformity that rests on an ABSENCE is still observed on an element of a page, so cite that element) and each citing a normativeRef that resolves against the active standard",
       manual: `a reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`,
+      human: `decidedBy "human" (a human auditor's verdict, instead of the default "agent") requires auditor: { name, organisation? } — the same evidence gate applies, and the verdict is reported under the auditor's name`,
     },
   };
 }
@@ -1101,6 +1117,16 @@ export function applyAdjudication(
     // item is surplus — so the gate crashed on `undefined.length` instead of refusing. The blame
     // above IS the refusal; there is nothing left to validate.
     if (!open.has(it.criteriaId)) continue;
+    // WHO RULED is part of the claim. Absent reads as the agent (every worklist is written so);
+    // "human" must name its auditor — an anonymous human verdict is no more checkable than an
+    // AI one, and would be published as an auditor's. Nothing else may be claimed here: the
+    // engine and the scan decide by measuring, never through an adjudication file.
+    const by = (it as { decidedBy?: unknown }).decidedBy;
+    if (by !== undefined && by !== "agent" && by !== "human") {
+      blame(it.criteriaId, `criterion ${it.criteriaId}: decidedBy must be "agent" or "human" (got ${JSON.stringify(by)})`);
+    } else if (by === "human" && !auditorOf(it)) {
+      blame(it.criteriaId, `criterion ${it.criteriaId}: a decidedBy "human" verdict must name its auditor — auditor: { name, organisation? }`);
+    }
     const v = it.verdict;
     if (v === null) {
       blame(it.criteriaId, `criterion ${it.criteriaId}: unadjudicated (verdict is null)`);
@@ -1465,7 +1491,7 @@ export function applyAdjudication(
           reason: it.reason === "needs-rendered-dom" ? "needs-rendered-dom" : "undecidable",
           justification: it.reason === "needs-rendered-dom" ? residualScanReason() : residualUndecidableReason(),
           findings: [],
-          decidedBy: "agent",
+          ...ruledBy(it),
         });
         continue;
       }
@@ -1478,7 +1504,7 @@ export function applyAdjudication(
         status: it.verdict as Status,
         ...(it.verdict === "C" || it.verdict === "NA" ? { justification: it.justification.trim(), ...citationsOf(it) } : {}),
         findings: [...fs, ...recs],
-        decidedBy: "agent",
+        ...ruledBy(it),
       });
     }
     // An OPEN criterion the file never mentioned — a coverage gap, or one the caller declared
@@ -1525,7 +1551,7 @@ export function applyAdjudication(
     if (rejectedSet.has(it.criteriaId)) continue; // refused: the criterion keeps its `manual` status
     if (it.verdict === "manual") {
       c.status = "manual";
-      c.decidedBy = "agent";
+      stampRuledBy(c, it);
       c.justification = it.reason === "needs-rendered-dom" ? residualScanReason() : residualUndecidableReason();
       stillManual++;
       continue;
@@ -1536,7 +1562,7 @@ export function applyAdjudication(
     // now reports as conforming (INAPPLICABLE_STATUS). Folded on the way in rather than
     // refused: the claim is unchanged, only the label it lands under.
     c.status = (it.verdict === "NA" ? INAPPLICABLE_STATUS : it.verdict) as Status;
-    c.decidedBy = "agent";
+    stampRuledBy(c, it);
     // Whatever it was closed for before, it now carries a ruling of its own.
     delete c.inapplicable;
     if (it.verdict === "C" || it.verdict === "NA") {
@@ -1629,6 +1655,30 @@ function citationsOf(it: AdjudicationItem): { citations?: CriterionCitation[] } 
   return cites.length ? { citations: cites } : {};
 }
 
+/** The named auditor of a human verdict, trimmed — undefined when there is no usable name. */
+export function auditorOf(it: { auditor?: unknown }): Auditor | undefined {
+  const a = it.auditor as { name?: unknown; organisation?: unknown } | undefined;
+  const name = typeof a?.name === "string" ? a.name.trim() : "";
+  if (!name) return undefined;
+  const organisation = typeof a?.organisation === "string" ? a.organisation.trim() : "";
+  return { name, ...(organisation ? { organisation } : {}) };
+}
+
+/** Who a folded verdict is recorded as ruled by: the named auditor for a human verdict, the
+ *  agent otherwise. Only called on a verdict the gate accepted, so a human one has a name. */
+function ruledBy(it: AdjudicationItem): { decidedBy: "agent" | "human"; auditor?: Auditor } {
+  const auditor = it.decidedBy === "human" ? auditorOf(it) : undefined;
+  return auditor ? { decidedBy: "human", auditor } : { decidedBy: "agent" };
+}
+
+/** The same, on a WCAG criterion — which may carry a previous fold's auditor to drop. */
+function stampRuledBy(c: { decidedBy?: string; auditor?: Auditor }, it: AdjudicationItem): void {
+  const r = ruledBy(it);
+  c.decidedBy = r.decidedBy;
+  if (r.auditor) c.auditor = r.auditor;
+  else delete c.auditor;
+}
+
 function agentFinding(criteriaId: string, f: AgentFinding, advisory = false): Finding {
   return {
     ruleId: `agent:${criteriaId}`,
@@ -1665,7 +1715,7 @@ export function recomputeTallies(a: AuditResult): void {
   // machine-verified number, which is exactly the claim the label denies. An agent NC does
   // count: a non-conformity is evidenced (grounded finding + normativeRef) and reporting
   // it lowers the rate, which is the safe direction.
-  const decided = a.criteria.filter((c) => c.status === "NC" || (c.status === "C" && c.decidedBy !== "agent"));
+  const decided = a.criteria.filter((c) => c.status === "NC" || (c.status === "C" && !isAdjudicated(c.decidedBy)));
   const conform = decided.filter((c) => c.status === "C").length;
   a.conformancePct = decided.length === 0 ? 100 : Math.round((conform / decided.length) * 100);
 }

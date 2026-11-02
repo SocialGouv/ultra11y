@@ -352,13 +352,15 @@ function foldRecordedAdjudication(root: string, fresh: AuditResult): void {
   if (prior.adjudicated) fresh.adjudicated = prior.adjudicated;
   const byId = new Map(fresh.criteria.map((c) => [c.id, c]));
   for (const c of prior.criteria) {
-    if (c.decidedBy !== "agent") continue;
+    // An agent's ruling or a named human auditor's — both are adjudications to carry.
+    if (c.decidedBy !== "agent" && c.decidedBy !== "human") continue;
     const target = byId.get(c.id);
     // A criterion the fresh run decided by itself is authoritative: the page moved, and a
     // stale ruling must never override a live measurement.
     if (target?.status !== "manual") continue;
     target.status = c.status;
-    target.decidedBy = "agent";
+    target.decidedBy = c.decidedBy;
+    if (c.auditor) target.auditor = c.auditor;
     if (c.justification) target.justification = c.justification;
   }
   fresh.residualRisks = fresh.residualRisks.filter((r) => byId.get(r.criteriaId)?.status === "manual");

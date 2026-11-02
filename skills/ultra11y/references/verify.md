@@ -153,6 +153,25 @@ A `manual` verdict — or a coverage gap — on a criterion the engine had provi
 want of a subject stays in §5 only: it is never counted in the NA column, which remains a subset
 of §3's C.
 
+### A human auditor's verdict — `decidedBy: "human"`
+
+A named human auditor adjudicates through the **same worklist**: on each item they rule, set
+`"decidedBy": "human"` and `"auditor": { "name": "Jeanne Dupont", "organisation": "Access42" }`
+(`organisation` optional) beside the verdict. The fold applies the **same gate** — a human `C`
+cites the harvested evidence, a human `NC` carries groundable findings; a name is not evidence —
+and refuses a human verdict with no `auditor.name`, or any `decidedBy` other than `agent` /
+`human`. A landed verdict is recorded as `decidedBy: "human"` with its `auditor` in the audit,
+the pack document and the verdict ledger (`--ledger`; a replay restores both), and:
+
+- counts like any decided verdict in the conformity rate, and stays out of the **automatic**
+  rate (a judgement, not a measurement);
+- reads « auditeur (Jeanne Dupont, Access42) » in the report's « Décidé par » column (never
+  « IA »), gets its own list in §3 and its own count in the annex's provenance line, and is
+  marked `C†` (the agent's is `C*`) in the page grid and the page sheets;
+- is **not** put on the automatic refutation trial: `verify --report`'s conformity worklist
+  tries the agent's conformities only (a named auditor is the second reader), and a refuter
+  withdrawing a human verdict anyway is left standing by `--prune`, which says so.
+
 ## Residual risk
 
 After adjudication, only the criteria the agent marked `manual` (`needs-rendered-dom` /

@@ -11,6 +11,8 @@
 import { auditorUnitModel } from "./auditor.js";
 import {
   agentMarkNote,
+  humanMarkNote,
+  ruledMark,
   basisLabel,
   commonOrigin,
   derivePages,
@@ -30,6 +32,7 @@ import { pageCoverage, pageCriterionRows, pageRatePct, pageTally } from "./pages
 import { partitionUnits, prdUnits, type PrdUnit } from "./prd.js";
 import {
   automationOverview,
+  ownerLabel,
   averageConformanceRate,
   conformanceRate,
   packReportGroups,
@@ -140,7 +143,7 @@ const T = {
     exhaustiveCaption: "Une ligne par critère ; S/R/J indique le nombre de tests static, rendered et judgment.",
     automationCol: "Tests S / R / J",
     decidedBy: "Décidé par",
-    owner: { engine: "moteur", scan: "scan", agent: "IA", pending: "à adjuger" },
+    owner: { engine: "moteur", scan: "scan", agent: "IA", human: "auditeur", pending: "à adjuger" },
   },
   en: {
     contents: "Contents",
@@ -203,7 +206,7 @@ const T = {
     exhaustiveCaption: "One row per criterion; S/R/J is the number of static, rendered and judgment tests.",
     automationCol: "S / R / J tests",
     decidedBy: "Decided by",
-    owner: { engine: "engine", scan: "scan", agent: "AI", pending: "to adjudicate" },
+    owner: { engine: "engine", scan: "scan", agent: "AI", human: "auditor", pending: "to adjudicate" },
   },
 } as const;
 
@@ -465,7 +468,7 @@ function criteriaGridBlocks(result: AuditResult, standard: StandardId, lang: Lan
     const tiers = Object.values(criterion?.automation?.tests ?? {});
     const n = (tier: "static" | "rendered" | "judgment") => tiers.filter((value) => value === tier).length;
     const status = row.inapplicable ? "NA" : row.status;
-    const owner = row.status === "manual" ? t.owner.pending : t.owner[row.decidedBy ?? "engine"];
+    const owner = ownerLabel(row, t.owner);
     rows.push([
       { text: pack && criterion ? `${pack.name} ${row.id} — ${titlePlain(pack, criterion, lang)}` : row.label },
       { status, text: "" },
@@ -568,7 +571,7 @@ function pageGridBlocks(result: AuditResult, page: PageResult, standard: Standar
       table.rows.push([{ text: group, colspan: 2 }]);
     }
     // A conformity an agent RULED carries the mark here too, exactly as on the Markdown sheet.
-    table.rows.push([{ text: row.label }, { status: row.status, text: row.decidedBy === "agent" && row.status === "C" ? "*" : "" }]);
+    table.rows.push([{ text: row.label }, { status: row.status, text: ruledMark(row.decidedBy, row.status) }]);
   }
   const out: Block[] = [
     { kind: "heading", level: 2, text: t.grid },
@@ -584,6 +587,7 @@ function pageGridBlocks(result: AuditResult, page: PageResult, standard: Standar
     table,
   ];
   if (rows.some((r) => r.decidedBy === "agent" && r.status === "C")) out.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
+  if (rows.some((r) => r.decidedBy === "human" && r.status === "C")) out.push({ kind: "note", tone: "info", runs: ticks(humanMarkNote(lang)) });
   return out;
 }
 
