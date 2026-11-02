@@ -48,7 +48,26 @@ var COLLECT_MAX_ELEMENTS = 5e3;
 var COLLECT_SNAPSHOT = `(() => {
   const PROPS = ${JSON.stringify(COLLECTED_CSS)};
   const MAX = ${COLLECT_MAX_ELEMENTS};
-  const els = document.querySelectorAll('*');
+  // The ordinal is a JOIN KEY against parseHtml(dom), so the walk must enumerate elements
+  // exactly as a reparse of the serialisation below will (#101). querySelectorAll('*') did not:
+  //  - an element appended INSIDE a raw-text element (Next's dev overlay puts <nextjs-portal>
+  //    in a <script>) is serialised as that element's raw text, and a reparse reads text \u2014
+  //    one ordinal too many, and every digest refused from there on;
+  //  - <template> contents are serialised and reparsed as elements, but live in
+  //    template.content, which querySelectorAll never traverses \u2014 one ordinal too few.
+  // Pre-order, children of the raw-text elements HTML parsers (htmlparser2 included) treat as
+  // text skipped, template.content descended.
+  const RAW_TEXT = new Set(['script', 'style', 'title', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes']);
+  const els = [];
+  const walkElements = (parent) => {
+    for (const child of parent.children) {
+      els.push(child);
+      const name = child.localName;
+      if (RAW_TEXT.has(name)) continue;
+      walkElements(name === 'template' && child.content ? child.content : child);
+    }
+  };
+  walkElements(document);
   const styles = [];
   const boxes = [];
   const n = Math.min(els.length, MAX);

@@ -38412,7 +38412,26 @@ var COLLECT_MAX_ELEMENTS = 5e3;
 var COLLECT_SNAPSHOT = `(() => {
   const PROPS = ${JSON.stringify(COLLECTED_CSS)};
   const MAX = ${COLLECT_MAX_ELEMENTS};
-  const els = document.querySelectorAll('*');
+  // The ordinal is a JOIN KEY against parseHtml(dom), so the walk must enumerate elements
+  // exactly as a reparse of the serialisation below will (#101). querySelectorAll('*') did not:
+  //  - an element appended INSIDE a raw-text element (Next's dev overlay puts <nextjs-portal>
+  //    in a <script>) is serialised as that element's raw text, and a reparse reads text \u2014
+  //    one ordinal too many, and every digest refused from there on;
+  //  - <template> contents are serialised and reparsed as elements, but live in
+  //    template.content, which querySelectorAll never traverses \u2014 one ordinal too few.
+  // Pre-order, children of the raw-text elements HTML parsers (htmlparser2 included) treat as
+  // text skipped, template.content descended.
+  const RAW_TEXT = new Set(['script', 'style', 'title', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes']);
+  const els = [];
+  const walkElements = (parent) => {
+    for (const child of parent.children) {
+      els.push(child);
+      const name = child.localName;
+      if (RAW_TEXT.has(name)) continue;
+      walkElements(name === 'template' && child.content ? child.content : child);
+    }
+  };
+  walkElements(document);
   const styles = [];
   const boxes = [];
   const n = Math.min(els.length, MAX);
@@ -40302,6 +40321,14 @@ function styleAt(doc, i2) {
 function hasDirectText(el) {
   return el.children.some((c2) => c2.type === "text" && c2.data.trim() !== "");
 }
+var DISABLEABLE = /* @__PURE__ */ new Set(["button", "input", "select", "textarea", "option", "optgroup", "fieldset"]);
+function inactive(el) {
+  for (let n = el; n; n = n.parent) {
+    if (attr(n, "aria-disabled") === "true") return true;
+    if (DISABLEABLE.has(n.tag) && attr(n, "disabled") !== void 0) return true;
+  }
+  return false;
+}
 function invisible(css) {
   if (css.display === "none" || css.visibility === "hidden") return true;
   const op = Number.parseFloat(css.opacity ?? "1");
@@ -40357,7 +40384,7 @@ var renderedContrast = {
     const index = elementIndex(doc);
     const out2 = [];
     for (const [el, i2] of index) {
-      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el) || inactive(el)) continue;
       const css = styleAt(doc, i2)?.css;
       if (!css || invisible(css)) continue;
       const fg = parseColor(css.color ?? "");
@@ -40396,7 +40423,7 @@ var renderedContrastPixel = {
     const index = elementIndex(doc);
     const out2 = [];
     for (const [el, i2] of index) {
-      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el) || inactive(el)) continue;
       const css = styleAt(doc, i2)?.css;
       if (!css || invisible(css)) continue;
       if (backdropOf(doc, index, el)) continue;
@@ -40426,12 +40453,24 @@ function hasNonColourAffordance(css, parentCss) {
   if ((css.borderBottomStyle ?? "none") !== "none" && Number.parseFloat(css.borderBottomWidth ?? "0") > 0) return true;
   const bg = parseColor(css.backgroundColor ?? "");
   if (bg && bg.a > 0) return true;
+  if ((css.backgroundImage ?? "none") !== "none") return true;
+  if ((css.boxShadow ?? "none") !== "none") return true;
   const w = Number.parseInt(css.fontWeight ?? "400", 10);
   const pw = Number.parseInt(parentCss?.fontWeight ?? "400", 10);
   if (Number.isFinite(w) && Number.isFinite(pw) && w >= pw + 200) return true;
   return false;
 }
 var TEXT_BLOCK = /* @__PURE__ */ new Set(["p", "li", "dd", "dt", "td", "th", "blockquote", "figcaption", "caption"]);
+var WORD = /[\p{L}\p{N}]/u;
+function hasSurroundingText(block, link) {
+  for (const c2 of block.children) {
+    if (c2 === link) continue;
+    if (c2.type === "text") {
+      if (WORD.test(c2.data)) return true;
+    } else if (WORD.test(visibleText(c2))) return true;
+  }
+  return false;
+}
 var renderedLinkColourOnly = {
   id: "rendered-link-colour-only",
   criteria: ["1.4.1"],
@@ -40444,6 +40483,7 @@ var renderedLinkColourOnly = {
       if (el.tag !== "a" || !hasDirectText(el)) continue;
       const parent = el.parent;
       if (!parent || !TEXT_BLOCK.has(parent.tag)) continue;
+      if (!hasSurroundingText(parent, el)) continue;
       const css = styleAt(doc, i2)?.css;
       const pi = index.get(parent);
       const parentCss = pi === void 0 ? void 0 : styleAt(doc, pi)?.css;
@@ -40486,9 +40526,11 @@ var renderedNonTextContrast = {
     const index = elementIndex(doc);
     const out2 = [];
     for (const [el, i2] of index) {
-      if (!BOUNDED_CONTROLS.has(el.tag)) continue;
+      if (!BOUNDED_CONTROLS.has(el.tag) || inactive(el)) continue;
       const type = (el.attribs.type ?? "").toLowerCase();
       if (el.tag === "input" && (type === "hidden" || type === "image")) continue;
+      if (el.tag === "button" && WORD.test(visibleText(el))) continue;
+      if (el.tag === "input" && ["button", "submit", "reset"].includes(type) && WORD.test(el.attribs.value ?? "")) continue;
       const css = styleAt(doc, i2)?.css;
       if (!css || invisible(css)) continue;
       if (css.boxShadow && css.boxShadow !== "none") continue;
@@ -49792,11 +49834,11 @@ function isHiddenFromAT(el) {
   return [el, ...ancestors(el)].some((node) => attr(node, "aria-hidden") === "true");
 }
 var NATIVE_FOCUSABLE = /* @__PURE__ */ new Set(["button", "select", "textarea", "iframe", "summary"]);
-var DISABLEABLE = /* @__PURE__ */ new Set(["button", "input", "select", "textarea"]);
+var DISABLEABLE2 = /* @__PURE__ */ new Set(["button", "input", "select", "textarea"]);
 function isFocusableElement(el) {
   const ti = attr(el, "tabindex");
   if (ti !== void 0 && !ti.includes("{") && ti.trim() !== "" && !Number.isNaN(Number(ti.trim()))) return true;
-  if (DISABLEABLE.has(el.tag) && hasAttr(el, "disabled")) return false;
+  if (DISABLEABLE2.has(el.tag) && hasAttr(el, "disabled")) return false;
   if (NATIVE_FOCUSABLE.has(el.tag)) return true;
   if (el.tag === "a" || el.tag === "area") return hasAttr(el, "href");
   if (el.tag === "input") return (attr(el, "type") ?? "text").trim().toLowerCase() !== "hidden";
@@ -50418,8 +50460,8 @@ function isInteractive(el) {
   if (el.tag === "input") return (attr(el, "type") ?? "text").toLowerCase() !== "hidden";
   return INTERACTIVE_ROLES.includes((attr(el, "role") ?? "").trim());
 }
-var DISABLEABLE2 = /* @__PURE__ */ new Set(["button", "input", "select", "textarea", "fieldset", "optgroup", "option"]);
-var isDisabled = (el) => DISABLEABLE2.has(el.tag) && hasAttr(el, "disabled");
+var DISABLEABLE3 = /* @__PURE__ */ new Set(["button", "input", "select", "textarea", "fieldset", "optgroup", "option"]);
+var isDisabled = (el) => DISABLEABLE3.has(el.tag) && hasAttr(el, "disabled");
 function isFocusable(el) {
   const tiRaw = attr(el, "tabindex");
   if (tiRaw !== void 0) {
