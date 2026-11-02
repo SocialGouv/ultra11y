@@ -2,7 +2,7 @@
 import type { Doc, El } from "../parse/html.js";
 import { attr, hasAttr, hasBoundAttr, hasDynamicSpread, descendants, ancestors } from "../parse/html.js";
 import { isIntrinsic } from "../parse/jsx-bridge.js";
-import { accessibleName, mayInjectContent, isHiddenFromAT, isDisplayHidden, isPresentational } from "../name.js";
+import { accessibleName, mayInjectContent, isHiddenFromAT, isDisplayHidden, isPresentational, labelledbyIsDynamic } from "../name.js";
 import { ARIA_ATTRS, ARIA_REQUIRED_ATTRS, ARIA_REQUIRED_PARENT, IMPLICIT_CONTAINER_ROLE, NAME_PROHIBITED_ROLES, isValidAriaValue } from "../aria.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
@@ -507,7 +507,9 @@ const menuitemEmptyName: Rule = {
   run(doc: Doc): RuleFinding[] {
     return doc.elements
       .filter((el) => ["menuitem", "menuitemcheckbox", "menuitemradio"].includes((attr(el, "role") ?? "").trim().toLowerCase()))
-      .filter((el) => !isHiddenFromAT(el) && !hasDynamicSpread(el) && !mayInjectContent(el) && accessibleName(el, doc).trim() === "")
+      .filter(
+        (el) => !isHiddenFromAT(el) && !hasDynamicSpread(el) && !mayInjectContent(el) && !labelledbyIsDynamic(el) && accessibleName(el, doc).trim() === "",
+      )
       .map((el) => ({ criteriaId: "4.1.2", el, msgId: "menuitem-empty-name" }));
   },
 };

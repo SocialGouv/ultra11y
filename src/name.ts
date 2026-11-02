@@ -200,13 +200,17 @@ export function visibleLabelText(el: El): string {
 // span is not visible at all. Comparing an aria-label against them would demand that the name
 // repeat help text, which neither RGAA 11.2.5 nor WCAG 2.5.3 asks.
 const NOT_INTITULE_CLASS = /(^|\s)(fr-hint-text|fr-sr-only|sr-only|visually-hidden|visuallyhidden|hint-text|help-text)(\s|$)/;
+// The visually hidden classes alone: a <label> (or a wrapper of it) that carries one is no
+// visible label at all, so there is no intitulé for the name to contain (#115).
+const VISUALLY_HIDDEN_CLASS = /(^|\s)(fr-sr-only|sr-only|visually-hidden|visuallyhidden)(\s|$)/;
 const FIELD_DESCENDANT = new Set(["input", "select", "textarea", "button", "datalist", "output"]);
 
 /** The PRIMARY visible text of a `<label>` — its intitulé — for the label-in-name comparison of
  *  a form field: hidden subtrees, aria-hidden decoration, hint/sr-only spans and the nested
  *  field itself (a wrapping label contains the <select> whose options are not label text) are
- *  left out. Literal text only; a caller must still refuse an interpolated result. */
+ *  left out, and a visually hidden label (sr-only on itself or a wrapper) has none. Literal text only; a caller must still refuse an interpolated result. */
 export function primaryLabelText(label: El): string {
+  if ([label, ...ancestors(label)].some((e) => VISUALLY_HIDDEN_CLASS.test(attr(e, "class") ?? ""))) return "";
   let out = "";
   const nonText = new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img", "svg"]);
   const walk = (n: HNode): void => {
