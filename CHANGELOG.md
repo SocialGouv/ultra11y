@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.54.2](https://github.com/SocialGouv/ultra11y/compare/v5.54.1...v5.54.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **collector,rendered:** align capture ordinals with the reparse; stop rendered false positives on DSFR links, text buttons and disabled controls ([#105](https://github.com/SocialGouv/ultra11y/issues/105)) ([c306466](https://github.com/SocialGouv/ultra11y/commit/c30646695c2f7e96fcbaedbe2b146ef9f6730702))
+
 ## [5.54.1](https://github.com/SocialGouv/ultra11y/compare/v5.54.0...v5.54.1) (2026-11-02)
 
 
