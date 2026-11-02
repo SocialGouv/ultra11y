@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.54.1](https://github.com/SocialGouv/ultra11y/compare/v5.54.0...v5.54.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **rgaa:** check rgaa 1.9.1 — a captioned <figure> must carry role figure|group and an aria-label identical to its figcaption ([#99](https://github.com/SocialGouv/ultra11y/issues/99)) ([ab537a4](https://github.com/SocialGouv/ultra11y/commit/ab537a4179f34321ee03b2a8c551b6bab3a3fc33))
+
 # [5.54.0](https://github.com/SocialGouv/ultra11y/compare/v5.53.0...v5.54.0) (2026-11-02)
 
 
