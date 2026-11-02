@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.55.3](https://github.com/SocialGouv/ultra11y/compare/v5.55.2...v5.55.3) (2026-11-02)
+
+
+### Bug Fixes
+
+* **axe-map,rendered:** axe label-title-only is never a blocking 4.1.2 failure; nontext-contrast skips hidden inputs and glyph-identified icon buttons ([#121](https://github.com/SocialGouv/ultra11y/issues/121)) ([5407d12](https://github.com/SocialGouv/ultra11y/commit/5407d128b061174a39427e464d36e3ace5496fcc))
+
 ## [5.55.2](https://github.com/SocialGouv/ultra11y/compare/v5.55.1...v5.55.2) (2026-11-02)
 
 
