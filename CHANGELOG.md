@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.57.1](https://github.com/SocialGouv/ultra11y/compare/v5.57.0...v5.57.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **adjudicate:** text subjects read rendered text; media, colour, contrast, form and site-map subjects harvest their real population ([#140](https://github.com/SocialGouv/ultra11y/issues/140)) ([d06af64](https://github.com/SocialGouv/ultra11y/commit/d06af64c7f1e37f7a7d2d7b8c63e9124bbb123a5))
+
 # [5.57.0](https://github.com/SocialGouv/ultra11y/compare/v5.56.2...v5.57.0) (2026-11-02)
 
 
