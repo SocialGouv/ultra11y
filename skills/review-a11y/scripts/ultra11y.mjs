@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { realpathSync as realpathSync8, writeFileSync as writeFileSync21, mkdirSync as mkdirSync18, existsSync as existsSync40, readFileSync as readFileSync35, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
+import { realpathSync as realpathSync8, writeFileSync as writeFileSync21, mkdirSync as mkdirSync18, existsSync as existsSync40, readFileSync as readFileSync36, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
 import { join as join53, relative as relative6, resolve as resolve18, sep as sep7, dirname as dirname20 } from "path";
 import { fileURLToPath as fileURLToPath5, pathToFileURL as pathToFileURL3 } from "url";
 
@@ -20433,13 +20433,13 @@ function walk(root, opts = {}) {
       const parsed = parseGitignore(readText2(join(frame.dir, ".gitignore")), frame.rel);
       if (parsed.length) rules = [...rules, ...parsed];
     }
-    for (const entry of entries) {
-      const name2 = entry.name;
+    for (const entry2 of entries) {
+      const name2 = entry2.name;
       const abs = join(frame.dir, name2);
       const rel2 = frame.rel ? `${frame.rel}/${name2}` : name2;
-      const isLink = entry.isSymbolicLink();
+      const isLink = entry2.isSymbolicLink();
       if (name2 === GIT_ENTRY) continue;
-      if (entry.isDirectory() && isIgnoredDirectory(name2, ignoreDirs)) continue;
+      if (entry2.isDirectory() && isIgnoredDirectory(name2, ignoreDirs)) continue;
       let st;
       try {
         st = isLink ? statSync(abs) : lstatSync(abs);
@@ -22980,16 +22980,16 @@ async function Module2(moduleArg = {}) {
   }
   __name(loadDynamicLibrary, "loadDynamicLibrary");
   var reportUndefinedSymbols = /* @__PURE__ */ __name(() => {
-    for (var [symName, entry] of Object.entries(GOT)) {
-      if (entry.value == 0) {
+    for (var [symName, entry2] of Object.entries(GOT)) {
+      if (entry2.value == 0) {
         var value = resolveGlobalSymbol(symName, true).sym;
-        if (!value && !entry.required) {
+        if (!value && !entry2.required) {
           continue;
         }
         if (typeof value == "function") {
-          entry.value = addFunction(value, value.sig);
+          entry2.value = addFunction(value, value.sig);
         } else if (typeof value == "number") {
-          entry.value = value;
+          entry2.value = value;
         } else {
           throw new Error(`bad export type for '${symName}': ${typeof value}`);
         }
@@ -29115,24 +29115,24 @@ function resolveJs(fromRel, spec, ctx) {
   for (const pkg of ctx.workspacePackages) {
     if (spec !== pkg.name && !spec.startsWith(pkg.name + "/")) continue;
     const sub = spec.slice(pkg.name.length).replace(/^\//, "");
-    const probeEntry = (entry) => {
-      for (const cand of [entry, ...distToSrcCandidates(entry)]) {
+    const probeEntry = (entry2) => {
+      for (const cand of [entry2, ...distToSrcCandidates(entry2)]) {
         const hit = tryResolve(norm(posix.join(pkg.dir, cand)));
         if (hit) return hit;
       }
       return void 0;
     };
     const subKey = sub ? "./" + sub : ".";
-    for (const entry of pkg.exportEntries) {
+    for (const entry2 of pkg.exportEntries) {
       let fill;
-      if (entry.star) {
-        const starAt = entry.key.indexOf("*");
-        const pre = entry.key.slice(0, starAt);
-        const post = entry.key.slice(starAt + 1);
+      if (entry2.star) {
+        const starAt = entry2.key.indexOf("*");
+        const pre = entry2.key.slice(0, starAt);
+        const post = entry2.key.slice(starAt + 1);
         if (!subKey.startsWith(pre) || !subKey.endsWith(post) || subKey.length < pre.length + post.length) continue;
         fill = subKey.slice(pre.length, subKey.length - post.length);
-      } else if (entry.key !== subKey) continue;
-      for (const t3 of entry.targets) {
+      } else if (entry2.key !== subKey) continue;
+      for (const t3 of entry2.targets) {
         const hit = probeEntry(fill === void 0 ? t3 : t3.replace(/\*/g, fill));
         if (hit) return { kind: "resolved", target: hit };
       }
@@ -29725,8 +29725,8 @@ function implementationsOf(hierarchy, name2) {
         if (seen.has(key2)) continue;
         seen.add(key2);
         out2.push(child);
-        const entry = hierarchy.get(child.name) ?? hierarchy.get(`${child.name}@${child.file}`);
-        if (entry && entry.file === child.file) next.push(entry);
+        const entry2 = hierarchy.get(child.name) ?? hierarchy.get(`${child.name}@${child.file}`);
+        if (entry2 && entry2.file === child.file) next.push(entry2);
       }
     }
     frontier = next;
@@ -29868,9 +29868,9 @@ function buildCallerIndex(scan2, importPairs, opts = {}) {
   }
   const sites = /* @__PURE__ */ new Map();
   const record = (def, caller) => {
-    let entry = sites.get(def.name + "\0" + def.file);
-    if (!entry) sites.set(def.name + "\0" + def.file, entry = { def, callers: [] });
-    entry.callers.push(caller);
+    let entry2 = sites.get(def.name + "\0" + def.file);
+    if (!entry2) sites.set(def.name + "\0" + def.file, entry2 = { def, callers: [] });
+    entry2.callers.push(caller);
   };
   for (const f of scan2.files) {
     if (!f.calls?.length) continue;
@@ -30508,11 +30508,11 @@ var init_bm25 = __esm({
     TEST_INTENT = /^(test|tests|spec|specs|fixture|fixtures|mock|mocks|stub|stubs)$/;
   }
 });
-function pagerankOf(ids, edges, damping = DAMPING) {
+function pagerankOf(ids2, edges, damping = DAMPING) {
   const out2 = /* @__PURE__ */ new Map();
-  const n = ids.length;
+  const n = ids2.length;
   if (n === 0) return out2;
-  const idx = new Map(ids.map((s, i2) => [s, i2]));
+  const idx = new Map(ids2.map((s, i2) => [s, i2]));
   const adj = Array.from({ length: n }, () => []);
   const outW = new Array(n).fill(0);
   for (const e of edges) {
@@ -30539,15 +30539,15 @@ function pagerankOf(ids, edges, damping = DAMPING) {
     pr = next;
     if (delta < CONVERGENCE) break;
   }
-  ids.forEach((s, i2) => out2.set(s, pr[i2]));
+  ids2.forEach((s, i2) => out2.set(s, pr[i2]));
   return out2;
 }
-function betweennessOf(ids, edges) {
+function betweennessOf(ids2, edges) {
   const out2 = /* @__PURE__ */ new Map();
-  for (const s of ids) out2.set(s, 0);
-  const n = ids.length;
+  for (const s of ids2) out2.set(s, 0);
+  const n = ids2.length;
   if (n < 3) return out2;
-  const idx = new Map(ids.map((s, i2) => [s, i2]));
+  const idx = new Map(ids2.map((s, i2) => [s, i2]));
   const nbSets = Array.from({ length: n }, () => /* @__PURE__ */ new Set());
   for (const e of edges) {
     if (e.dangling) continue;
@@ -30598,7 +30598,7 @@ function betweennessOf(ids, edges) {
     }
   }
   const norm22 = (n - 1) * (n - 2) / 2;
-  ids.forEach((id, i2) => out2.set(id, cb[i2] / 2 / norm22));
+  ids2.forEach((id, i2) => out2.set(id, cb[i2] / 2 / norm22));
   return out2;
 }
 function applyCentrality(graph) {
@@ -30650,9 +30650,9 @@ function symbolComplexity(scan2, rel2, top = 50) {
       if (s.kind === "reexport" || s.kind === "reexport-all") continue;
       const end = s.endLine ?? s.line;
       const body22 = lines.slice(s.line - 1, end).join("\n");
-      const entry = { file: f.rel, name: s.name, line: s.line, complexity: complexityOfSource(body22) };
-      if (s.endLine !== void 0) entry.endLine = s.endLine;
-      out2.push(entry);
+      const entry2 = { file: f.rel, name: s.name, line: s.line, complexity: complexityOfSource(body22) };
+      if (s.endLine !== void 0) entry2.endLine = s.endLine;
+      out2.push(entry2);
     }
   }
   out2.sort((a, b) => b.complexity - a.complexity || byStr(a.file, b.file) || a.line - b.line);
@@ -30786,13 +30786,13 @@ function bm25TrigramsFor(scan2) {
 function importPagerankFor(scan2) {
   const c2 = cacheFor(scan2);
   if (!c2.importPagerank) {
-    const ids = scan2.files.map((f) => f.rel);
+    const ids2 = scan2.files.map((f) => f.rel);
     const edges = [];
     for (const pair of importPairsFor(scan2)) {
       const sep32 = pair.indexOf("|");
       edges.push({ from: pair.slice(0, sep32), to: pair.slice(sep32 + 1), kind: "import", weight: 1 });
     }
-    c2.importPagerank = pagerankOf(ids, edges);
+    c2.importPagerank = pagerankOf(ids2, edges);
   }
   return c2.importPagerank;
 }
@@ -31091,8 +31091,8 @@ function findReferences(scan2, name2) {
   }
   defs.sort((a, b) => byStr(a.file, b.file) || a.line - b.line);
   const index = callerIndexFor(scan2);
-  const entry = index.get(name2);
-  const callSites = entry ? [...entry.callers] : [];
+  const entry2 = index.get(name2);
+  const callSites = entry2 ? [...entry2.callers] : [];
   const referencingFiles = /* @__PURE__ */ new Set();
   const unique = uniqueDefsFor(scan2);
   const defFile = unique.get(name2);
@@ -31995,10 +31995,10 @@ function compareCommunities(a, b) {
 }
 function assignIds(ordered, previous) {
   const n = ordered.length;
-  const ids = new Array(n).fill(-1);
+  const ids2 = new Array(n).fill(-1);
   if (!previous || Object.keys(previous).length === 0) {
-    for (let i2 = 0; i2 < n; i2++) ids[i2] = i2;
-    return ids;
+    for (let i2 = 0; i2 < n; i2++) ids2[i2] = i2;
+    return ids2;
   }
   const prevSets = Object.entries(previous).map(([id, members]) => ({
     id: Number(id),
@@ -32024,15 +32024,15 @@ function assignIds(ordered, previous) {
   for (let ni = 0; ni < n; ni++) {
     const pid = matched.get(ni);
     if (pid !== void 0 && pid >= 0 && pid < n && !taken.has(pid)) {
-      ids[ni] = pid;
+      ids2[ni] = pid;
       taken.add(pid);
     }
   }
   const free = [];
   for (let id = 0; id < n; id++) if (!taken.has(id)) free.push(id);
   let fi = 0;
-  for (let ni = 0; ni < n; ni++) if (ids[ni] === -1) ids[ni] = free[fi++];
-  return ids;
+  for (let ni = 0; ni < n; ni++) if (ids2[ni] === -1) ids2[ni] = free[fi++];
+  return ids2;
 }
 function detectCommunities(modules, edges, previous) {
   const out2 = /* @__PURE__ */ new Map();
@@ -32043,9 +32043,9 @@ function detectCommunities(modules, edges, previous) {
   const split = splitOversized(groupByLabel(labels), g, slugs.length);
   const communities = split.map((grp) => grp.map((i2) => slugs[i2]).sort(byStr));
   communities.sort(compareCommunities);
-  const ids = assignIds(communities, previous);
+  const ids2 = assignIds(communities, previous);
   communities.forEach((comm, ni) => {
-    for (const s of comm) out2.set(s, ids[ni]);
+    for (const s of comm) out2.set(s, ids2[ni]);
   });
   return out2;
 }
@@ -32479,7 +32479,7 @@ function basicTokenize(text) {
 }
 function wordpiece(word, model) {
   if (!word) return [];
-  const ids = [];
+  const ids2 = [];
   let start2 = 0;
   const n = word.length;
   while (start2 < n) {
@@ -32495,17 +32495,17 @@ function wordpiece(word, model) {
       end--;
     }
     if (match === -1) return model.unkId >= 0 ? [model.unkId] : [];
-    ids.push(match);
+    ids2.push(match);
     start2 = end;
   }
-  return ids;
+  return ids2;
 }
 function tokenize(text, model) {
-  const ids = [];
+  const ids2 = [];
   for (const word of basicTokenize(text)) {
-    for (const id of wordpiece(word, model)) ids.push(id);
+    for (const id of wordpiece(word, model)) ids2.push(id);
   }
-  return ids;
+  return ids2;
 }
 function roundHalfToEven(x) {
   const f = Math.floor(x);
@@ -32531,14 +32531,14 @@ function quantize(vec) {
 }
 function encode(model, text) {
   const { dim, weights } = model;
-  const ids = tokenize(text, model);
-  if (ids.length === 0) return new Int8Array(dim);
+  const ids2 = tokenize(text, model);
+  if (ids2.length === 0) return new Int8Array(dim);
   const pooled = new Float64Array(dim);
-  for (const id of ids) {
+  for (const id of ids2) {
     const base = id * dim;
     for (let d = 0; d < dim; d++) pooled[d] += weights[base + d];
   }
-  const inv = 1 / ids.length;
+  const inv = 1 / ids2.length;
   for (let d = 0; d < dim; d++) pooled[d] *= inv;
   return quantize(pooled);
 }
@@ -33195,14 +33195,14 @@ function parseLspConfig(payload) {
   const raw = payload;
   if (raw.version !== 1) throw new Error(`lsp.json: unsupported version ${JSON.stringify(raw.version)} (expected 1)`);
   if (!Array.isArray(raw.servers)) throw new Error("lsp.json: `servers` must be an array");
-  const ids = /* @__PURE__ */ new Set();
-  const servers = raw.servers.map((entry, i2) => {
-    if (!entry || typeof entry !== "object") throw new Error(`lsp.json: servers[${i2}] must be an object`);
-    const s = entry;
+  const ids2 = /* @__PURE__ */ new Set();
+  const servers = raw.servers.map((entry2, i2) => {
+    if (!entry2 || typeof entry2 !== "object") throw new Error(`lsp.json: servers[${i2}] must be an object`);
+    const s = entry2;
     const id = typeof s.id === "string" && s.id.trim() ? s.id.trim() : void 0;
     if (!id) throw new Error(`lsp.json: servers[${i2}].id must be a non-empty string`);
-    if (ids.has(id)) throw new Error(`lsp.json: duplicate server id ${JSON.stringify(id)}`);
-    ids.add(id);
+    if (ids2.has(id)) throw new Error(`lsp.json: duplicate server id ${JSON.stringify(id)}`);
+    ids2.add(id);
     if (typeof s.command !== "string" || !s.command.trim()) throw new Error(`lsp.json: servers[${i2}].command must be a non-empty string`);
     if (!Array.isArray(s.languages) || !s.languages.length || s.languages.some((l) => typeof l !== "string")) {
       throw new Error(`lsp.json: servers[${i2}].languages must be a non-empty array of strings`);
@@ -33497,10 +33497,10 @@ function toList(v) {
 function parseRules(input) {
   const raw = Array.isArray(input) ? input : input?.rules;
   if (!Array.isArray(raw)) throw new Error("rules config must be an array (or an object with a `rules` array)");
-  return raw.map((entry, i2) => {
+  return raw.map((entry2, i2) => {
     const at = `rules[${i2}]`;
-    if (typeof entry !== "object" || entry === null) throw new Error(`${at}: must be an object`);
-    const r = entry;
+    if (typeof entry2 !== "object" || entry2 === null) throw new Error(`${at}: must be an object`);
+    const r = entry2;
     if (typeof r.name !== "string" || !r.name) throw new Error(`${at}: \`name\` (non-empty string) is required`);
     if (r.severity !== void 0 && !SEVERITIES.has(r.severity))
       throw new Error(`${at} (${r.name}): \`severity\` must be "error" or "warn"`);
@@ -33698,8 +33698,8 @@ function findDeadCode(scan2) {
   for (const f of scan2.files) {
     for (const s of f.symbols) {
       if (!consider(s)) continue;
-      const entry = callers.get(`${s.name}@${s.file}`) ?? callers.get(s.name);
-      const hasCallers = !!entry && entry.def.file === s.file && entry.callers.length > 0;
+      const entry2 = callers.get(`${s.name}@${s.file}`) ?? callers.get(s.name);
+      const hasCallers = !!entry2 && entry2.def.file === s.file && entry2.callers.length > 0;
       if (hasCallers) continue;
       const referenced = (refs.get(s.name)?.size ?? 0) > 0;
       out2.push({ name: s.name, file: s.file, line: s.line, kind: s.kind, tier: referenced ? "uncalled" : "unreferenced" });
@@ -34609,26 +34609,26 @@ function memoizedEmbedModel(modelDir) {
 function sessionGet(key2) {
   const i2 = sessionCaches.findIndex((e) => e.key === key2);
   if (i2 < 0) return void 0;
-  const [entry] = sessionCaches.splice(i2, 1);
-  sessionCaches.unshift(entry);
-  return entry;
+  const [entry2] = sessionCaches.splice(i2, 1);
+  sessionCaches.unshift(entry2);
+  return entry2;
 }
-function sessionPut(entry) {
-  const i2 = sessionCaches.findIndex((e) => e.key === entry.key);
+function sessionPut(entry2) {
+  const i2 = sessionCaches.findIndex((e) => e.key === entry2.key);
   if (i2 >= 0) sessionCaches.splice(i2, 1);
-  sessionCaches.unshift(entry);
+  sessionCaches.unshift(entry2);
   sessionCaches.length = Math.min(sessionCaches.length, SESSION_CACHE_MAX);
-  return entry;
+  return entry2;
 }
 function sessionClear() {
   sessionCaches.length = 0;
 }
 function sessionInvalidate(repo, rel2) {
   const prefix2 = repo + "\0";
-  for (const entry of sessionCaches) {
-    if (!entry.key.startsWith(prefix2)) continue;
-    if (rel2) entry.cacheMap.delete(rel2);
-    else entry.cacheMap.clear();
+  for (const entry2 of sessionCaches) {
+    if (!entry2.key.startsWith(prefix2)) continue;
+    if (rel2) entry2.cacheMap.delete(rel2);
+    else entry2.cacheMap.clear();
   }
 }
 function sessionKey(repo, opts) {
@@ -34679,7 +34679,7 @@ function getScan(repo, opts = {}, walked) {
 async function getScanParallel(repo, opts = {}, walked, warm = async () => {
 }) {
   const key2 = sessionKey(repo, opts);
-  const existing = sessionCaches.find((entry) => entry.key === key2);
+  const existing = sessionCaches.find((entry2) => entry2.key === key2);
   if (existing) {
     const originalCache = existing.cacheMap;
     const reuseUnchanged = (fresh) => {
@@ -34733,8 +34733,8 @@ function getScanSummary(repo, opts = {}, walked) {
 }
 function getArtifacts(repo, opts = {}, walked, prepared) {
   const scan2 = prepared ?? getScan(repo, opts, walked);
-  const entry = sessionCaches.find((e) => e.scan === scan2);
-  if (entry) return entry.arts ??= entry.loadArtifacts?.() ?? buildArtifactsFromScan(scan2, opts);
+  const entry2 = sessionCaches.find((e) => e.scan === scan2);
+  if (entry2) return entry2.arts ??= entry2.loadArtifacts?.() ?? buildArtifactsFromScan(scan2, opts);
   return buildArtifactsFromScan(scan2, opts);
 }
 async function warmGrammarsForRepo(repo) {
@@ -34868,8 +34868,8 @@ async function callTool(name2, args2, defaultRepo) {
     const index = args2.recall === true ? buildCallerIndex(scan2, void 0, { recall: true }) : callerIndexFor(scan2);
     const lookup2 = str(args2.name);
     if (lookup2) {
-      const entry = index.get(lookup2);
-      return JSON.stringify(entry ?? { error: `no tracked callers for "${lookup2}"` }, null, 2);
+      const entry2 = index.get(lookup2);
+      return JSON.stringify(entry2 ?? { error: `no tracked callers for "${lookup2}"` }, null, 2);
     }
     const obj = {};
     for (const [k, v] of index) obj[k] = v;
@@ -35095,12 +35095,12 @@ async function callTool(name2, args2, defaultRepo) {
     const wanted = str(args2.name);
     if (!wanted) {
       const obj = {};
-      for (const [key2, entry2] of hierarchy) obj[key2] = entry2;
+      for (const [key2, entry22] of hierarchy) obj[key2] = entry22;
       return JSON.stringify(obj, null, 2);
     }
-    const entry = hierarchy.get(wanted);
-    if (!entry) return JSON.stringify({ error: `no type named ${wanted}` }, null, 2);
-    return JSON.stringify(entry, null, 2);
+    const entry2 = hierarchy.get(wanted);
+    if (!entry2) return JSON.stringify({ error: `no type named ${wanted}` }, null, 2);
+    return JSON.stringify(entry2, null, 2);
   }
   if (name2 === "implementations") {
     const wanted = str(args2.name);
@@ -35172,7 +35172,7 @@ async function runMcpServer(opts = {}) {
     }
   }
   const send = (msg) => {
-    const wire = Array.isArray(msg) ? msg.map((entry) => ({ jsonrpc: "2.0", ...entry })) : { jsonrpc: "2.0", ...msg };
+    const wire = Array.isArray(msg) ? msg.map((entry2) => ({ jsonrpc: "2.0", ...entry2 })) : { jsonrpc: "2.0", ...msg };
     process.stdout.write(JSON.stringify(wire) + "\n");
   };
   const rl = createInterface({ input: process.stdin, terminal: false });
@@ -35716,16 +35716,16 @@ function safeRelPath(name2) {
 function extractTarInto(rawTar, destDir) {
   const root = resolve2(destDir);
   const written = [];
-  for (const entry of readTar(asBuffer(rawTar))) {
-    if (entry.type !== "0" && entry.type !== "\0") continue;
-    const rel2 = safeRelPath(entry.name);
-    if (rel2 === null) throw new Error(`refusing unsafe tar entry: ${entry.name}`);
+  for (const entry2 of readTar(asBuffer(rawTar))) {
+    if (entry2.type !== "0" && entry2.type !== "\0") continue;
+    const rel2 = safeRelPath(entry2.name);
+    if (rel2 === null) throw new Error(`refusing unsafe tar entry: ${entry2.name}`);
     const dest = resolve2(destDir, rel2);
     if (dest !== root && !dest.startsWith(root + sep2)) {
-      throw new Error(`tar entry escapes destination: ${entry.name}`);
+      throw new Error(`tar entry escapes destination: ${entry2.name}`);
     }
     mkdirSync(dirname3(dest), { recursive: true });
-    writeFileSync(dest, entry.data);
+    writeFileSync(dest, entry2.data);
     written.push(rel2);
   }
   return written;
@@ -36237,9 +36237,9 @@ function dependentsOf(edges) {
 var adjacencyMemo = /* @__PURE__ */ new WeakMap();
 function adjacencyOf(edges, kinds) {
   const viewKey = kinds ? [...kinds].sort(byStr).join(",") : "*";
-  let entry = adjacencyMemo.get(edges);
-  if (!entry || entry.length !== edges.length) adjacencyMemo.set(edges, entry = { length: edges.length, views: /* @__PURE__ */ new Map() });
-  const cached = entry.views.get(viewKey);
+  let entry2 = adjacencyMemo.get(edges);
+  if (!entry2 || entry2.length !== edges.length) adjacencyMemo.set(edges, entry2 = { length: edges.length, views: /* @__PURE__ */ new Map() });
+  const cached = entry2.views.get(viewKey);
   if (cached) return cached;
   const out2 = /* @__PURE__ */ new Map();
   const inn = /* @__PURE__ */ new Map();
@@ -36255,7 +36255,7 @@ function adjacencyOf(edges, kinds) {
   for (const arr of out2.values()) arr.sort((a, b) => byStr(a.to, b.to));
   for (const arr of inn.values()) arr.sort((a, b) => byStr(a.from, b.from));
   const adj = { out: out2, inn, degree, threshold: hubThreshold([...degree.values()]) };
-  entry.views.set(viewKey, adj);
+  entry2.views.set(viewKey, adj);
   return adj;
 }
 function hubThreshold(degrees) {
@@ -37110,10 +37110,10 @@ async function runCli(rawArgv) {
     const writeCache = (out2) => {
       const files = {};
       for (const f of scan2.files) {
-        const entry = { hash: f.hash, record: f, size: f.size };
+        const entry2 = { hash: f.hash, record: f, size: f.size };
         const mtime = scan2.mtimes.get(f.rel);
-        if (mtime !== void 0) entry.mtimeMs = mtime;
-        files[f.rel] = entry;
+        if (mtime !== void 0) entry2.mtimeMs = mtime;
+        files[f.rel] = entry2;
       }
       writeFileSync4(
         cachePath,
@@ -37186,18 +37186,18 @@ async function runCli(rawArgv) {
     const scan2 = await readScan();
     const index = buildCallerIndex(scan2, void 0, { recall: flags2.recall });
     const obj = {};
-    for (const [name2, entry] of index) obj[name2] = entry;
+    for (const [name2, entry2] of index) obj[name2] = entry2;
     emit(JSON.stringify(obj, null, 2) + "\n", flags2.out);
   } else if (cmd === "hierarchy") {
     const scan2 = await readScan();
     const hierarchy = buildTypeHierarchy(scan2, computeImportPairs(scan2));
     if (flags2.positional) {
-      const entry = hierarchy.get(flags2.positional);
-      if (!entry) throw new Error(`no type named ${flags2.positional}`);
-      emit(JSON.stringify(entry, null, 2) + "\n", flags2.out);
+      const entry2 = hierarchy.get(flags2.positional);
+      if (!entry2) throw new Error(`no type named ${flags2.positional}`);
+      emit(JSON.stringify(entry2, null, 2) + "\n", flags2.out);
     } else {
       const obj = {};
-      for (const [key2, entry] of hierarchy) obj[key2] = entry;
+      for (const [key2, entry2] of hierarchy) obj[key2] = entry2;
       emit(JSON.stringify(obj, null, 2) + "\n", flags2.out);
     }
   } else if (cmd === "implementations") {
@@ -37332,14 +37332,14 @@ async function runCli(rawArgv) {
       process.stderr.write(`codeindex: ${index.records.length} embedding records \u2192 ${flags2.out}/embeddings.bin (model ${model.modelId})
 `);
     } else if (sub === "pull") {
-      const { url, sha256 } = resolveEmbedPullUrl();
+      const { url, sha256: sha2562 } = resolveEmbedPullUrl();
       const destDir = process.env.CODEINDEX_EMBED_DIR ?? join22(flags2.repo, ".codeindex", "models");
       mkdirSync3(destDir, { recursive: true });
       process.stderr.write(`codeindex: fetching model from ${url} \u2192 ${join22(destDir, "model.json")}
 `);
       let body22;
       try {
-        body22 = await fetchEmbedModel(url, sha256);
+        body22 = await fetchEmbedModel(url, sha2562);
       } catch (e) {
         process.stderr.write(`codeindex: pull failed \u2014 ${e instanceof Error ? e.message : String(e)} (nothing written)
 `);
@@ -39841,18 +39841,18 @@ function entryFor(id) {
 function resolveMessage(f, lang) {
   const localized = f.i18n?.message?.[lang];
   if (localized) return localized;
-  const entry = entryFor(f.msg?.id);
-  return entry ? entry.message[lang](f.msg?.params ?? {}) : f.message;
+  const entry2 = entryFor(f.msg?.id);
+  return entry2 ? entry2.message[lang](f.msg?.params ?? {}) : f.message;
 }
 function resolveRemediation(f, lang) {
   const localized = f.i18n?.remediation?.[lang];
   if (localized) return localized;
-  const entry = entryFor(f.msg?.id);
-  return entry ? entry.remediation[lang](f.msg?.params ?? {}) : f.remediation;
+  const entry2 = entryFor(f.msg?.id);
+  return entry2 ? entry2.remediation[lang](f.msg?.params ?? {}) : f.remediation;
 }
 function resolveNote(related, lang) {
-  const entry = related.noteId ? NOTE_CATALOG[related.noteId] : void 0;
-  return entry ? entry[lang] : related.note;
+  const entry2 = related.noteId ? NOTE_CATALOG[related.noteId] : void 0;
+  return entry2 ? entry2[lang] : related.note;
 }
 
 // src/rules/rule.ts
@@ -39887,8 +39887,8 @@ function selectorOf(el) {
   return el.tag;
 }
 function toFinding(doc, ruleId, def, rf, ruleAdvisory) {
-  const entry = MSG_CATALOG[rf.msgId];
-  if (!entry) {
+  const entry2 = MSG_CATALOG[rf.msgId];
+  if (!entry2) {
     throw new Error(`toFinding: msgId "${rf.msgId}" (rule "${ruleId}") is not in MSG_CATALOG \u2014 add it to src/messages.ts.`);
   }
   const params = rf.params ?? {};
@@ -39900,8 +39900,8 @@ function toFinding(doc, ruleId, def, rf, ruleAdvisory) {
     col: rf.el.col,
     selectorHint: rf.selectorHint ?? selectorOf(rf.el),
     severity: rf.severity ?? def,
-    message: entry.message.en(params),
-    remediation: entry.remediation.en(params),
+    message: entry2.message.en(params),
+    remediation: entry2.remediation.en(params),
     msg: rf.params ? { id: rf.msgId, params: rf.params } : { id: rf.msgId },
     snippet: snippet(doc, rf.el),
     // Only carry source offsets when they index into the *real* file. For lossy
@@ -47506,15 +47506,15 @@ function validatePack(raw, opts = {}) {
   });
   const criteria = Array.isArray(p.criteria) ? p.criteria : null;
   if (!criteria) err2("criteria", "criteria must be an array");
-  const ids = /* @__PURE__ */ new Set();
+  const ids2 = /* @__PURE__ */ new Set();
   const countByTheme = /* @__PURE__ */ new Map();
   criteria?.forEach((c2, i2) => {
     const id = c2?.id;
     if (typeof id !== "string" || id === "") {
       err2(`criteria[${i2}].id`, "criterion id must be a non-empty string");
     } else {
-      if (ids.has(id)) err2(`criteria[${i2}].id`, `duplicate criterion id "${id}"`);
-      ids.add(id);
+      if (ids2.has(id)) err2(`criteria[${i2}].id`, `duplicate criterion id "${id}"`);
+      ids2.add(id);
       if (idRe && !idRe.test(id)) err2(`criteria[${i2}].id`, `id "${id}" does not match idPattern ${String(p.idPattern)}`);
     }
     const theme = c2?.theme;
@@ -47575,8 +47575,8 @@ function validatePack(raw, opts = {}) {
         );
         const described = /* @__PURE__ */ new Set();
         const decisiveByTest = /* @__PURE__ */ new Set();
-        rules.forEach((entry, k) => {
-          const rule = entry;
+        rules.forEach((entry2, k) => {
+          const rule = entry2;
           const rid = rule?.id;
           const refs = rule?.tests;
           const effect = rule?.effect;
@@ -47746,7 +47746,7 @@ function validatePack(raw, opts = {}) {
         }
         if (typeof r.criterion !== "string" || r.criterion === "") {
           err2(`${at}.criterion`, "rule criterion must be a non-empty string");
-        } else if (!ids.has(r.criterion)) {
+        } else if (!ids2.has(r.criterion)) {
           err2(`${at}.criterion`, `rule reports under criterion "${r.criterion}" which does not exist in this pack`);
         }
         if (typeof r.severity !== "string" || !SEVERITIES2.has(r.severity)) {
@@ -47826,7 +47826,7 @@ function validatePack(raw, opts = {}) {
         if (typeof m.ruleId !== "string" || m.ruleId.trim() === "") err2(`${at}.ruleId`, "secondary mapping ruleId must be a non-empty string");
         if (typeof m.criterion !== "string" || m.criterion === "") {
           err2(`${at}.criterion`, "secondary mapping criterion must be a non-empty string");
-        } else if (!ids.has(m.criterion)) {
+        } else if (!ids2.has(m.criterion)) {
           err2(`${at}.criterion`, `secondary mapping projects onto criterion "${m.criterion}" which does not exist in this pack`);
         }
         if (m.enabled !== void 0 && typeof m.enabled !== "boolean") err2(`${at}.enabled`, "secondary mapping enabled must be a boolean");
@@ -47837,7 +47837,7 @@ function validatePack(raw, opts = {}) {
             warn(`${at}.note`, `secondary mapping note has no string for the default locale "${loc}"`);
           }
         }
-        if (typeof m.ruleId === "string" && m.ruleId.trim() !== "" && typeof m.criterion === "string" && ids.has(m.criterion)) {
+        if (typeof m.ruleId === "string" && m.ruleId.trim() !== "" && typeof m.criterion === "string" && ids2.has(m.criterion)) {
           warn(at, `secondary mapping bypasses the SC crosswalk \u2014 intentional deviation (ruleId "${m.ruleId}" \u2192 criterion "${m.criterion}")`);
         }
       });
@@ -47966,7 +47966,7 @@ function visible() {
   const overlay = currentOverlay();
   if (!overlay?.size) return registry;
   const merged = new Map(registry);
-  for (const [key2, entry] of overlay) merged.set(key2, entry);
+  for (const [key2, entry2] of overlay) merged.set(key2, entry2);
   return merged;
 }
 function withScope(scope, fn) {
@@ -48051,8 +48051,8 @@ function listPacks() {
 function packsForSc(sc) {
   const out2 = [];
   for (const { pack } of visible().values()) {
-    const ids = pack.criteria.filter((c2) => c2.wcag.includes(sc)).map((c2) => c2.id);
-    if (ids.length) out2.push({ key: pack.key, ids });
+    const ids2 = pack.criteria.filter((c2) => c2.wcag.includes(sc)).map((c2) => c2.id);
+    if (ids2.length) out2.push({ key: pack.key, ids: ids2 });
   }
   return out2;
 }
@@ -48532,13 +48532,13 @@ var SUBJECTS = {
         const inside = (x) => ancestors(x).includes(e);
         const ths = d.elements.filter((x) => inside(x) && (x.tag === "th" || ["columnheader", "rowheader"].includes(roleOf(x))));
         const scoped = ths.filter((x) => attr(x, "scope") !== void 0).length;
-        const ids = ths.filter((x) => attr(x, "id") !== void 0).length;
+        const ids2 = ths.filter((x) => attr(x, "id") !== void 0).length;
         const headers = d.elements.filter((x) => inside(x) && attr(x, "headers") !== void 0).length;
         const named3 = attr(e, "aria-label") ?? attr(e, "aria-labelledby") ?? attr(e, "title") ?? "";
         return h(
           d,
           e,
-          `<${e.tag}${e.tag === "table" ? "" : ` role="${roleOf(e)}"`}> caption="${caption ? t(caption, 40) : ""}" name="${named3.slice(0, 40)}" role="${attr(e, "role") ?? ""}" th=${ths.length} (scope=${scoped}, id=${ids}) cells-with-headers=${headers} summary="${attr(e, "summary") ?? ""}" describedby="${attr(e, "aria-describedby") ?? ""}" \u2014 data table or layout?`,
+          `<${e.tag}${e.tag === "table" ? "" : ` role="${roleOf(e)}"`}> caption="${caption ? t(caption, 40) : ""}" name="${named3.slice(0, 40)}" role="${attr(e, "role") ?? ""}" th=${ths.length} (scope=${scoped}, id=${ids2}) cells-with-headers=${headers} summary="${attr(e, "summary") ?? ""}" describedby="${attr(e, "aria-describedby") ?? ""}" \u2014 data table or layout?`,
           `table|${caption ? t(caption, 40) : ""}|${ths.length}|${attr(e, "role") ?? ""}`
         );
       })
@@ -49676,9 +49676,9 @@ function subjectsForPackCriterion(standard, id, scs) {
   for (const sc of scs) for (const subject of subjectsForSc(sc)) if (!out2.includes(subject)) out2.push(subject);
   return out2;
 }
-function subjectsAbsent(ids, seen) {
-  if (!ids.length) return false;
-  return ids.every((id) => EXISTENCE_SUBJECTS.has(id) && !seen.has(id));
+function subjectsAbsent(ids2, seen) {
+  if (!ids2.length) return false;
+  return ids2.every((id) => EXISTENCE_SUBJECTS.has(id) && !seen.has(id));
 }
 function subjectsPresentIn(doc, skip) {
   const out2 = [];
@@ -49693,10 +49693,10 @@ function subjectsPresentIn(doc, skip) {
   }
   return out2;
 }
-function harvestSubjects(ids, docs) {
+function harvestSubjects(ids2, docs) {
   const out2 = [];
   const seen = /* @__PURE__ */ new Set();
-  for (const id of ids) {
+  for (const id of ids2) {
     for (const item of SUBJECTS[id]?.(docs) ?? []) {
       const key2 = `${item.ev.file}:${item.at}:${item.cls}`;
       if (seen.has(key2)) continue;
@@ -49759,9 +49759,9 @@ function embeddedImageName(n, doc) {
 function labelledbyResolvesEmpty(el, doc) {
   const raw = attr(el, "aria-labelledby");
   if (raw === void 0 || raw.includes("{")) return false;
-  const ids = raw.split(/\s+/).filter(Boolean);
-  if (!ids.length) return false;
-  for (const id of ids) {
+  const ids2 = raw.split(/\s+/).filter(Boolean);
+  if (!ids2.length) return false;
+  for (const id of ids2) {
     const ref = doc.byId.get(id);
     if (!ref) {
       if (doc.kind !== "html") return false;
@@ -49838,10 +49838,10 @@ function visuallyRenderedText(el) {
   return collapse(out2);
 }
 function ariaLabelledbyText(el, doc) {
-  const ids = attr(el, "aria-labelledby");
-  if (!ids) return "";
+  const ids2 = attr(el, "aria-labelledby");
+  if (!ids2) return "";
   const parts2 = [];
-  for (const id of ids.split(/\s+/).filter(Boolean)) {
+  for (const id of ids2.split(/\s+/).filter(Boolean)) {
     const ref = doc.byId.get(id);
     if (ref) parts2.push(nameFromContent(ref, doc, isHiddenFromAT(ref)) || (attr(ref, "aria-label") ?? "").trim());
   }
@@ -50441,8 +50441,8 @@ var ariaRefMissingId = {
         const v = (attr(el, a) ?? "").trim();
         if (v && !v.includes("{")) refs.push({ attr: a, ids: [v] });
       }
-      for (const { attr: a, ids } of refs) {
-        const missing = ids.filter((id) => !doc.byId.has(id));
+      for (const { attr: a, ids: ids2 } of refs) {
+        const missing = ids2.filter((id) => !doc.byId.has(id));
         if (missing.length) {
           out2.push({
             criteriaId: "4.1.2",
@@ -50835,8 +50835,8 @@ function requiredIdrefDangling(el, doc, name2, value) {
   const role = (attr(el, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
   if (!ARIA_REQUIRED_ATTRS[role]?.includes(name2)) return false;
   if (role === "combobox" && (attr(el, "aria-expanded") ?? "").trim().toLowerCase() !== "true") return false;
-  const ids = value.split(/\s+/).filter(Boolean);
-  return ids.length > 0 && ids.every((id) => !doc.byId.has(id));
+  const ids2 = value.split(/\s+/).filter(Boolean);
+  return ids2.length > 0 && ids2.every((id) => !doc.byId.has(id));
 }
 var invalidAriaValue = {
   id: "invalid-aria-value",
@@ -53232,8 +53232,8 @@ function runRules(doc, only) {
 
 // src/rules/cross-rule.ts
 function crossToFinding(doc, ruleId, def, cf) {
-  const entry = MSG_CATALOG[cf.msgId];
-  if (!entry) {
+  const entry2 = MSG_CATALOG[cf.msgId];
+  if (!entry2) {
     throw new Error(`crossToFinding: msgId "${cf.msgId}" (rule "${ruleId}") is not in MSG_CATALOG \u2014 add it to src/messages.ts.`);
   }
   const params = cf.params ?? {};
@@ -53245,8 +53245,8 @@ function crossToFinding(doc, ruleId, def, cf) {
     col: cf.el.col,
     selectorHint: cf.selectorHint ?? selectorOf(cf.el),
     severity: cf.severity ?? def,
-    message: entry.message.en(params),
-    remediation: entry.remediation.en(params),
+    message: entry2.message.en(params),
+    remediation: entry2.remediation.en(params),
     msg: cf.params ? { id: cf.msgId, params: cf.params } : { id: cf.msgId },
     snippet: snippet(doc, cf.el),
     ...doc.lossy ? {} : { sourceStart: cf.el.start, sourceEnd: cf.el.end },
@@ -53672,8 +53672,8 @@ var crossNameRefCrossFile = {
       const isHeading = HEADING_TAG.test(el.tag) || (attr(el, "role") ?? "") === "heading";
       if (isHeading) {
         const lb = (attr(el, "aria-labelledby") ?? "").trim();
-        const ids = lb.includes("{") ? [] : lb.split(/\s+/).filter(Boolean);
-        if (ids.length && ids.every((id) => !doc.byId.has(id) && idDefinedAnywhere(graph, id)))
+        const ids2 = lb.includes("{") ? [] : lb.split(/\s+/).filter(Boolean);
+        if (ids2.length && ids2.every((id) => !doc.byId.has(id) && idDefinedAnywhere(graph, id)))
           suppress.push({ ruleId: "empty-heading", line: el.line, reason: "intitul\xE9 fourni par un aria-labelledby d\xE9fini dans un autre fichier" });
       }
     }
@@ -54846,8 +54846,8 @@ function finalize(acc, inputs, extra = {}) {
   };
 }
 function hashContent(content, mode) {
-  const norm5 = mode === "normalized" ? content.replace(/>\s+</g, "><").trim() : content;
-  return createHash4("sha1").update(norm5).digest("hex");
+  const norm6 = mode === "normalized" ? content.replace(/>\s+</g, "><").trim() : content;
+  return createHash4("sha1").update(norm6).digest("hex");
 }
 function runAudit(opts) {
   const acc = newAccum();
@@ -59847,10 +59847,10 @@ function resolveGuidance(standard, criterionId, wcagRefs) {
   const seen = /* @__PURE__ */ new Set();
   const out2 = [];
   const push = (entries, via, inherited) => {
-    for (const entry of entries) {
-      if (seen.has(entry.id)) continue;
-      seen.add(entry.id);
-      out2.push({ entry, via, inherited, languagesAvailable: languagesOf(entry) });
+    for (const entry2 of entries) {
+      if (seen.has(entry2.id)) continue;
+      seen.add(entry2.id);
+      out2.push({ entry: entry2, via, inherited, languagesAvailable: languagesOf(entry2) });
     }
   };
   if (isCore(standard)) {
@@ -59916,9 +59916,9 @@ function pagesOf(result) {
   const fromScope = result.scope.pages ?? [];
   const audited = result.scope.pagesAudited;
   const checked = audited === void 0 ? fromScope : fromScope.map((p) => p.basis === "snapshot" && !audited.includes(p.id) ? { ...p, basis: "not-audited" } : p);
-  const ids = new Set(checked.map((p) => p.id));
+  const ids2 = new Set(checked.map((p) => p.id));
   const urls = new Set(checked.map((p) => p.url));
-  const extra = pageScopesFromSample(result.scope.sample).filter((p) => !ids.has(p.id) && !urls.has(p.url));
+  const extra = pageScopesFromSample(result.scope.sample).filter((p) => !ids2.has(p.id) && !urls.has(p.url));
   const cov = result.scope.pageCoverage;
   const stamped = cov ? [...checked, ...extra].map((p) => cov[p.id] ? { ...p, coverage: cov[p.id] } : p) : [...checked, ...extra];
   return stamped.map((p) => p.basis === "snapshot" ? p : p.coverage ? { ...p, coverage: void 0 } : p);
@@ -59988,8 +59988,8 @@ function occurrencesByPage(findings, resolver) {
       continue;
     }
     if (resolver.approximate(f)) approximate = true;
-    const entry = counts.get(page.id);
-    if (entry) entry.count++;
+    const entry2 = counts.get(page.id);
+    if (entry2) entry2.count++;
     else counts.set(page.id, { page, count: 1 });
   }
   const order = new Map(resolver.pages.map((p, i2) => [p.id, i2]));
@@ -63602,12 +63602,12 @@ function runGlossary(opts) {
     console.error(`ultra11y criteria: no ${label} glossary term matching "${term}".${near.length ? ` Did you mean: ${near.join(", ")}?` : ""}`);
     return 2;
   }
-  const entry = glossary[hit];
-  if (opts.json) console.log(JSON.stringify({ anchor: hit, ...entry }, null, 2));
+  const entry2 = glossary[hit];
+  if (opts.json) console.log(JSON.stringify({ anchor: hit, ...entry2 }, null, 2));
   else {
-    console.log(`${label} \u2014 ${entry.title}  (#${hit})`);
+    console.log(`${label} \u2014 ${entry2.title}  (#${hit})`);
     console.log("");
-    console.log(entry.body);
+    console.log(entry2.body);
   }
   return 0;
 }
@@ -63980,6 +63980,7 @@ var citationKey = (cite) => {
 };
 var citationSetKey = (it) => it.kind === "c" ? (it.citations ?? []).map(citationKey).sort().join("||") : "";
 var itemKey = (it) => `${it.kind ?? "nc"}|${it.criteriaId}|${it.file}|${it.line}|${it.selector}|${citationSetKey(it)}`;
+var claimKey = itemKey;
 var resumableItemKey = (it) => {
   return `${it.kind ?? "nc"}|${it.criteriaId}|${canonicalFile(it.file)}|${it.line}|${it.selector}|${it.claim}|${citationSetKey(it)}`;
 };
@@ -64329,10 +64330,10 @@ function hasRenderedEvidence(r) {
 function packReportNcIds(md, idGrammar) {
   const body3 = sectionBody(md, 2);
   const re = new RegExp(`^\\*\\*[^*\\n]+\\*\\*\\s*:\\s*(${idGrammar})\\s*\u2014`, "gm");
-  const ids = /* @__PURE__ */ new Set();
+  const ids2 = /* @__PURE__ */ new Set();
   let m;
-  while (m = re.exec(body3)) ids.add(m[1]);
-  return ids;
+  while (m = re.exec(body3)) ids2.add(m[1]);
+  return ids2;
 }
 function checkSemantic(md, opts) {
   const lang = opts.lang ?? "en";
@@ -65859,10 +65860,10 @@ function applyAdjudication(audit2, adj, opts = {}) {
     return engineNcCache.get(key2) ?? EMPTY_IDS;
   };
   const toGround = (criteriaId, g, fallback, offHarvest) => {
-    const entry = { g, ...fallback ? { fallback } : {}, ...offHarvest ? { offHarvest } : {} };
+    const entry2 = { g, ...fallback ? { fallback } : {}, ...offHarvest ? { offHarvest } : {} };
     const list = groundInputs.get(criteriaId);
-    if (list) list.push(entry);
-    else groundInputs.set(criteriaId, [entry]);
+    if (list) list.push(entry2);
+    else groundInputs.set(criteriaId, [entry2]);
   };
   for (const it of adj.items) {
     if (!open.has(it.criteriaId)) continue;
@@ -66180,7 +66181,7 @@ var T2 = {
     alsoAt: "aussi en",
     snippetLabel: "`snippet` \xE0 copier dans la citation",
     renderedAvailable: "**RENDU DISPONIBLE.** Cet audit a ing\xE9r\xE9 des captures de page : le rendu de la page est sur le disque, sous `.ultra11y/pages/<id>/` \u2014 `dom.html` (le DOM s\xE9rialis\xE9 par le navigateur), `styles.json` (les styles calcul\xE9s), `boxes.json` (les bo\xEEtes et positions), `axtree.json` (l'arbre d'accessibilit\xE9) et `screen.png`. Un crit\xE8re \xAB \xE0 restituer \xBB \u2014 information par la couleur, op\xE9rabilit\xE9 clavier d'un script, geste au pointeur \u2014 se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. `needs-rendered-dom` reste la bonne r\xE9ponse pour un crit\xE8re dont aucune capture ne porte le sujet, et pour lui seul.",
-    nothingRendered: (ids) => `**AUCUN RENDU DANS CETTE PORT\xC9E.** ${ids.length} crit\xE8re(s) exigent une page rendue, et aucune page n'a \xE9t\xE9 instantan\xE9e ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule r\xE9ponse honn\xEAte. Rendez AVANT d'adjuger \u2014 \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) \u2014 puis reconstruisez cette liste : la mesure en ferme la plupart sans mod\xE8le, donc sans facture. Concern\xE9s : ${ids.map((id) => `\`${id}\``).join(" \xB7 ")}`,
+    nothingRendered: (ids2) => `**AUCUN RENDU DANS CETTE PORT\xC9E.** ${ids2.length} crit\xE8re(s) exigent une page rendue, et aucune page n'a \xE9t\xE9 instantan\xE9e ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule r\xE9ponse honn\xEAte. Rendez AVANT d'adjuger \u2014 \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) \u2014 puis reconstruisez cette liste : la mesure en ferme la plupart sans mod\xE8le, donc sans facture. Concern\xE9s : ${ids2.map((id) => `\`${id}\``).join(" \xB7 ")}`,
     briefContract: "> **CONTRAT DE VERDICT** \u2014 le pli est FERM\xC9 : un verdict auquel il manque son champ obligatoire est refus\xE9, et son crit\xE8re retourne \xAB \xE0 \xE9valuer \xBB en portant le refus. Renseignez le verdict de CE crit\xE8re, ici :",
     absenceRule: "> **UNE NC EN FORME D'ABSENCE S'ANCRE QUAND M\xCAME.** \xAB Il n'y a pas de second syst\xE8me de navigation \xBB, \xAB il n'y a pas de moteur de recherche \xBB, \xAB aucun message d'erreur ne sugg\xE8re le format attendu \xBB : une absence se CONSTATE quelque part. Citez l'\xE9l\xE9ment et la page o\xF9 vous l'avez constat\xE9e \u2014 le `<nav>`, le `<header>`, le formulaire \u2014 avec son `file`, sa `line` et son `snippet`. Une NC sans `file` est refus\xE9e aussi s\xFBrement qu'un `C` sans citations. Et si le sujet du crit\xE8re n'existe nulle part dans le p\xE9rim\xE8tre audit\xE9, le verdict n'est pas `NC` : c'est `NA`, avec sa justification.",
     incomplete: "LECTURE INCOMPL\xC8TE \u2014 un \xAB C \xBB sera refus\xE9 sur ce crit\xE8re",
@@ -66234,7 +66235,7 @@ var T2 = {
     alsoAt: "also at",
     snippetLabel: "`snippet` to copy into the citation",
     renderedAvailable: "**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under `.ultra11y/pages/<id>/` \u2014 `dom.html` (the DOM the browser serialized), `styles.json` (computed styles), `boxes.json` (boxes and positions), `axtree.json` (the accessibility tree) and `screen.png`. A needs-rendering criterion \u2014 information by colour, keyboard operability of a script, a pointer gesture \u2014 is decided FROM THOSE FILES: read them as you would read the source. `needs-rendered-dom` stays the right answer for a criterion no capture carries the subject of, and for that alone.",
-    nothingRendered: (ids) => `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating \u2014 \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) \u2014 then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids.map((id) => `\`${id}\``).join(" \xB7 ")}`,
+    nothingRendered: (ids2) => `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids2.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating \u2014 \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) \u2014 then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids2.map((id) => `\`${id}\``).join(" \xB7 ")}`,
     briefContract: "> **VERDICT CONTRACT** \u2014 the fold is FAIL-CLOSED: a verdict missing its required field is refused, and its criterion goes back to \xAB to assess \xBB carrying the refusal. Record THIS criterion's verdict, here:",
     absenceRule: "> **AN NC SHAPED LIKE AN ABSENCE STILL HAS TO BE ANCHORED.** \xAB There is no second navigation system \xBB, \xAB there is no search engine \xBB, \xAB no error message suggests the expected format \xBB: an absence is OBSERVED somewhere. Cite the element and the page you observed it on \u2014 the `<nav>`, the `<header>`, the form \u2014 with its `file`, `line` and `snippet`. An NC with no `file` is refused exactly as surely as a `C` with no citations. And when the criterion's subject exists nowhere in the audited scope, the verdict is not `NC`: it is `NA`, with its justification.",
     incomplete: "INCOMPLETE READING \u2014 a C will be refused on this criterion",
@@ -66281,11 +66282,11 @@ function glossaryBlock(pack, crit, lang) {
   const out2 = [`> **${s.glossary}**`, ""];
   let any = false;
   for (const a of anchors) {
-    const entry = resolveGlossary(pack.key, a);
-    if (!entry) continue;
+    const entry2 = resolveGlossary(pack.key, a);
+    if (!entry2) continue;
     any = true;
-    const body3 = entry.body.replace(/\s+/g, " ").trim();
-    out2.push(`- **${entry.title}** \u2014 ${body3.length > MAX_GLOSSARY_CHARS ? `${body3.slice(0, MAX_GLOSSARY_CHARS)}\u2026` : body3}`);
+    const body3 = entry2.body.replace(/\s+/g, " ").trim();
+    out2.push(`- **${entry2.title}** \u2014 ${body3.length > MAX_GLOSSARY_CHARS ? `${body3.slice(0, MAX_GLOSSARY_CHARS)}\u2026` : body3}`);
   }
   out2.push("");
   return any ? out2 : [];
@@ -66624,10 +66625,11 @@ function pruneRefuted(audit2, standard, items, lang = "en", untried = []) {
       });
     }
   }
-  const skippedEngine = withdrawn.filter((it) => !acted.has(it.criteriaId)).length;
+  const skippedEngineClaims = withdrawn.filter((it) => !acted.has(it.criteriaId));
+  const skippedEngine = skippedEngineClaims.length;
   if (deleted.size) next.findings = next.findings.filter((f) => !deleted.has(`${f.criteriaId}|${findingKey(f)}`));
   if (isCore(standard)) recomputeTallies(next);
-  return { audit: next, removedFindings, reopenedCriteria, clearedConformities, untriedConformities, skippedEngine };
+  return { audit: next, removedFindings, reopenedCriteria, clearedConformities, untriedConformities, skippedEngine, skippedEngineClaims };
 }
 
 // src/ledger.ts
@@ -66673,30 +66675,30 @@ function evidenceAnchorsOf(evidence, root) {
   return [...out2].sort().join(",");
 }
 var anchorHash = (e, root) => createHash6("sha256").update(anchorKey2(e, root)).digest("hex").slice(0, 16);
-function verdictStillHolds(entry, today2, opts) {
+function verdictStillHolds(entry2, today2, opts) {
   const stale = (why) => ({ holds: false, why });
-  const was = entry.evidenceCount;
+  const was = entry2.evidenceCount;
   if (!opts.harvestComplete) {
     return stale(
       `Ledger verdict is STALE \u2014 this run's harvest is INCOMPLETE (page captures the audit says it read are missing from disk), so neither what it found nor what it did not says anything about the code. Re-run with the captures present.`
     );
   }
   const root = opts.root;
-  if (evidenceFingerprint(today2) === entry.evidenceFingerprint || root !== void 0 && evidenceFingerprint(today2, root) === entry.evidenceFingerprint) {
+  if (evidenceFingerprint(today2) === entry2.evidenceFingerprint || root !== void 0 && evidenceFingerprint(today2, root) === entry2.evidenceFingerprint) {
     return { holds: true };
   }
-  if (typeof entry.evidenceAnchors !== "string" || !entry.evidenceAnchors) {
+  if (typeof entry2.evidenceAnchors !== "string" || !entry2.evidenceAnchors) {
     return stale(
-      `Ledger verdict is STALE \u2014 the evidence changed since it was recorded on ${entry.date} (${was} item(s) then, ${today2.length} now), and the entry records no anchor set, so what changed cannot be established. Re-adjudicate this criterion.`
+      `Ledger verdict is STALE \u2014 the evidence changed since it was recorded on ${entry2.date} (${was} item(s) then, ${today2.length} now), and the entry records no anchor set, so what changed cannot be established. Re-adjudicate this criterion.`
     );
   }
-  if (entry.verdict === "NC") return { holds: true };
+  if (entry2.verdict === "NC") return { holds: true };
   if (today2.length === 0) {
     return stale(
-      `Ledger verdict is STALE \u2014 the harvest for this criterion is now EMPTY where it held ${was} item(s) on ${entry.date}. Nothing was examined, which is not the same claim as nothing being wrong.`
+      `Ledger verdict is STALE \u2014 the harvest for this criterion is now EMPTY where it held ${was} item(s) on ${entry2.date}. Nothing was examined, which is not the same claim as nothing being wrong.`
     );
   }
-  const recorded = new Set(entry.evidenceAnchors.split(","));
+  const recorded = new Set(entry2.evidenceAnchors.split(","));
   const added = /* @__PURE__ */ new Set();
   for (const e of today2) {
     const rooted = anchorHash(e, root);
@@ -66704,12 +66706,12 @@ function verdictStillHolds(entry, today2, opts) {
   }
   if (added.size > 0) {
     return stale(
-      `Ledger verdict is STALE \u2014 ${added.size} piece(s) of evidence are NEW since the verdict was recorded on ${entry.date} (${was} item(s) then, ${today2.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`
+      `Ledger verdict is STALE \u2014 ${added.size} piece(s) of evidence are NEW since the verdict was recorded on ${entry2.date} (${was} item(s) then, ${today2.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`
     );
   }
   const exists = opts.fileExists ?? ((f) => existsSync24(f));
   const contributing = /* @__PURE__ */ new Set([...evidenceFilesOf(today2), ...evidenceFilesOf(today2, root)]);
-  const silent = (entry.evidenceFiles ?? []).filter((f) => !contributing.has(f) && !contributing.has(identityFile(f, root)) && exists(f));
+  const silent = (entry2.evidenceFiles ?? []).filter((f) => !contributing.has(f) && !contributing.has(identityFile(f, root)) && exists(f));
   if (silent.length > 0) {
     const shown = silent.slice(0, 4);
     return stale(
@@ -66808,26 +66810,26 @@ function pruneLedger(ledger, items, reopenedCriteria, clearedConformities, root)
   let removedEntries = 0;
   let removedFindings = 0;
   const entries = [];
-  for (const entry of ledger.entries) {
-    if (dropCriteria.has(entry.criteriaId)) {
+  for (const entry2 of ledger.entries) {
+    if (dropCriteria.has(entry2.criteriaId)) {
       removedEntries++;
       continue;
     }
-    const anchors = withdrawn.get(entry.criteriaId);
-    if (!anchors?.size || !entry.findings?.length) {
-      entries.push(entry);
+    const anchors = withdrawn.get(entry2.criteriaId);
+    if (!anchors?.size || !entry2.findings?.length) {
+      entries.push(entry2);
       continue;
     }
-    const findings = entry.findings.filter((finding) => {
+    const findings = entry2.findings.filter((finding) => {
       const keep = !anchors.has(findingKey2(finding));
       if (!keep) removedFindings++;
       return keep;
     });
-    if (entry.verdict === "NC" && findings.length === 0) {
+    if (entry2.verdict === "NC" && findings.length === 0) {
       removedEntries++;
       continue;
     }
-    entries.push({ ...entry, findings });
+    entries.push({ ...entry2, findings });
   }
   return { ledger: { ...ledger, entries }, removedEntries, removedFindings };
 }
@@ -66935,9 +66937,9 @@ var MAX_ATTEMPTS = 4;
 var MAX_TOKENS = 16e3;
 function batchWorklist(items, render2, size = BATCH_SIZE) {
   if (!Number.isInteger(size) || size < 1) throw new Error(`batch size must be a positive integer (got ${size})`);
-  const ids = items.map((item) => item.criteriaId);
-  if (new Set(ids).size !== ids.length) {
-    const duplicate = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+  const ids2 = items.map((item) => item.criteriaId);
+  if (new Set(ids2).size !== ids2.length) {
+    const duplicate = [...new Set(ids2.filter((id, index) => ids2.indexOf(id) !== index))];
     throw new Error(`worklist contains duplicate criterion id(s): ${duplicate.join(", ")}`);
   }
   const batches = [];
@@ -67697,7 +67699,7 @@ function validateSample(raw) {
   const s = raw;
   const pages = Array.isArray(s.pages) ? s.pages : null;
   if (!pages || pages.length === 0) err2("sample.pages", "sample.pages must be a non-empty array");
-  const ids = /* @__PURE__ */ new Set();
+  const ids2 = /* @__PURE__ */ new Set();
   pages?.forEach((pg, i2) => {
     if (typeof pg !== "object" || pg === null || Array.isArray(pg)) {
       err2(`sample.pages[${i2}]`, "each page must be an object { id, name, url, auth?, storageState?, notes?, sources? }");
@@ -67708,8 +67710,8 @@ function validateSample(raw) {
     if (typeof id !== "string" || id.trim() === "") {
       err2(`sample.pages[${i2}].id`, "page id must be a non-empty string");
     } else {
-      if (ids.has(id)) err2(`sample.pages[${i2}].id`, `duplicate page id "${id}"`);
-      ids.add(id);
+      if (ids2.has(id)) err2(`sample.pages[${i2}].id`, `duplicate page id "${id}"`);
+      ids2.add(id);
     }
     if (typeof p.name !== "string" || p.name.trim() === "") err2(`sample.pages[${i2}].name`, "page name must be a non-empty string");
     if (typeof p.url !== "string" || p.url.trim() === "") err2(`sample.pages[${i2}].url`, "page url must be a non-empty string");
@@ -67797,14 +67799,14 @@ function proposeSamplePages(urls, titles) {
 }
 function mergeSample(existing, proposed) {
   const pages = [...existing?.pages ?? []];
-  const ids = new Set(pages.map((p) => p.id));
+  const ids2 = new Set(pages.map((p) => p.id));
   const urls = new Set(pages.map((p) => p.url));
   const added = [];
   for (const p of proposed) {
     if (urls.has(p.url)) continue;
     let id = p.id;
-    for (let n = 2; ids.has(id); n++) id = `${p.id}-${n}`;
-    ids.add(id);
+    for (let n = 2; ids2.has(id); n++) id = `${p.id}-${n}`;
+    ids2.add(id);
     urls.add(p.url);
     const page = { ...p, id };
     pages.push(page);
@@ -68274,12 +68276,12 @@ function resolveHostAnchor(file, snippet2) {
     idx = source.indexOf(openMatch[0]);
     if (idx >= 0) return at(idx, openMatch[0].length);
   }
-  const norm5 = (t3) => t3.replace(/\s+/g, " ").trim();
-  const needle = norm5(openMatch ? openMatch[0] : s);
+  const norm6 = (t3) => t3.replace(/\s+/g, " ").trim();
+  const needle = norm6(openMatch ? openMatch[0] : s);
   if (needle) {
     const lines = source.split("\n");
     for (let i2 = 0; i2 < lines.length; i2++) {
-      if (norm5(lines[i2]).includes(needle)) {
+      if (norm6(lines[i2]).includes(needle)) {
         const start2 = starts[i2] ?? 0;
         return { line: i2 + 1, col: 1, start: start2, end: start2 + lines[i2].length };
       }
@@ -70312,12 +70314,12 @@ function packCriteriaOf(pack, f) {
   return hasId(pack, f.criteriaId) ? [f.criteriaId] : [];
 }
 function packCriterionLabel(pack, f) {
-  const ids = packCriteriaOf(pack, f);
-  return ids.length ? `${pack.name} ${ids.join(", ")}` : null;
+  const ids2 = packCriteriaOf(pack, f);
+  return ids2.length ? `${pack.name} ${ids2.join(", ")}` : null;
 }
-function packFinding(f, ids) {
+function packFinding(f, ids2) {
   const { criteriaId: _sc, ...rest } = f;
-  return { ...rest, criteriaId: ids[0], criteriaIds: ids };
+  return { ...rest, criteriaId: ids2[0], criteriaIds: ids2 };
 }
 function packAuditDocument(input, packKey, lang) {
   const audit2 = unwrapAudit(input);
@@ -70343,7 +70345,7 @@ function packAuditDocument(input, packKey, lang) {
       ...pc?.automation ? { automation: pc.automation } : {}
     };
   });
-  const findings = [...seen].map(([f, ids]) => packFinding(f, ids));
+  const findings = [...seen].map(([f, ids2]) => packFinding(f, ids2));
   const themes = pack.themes.map((t3) => {
     const rows = criteria.filter((c2) => c2.theme === t3.number);
     return {
@@ -70552,8 +70554,8 @@ function ruleFor(f, standard, lang) {
     properties: { tags, "problem.severity": level }
   };
 }
-function packHelpUri(pack, ids) {
-  const url = ids[0] ? criterionUrl(pack, ids[0]) : void 0;
+function packHelpUri(pack, ids2) {
+  const url = ids2[0] ? criterionUrl(pack, ids2[0]) : void 0;
   return url ? { helpUri: url } : {};
 }
 function toSarif(result, opts = {}) {
@@ -70714,8 +70716,8 @@ var S = {
     renderedActuallyTested: (n) => `${n} page(s) rendue(s) r\xE9ellement test\xE9e(s)`,
     testedPages: (pages, more) => `Pages test\xE9es : ${pages}${more ? ` \xB7 \u2026 +${more} dans l'artefact` : ""}`,
     noRenderedExecuted: "0 page rendue : aucun test rendered n'a \xE9t\xE9 ex\xE9cut\xE9",
-    staticTested: (tests, ids) => `${tests} test(s) static \u2014 crit\xE8res : ${ids || "\u2014"}`,
-    renderedContract: (tests, ids) => `${tests} test(s) rendered pr\xE9vus \u2014 crit\xE8res : ${ids || "\u2014"}`,
+    staticTested: (tests, ids2) => `${tests} test(s) static \u2014 crit\xE8res : ${ids2 || "\u2014"}`,
+    renderedContract: (tests, ids2) => `${tests} test(s) rendered pr\xE9vus \u2014 crit\xE8res : ${ids2 || "\u2014"}`,
     deterministicSignals: (covered, decisive, candidate, advisory) => `Couverture moteur : ${covered} crit\xE8re(s) re\xE7oivent un signal normatif \u2014 ${decisive} crit\xE8re(s) peuvent produire un NC d\xE9cisif \xB7 ${candidate} re\xE7oivent des preuves candidates (avec chevauchement)${advisory ? ` \xB7 ${advisory} autre re\xE7oit une recommandation advisory` : ""}`,
     judgmentContract: (tests, criteria) => `${tests} test(s) judgment sur ${criteria} crit\xE8re(s), tous transmis \xE0 l'IA tant qu'ils ne sont pas tranch\xE9s`
   },
@@ -70792,8 +70794,8 @@ var S = {
     renderedActuallyTested: (n) => `${n} rendered page(s) actually tested`,
     testedPages: (pages, more) => `Pages tested: ${pages}${more ? ` \xB7 \u2026 +${more} in the artifact` : ""}`,
     noRenderedExecuted: "0 rendered pages: no rendered test was executed",
-    staticTested: (tests, ids) => `${tests} static test(s) \u2014 criteria: ${ids || "\u2014"}`,
-    renderedContract: (tests, ids) => `${tests} planned rendered test(s) \u2014 criteria: ${ids || "\u2014"}`,
+    staticTested: (tests, ids2) => `${tests} static test(s) \u2014 criteria: ${ids2 || "\u2014"}`,
+    renderedContract: (tests, ids2) => `${tests} planned rendered test(s) \u2014 criteria: ${ids2 || "\u2014"}`,
     deterministicSignals: (covered, decisive, candidate, advisory) => `Engine coverage: ${covered} criterion(ia) receive a normative signal \u2014 ${decisive} criterion(ia) can produce a decisive NC \xB7 ${candidate} receive candidate evidence (with overlap)${advisory ? ` \xB7 ${advisory} other receives an advisory recommendation` : ""}`,
     judgmentContract: (tests, criteria) => `${tests} judgment test(s) across ${criteria} criterion(ia), all sent to AI while undecided`
   }
@@ -70890,11 +70892,11 @@ function runScopeLines(result, standard, lang, includePageNames = false) {
   }
   const automation = automationOverview(standard);
   if (!automation) return out2;
-  const ids = (values) => values.map((id) => `\`${id}\``).join(" \xB7 ");
+  const ids2 = (values) => values.map((id) => `\`${id}\``).join(" \xB7 ");
   const normativeSignals = (/* @__PURE__ */ new Set([...automation.signals.decisive, ...automation.signals.candidate])).size;
   out2.push(
-    `> ${s.staticTested(automation.tests.static, ids(automation.criteria.static))}`,
-    `> ${s.renderedContract(automation.tests.rendered, ids(automation.criteria.rendered))}`,
+    `> ${s.staticTested(automation.tests.static, ids2(automation.criteria.static))}`,
+    `> ${s.renderedContract(automation.tests.rendered, ids2(automation.criteria.rendered))}`,
     `> ${s.deterministicSignals(normativeSignals, automation.signals.decisive.length, automation.signals.candidate.length, automation.signals.advisory.length)}`,
     `> ${s.judgmentContract(automation.tests.judgment, automation.criteria.judgment.length)}`
   );
@@ -71984,7 +71986,7 @@ function criteriaGridBlocks(result, standard, lang) {
   const pack = isCore(standard) ? void 0 : loadPack(standard);
   const rows = [];
   for (const row of groups.flatMap((group) => group.rows)) {
-    const criterion = pack?.criteria.find((entry) => entry.id === row.id);
+    const criterion = pack?.criteria.find((entry2) => entry2.id === row.id);
     const tiers = Object.values(criterion?.automation?.tests ?? {});
     const n = (tier) => tiers.filter((value) => value === tier).length;
     const status = row.inapplicable ? "NA" : row.status;
@@ -72376,8 +72378,8 @@ var DEV_DEFAULT_PORT = 4111;
 function criterionLabel3(f, standard) {
   if (isCore(standard)) return `WCAG ${f.criteriaId}`;
   const pack = loadPack(standard);
-  const ids = packCriteriaForFinding(pack, f);
-  return ids.length ? `${pack.name} ${ids.join(", ")}` : `WCAG ${f.criteriaId}`;
+  const ids2 = packCriteriaForFinding(pack, f);
+  return ids2.length ? `${pack.name} ${ids2.join(", ")}` : `WCAG ${f.criteriaId}`;
 }
 function overlayJs() {
   return `(() => {
@@ -73151,9 +73153,9 @@ function phaseSpec(name2) {
   if (!spec) throw new Error(`no phase spec for "${name2}"`);
   return spec;
 }
-function toBatches(ids, batchSize) {
+function toBatches(ids2, batchSize) {
   const out2 = [];
-  for (let i2 = 0; i2 < ids.length; i2 += batchSize) out2.push(ids.slice(i2, i2 + batchSize));
+  for (let i2 = 0; i2 < ids2.length; i2 += batchSize) out2.push(ids2.slice(i2, i2 + batchSize));
   return out2;
 }
 function phaseWorkflowScript(ph, runAbs, engineAbs, batchSize) {
@@ -73485,11 +73487,261 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
   return { exitCode: 0, written, notices, errors: [], phases };
 }
 
+// src/trial-summary.ts
+import { createHash as createHash8 } from "crypto";
+import { readFileSync as readFileSync33 } from "fs";
+var sha256 = (path) => createHash8("sha256").update(readFileSync33(path)).digest("hex");
+var entry = (it) => ({
+  n: it.n,
+  kind: it.kind ?? "nc",
+  criteriaId: it.criteriaId,
+  file: it.file,
+  line: it.line,
+  selector: it.selector,
+  claim: it.claim,
+  verdict: typeof it.verdict === "string" ? it.verdict : null,
+  note: typeof it.note === "string" ? it.note : ""
+});
+var norm5 = (v) => typeof v === "string" && v.trim() ? v.trim().toLowerCase() : null;
+var emptyCounts = () => ({ supported: 0, partial: 0, refuted: 0, unsupported: 0, unadjudicated: 0, invalid: 0, missing: 0 });
+function recordOf(audit2, standard, id) {
+  if (!isCore(standard)) return audit2.packAdjudication?.standard === standard ? audit2.packAdjudication.criteria.find((c2) => c2.id === id) : void 0;
+  return audit2.criteria.find((c2) => c2.id === id);
+}
+function withdrawalLanded(pruned, standard, it) {
+  const rec = recordOf(pruned, standard, it.criteriaId);
+  if (it.kind === "c") return !rec || rec.status !== "C" && rec.status !== "NA";
+  const k = `${it.file.trim()}|${it.line}|${(it.selector ?? "").trim()}`;
+  return !rec?.findings.some((f) => `${f.file.trim()}|${f.line}|${(f.selectorHint ?? "").trim()}` === k);
+}
+var ids = (xs) => [...new Set(xs.map((x) => x.criteriaId))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+function buildTrialSummary(input) {
+  const { standard, audit: audit2, verdicts } = input;
+  const expectedNc = buildWorklist(input.reportMd, standard, Number.POSITIVE_INFINITY);
+  const expected = [...expectedNc, ...buildConformityWorklist(conformityClaimsFromAudit(audit2, standard), expectedNc.length, Number.POSITIVE_INFINITY)];
+  const r = applyVerdicts(verdicts, expected);
+  const expectedKeys = new Set(expected.map(claimKey));
+  const foreignItems = verdicts.filter((it) => !expectedKeys.has(claimKey(it)));
+  const missingItems = r.failures.filter((f) => !verdicts.includes(f));
+  const claims = { total: verdicts.length + missingItems.length, nc: emptyCounts(), c: emptyCounts() };
+  for (const it of verdicts) {
+    const counts = it.kind === "c" ? claims.c : claims.nc;
+    const v = norm5(it.verdict);
+    if (v === null) counts.unadjudicated++;
+    else if (v === "supported" || v === "partial" || v === "refuted" || v === "unsupported") counts[v]++;
+    else counts.invalid++;
+  }
+  for (const it of missingItems) (it.kind === "c" ? claims.c : claims.nc).missing++;
+  const untriedForPrune = r.failures.filter((f) => !["refuted", "unsupported"].includes(norm5(f.verdict) ?? ""));
+  const dry = pruneRefuted(audit2, standard, verdicts, input.lang, untriedForPrune);
+  const contested = new Set(dry.skippedEngineClaims);
+  const foreign = new Set(foreignItems);
+  const withdrawnAgent = verdicts.filter((it) => !foreign.has(it) && !contested.has(it) && ["refuted", "unsupported"].includes(norm5(it.verdict) ?? ""));
+  const applied = [];
+  const notApplied = [];
+  for (const it of withdrawnAgent) (input.pruned && withdrawalLanded(input.pruned.audit, standard, it) ? applied : notApplied).push(entry(it));
+  const confirmed = verdicts.filter((it) => !foreign.has(it) && ["supported", "partial"].includes(norm5(it.verdict) ?? "")).map(entry);
+  const contestedEngine = verdicts.filter((it) => contested.has(it) && !foreign.has(it)).map(entry);
+  const untried = [
+    ...verdicts.filter((it) => !foreign.has(it) && !["supported", "partial", "refuted", "unsupported"].includes(norm5(it.verdict) ?? "")),
+    ...missingItems
+  ].map(entry);
+  const foreignEntries = foreignItems.map(entry);
+  const coverage = {
+    expected: expected.length,
+    covered: expected.length - missingItems.length,
+    missing: missingItems.length,
+    foreign: foreignItems.length,
+    complete: missingItems.length === 0 && foreignItems.length === 0
+  };
+  const gate = { ok: input.gate.ok, failed: input.gate.issues.length, total: input.gate.total, issues: input.gate.issues };
+  const id = (path, date) => ({ path, sha256: sha256(path), ...date ? { date } : {} });
+  return {
+    kind: "trial-summary",
+    standard,
+    identity: {
+      audit: id(input.auditPath, audit2.date),
+      verdicts: id(input.verdictsPath),
+      report: id(input.reportPath),
+      ...input.pruned ? { pruned: id(input.pruned.path, input.pruned.audit.date) } : {}
+    },
+    claims,
+    criteria: {
+      confirmed: ids(confirmed),
+      withdrawn: ids([...applied, ...notApplied]),
+      contested: ids(contestedEngine),
+      untried: ids(untried),
+      foreign: ids(foreignEntries)
+    },
+    confirmed,
+    withdrawals: { applied, notApplied },
+    contestedEngine,
+    untried,
+    foreign: foreignEntries,
+    coverage,
+    application: { ok: r.unadjudicated + r.invalid + r.missing === 0, pruned: input.pruned !== void 0 },
+    gate,
+    validated: gate.ok && coverage.complete && contestedEngine.length === 0 && untried.length === 0
+  };
+}
+var T6 = {
+  fr: {
+    title: "Bilan de contre-expertise",
+    validated: "**Contre-expertise ex\xE9cut\xE9e, gate s\xE9mantique vert** \u2014 l'audit peut \xEAtre pr\xE9sent\xE9 comme valid\xE9 par la contre-expertise.",
+    notValidated: (why) => `**Contre-expertise ex\xE9cut\xE9e \u2014 audit NON valid\xE9** : ${why.join(" ; ")}.`,
+    whyGate: (n) => `gate s\xE9mantique en \xE9chec (${n} probl\xE8me(s))`,
+    whyContested: (n) => `${n} d\xE9cision(s) moteur contest\xE9e(s), non r\xE9solue(s)`,
+    whyUntried: (n) => `${n} revendication(s) jamais mise(s) \xE0 l'\xE9preuve`,
+    whyForeign: (n) => `${n} verdict(s) \xE9tranger(s) \xE0 cet audit`,
+    identity: "Identit\xE9",
+    file: "Fichier",
+    role: "R\xF4le",
+    roles: { audit: "Audit contre-expertis\xE9 (--in)", verdicts: "Verdicts (--verdicts)", report: "Rapport (--report)", pruned: "Audit \xE9lagu\xE9 (--pruned)" },
+    standard: "R\xE9f\xE9rentiel :",
+    coverage: "Couverture",
+    coverageLine: (c2) => `${c2.covered}/${c2.expected} revendication(s) attendue(s) couverte(s), ${c2.missing} absente(s), ${c2.foreign} \xE9trang\xE8re(s) \xE0 cet audit${c2.complete ? "" : " \u2014 **couverture incompl\xE8te ou association incoh\xE9rente**"}.`,
+    unitNote: "Les nombres comptent des **revendications** (un \xE9l\xE9ment ou un ensemble de preuves), pas des crit\xE8res : un crit\xE8re peut en porter plusieurs. Les crit\xE8res distincts figurent sous chaque section.",
+    verdicts: "Verdicts",
+    head: "| Revendication | supported | partial | refuted | unsupported | non statu\xE9 | invalide | absente |",
+    nc: "Non-conformit\xE9",
+    c: "Conformit\xE9 revendiqu\xE9e",
+    confirmed: "Constats confirm\xE9s (supported / partial)",
+    applied: "Retraits appliqu\xE9s",
+    appliedNone: "Aucun retrait constat\xE9 dans l'audit \xE9lagu\xE9.",
+    notApplied: "Retraits non constat\xE9s",
+    notAppliedWhy: (pruned) => pruned ? "Ces revendications ont \xE9t\xE9 retir\xE9es par la contre-expertise mais l'audit \xE9lagu\xE9 les porte encore." : "Aucun audit \xE9lagu\xE9 fourni (--pruned) : ces retraits ne sont PAS constat\xE9s. Appliquez-les avec `verify --apply \u2026 --prune`, puis passez l'audit obtenu en --pruned.",
+    contested: "D\xE9cisions moteur contest\xE9es \u2014 non r\xE9solues",
+    contestedWhy: "La contre-expertise conteste ces d\xE9cisions du moteur ; `--prune` ne les modifie pas, et elles restent dans l'audit et dans le rapport. Elles ne sont ni des conformit\xE9s ni des constats confirm\xE9s : un faux positif se corrige dans la r\xE8gle, et le gate reste en \xE9chec tant qu'elles demeurent.",
+    untried: "Jamais mises \xE0 l'\xE9preuve",
+    foreign: "Verdicts \xE9trangers \xE0 cet audit",
+    foreignWhy: "Ces verdicts portent sur des revendications que cet audit et ce rapport ne font pas : la liste vient d'un autre audit ou d'un autre rapport.",
+    gate: "Gate s\xE9mantique et application",
+    application: (a) => `Application des verdicts (\`verify --apply \u2026 --prune\`) : ${a.ok ? "accept\xE9e" : "refus\xE9e (verdicts non statu\xE9s, invalides ou absents)"}${a.pruned ? "" : " \u2014 non constat\xE9e : aucun audit \xE9lagu\xE9 fourni"}.`,
+    gateLine: (g) => `Gate s\xE9mantique (\`check --semantic\` sur ce rapport et ces verdicts) : ${g.ok ? "**vert**" : `**en \xE9chec** (${g.failed} probl\xE8me(s))`}.`,
+    none: "Aucun.",
+    verdict: "verdict :",
+    note: "note :",
+    distinct: (n) => `${n} crit\xE8re(s) distinct(s)`
+  },
+  en: {
+    title: "Counter-review summary",
+    validated: "**Counter-review run, semantic gate green** \u2014 the audit can be presented as validated by the counter-review.",
+    notValidated: (why) => `**Counter-review run \u2014 audit NOT validated**: ${why.join("; ")}.`,
+    whyGate: (n) => `semantic gate failing (${n} issue(s))`,
+    whyContested: (n) => `${n} contested engine decision(s), unresolved`,
+    whyUntried: (n) => `${n} claim(s) never tried`,
+    whyForeign: (n) => `${n} verdict(s) foreign to this audit`,
+    identity: "Identity",
+    file: "File",
+    role: "Role",
+    roles: { audit: "Audit under review (--in)", verdicts: "Verdicts (--verdicts)", report: "Report (--report)", pruned: "Pruned audit (--pruned)" },
+    standard: "Standard:",
+    coverage: "Coverage",
+    coverageLine: (c2) => `${c2.covered}/${c2.expected} expected claim(s) covered, ${c2.missing} missing, ${c2.foreign} foreign to this audit${c2.complete ? "" : " \u2014 **incomplete coverage or inconsistent association**"}.`,
+    unitNote: "Counts are **claims** (one element or evidence set), not criteria: one criterion may carry several. Distinct criteria are listed under each section.",
+    verdicts: "Verdicts",
+    head: "| Claim | supported | partial | refuted | unsupported | unadjudicated | invalid | missing |",
+    nc: "Non-conformity",
+    c: "Claimed conformity",
+    confirmed: "Confirmed findings (supported / partial)",
+    applied: "Withdrawals applied",
+    appliedNone: "No withdrawal shows in the pruned audit.",
+    notApplied: "Withdrawals not shown applied",
+    notAppliedWhy: (pruned) => pruned ? "The counter-review withdrew these claims but the pruned audit still carries them." : "No pruned audit given (--pruned): these withdrawals are NOT shown applied. Apply them with `verify --apply \u2026 --prune`, then pass the resulting audit as --pruned.",
+    contested: "Contested engine decisions \u2014 unresolved",
+    contestedWhy: "The counter-review contests these engine decisions; `--prune` does not change them, and they stay in the audit and the report. They are neither conformities nor confirmed findings: a false positive is fixed in the rule, and the gate stays red while they remain.",
+    untried: "Never tried",
+    foreign: "Verdicts foreign to this audit",
+    foreignWhy: "These verdicts are about claims this audit and report do not make: the list comes from another audit or report.",
+    gate: "Semantic gate and application",
+    application: (a) => `Verdict application (\`verify --apply \u2026 --prune\`): ${a.ok ? "accepted" : "refused (blank, invalid or missing verdicts)"}${a.pruned ? "" : " \u2014 not shown: no pruned audit given"}.`,
+    gateLine: (g) => `Semantic gate (\`check --semantic\` on this report and these verdicts): ${g.ok ? "**green**" : `**failing** (${g.failed} issue(s))`}.`,
+    none: "None.",
+    verdict: "verdict:",
+    note: "note:",
+    distinct: (n) => `${n} distinct criterion(ia)`
+  }
+};
+function formatTrialSummary(s, lang = "en") {
+  const t3 = T6[lang] ?? T6.en;
+  const why = [];
+  if (!s.gate.ok) why.push(t3.whyGate(s.gate.failed));
+  if (s.contestedEngine.length) why.push(t3.whyContested(s.contestedEngine.length));
+  if (s.untried.length) why.push(t3.whyUntried(s.untried.length));
+  if (s.foreign.length) why.push(t3.whyForeign(s.foreign.length));
+  const line = (e) => `- **${e.criteriaId}** (${e.kind === "c" ? "C" : "NC"}) ${e.file ? `\`${e.file}:${e.line}\`${e.selector ? ` (\`${e.selector}\`)` : ""} ` : ""}\u2014 ${e.claim.replace(/\s+/g, " ").trim()} \u2014 ${t3.verdict} ${e.verdict ?? "\u2205"}${e.note.trim() ? ` \u2014 ${t3.note} ${e.note.trim()}` : ""}`;
+  const list = (xs) => xs.length ? `${t3.distinct(ids(xs).length)}.
+
+${xs.map(line).join("\n")}` : t3.none;
+  const row = (label, c2) => `| ${label} | ${c2.supported} | ${c2.partial} | ${c2.refuted} | ${c2.unsupported} | ${c2.unadjudicated} | ${c2.invalid} | ${c2.missing} |`;
+  const idRow = (role, f) => `| ${role} | \`${f.path}\`${f.date ? ` (${f.date})` : ""} | \`${f.sha256.slice(0, 12)}\` |`;
+  return [
+    `# ${t3.title}`,
+    "",
+    s.validated && why.length === 0 ? t3.validated : t3.notValidated(why.length ? why : [t3.whyGate(s.gate.failed)]),
+    "",
+    `## ${t3.identity}`,
+    "",
+    `${t3.standard} \`${s.standard}\``,
+    "",
+    `| ${t3.role} | ${t3.file} | sha256 |`,
+    "|---|---|---|",
+    idRow(t3.roles.audit, s.identity.audit),
+    idRow(t3.roles.verdicts, s.identity.verdicts),
+    idRow(t3.roles.report, s.identity.report),
+    ...s.identity.pruned ? [idRow(t3.roles.pruned, s.identity.pruned)] : [],
+    "",
+    `## ${t3.coverage}`,
+    "",
+    t3.coverageLine(s.coverage),
+    "",
+    `## ${t3.verdicts}`,
+    "",
+    t3.unitNote,
+    "",
+    t3.head,
+    "|---|---|---|---|---|---|---|---|",
+    row(t3.nc, s.claims.nc),
+    row(t3.c, s.claims.c),
+    "",
+    `## ${t3.confirmed}`,
+    "",
+    list(s.confirmed),
+    "",
+    `## ${t3.applied}`,
+    "",
+    s.withdrawals.applied.length ? list(s.withdrawals.applied) : t3.appliedNone,
+    "",
+    `## ${t3.notApplied}`,
+    "",
+    ...s.withdrawals.notApplied.length ? [t3.notAppliedWhy(s.application.pruned), "", list(s.withdrawals.notApplied)] : [t3.none],
+    "",
+    `## ${t3.contested}`,
+    "",
+    ...s.contestedEngine.length ? [t3.contestedWhy, "", list(s.contestedEngine)] : [t3.none],
+    "",
+    `## ${t3.untried}`,
+    "",
+    list(s.untried),
+    "",
+    `## ${t3.foreign}`,
+    "",
+    ...s.foreign.length ? [t3.foreignWhy, "", list(s.foreign)] : [t3.none],
+    "",
+    `## ${t3.gate}`,
+    "",
+    `- ${t3.application(s.application)}`,
+    `- ${t3.gateLine(s.gate)}`,
+    ...s.gate.issues.map((i2) => `  - ${i2}`),
+    ""
+  ].join("\n");
+}
+
 // src/mcp/stdio.ts
 import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
-import { existsSync as existsSync38, readFileSync as readFileSync33, realpathSync as realpathSync6, statSync as statSync18 } from "fs";
+import { existsSync as existsSync38, readFileSync as readFileSync34, realpathSync as realpathSync6, statSync as statSync18 } from "fs";
 import { isAbsolute as isAbsolute5, join as join51, resolve as resolve16, sep as sep5 } from "path";
 
 // src/criteria-view.ts
@@ -73523,8 +73775,8 @@ function guidanceView(r, lang) {
 function glossaryViews(pack, c2) {
   const out2 = [];
   for (const anchor of glossaryAnchorsOf(c2)) {
-    const entry = resolveGlossary(pack.key, anchor);
-    if (entry) out2.push({ anchor, title: entry.title, body: entry.body });
+    const entry2 = resolveGlossary(pack.key, anchor);
+    if (entry2) out2.push({ anchor, title: entry2.title, body: entry2.body });
   }
   return out2;
 }
@@ -73541,8 +73793,8 @@ function scView(id, lang, includeGuidance) {
     // The terms the wording links to. WCAG's definitions are normative in exactly the way
     // a pack's are: "large scale" and "pure decoration" mean what the glossary says.
     glossary: ((lang === "fr" ? c2.termsFr : c2.terms) ?? []).flatMap((slug) => {
-      const entry = coreGlossary(lang)[slug];
-      return entry ? [{ anchor: slug, title: entry.title, body: entry.body }] : [];
+      const entry2 = coreGlossary(lang)[slug];
+      return entry2 ? [{ anchor: slug, title: entry2.title, body: entry2.body }] : [];
     }),
     level: c2.level,
     addedIn: c2.addedIn,
@@ -73608,9 +73860,9 @@ function criterionView(standard, id, lang, includeGuidance = false) {
   if (!c2) throw new CriteriaLookupError(`no such ${pack.name} criterion: ${id}. List them all by omitting \`sc\`.`);
   return { ...base, criterion: packCriterionView(pack, c2, lang, includeGuidance), text: formatPackCriterion(pack, c2, lang) };
 }
-function tierCensus(standard, ids) {
+function tierCensus(standard, ids2) {
   const by = {};
-  for (const id of ids) {
+  for (const id of ids2) {
     const t3 = criterionCoverage(standard, id)?.tier;
     if (t3) by[t3] = (by[t3] ?? 0) + 1;
   }
@@ -73754,23 +74006,23 @@ function glossaryView(standard, term, lang = "en") {
     const near = anchors.filter((a) => foldTerm2(a).includes(want) || foldTerm2(glossary[a]?.title ?? "").includes(want)).slice(0, 8);
     throw new CriteriaLookupError(`no ${label} glossary term matching "${wanted}".`, near);
   }
-  const entry = glossary[hit];
+  const entry2 = glossary[hit];
   return {
     standard,
     standardLabel: standardLabel(standard),
     kind: "glossary-term",
     anchor: hit,
-    title: entry.title,
-    body: entry.body,
+    title: entry2.title,
+    body: entry2.body,
     // Which criteria this definition actually governs — the reason it is normative.
     citedBy: isCore(standard) ? [] : citedBy(loadPack(standard), hit)
   };
 }
 
 // src/method-view.ts
-function tierCensus2(standard, ids) {
+function tierCensus2(standard, ids2) {
   const by = {};
-  for (const id of ids) {
+  for (const id of ids2) {
     const t3 = criterionCoverage(standard, id)?.tier;
     if (t3) by[t3] = (by[t3] ?? 0) + 1;
   }
@@ -73897,9 +74149,9 @@ function methodView(standard, lang, opts = {}) {
   const sourceIds = [...coverage].filter(([, c2]) => c2.sourceIsEnough).map(([id]) => id);
   const failableFromSource = [...coverage].filter(([, c2]) => !c2.sourceIsEnough && c2.canFailFrom.includes("source")).map(([id]) => id);
   const evidenceTiers = ["source", "cross-file", "rendered-page", "browser"].map((tier) => {
-    const ids = [...coverage].filter(([, criterion]) => criterion.canFailFrom.includes(tier)).map(([id]) => id);
-    return { tier, count: ids.length, ids, ...TIER_GUIDE[tier] };
-  }).filter((entry) => entry.count > 0);
+    const ids2 = [...coverage].filter(([, criterion]) => criterion.canFailFrom.includes(tier)).map(([id]) => id);
+    return { tier, count: ids2.length, ids: ids2, ...TIER_GUIDE[tier] };
+  }).filter((entry2) => entry2.count > 0);
   const pack = isCore(standard) ? void 0 : getPack(standard);
   return {
     standard,
@@ -74210,7 +74462,7 @@ function handleSampleCheck(cwd, standard) {
   }
   let raw;
   try {
-    raw = JSON.parse(readFileSync33(file, "utf8"));
+    raw = JSON.parse(readFileSync34(file, "utf8"));
   } catch (e) {
     throw new ToolError(`.ultra11yrc.json is not valid JSON: ${e.message}`);
   }
@@ -74328,7 +74580,7 @@ function reportText(args2, tool) {
   if (!isAbsolute5(file)) throw new ToolError("`report_file` must be an absolute path.");
   if (!existsSync38(file)) throw new ToolError(`report file not found: ${file}`);
   try {
-    return withReportAnnexes(readFileSync33(file, "utf8"), file, (p) => readFileSync33(p, "utf8"));
+    return withReportAnnexes(readFileSync34(file, "utf8"), file, (p) => readFileSync34(p, "utf8"));
   } catch (e) {
     throw new ToolError(e instanceof Error ? e.message : String(e));
   }
@@ -74412,7 +74664,7 @@ function handleRead(args2, cwd) {
   const st = statSync18(real);
   if (!st.isFile()) throw new ToolError(`not a file: ${raw}`);
   if (st.size > MAX_READ_BYTES) throw new ToolError(`file is too large to read (${st.size} bytes): ${raw}`);
-  const lines = readFileSync33(real, "utf8").split("\n");
+  const lines = readFileSync34(real, "utf8").split("\n");
   const total = lines.length;
   const start2 = Math.max(1, Math.floor(num2(args2.start_line) ?? 1));
   if (start2 > total) throw new ToolError(`start_line ${start2} is past the end of the file (${total} lines).`);
@@ -75074,7 +75326,7 @@ function str3(v) {
 var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
-import { existsSync as existsSync39, readdirSync as readdirSync7, readFileSync as readFileSync34, realpathSync as realpathSync7, statSync as statSync19 } from "fs";
+import { existsSync as existsSync39, readdirSync as readdirSync7, readFileSync as readFileSync35, realpathSync as realpathSync7, statSync as statSync19 } from "fs";
 import { basename as basename4, dirname as dirname19, join as join52, resolve as resolve17, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 var SKILL_NAME = "ultra11y";
@@ -75116,7 +75368,7 @@ function readResource(uri, moduleDir) {
     throw new ResourceError(`resource path escapes the skill root: ${uri}`);
   }
   if (!statSync19(targetReal).isFile()) throw new ResourceError(`not a file: ${uri}`);
-  return { uri, mimeType: "text/markdown", text: readFileSync34(targetReal, "utf8") };
+  return { uri, mimeType: "text/markdown", text: readFileSync35(targetReal, "utf8") };
 }
 var ResourceError = class extends Error {
 };
@@ -75134,7 +75386,7 @@ function describe(root, rel2, fallbackTitle) {
 function firstProse(file) {
   let text;
   try {
-    text = readFileSync34(file, "utf8");
+    text = readFileSync35(file, "utf8");
   } catch {
     return void 0;
   }
@@ -75696,6 +75948,7 @@ Usage:
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
   ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (fold the adjudication into the audit)
   ultra11y verify   --apply <VERIFY.todo.json> --report <md> --in <audit.json> --out <dir> --prune   (APPLY the trial: delete refuted non-conformities, send refuted conformities back to \xAB \xE0 \xE9valuer \xBB)
+  ultra11y verify   --summary --verdicts <VERIFY.todo.json> --report <md> --in <audit.json> [--pruned <audit.json>] [--out <dir>] [--json]   (read-only bilan of the trial \u2192 TRIAL.md: confirmed, withdrawn/applied, contested engine decisions, coverage, gate)
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs\u2026 | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
@@ -76170,6 +76423,8 @@ var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
   "theme",
   "apply",
   "verdicts",
+  // `verify --summary`: the audit `verify --apply … --prune` wrote, to show which withdrawals landed.
+  "pruned",
   // `check --require-decided`: the criteria a project declares it cannot decide.
   "allow-undecided",
   "max-verify",
@@ -76241,6 +76496,8 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   // `verify --apply … --prune`: apply what the refutation trial decided to the audit, instead
   // of only reporting it (src/refute.ts).
   "prune",
+  // `verify --summary`: the read-only bilan of a counter-review (src/trial-summary.ts).
+  "summary",
   "changed",
   "staged",
   "jsx",
@@ -77615,7 +77872,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
     const gaPath = join53(root, ".gitattributes");
     try {
-      const existing = existsSync40(gaPath) ? readFileSync35(gaPath, "utf8") : "";
+      const existing = existsSync40(gaPath) ? readFileSync36(gaPath, "utf8") : "";
       if (!existing.includes(".ultra11y/captures/")) {
         appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
         console.log(lang === "fr" ? `.gitattributes : ajout\xE9 \xAB ${gaLine} \xBB` : `.gitattributes: added "${gaLine}"`);
@@ -77624,7 +77881,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     }
     try {
       const giPath = join53(root, ".gitignore");
-      if (existsSync40(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync35(giPath, "utf8")))
+      if (existsSync40(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync36(giPath, "utf8")))
         console.error(
           lang === "fr" ? "\u26A0\uFE0F .ultra11y semble ignor\xE9 par .gitignore \u2014 les captures doivent \xEAtre committ\xE9es pour le gate (ajoutez \xAB !.ultra11y/captures/ \xBB)." : '\u26A0\uFE0F .ultra11y appears gitignored \u2014 captures must be committed for the gate (add "!.ultra11y/captures/").'
         );
@@ -77836,6 +78093,7 @@ function cmdCheck(p) {
   return ok ? 0 : 1;
 }
 function cmdVerify(p) {
+  if (p.flags.summary === true) return cmdVerifySummary(p);
   const lang = resolveLang(p.flags, {});
   const apply = p.flags.apply;
   if (typeof apply === "string" && apply) {
@@ -77915,17 +78173,17 @@ function cmdVerify(p) {
         );
       }
       if (r.conformitiesRefused.length) {
-        const ids = [...new Set(r.conformitiesRefused.map((f) => f.criteriaId))].join(", ");
+        const ids2 = [...new Set(r.conformitiesRefused.map((f) => f.criteriaId))].join(", ");
         console.error(
-          pruned ? lang === "fr" ? `\u2717 ${r.conformitiesRefused.length} conformit\xE9(s) revendiqu\xE9e(s) non \xE9tay\xE9e(s) \u2014 ces crit\xE8res sont revenus \xE0 \xAB \xE0 \xE9valuer \xBB, ils ne deviennent PAS des non-conformit\xE9s : ${ids}` : `\u2717 ${r.conformitiesRefused.length} claimed conformity(ies) unsupported \u2014 those criteria are back to "to assess", they do NOT become non-conformities: ${ids}` : lang === "fr" ? `\u2717 ${r.conformitiesRefused.length} conformit\xE9(s) revendiqu\xE9e(s) non \xE9tay\xE9e(s) \u2014 relancez avec --prune pour renvoyer ces crit\xE8res \xE0 \xAB \xE0 \xE9valuer \xBB (ils ne deviennent PAS des non-conformit\xE9s) : ${ids}` : `\u2717 ${r.conformitiesRefused.length} claimed conformity(ies) unsupported \u2014 re-run with --prune to send those criteria back to "to assess" (they do NOT become non-conformities): ${ids}`
+          pruned ? lang === "fr" ? `\u2717 ${r.conformitiesRefused.length} conformit\xE9(s) revendiqu\xE9e(s) non \xE9tay\xE9e(s) \u2014 ces crit\xE8res sont revenus \xE0 \xAB \xE0 \xE9valuer \xBB, ils ne deviennent PAS des non-conformit\xE9s : ${ids2}` : `\u2717 ${r.conformitiesRefused.length} claimed conformity(ies) unsupported \u2014 those criteria are back to "to assess", they do NOT become non-conformities: ${ids2}` : lang === "fr" ? `\u2717 ${r.conformitiesRefused.length} conformit\xE9(s) revendiqu\xE9e(s) non \xE9tay\xE9e(s) \u2014 relancez avec --prune pour renvoyer ces crit\xE8res \xE0 \xAB \xE0 \xE9valuer \xBB (ils ne deviennent PAS des non-conformit\xE9s) : ${ids2}` : `\u2717 ${r.conformitiesRefused.length} claimed conformity(ies) unsupported \u2014 re-run with --prune to send those criteria back to "to assess" (they do NOT become non-conformities): ${ids2}`
         );
       }
       if (r.conformitiesUntried.length) {
-        const ids = [...new Set(r.conformitiesUntried.map((f) => f.criteriaId))].join(", ");
+        const ids2 = [...new Set(r.conformitiesUntried.map((f) => f.criteriaId))].join(", ");
         const absent = r.conformitiesUntried.some((f) => !items.includes(f));
         const regen = absent && capCould ? lang === "fr" ? " R\xE9g\xE9n\xE9rez la worklist avec --max-verify 0." : " Regenerate the worklist with --max-verify 0." : "";
         console.error(
-          pruned ? lang === "fr" ? `\u2717 ${r.conformitiesUntried.length} conformit\xE9(s) revendiqu\xE9e(s) jamais mise(s) \xE0 l'\xE9preuve \u2014 renvoy\xE9e(s) \xE0 \xAB \xE0 \xE9valuer \xBB : ${ids}.${regen}` : `\u2717 ${r.conformitiesUntried.length} claimed conformity(ies) never tried \u2014 sent back to "to assess": ${ids}.${regen}` : lang === "fr" ? `\u2717 ${r.conformitiesUntried.length} conformit\xE9(s) revendiqu\xE9e(s) jamais mise(s) \xE0 l'\xE9preuve \u2014 la contre-expertise est incompl\xE8te : ${ids}.${regen}` : `\u2717 ${r.conformitiesUntried.length} claimed conformity(ies) never tried \u2014 the trial is incomplete: ${ids}.${regen}`
+          pruned ? lang === "fr" ? `\u2717 ${r.conformitiesUntried.length} conformit\xE9(s) revendiqu\xE9e(s) jamais mise(s) \xE0 l'\xE9preuve \u2014 renvoy\xE9e(s) \xE0 \xAB \xE0 \xE9valuer \xBB : ${ids2}.${regen}` : `\u2717 ${r.conformitiesUntried.length} claimed conformity(ies) never tried \u2014 sent back to "to assess": ${ids2}.${regen}` : lang === "fr" ? `\u2717 ${r.conformitiesUntried.length} conformit\xE9(s) revendiqu\xE9e(s) jamais mise(s) \xE0 l'\xE9preuve \u2014 la contre-expertise est incompl\xE8te : ${ids2}.${regen}` : `\u2717 ${r.conformitiesUntried.length} claimed conformity(ies) never tried \u2014 the trial is incomplete: ${ids2}.${regen}`
         );
       }
       for (const issue of grounding.issues) console.error(`\u2717 ${issue}`);
@@ -77937,6 +78195,73 @@ function cmdVerify(p) {
     return ok ? 0 : 1;
   }
   return cmdVerifyWorklist(p, lang);
+}
+function cmdVerifySummary(p) {
+  const standard = stdOf(p, "verify");
+  if (standard === null) return 2;
+  const lang = resolveLang(p.flags, { standard });
+  const need = (flag) => {
+    const v = p.flags[flag];
+    if (typeof v === "string" && v && v !== "-") return v;
+    console.error(
+      lang === "fr" ? `ultra11y verify : --summary exige --verdicts <VERIFY.json>, --report <md> et --in <audit.json> (--${flag} manquant) \u2014 le bilan ne devine aucune de ses sources.` : `ultra11y verify: --summary requires --verdicts <VERIFY.json>, --report <md> and --in <audit.json> (--${flag} missing) \u2014 the summary guesses none of its sources.`
+    );
+    return null;
+  };
+  const verdictsPath = need("verdicts");
+  const reportPath = verdictsPath === null ? null : need("report");
+  const auditPath = reportPath === null ? null : need("in");
+  if (verdictsPath === null || reportPath === null || auditPath === null) return 2;
+  const readJson4 = (path, flag) => {
+    try {
+      return JSON.parse(readText(path));
+    } catch {
+      console.error(`ultra11y verify: --${flag} file not found or not valid JSON: ${path}.`);
+      return void 0;
+    }
+  };
+  const verdicts = readJson4(verdictsPath, "verdicts");
+  if (!Array.isArray(verdicts)) {
+    if (verdicts !== void 0) console.error("ultra11y verify: --verdicts must be a JSON array of verdicts (a filled VERIFY.todo.json).");
+    return 2;
+  }
+  const rawAudit = readJson4(auditPath, "in");
+  if (rawAudit === void 0) return 2;
+  const audit2 = unwrapAudit(rawAudit);
+  let pruned;
+  const prunedFlag = p.flags.pruned;
+  if (typeof prunedFlag === "string" && prunedFlag) {
+    const raw = readJson4(prunedFlag, "pruned");
+    if (raw === void 0) return 2;
+    pruned = { audit: unwrapAudit(raw), path: resolve18(prunedFlag) };
+  }
+  const reportMd = readReportInput(reportPath, "verify");
+  if (reportMd === null) return 2;
+  const gate = checkSemantic(reportMd, { reportPath, verdictsPath, standard, lang });
+  const summary = buildTrialSummary({
+    standard,
+    lang,
+    audit: audit2,
+    auditPath: resolve18(auditPath),
+    verdicts,
+    verdictsPath: resolve18(verdictsPath),
+    reportMd,
+    reportPath: resolve18(reportPath),
+    ...pruned ? { pruned } : {},
+    gate
+  });
+  if (p.flags.json) {
+    console.log(JSON.stringify(summary, null, 2));
+    return 0;
+  }
+  const out2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : ".";
+  mkdirSync18(out2, { recursive: true });
+  const mdPath = join53(out2, "TRIAL.md");
+  writeFileSync21(mdPath, formatTrialSummary(summary, lang));
+  console.log(
+    summary.validated ? lang === "fr" ? `\u2713 Bilan de contre-expertise \u2192 ${mdPath} \u2014 gate s\xE9mantique vert.` : `\u2713 Counter-review summary \u2192 ${mdPath} \u2014 semantic gate green.` : lang === "fr" ? `Bilan de contre-expertise \u2192 ${mdPath} \u2014 audit NON valid\xE9 (gate ${summary.gate.ok ? "vert" : "en \xE9chec"}, ${summary.contestedEngine.length} d\xE9cision(s) moteur contest\xE9e(s), ${summary.untried.length} jamais mise(s) \xE0 l'\xE9preuve, ${summary.foreign.length} \xE9trang\xE8re(s)).` : `Counter-review summary \u2192 ${mdPath} \u2014 audit NOT validated (gate ${summary.gate.ok ? "green" : "failing"}, ${summary.contestedEngine.length} contested engine decision(s), ${summary.untried.length} never tried, ${summary.foreign.length} foreign).`
+  );
+  return 0;
 }
 function applyPrune(p, standard, items, lang, untried = []) {
   const inFlag = p.flags.in;
@@ -78022,9 +78347,9 @@ function cmdVerifyWorklist(p, langIn) {
     const unrendered = unrenderedResidual(audit2, adjItems);
     const w = writeAdjudication(adjItems, out2, { standard, auditDate: audit2.date, lang, unrendered, web });
     if (unrendered.length) {
-      const ids = unrendered.join(" \xB7 ");
+      const ids2 = unrendered.join(" \xB7 ");
       console.error(
-        lang === "fr" ? `ultra11y verify : ${unrendered.length} crit\xE8re(s) exigent une page rendue et aucune page n'a \xE9t\xE9 instantan\xE9e \u2014 ils resteront \xAB \xE0 \xE9valuer \xBB quoi qu'il arrive. Lancez \`ultra11y scan <url> --merge ${inFlag2}\` d'abord. Concern\xE9s : ${ids}` : `ultra11y verify: ${unrendered.length} criterion(ia) need a rendered page and no page was snapshotted \u2014 they will stay "to assess" whatever happens. Run \`ultra11y scan <url> --merge ${inFlag2}\` first. Affected: ${ids}`
+        lang === "fr" ? `ultra11y verify : ${unrendered.length} crit\xE8re(s) exigent une page rendue et aucune page n'a \xE9t\xE9 instantan\xE9e \u2014 ils resteront \xAB \xE0 \xE9valuer \xBB quoi qu'il arrive. Lancez \`ultra11y scan <url> --merge ${inFlag2}\` d'abord. Concern\xE9s : ${ids2}` : `ultra11y verify: ${unrendered.length} criterion(ia) need a rendered page and no page was snapshotted \u2014 they will stay "to assess" whatever happens. Run \`ultra11y scan <url> --merge ${inFlag2}\` first. Affected: ${ids2}`
       );
     }
     if (adjItems.every((it) => it.evidence.length === 0)) {
@@ -78103,9 +78428,9 @@ function cmdVerifyWorklist(p, langIn) {
   return 0;
 }
 function trialAnchorFallbacks(p, standard, passing) {
-  const ids = [...new Set(passing.filter((it) => it.kind === "c").map((it) => it.criteriaId))];
+  const ids2 = [...new Set(passing.filter((it) => it.kind === "c").map((it) => it.criteriaId))];
   const inFlag = p.flags.in;
-  if (!ids.length || typeof inFlag !== "string" || !inFlag || inFlag === "-") return void 0;
+  if (!ids2.length || typeof inFlag !== "string" || !inFlag || inFlag === "-") return void 0;
   let audit2;
   try {
     audit2 = unwrapAudit(JSON.parse(readText(inFlag)));
@@ -78113,7 +78438,7 @@ function trialAnchorFallbacks(p, standard, passing) {
     return void 0;
   }
   const cwd = typeof p.flags.cwd === "string" ? p.flags.cwd : void 0;
-  const evidence = evidenceForCriteria(audit2, ids, { cwd, standard });
+  const evidence = evidenceForCriteria(audit2, ids2, { cwd, standard });
   const { citationDrift } = adjudicationLimits(cwd);
   return (it, cite) => evidenceFallback(evidence.get(it.criteriaId) ?? [], cite, citationDrift).fallback;
 }

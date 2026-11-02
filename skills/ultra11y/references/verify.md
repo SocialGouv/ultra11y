@@ -93,6 +93,35 @@ is NOT tried is the one the engine's own absence fold already proves — every s
 criterion is an element species (`<img>`, `<table>`, a form control…) and none exists anywhere in
 the scope.
 
+### The counter-review summary — `verify --summary`
+
+```
+node scripts/ultra11y.mjs verify --summary --verdicts VERIFY.filled.json --report audits/rgaa-YYYY-MM-DD.md \
+  --in audit.json --standard rgaa [--pruned pruned/audit-latest.json] [--out <dir>] [--json]
+```
+Writes `TRIAL.md` (or the same data as JSON on stdout): the bilan of one trial, **read-only**. It
+names the audit, verdicts, report and pruned audit it was built from (path, date, sha256), then
+separates:
+
+- **coverage** — claims expected from this report and this `--in` audit, covered, missing, and
+  *foreign* (verdicts for claims this audit does not make: a list drawn from another audit);
+- **verdicts**, counted in claims per kind (non-conformity / claimed conformity) — `supported`,
+  `partial`, `refuted`, `unsupported`, blank, invalid, missing — with the distinct criteria apart;
+- **confirmed findings** (`supported`/`partial`), each with its note;
+- **withdrawals applied** — an agent judgement `--prune` withdrew, shown applied only when the
+  `--pruned` audit no longer carries it; without `--pruned` every withdrawal is listed as *not
+  shown applied*;
+- **contested engine decisions — unresolved** (`skippedEngine`): `--prune` leaves them in the audit
+  and the report on purpose; the bilan never turns them into a conformity or a confirmed finding;
+- **never tried** claims;
+- **the semantic gate** (`check --semantic` on this report and these verdicts) **apart from** the
+  verdicts' application (`verify --apply … --prune` accepted or refused).
+
+The headline says « counter-review run — audit NOT validated » until the gate is green with
+nothing missing, foreign or contested. All three inputs are required — no ledger and no
+`VERIFY.todo.json` next to the report is ever picked up — and the command exits 0 once the bilan is
+written: it is a report, `check --semantic` stays the gate.
+
 ## `verify --manual` — adjudicate the residual (judgment / needs-rendering) criteria
 
 The **AI agent** decides the `manual` criteria itself, gated. Run from the audit's cwd
