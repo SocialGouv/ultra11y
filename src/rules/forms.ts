@@ -66,7 +66,10 @@ const controlLabelMissing: Rule = {
       // caller renders: the shared-component pattern. Nothing in this document can prove the
       // field unlabelled, and a blocking NC on it is a guess (#94). The rendered tier, where
       // ids are resolved, decides — `axe:label` and this very rule on the page snapshots.
-      if ((attr(el, "id") ?? "").includes("{")) continue;
+      // Same for a framework-bound id (Vue `:id="inputId"`, `v-bind:id`), where the literal
+      // attribute is absent (#115).
+      const id = attr(el, "id");
+      if (id === undefined ? hasBoundAttr(el, "id") : id.includes("{")) continue;
       out.push({
         criteriaId: "4.1.2",
         el,

@@ -48646,12 +48646,12 @@ var PROBE_KEYS = {
   "4.1.3": ["liveRegion"]
 };
 var MEASURED_SCS = ["1.3.4", "1.4.1", "1.4.3", "1.4.4", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
-var insideRoleImg = (e) => ancestors(e).some((a) => (attr(a, "role") ?? "").trim().toLowerCase() === "img");
+var insideRoleImg = (e) => ancestors(e).some((a) => roleOf(a) === "img");
 var SUBJECTS = {
   // Every image-like element and the alternative it carries. Class = (alt, src): the same
   // logo on 38 pages is one decision, not 38.
   images: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas").concat(elementsByTag(d, "input").filter((e) => (attr(e, "type") ?? "").trim().toLowerCase() === "image")).concat(d.elements.filter((e) => attr(e, "role") === "img")).filter((e, i2, a) => a.indexOf(e) === i2 && !insideRoleImg(e)).map((e) => {
+    (d) => elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas").concat(elementsByTag(d, "input").filter((e) => (attr(e, "type") ?? "").trim().toLowerCase() === "image")).concat(d.elements.filter((e) => roleOf(e) === "img")).filter((e, i2, a) => a.indexOf(e) === i2 && !insideRoleImg(e)).map((e) => {
       const extra = ["title", "aria-labelledby", "aria-hidden", "role", "aria-describedby", "longdesc"].filter((a) => attr(e, a) !== void 0).map((a) => ` ${a}="${(attr(e, a) ?? "").slice(0, 60)}"`).join("");
       const figure = ancestors(e).some((a) => a.tag === "figure");
       return h(
@@ -50070,8 +50070,10 @@ function visibleLabelText(el) {
   return collapse(out2);
 }
 var NOT_INTITULE_CLASS = /(^|\s)(fr-hint-text|fr-sr-only|sr-only|visually-hidden|visuallyhidden|hint-text|help-text)(\s|$)/;
+var VISUALLY_HIDDEN_CLASS = /(^|\s)(fr-sr-only|sr-only|visually-hidden|visuallyhidden)(\s|$)/;
 var FIELD_DESCENDANT = /* @__PURE__ */ new Set(["input", "select", "textarea", "button", "datalist", "output"]);
 function primaryLabelText(label) {
+  if ([label, ...ancestors(label)].some((e) => VISUALLY_HIDDEN_CLASS.test(attr(e, "class") ?? ""))) return "";
   let out2 = "";
   const nonText = /* @__PURE__ */ new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img", "svg"]);
   const walk3 = (n) => {
@@ -50340,7 +50342,7 @@ var figureCaptionUnassociated = {
     for (const el of doc.elements) {
       if (el.tag !== "figure" || isHidden(el) || hasDynamicSpread(el)) continue;
       const desc = descendants(el);
-      const caption = desc.find((d) => d.tag === "figcaption");
+      const caption = desc.find((d) => d.tag === "figcaption" && ancestors(d).find((a) => a.tag === "figure") === el);
       if (!caption || !desc.some((d) => d !== caption && isCaptionedImage(d) && !ancestors(d).includes(caption))) continue;
       const captionText = collapseWs(textContent(caption));
       if (!captionText || captionText.includes("{") || mayInjectContent(caption)) continue;
@@ -51017,7 +51019,9 @@ var menuitemEmptyName = {
   criteria: ["4.1.2"],
   severity: "bloquant",
   run(doc) {
-    return doc.elements.filter((el) => ["menuitem", "menuitemcheckbox", "menuitemradio"].includes((attr(el, "role") ?? "").trim().toLowerCase())).filter((el) => !isHiddenFromAT(el) && !hasDynamicSpread(el) && !mayInjectContent(el) && accessibleName(el, doc).trim() === "").map((el) => ({ criteriaId: "4.1.2", el, msgId: "menuitem-empty-name" }));
+    return doc.elements.filter((el) => ["menuitem", "menuitemcheckbox", "menuitemradio"].includes((attr(el, "role") ?? "").trim().toLowerCase())).filter(
+      (el) => !isHiddenFromAT(el) && !hasDynamicSpread(el) && !mayInjectContent(el) && !labelledbyIsDynamic(el) && accessibleName(el, doc).trim() === ""
+    ).map((el) => ({ criteriaId: "4.1.2", el, msgId: "menuitem-empty-name" }));
   }
 };
 var nestedInteractive = {
@@ -51693,6 +51697,9 @@ var ALLOWED_IN_LIST = /* @__PURE__ */ new Set(["li", "script", "template", "slot
 function rendersElsewhere(tag) {
   return !isIntrinsic(tag) || tag.includes("-") || tag === "component";
 }
+function listChildren(el) {
+  return el.children.flatMap((c2) => c2.type !== "element" ? [] : c2.tag === "#fragment" ? listChildren(c2) : [c2]);
+}
 var listStructure = {
   id: "list-structure",
   criteria: ["1.3.1"],
@@ -51701,8 +51708,8 @@ var listStructure = {
     const out2 = [];
     for (const el of doc.elements) {
       if (el.tag === "ul" || el.tag === "ol") {
-        const bad = el.children.find((c2) => c2.type === "element" && !rendersElsewhere(c2.tag) && !ALLOWED_IN_LIST.has(c2.tag));
-        if (bad && bad.type === "element") {
+        const bad = listChildren(el).find((c2) => !rendersElsewhere(c2.tag) && !ALLOWED_IN_LIST.has(c2.tag));
+        if (bad) {
           out2.push({
             criteriaId: "1.3.1",
             el: bad,
@@ -51716,7 +51723,7 @@ var listStructure = {
         if (parent.tag === "template" || ancestors(el).some((a) => a.tag === "template" || a.tag !== "#fragment" && rendersElsewhere(a.tag))) continue;
         let host = parent;
         while (host && host.tag === "#fragment") host = host.parent;
-        if (!host) continue;
+        if (!host || ["ul", "ol", "menu"].includes(host.tag)) continue;
         out2.push({
           criteriaId: "1.3.1",
           el,
@@ -52450,7 +52457,8 @@ var controlLabelMissing = {
       if (via === "title") continue;
       if (hasDynamicSpread(el)) continue;
       if (hasAttr(el, "placeholder")) continue;
-      if ((attr(el, "id") ?? "").includes("{")) continue;
+      const id = attr(el, "id");
+      if (id === void 0 ? hasBoundAttr(el, "id") : id.includes("{")) continue;
       out2.push({
         criteriaId: "4.1.2",
         el,

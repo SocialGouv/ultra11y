@@ -512,7 +512,7 @@ const MEASURED_SCS = ["1.3.4", "1.4.1", "1.4.3", "1.4.4", "1.4.10", "1.4.11", "1
  *  nothing below it — no alt, no aria-label, no text — is in the accessibility tree. The
  *  container IS the image. Only `img`: the children of a `button` or a `tab` still give their
  *  text, and an image's alt, to the accessible name (#108). */
-const insideRoleImg = (e: El): boolean => ancestors(e).some((a) => (attr(a, "role") ?? "").trim().toLowerCase() === "img");
+const insideRoleImg = (e: El): boolean => ancestors(e).some((a) => roleOf(a) === "img");
 
 export const SUBJECTS: Record<string, Subject> = {
   // Every image-like element and the alternative it carries. Class = (alt, src): the same
@@ -522,7 +522,7 @@ export const SUBJECTS: Record<string, Subject> = {
       elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas")
         // RGAA 1.1.3 is about nothing else: an image button is an image.
         .concat(elementsByTag(d, "input").filter((e) => (attr(e, "type") ?? "").trim().toLowerCase() === "image"))
-        .concat(d.elements.filter((e) => attr(e, "role") === "img"))
+        .concat(d.elements.filter((e) => roleOf(e) === "img"))
         .filter((e, i, a) => a.indexOf(e) === i && !insideRoleImg(e))
         .map((e) => {
           // The other mechanisms the RGAA tests name, when present — an image's verdict turns

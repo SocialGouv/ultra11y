@@ -234,7 +234,9 @@ const figureCaptionUnassociated: Rule = {
     for (const el of doc.elements) {
       if (el.tag !== "figure" || isHidden(el) || hasDynamicSpread(el)) continue;
       const desc = descendants(el);
-      const caption = desc.find((d) => d.tag === "figcaption");
+      // Only this figure's own caption: a nested figure's <figcaption> belongs to that figure
+      // (its nearest figure ancestor), never to the outer one (#115).
+      const caption = desc.find((d) => d.tag === "figcaption" && ancestors(d).find((a) => a.tag === "figure") === el);
       if (!caption || !desc.some((d) => d !== caption && isCaptionedImage(d) && !ancestors(d).includes(caption))) continue;
       const captionText = collapseWs(textContent(caption));
       if (!captionText || captionText.includes("{") || mayInjectContent(caption)) continue;

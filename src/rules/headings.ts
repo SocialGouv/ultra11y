@@ -143,6 +143,12 @@ function rendersElsewhere(tag: string): boolean {
   return !isIntrinsic(tag) || tag.includes("-") || tag === "component";
 }
 
+/** The element children a list renders: a `#fragment` is transparent, its own children stand
+ *  in its place (#115). */
+function listChildren(el: El): El[] {
+  return el.children.flatMap((c) => (c.type !== "element" ? [] : c.tag === "#fragment" ? listChildren(c) : [c]));
+}
+
 const listStructure: Rule = {
   id: "list-structure",
   criteria: ["1.3.1"],
@@ -154,8 +160,10 @@ const listStructure: Rule = {
         // Only intrinsic (HTML) children are a definite violation; a PascalCase
         // component child may itself render an <li>, so it is left to the cross-file
         // graph / human, never asserted here.
-        const bad = el.children.find((c) => c.type === "element" && !rendersElsewhere(c.tag) && !ALLOWED_IN_LIST.has(c.tag));
-        if (bad && bad.type === "element") {
+        // A fragment (`{open && (<><li/></>)}`) renders its children in its place: it is
+        // transparent, so the list's real children are those it carries (#115).
+        const bad = listChildren(el).find((c) => !rendersElsewhere(c.tag) && !ALLOWED_IN_LIST.has(c.tag));
+        if (bad) {
           out.push({
             criteriaId: "1.3.1",
             el: bad,
@@ -175,7 +183,7 @@ const listStructure: Rule = {
         // Only a fragment nested inside a known element still has a provable parent.
         let host: typeof parent | null = parent;
         while (host && host.tag === "#fragment") host = host.parent;
-        if (!host) continue;
+        if (!host || ["ul", "ol", "menu"].includes(host.tag)) continue;
         out.push({
           criteriaId: "1.3.1",
           el,
