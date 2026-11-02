@@ -308,10 +308,18 @@ export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFoc
 // Pass 2 (after each Tab): is the active element a tagged focusable whose focus PROXY
 // (itself, or its label for a custom control) is UNCHANGED vs the unfocused snapshot?
 // If so, focus produced no visible indicator.
+/** The custom elements frameworks inject in DEVELOPMENT only — their focusable controls live
+ *  in a shadow root and are no part of the audited product (#127). */
+export const DEV_TOOL_HOSTS: readonly string[] = ["nextjs-portal", "vite-error-overlay", "astro-dev-toolbar", "nuxt-devtools-container", "nuxt-devtools"];
+
 export const FOCUS_CHECK_PROBE = `(() => {
   const e = document.activeElement;
   // FOCUS LEFT THE DOCUMENT — the normal end of a tab ring, and nothing to measure.
   if (!e || e === document.body || e === document.documentElement) return null;
+  // A FRAMEWORK'S DEV-TOOLS OVERLAY is not the product (#127): Next's <nextjs-portal> holds a
+  // focusable button in its shadow root, and counting it as an untagged stop refused every page
+  // captured under a dev server. Not compared, not counted; the walk goes on.
+  if (${JSON.stringify(DEV_TOOL_HOSTS)}.indexOf((e.localName || '').toLowerCase()) >= 0) return { devTools: true, key: '', changed: true, selector: '', html: '' };
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
   // FOCUS IS ON SOMETHING THE SETUP NEVER TAGGED, which is a different fact entirely and used
   // to be reported as the same one. A skip link revealed only on focus, a widget that moves
@@ -509,8 +517,15 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
       break;
     }
     await page.keyboard.press("Tab");
-    const r = (await page.evaluate(FOCUS_CHECK_PROBE)) as { key: string; changed: boolean; selector: string; html: string; untagged?: boolean } | null;
-    if (!r) continue;
+    const r = (await page.evaluate(FOCUS_CHECK_PROBE)) as {
+      key: string;
+      changed: boolean;
+      selector: string;
+      html: string;
+      untagged?: boolean;
+      devTools?: boolean;
+    } | null;
+    if (!r || r.devTools) continue;
     // Tab landed on a focusable the setup never tagged. Nothing here can be measured, and the
     // walk must not later claim it crossed the whole ring: a skip link that only appears on
     // focus is exactly the control this criterion is about.
@@ -635,6 +650,7 @@ function tabPressBudget(count: number, limits: ProbeLimits): number {
 export const FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const e = document.activeElement;
   if (!e || e === document.body || e === document.documentElement) return null;
+  if (${JSON.stringify(DEV_TOOL_HOSTS)}.indexOf((e.localName || '').toLowerCase()) >= 0) return null; // dev tooling, not the product (#127)
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
   const stops = ${JSON.stringify(NATIVE_SEGMENT_STOPS)};
   const type = e.tagName === 'INPUT' ? (e.getAttribute('type') || 'text').toLowerCase() : '';

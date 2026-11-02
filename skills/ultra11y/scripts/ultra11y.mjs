@@ -37967,10 +37967,15 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
   return { n: n, total: total };
 })()`;
 }
+var DEV_TOOL_HOSTS = ["nextjs-portal", "vite-error-overlay", "astro-dev-toolbar", "nuxt-devtools-container", "nuxt-devtools"];
 var FOCUS_CHECK_PROBE = `(() => {
   const e = document.activeElement;
   // FOCUS LEFT THE DOCUMENT \u2014 the normal end of a tab ring, and nothing to measure.
   if (!e || e === document.body || e === document.documentElement) return null;
+  // A FRAMEWORK'S DEV-TOOLS OVERLAY is not the product (#127): Next's <nextjs-portal> holds a
+  // focusable button in its shadow root, and counting it as an untagged stop refused every page
+  // captured under a dev server. Not compared, not counted; the walk goes on.
+  if (${JSON.stringify(DEV_TOOL_HOSTS)}.indexOf((e.localName || '').toLowerCase()) >= 0) return { devTools: true, key: '', changed: true, selector: '', html: '' };
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
   // FOCUS IS ON SOMETHING THE SETUP NEVER TAGGED, which is a different fact entirely and used
   // to be reported as the same one. A skip link revealed only on focus, a widget that moves
@@ -38091,7 +38096,7 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
     }
     await page.keyboard.press("Tab");
     const r = await page.evaluate(FOCUS_CHECK_PROBE);
-    if (!r) continue;
+    if (!r || r.devTools) continue;
     if (r.untagged) {
       untagged++;
       continue;
@@ -38142,6 +38147,7 @@ function tabPressBudget(count, limits) {
 var FOCUS_WHERE_PROBE = `(() => { ${PRELUDE}
   const e = document.activeElement;
   if (!e || e === document.body || e === document.documentElement) return null;
+  if (${JSON.stringify(DEV_TOOL_HOSTS)}.indexOf((e.localName || '').toLowerCase()) >= 0) return null; // dev tooling, not the product (#127)
   const key = e.getAttribute && e.getAttribute('data-u11y-f');
   const stops = ${JSON.stringify(NATIVE_SEGMENT_STOPS)};
   const type = e.tagName === 'INPUT' ? (e.getAttribute('type') || 'text').toLowerCase() : '';
