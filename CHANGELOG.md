@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.55.2](https://github.com/SocialGouv/ultra11y/compare/v5.55.1...v5.55.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **rules:** a fragment inside a list, a bound id or labelledby, an sr-only label and a nested figure's caption are no longer findings ([#120](https://github.com/SocialGouv/ultra11y/issues/120)) ([cecd78e](https://github.com/SocialGouv/ultra11y/commit/cecd78ee0b91994f0cc160b5aa3f338391562f48))
+
 ## [5.55.1](https://github.com/SocialGouv/ultra11y/compare/v5.55.0...v5.55.1) (2026-11-02)
 
 
