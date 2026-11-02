@@ -3,7 +3,7 @@
 // The generic machinery (directory walking, glob → RegExp) is the vendored
 // codeindex engine's; everything ultra11y-specific (markup extension allowlist,
 // test-artifact policy, audit-output skips, input-scope matching) stays here.
-import { existsSync, statSync } from "node:fs";
+import { type Dirent, existsSync, readdirSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
 import { ext } from "./util.js";
 import { compileGlobs as engineCompileGlobs, walk as engineWalk } from "./vendor/codeindex-engine.mjs";
@@ -123,6 +123,35 @@ function walk(dir: string, acc: string[]): void {
   }
 }
 
+// DOWNLOADABLE DOCUMENTS. The engine's walk skips binaries, PDFs included — right for a markup
+// audit, and the reason a directory input never pulls in every PDF a repository happens to hold.
+// A PDF is audited only when it is ASKED for: named directly, or matched by a glob that names the
+// `.pdf` extension itself (`docs/**/*.pdf`, `.ultra11y/documents/*.pdf`). Such a glob gets this
+// small walk of its own, pruned like the engine's (VCS and dependency dirs, ultra11y's outputs).
+const PDF_GLOB = /\.pdf$/i;
+const PDF_WALK_SKIP = new Set(["node_modules", ".git", ".hg", ".svn"]);
+const PDF_WALK_MAX = 10_000;
+function walkPdfs(dir: string): string[] {
+  const out: string[] = [];
+  const stack: { abs: string; depth: number }[] = [{ abs: dir, depth: 0 }];
+  while (stack.length && out.length < PDF_WALK_MAX) {
+    const { abs, depth } = stack.pop()!;
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(abs, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      const p = join(abs, e.name);
+      if (e.isDirectory()) {
+        if (depth < 32 && !PDF_WALK_SKIP.has(e.name) && !SKIP_DIR.has(e.name)) stack.push({ abs: p, depth: depth + 1 });
+      } else if (e.isFile() && PDF_GLOB.test(e.name)) out.push(p);
+    }
+  }
+  return out;
+}
+
 function staticBase(glob: string): string {
   const idx = glob.search(/[*?]/);
   const head = idx === -1 ? glob : glob.slice(0, idx);
@@ -169,6 +198,10 @@ export function expandInputs(inputs: string[], opts: ExpandOpts = {}): string[] 
       // A positional glob input is ONE glob (no comma-splitting — that is an
       // --include/--exclude flag affordance), compiled by the engine.
       const match = engineCompileGlobs([input])!;
+      if (PDF_GLOB.test(input)) {
+        for (const f of walkPdfs(staticBase(input))) if (match(toPosix(f))) files.add(f);
+        continue;
+      }
       const acc = walkCached(staticBase(input), opts);
       // Honour the markup allowlist for globs too — a broad `src/**` must not pull
       // in .js/.css/.json and parse them as HTML (engine scope is markup only).
@@ -177,7 +210,7 @@ export function expandInputs(inputs: string[], opts: ExpandOpts = {}): string[] 
       if (statSync(input).isDirectory()) {
         const acc = walkCached(input, opts);
         for (const f of acc) if (exts.has(ext(f))) files.add(f);
-      } else if (exts.has(ext(input))) {
+      } else if (exts.has(ext(input)) || PDF_GLOB.test(input)) {
         files.add(input);
         explicit.add(input);
       }

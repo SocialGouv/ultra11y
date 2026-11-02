@@ -12,7 +12,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 1.1.1 | Non-text Content | A | judgment | img-alt-missing, canvas-fallback-missing, decorative-alt-misuse, decorative-marked-exposed, input-image-alt-missing, object-embed-no-name, chart-no-accessible-name, figure-caption-unassociated | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.9, 4.7, 4.8, 4.9, 6.1, 6.2, 7.2, 10.2, 13.3, 13.4, 13.5, 13.6 |
+| 1.1.1 | Non-text Content | A | judgment | img-alt-missing, canvas-fallback-missing, decorative-alt-misuse, decorative-marked-exposed, input-image-alt-missing, object-embed-no-name, chart-no-accessible-name, figure-caption-unassociated, pdf-no-text | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.9, 4.7, 4.8, 4.9, 6.1, 6.2, 7.2, 10.2, 13.3, 13.4, 13.5, 13.6 |
 
 ## 1.2 Time-based Media
 
@@ -28,7 +28,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 1.3.1 | Info and Relationships | A | judgment | fieldset-legend-missing, data-table-no-headers, table-caption-missing, layout-table-data-markup, heading-order-skip, h1-missing, h1-multiple, list-structure, dl-structure, empty-heading, label-for-dangling, missing-main-landmark, multiple-main-landmark, sortable-header-no-aria-sort, nav-landmark-missing, nav-landmark-unnamed, aria-required-parent, headers-attr-dangling, th-no-data-cells, table-scope-invalid, radio-checkbox-group-ungrouped, table-empty-data-cell, css-generated-content-informative, presentational-element, presentational-attribute, presentational-spacing | 3.1, 5.1, 5.2, 5.4, 5.5, 5.6, 5.7, 5.8, 7.3, 8.9, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 11.1, 11.5, 11.6, 11.7, 11.8, 12.6, 13.3, 13.4 |
+| 1.3.1 | Info and Relationships | A | judgment | fieldset-legend-missing, data-table-no-headers, table-caption-missing, layout-table-data-markup, heading-order-skip, h1-missing, h1-multiple, list-structure, dl-structure, empty-heading, label-for-dangling, missing-main-landmark, multiple-main-landmark, sortable-header-no-aria-sort, nav-landmark-missing, nav-landmark-unnamed, aria-required-parent, headers-attr-dangling, th-no-data-cells, table-scope-invalid, radio-checkbox-group-ungrouped, table-empty-data-cell, css-generated-content-informative, presentational-element, presentational-attribute, presentational-spacing, pdf-untagged, pdf-structure-shallow | 3.1, 5.1, 5.2, 5.4, 5.5, 5.6, 5.7, 5.8, 7.3, 8.9, 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 11.1, 11.5, 11.6, 11.7, 11.8, 12.6, 13.3, 13.4 |
 | 1.3.2 | Meaningful Sequence | A | judgment | — | 5.3, 8.10, 10.1, 10.3, 10.8, 13.3, 13.4 |
 | 1.3.3 | Sensory Characteristics | A | judgment | — | 10.9, 10.10 |
 | 1.3.4 | Orientation | AA | needs-rendering | rendered-orientation-lock | 13.9 |
@@ -74,7 +74,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
 | 2.4.1 | Bypass Blocks | A | judgment | skip-link-target-missing, bypass-blocks-missing | 9.1, 12.6, 12.7, 13.3, 13.4 |
-| 2.4.2 | Page Titled | A | static | title-missing-empty | 8.5, 8.6 |
+| 2.4.2 | Page Titled | A | static | title-missing-empty, pdf-title-missing | 8.5, 8.6 |
 | 2.4.3 | Focus Order | A | judgment | positive-tabindex | 10.3, 12.7, 12.8, 13.3, 13.4 |
 | 2.4.4 | Link Purpose (In Context) | A | judgment | link-empty-name, icon-only-control-unnamed | 6.1, 6.2 |
 | 2.4.5 | Multiple Ways | AA | judgment | — | 12.1, 12.3, 12.4 |
@@ -97,7 +97,7 @@ criteria that map to it. SC ids, titles and levels are derived from the W3C sour
 
 | SC | Title | Level | Automatability | Rules | RGAA |
 |---|---|---|---|---|---|
-| 3.1.1 | Language of Page | A | static | html-lang-missing, document-language-missing, html-lang-xml-lang-mismatch, lang-invalid | 8.3, 8.4, 13.3, 13.4 |
+| 3.1.1 | Language of Page | A | static | html-lang-missing, document-language-missing, html-lang-xml-lang-mismatch, lang-invalid, pdf-lang-missing | 8.3, 8.4, 13.3, 13.4 |
 | 3.1.2 | Language of Parts | AA | judgment | inline-lang-change-missing, lang-invalid | 8.7, 8.8 |
 
 ## 3.2 Predictable

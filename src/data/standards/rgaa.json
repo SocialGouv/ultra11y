@@ -5745,14 +5745,45 @@
       ],
       "wcag": ["1.1.1", "1.3.1", "1.3.2", "2.4.1", "2.4.3", "3.1.1", "4.1.2"],
       "appliesTo": {
-        "ruleIds": []
+        "ruleIds": ["pdf-lang-missing", "pdf-no-text", "pdf-structure-shallow", "pdf-title-missing", "pdf-untagged"]
       },
       "judgment": true,
       "automation": {
         "tests": {
           "1": "judgment"
         },
-        "rules": []
+        "rules": [
+          {
+            "id": "pdf-lang-missing",
+            "tests": ["1"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "pdf-no-text",
+            "tests": ["1"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "pdf-structure-shallow",
+            "tests": ["1"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "pdf-title-missing",
+            "tests": ["1"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "pdf-untagged",
+            "tests": ["1"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
       }
     },
     {

@@ -154,7 +154,16 @@ const RULE_SC = {
   "field-label-in-name-mismatch": ["2.5.3"],
   "invalid-aria-attr": ["4.1.2"], "invalid-aria-value": ["4.1.2"], "aria-required-attr": ["4.1.2"], "aria-prohibited-attr": ["4.1.2"],
   "dl-structure": ["1.3.1"], "on-input-context-change": ["3.2.2"],
+  // Document rules (src/rules/pdf.ts) — the SC each one evidences in WCAG terms.
+  "pdf-untagged": ["1.3.1"], "pdf-lang-missing": ["3.1.1"], "pdf-title-missing": ["2.4.2"], "pdf-no-text": ["1.1.1"],
+  "pdf-structure-shallow": ["1.3.1"],
 };
+
+// DOCUMENT RULES are routed by rule id, not by success criterion (src/standards/derive.ts): a
+// downloadable document is not the page, and RGAA files every failure of one under 13.3 — whose
+// crosswalk does not include 2.4.2, the SC a PDF's missing title evidences. So the shared-SC
+// self-check below does not apply to them; their single home is stated in RULE_TO_CRITERIA.
+const DOCUMENT_RULES = new Set(["pdf-untagged", "pdf-lang-missing", "pdf-title-missing", "pdf-no-text", "pdf-structure-shallow"]);
 
 // ---- Judgment criteria: RGAA wordings that ask MORE than their WCAG mapping ----
 // A criterion derives its status from the WCAG SCs DINUM's own crosswalk cites, and the
@@ -184,7 +193,7 @@ const JUDGMENT_CRITERIA = {
   // that fails them is the one drawn with no list markup at all. An absence of <ul> is not an
   // absence of lists, so a clean or empty pass must never close 9.3 on its own.
   "9.3": "« les informations regroupées visuellement sous forme de liste » — un regroupement visuel se constate à la lecture ; l’absence de <ul>/<ol>/<dl> ne prouve pas l’absence de liste.",
-  "13.3": "« version accessible du document en téléchargement » — aucune règle moteur ne peut ouvrir le document ; les CS mappés ne portent que sur la page.",
+  "13.3": "« version accessible du document en téléchargement » — les règles pdf-* lisent un PDF téléchargé (balisage, langue, titre, texte extractible, structure) et n'en relèvent que les défauts grossiers ; elles ne voient ni la conformité PDF/UA ni l'existence d'une version alternative accessible, que la condition « si nécessaire » admet.",
   "13.4": "« cette version offre-t-elle la même information ? » — comparaison de deux documents, hors de portée d’un audit de la page.",
 };
 
@@ -324,6 +333,10 @@ const RULE_TO_CRITERIA = {
   // Theme 13 — consultation (13.1 time limits, 13.8 moving/blinking)
   "meta-refresh-redirect": ["13.1"], "blink-marquee": ["13.8"], "autoplay-media": ["4.10"],
   "axe:no-autoplay-audio": ["4.10"], "axe:blink": ["13.8"], "axe:marquee": ["13.8"],
+  // 13.3 — the downloadable documents themselves (src/rules/pdf.ts). CANDIDATE evidence only:
+  // the criterion is met by an accessible alternative version too, which no document check sees.
+  "pdf-untagged": ["13.3"], "pdf-lang-missing": ["13.3"], "pdf-title-missing": ["13.3"], "pdf-no-text": ["13.3"],
+  "pdf-structure-shallow": ["13.3"],
 };
 
 // A rule firing is NOT automatically a complete RGAA failure. Most engine rules are useful
@@ -454,6 +467,10 @@ const CANDIDATE_RULE_TESTS = {
   "13.1|meta-refresh-redirect": ["2"],
   "13.8|axe:blink": ["2"],
   "13.8|axe:marquee": ["1"],
+  "13.3|pdf-untagged": ["1"],
+  "13.3|pdf-lang-missing": ["1"],
+  "13.3|pdf-title-missing": ["1"],
+  "13.3|pdf-no-text": ["1"],
 };
 
 // WHICH CRITERIA MAY BE CONCLUDED FROM A CLEAN ENGINE PASS — the shortest list in this file,
@@ -537,7 +554,7 @@ async function main() {
     const scs = RULE_SC[ruleId]; // undefined for axe:/dyn- (namespaced, not statically validated)
     for (const cid of critIds) {
       if (!wcagById.has(cid)) throw new Error(`RULE_TO_CRITERIA: rule "${ruleId}" → unknown RGAA criterion "${cid}"`);
-      if (scs && !scs.some((sc) => wcagById.get(cid).has(sc))) {
+      if (scs && !DOCUMENT_RULES.has(ruleId) && !scs.some((sc) => wcagById.get(cid).has(sc))) {
         throw new Error(`RULE_TO_CRITERIA: "${ruleId}" (SC ${scs.join(",")}) under RGAA ${cid} (WCAG ${[...wcagById.get(cid)].join(",")}) — no shared SC, entry is inert`);
       }
       (critRules[cid] ||= new Set()).add(ruleId);

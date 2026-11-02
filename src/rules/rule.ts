@@ -61,6 +61,9 @@ export interface Rule {
   // (Finding.advisory) unless a RuleFinding overrides it — it can never flip a criterion
   // to NC. Absent ⇒ normative. See src/rules/headings.ts (h1-missing / h1-multiple).
   advisory?: boolean;
+  // The input this rule reads. Absent ⇒ markup (HTML/JSX/SFC). `pdf` rules run ONLY on a
+  // document Doc (src/rules/pdf.ts), and markup rules never run on one — see `runRules`.
+  input?: "pdf";
   run(doc: Doc): RuleFinding[];
 }
 

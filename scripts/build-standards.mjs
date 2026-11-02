@@ -639,7 +639,7 @@ const NEEDS_RENDERING = new Set([
 // icon-only-control-unnamed) appear under BOTH their SCs so registry's bidirectional
 // rule↔dataset cross-check holds.
 const RULE_SC_COVERAGE = {
-  "1.1.1": ["img-alt-missing", "canvas-fallback-missing", "decorative-alt-misuse", "decorative-marked-exposed", "input-image-alt-missing", "object-embed-no-name", "chart-no-accessible-name", "figure-caption-unassociated"],
+  "1.1.1": ["img-alt-missing", "canvas-fallback-missing", "decorative-alt-misuse", "decorative-marked-exposed", "input-image-alt-missing", "object-embed-no-name", "chart-no-accessible-name", "figure-caption-unassociated", "pdf-no-text"],
   "1.2.2": ["media-no-track"],
   "1.3.1": [
     "fieldset-legend-missing", "data-table-no-headers", "table-caption-missing",
@@ -649,6 +649,8 @@ const RULE_SC_COVERAGE = {
     "headers-attr-dangling", "th-no-data-cells", "table-scope-invalid",
     "radio-checkbox-group-ungrouped", "table-empty-data-cell", "css-generated-content-informative",
     "presentational-element", "presentational-attribute", "presentational-spacing",
+    // Document rules (src/rules/pdf.ts): read on a downloadable PDF, kept out of the page verdict.
+    "pdf-untagged", "pdf-structure-shallow",
   ],
   "1.3.5": ["field-purpose-incomplete", "autocomplete-token-invalid"],
   "1.4.2": ["autoplay-media"],
@@ -662,14 +664,14 @@ const RULE_SC_COVERAGE = {
   "2.2.1": ["meta-refresh-redirect"],
   "2.2.2": ["autoplay-media", "blink-marquee"],
   "2.4.1": ["skip-link-target-missing", "bypass-blocks-missing"],
-  "2.4.2": ["title-missing-empty"],
+  "2.4.2": ["title-missing-empty", "pdf-title-missing"],
   "2.4.3": ["positive-tabindex"],
   "2.4.7": ["rendered-focus-not-visible"],
   "2.4.4": ["link-empty-name", "icon-only-control-unnamed"],
   "2.5.3": ["label-in-name-mismatch", "form-label-in-name-mismatch", "link-label-in-name-mismatch", "field-label-in-name-mismatch"],
   "3.2.2": ["on-input-context-change"],
   "3.3.8": ["credential-entry-blocked"],
-  "3.1.1": ["html-lang-missing", "document-language-missing", "html-lang-xml-lang-mismatch", "lang-invalid"],
+  "3.1.1": ["html-lang-missing", "document-language-missing", "html-lang-xml-lang-mismatch", "lang-invalid", "pdf-lang-missing"],
   "3.1.2": ["inline-lang-change-missing", "lang-invalid"],
   "3.3.1": ["aria-invalid-no-description", "error-not-associated"],
   "3.3.2": ["radio-checkbox-group-ungrouped", "date-fields-ungrouped"],

@@ -610,6 +610,44 @@ export interface ResidualRisk {
   automatability: Automatability;
 }
 
+/** Where a downloadable document came from — set by `scan` (src/documents.ts) in the sidecar
+ *  beside each downloaded file, absent for a PDF named directly as an input. */
+export interface DocumentOrigin {
+  /** The URL it was downloaded from. */
+  url?: string;
+  /** Ids of the page snapshots that link to it — its findings are attributed to each. */
+  pages?: string[];
+}
+
+/** The outcome of one document check. `not-detected` is NOT a pass: it says the reader looked
+ *  and did not observe that failure, which is all an automated document check can say — PDF/UA
+ *  conformance is a validator's verdict (veraPDF, PAC), never this engine's. `not-checked`: the
+ *  check could not run (unreadable file, undecodable content, no structure tree to walk). */
+export type DocumentCheckOutcome = "fail" | "not-detected" | "not-checked";
+
+export interface DocumentAudit extends DocumentOrigin {
+  /** The audited file, exactly as its findings cite it. */
+  file: string;
+  format: "pdf";
+  readable: boolean;
+  /** Why the file could not be read — encrypted, malformed, truncated, too large, not a PDF. */
+  unreadable?: string;
+  detail?: string;
+  version?: string;
+  pageCount: number;
+  tagged: boolean;
+  lang?: string;
+  title?: string;
+  displayDocTitle: boolean;
+  /** Text-showing operators found: yes / no / unknown (content could not be decoded). */
+  text: "yes" | "no" | "unknown";
+  headings?: number;
+  tables?: number;
+  tablesWithoutTh?: number;
+  /** Rule id → outcome, one entry per document rule. */
+  checks: Record<string, DocumentCheckOutcome>;
+}
+
 export interface AuditResult {
   tool: "ultra11y";
   standard: "wcag"; // self-describing: the engine keys on WCAG 2.2 SCs (packs are derived views)
@@ -699,6 +737,16 @@ export interface AuditResult {
   // appliesTo/ruleMatches machinery as engine findings). Optional/additive (no
   // SCHEMA_VERSION bump) — absent/empty ⇒ no pack ran a rule.
   packFindings?: Finding[];
+  // DOWNLOADABLE DOCUMENTS read in this run (PDF files named as inputs, or downloaded by `scan`
+  // into .ultra11y/documents), each with the outcome of every document check. Optional/additive.
+  documents?: DocumentAudit[];
+  // Findings raised by the document rules (src/rules/pdf.ts). Kept SEPARATE from `findings` and
+  // `criteria`, like `packFindings`: a document is not the page that links it, and an accessible
+  // alternative version may exist (WCAG's « conforming alternate version », RGAA 13.3's « si
+  // nécessaire »), so these never decide a WCAG verdict on their own. A pack projection routes
+  // them by rule id onto the criterion that asks about documents (RGAA 13.3), as CANDIDATE
+  // evidence for the adjudicator. Optional/additive — absent when no document was read.
+  documentFindings?: Finding[];
   residualRisks: ResidualRisk[];
   // Automatic static-check pass rate over the machine-DECIDABLE SCs only (the small
   // static set + any judgment SC that fired a definite NC). NOT a full conformance

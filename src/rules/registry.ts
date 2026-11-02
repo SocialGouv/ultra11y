@@ -18,6 +18,7 @@ import { presentationRules } from "./presentation.js";
 import { colorsRules } from "./colors.js";
 import { renderedRules } from "./rendered.js";
 import { timingRules } from "./timing.js";
+import { pdfRules } from "./pdf.js";
 
 export const ALL_RULES: Rule[] = [
   ...colorsRules,
@@ -34,6 +35,7 @@ export const ALL_RULES: Rule[] = [
   ...multimediaRules,
   ...presentationRules,
   ...timingRules,
+  ...pdfRules,
 ];
 
 const SEVERITY_ORDER: Record<string, number> = { bloquant: 0, majeur: 1, mineur: 2 };
@@ -49,8 +51,11 @@ export function ruleIds(): string[] {
 export function runRules(doc: Doc, only?: Set<string>): Finding[] {
   const out: Finding[] = [];
   const fullDoc = isFullDocument(doc);
+  // A PDF is not markup: only the document rules read it, and they read nothing else.
+  const pdf = doc.kind === "pdf";
   for (const rule of ALL_RULES) {
     if (only && !only.has(rule.id)) continue;
+    if ((rule.input === "pdf") !== pdf) continue;
     if (rule.scope === "page" && !fullDoc) continue;
     for (const rf of rule.run(doc)) out.push(toFinding(doc, rule.id, rule.severity, rf, rule.advisory));
   }

@@ -368,7 +368,13 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
     // criterion can actually be non-conformant on. NC is driven by NON-ADVISORY findings
     // only; advisory findings still attach (so the pack report/PRD renders the
     // recommendation) but never flip the criterion to NC.
-    const applicableFindings = allFindings.filter((f) => ruleMatches(f.ruleId, pc.appliesTo!.ruleIds));
+    // DOCUMENT findings (src/rules/pdf.ts) are routed by RULE ID alone. A downloadable document
+    // is not the page, so the page's success-criteria crosswalk says nothing about where its
+    // failures belong — RGAA files every one of them under 13.3, whose WCAG mapping does not even
+    // include 2.4.2 (a PDF's missing title). The pack's `appliesTo` is the curated statement of
+    // which criterion a rule answers, and it is the only gate applied here.
+    const docFindings = (audit.documentFindings ?? []).filter((f) => ruleMatches(f.ruleId, pc.appliesTo!.ruleIds)).map((f) => overrideFinding(f, overrides));
+    const applicableFindings = [...allFindings.filter((f) => ruleMatches(f.ruleId, pc.appliesTo!.ruleIds)), ...docFindings];
     const contractFor = (ruleId: string) => pc.automation?.rules.find((rule) => ruleMatches(ruleId, [rule.id]));
     const candidateFindings = pc.automation ? applicableFindings.filter((f) => !f.advisory && contractFor(f.ruleId)?.effect === "candidate") : [];
     const findings = pc.automation ? applicableFindings.filter((f) => f.advisory || contractFor(f.ruleId)?.effect !== "candidate") : applicableFindings;

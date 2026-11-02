@@ -2,7 +2,8 @@
 // tree that the rules walk. Zero runtime deps beyond htmlparser2 (bundled).
 import { parseDocument } from "htmlparser2";
 import type { Document, ChildNode, Element as DhElement } from "domhandler";
-import type { RenderSignals } from "../types.js";
+import type { DocumentOrigin, RenderSignals } from "../types.js";
+import type { PdfFacts } from "./pdf.js";
 
 export interface El {
   type: "element";
@@ -42,7 +43,13 @@ export interface Doc {
   // single-file component (.vue/.svelte/.astro) template — parsed as HTML but with
   // component case PRESERVED (so PascalCase components are skipped like in JSX).
   // Optional/additive so existing AuditResult JSON and direct parseHtml callers stay valid.
-  kind?: "html" | "jsx-ast" | "jsx-lossy" | "sfc";
+  // `pdf` is a downloadable DOCUMENT read by src/parse/pdf.ts: no markup at all (`elements` is
+  // empty), its facts in `pdf`, and only the `input: "pdf"` rules run on it (registry.ts).
+  kind?: "html" | "jsx-ast" | "jsx-lossy" | "sfc" | "pdf";
+  // Set on a `pdf` Doc: what the reader established about the file, and where it came from
+  // (the URL `scan` downloaded it from, the pages that link it). See src/documents.ts.
+  pdf?: PdfFacts;
+  document?: DocumentOrigin;
   // JSX only: import specifiers of component-LIBRARY components rendered in this
   // file (e.g. "@codegouvfr/react-dsfr/Button"). Their real HTML output lives in
   // node_modules and is invisible to source analysis — a source verdict is

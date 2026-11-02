@@ -53,6 +53,12 @@ const OUT_OF_SCOPE: Record<string, string> = {
   "rendered-link-colour-only": "needs a snapshot's computed styles — tests/browser-tier.e2e.test.ts",
   "rendered-focus-not-visible": "needs a snapshot's stylesheet rules — tests/browser-tier.e2e.test.ts",
   "rendered-orientation-lock": "needs a snapshot's stylesheet rules — tests/browser-tier.e2e.test.ts",
+  // Document rules. Their input is a PDF file, and this fixture is a site's markup.
+  "pdf-untagged": "reads a PDF document, not markup — tests/pdf.test.ts (tests/fixtures/pdf)",
+  "pdf-lang-missing": "reads a PDF document, not markup — tests/pdf.test.ts (tests/fixtures/pdf)",
+  "pdf-title-missing": "reads a PDF document, not markup — tests/pdf.test.ts (tests/fixtures/pdf)",
+  "pdf-no-text": "reads a PDF document, not markup — tests/pdf.test.ts (tests/fixtures/pdf)",
+  "pdf-structure-shallow": "reads a PDF document, not markup — tests/pdf.test.ts (tests/fixtures/pdf)",
 };
 
 /** The pack rule that only a CAPTURE can raise: it is gated on the `doctype` signal, which a

@@ -59,7 +59,8 @@ describe("a country standard's own criteria", () => {
     // is the difference between a plan and a false sense of coverage. It was 58 until the
     // doctype (8.1) got an instrument of its own; 10.5 correctly lost contrast-ratio rules,
     // because it asks about paired CSS declarations instead.
-    expect(r.counts.noEngineRule).toBe(53);
+    // 52 since 13.3 gained the document rules, which read the downloadable PDF itself.
+    expect(r.counts.noEngineRule).toBe(52);
     expect(r.groups).toHaveLength(13);
   });
 

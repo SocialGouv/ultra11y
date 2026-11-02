@@ -127,6 +127,38 @@ function hAt(doc: Doc, line: number, selector: string, note: string, cls: string
   };
 }
 
+/** One downloadable PDF as an anchor: line 1 of the file (its `%PDF-x.y` header, which grounding
+ *  finds), and a note stating every check — observed, not observed, or not checkable. */
+function pdfDocumentAnchor(doc: Doc): Harvested {
+  const f = doc.pdf;
+  const where = doc.document?.url ?? doc.file;
+  let note: string;
+  if (!f?.readable) {
+    note = `downloadable PDF document ${where} — UNREADABLE (${f?.unreadable ?? "unknown"}${f?.detail ? `: ${f.detail}` : ""}); nothing about it could be established, so it must be opened and judged by hand — is it accessible, or is an accessible alternative offered?`;
+  } else {
+    const s = f.structure;
+    const text = !f.contentScanned ? "unknown" : f.textOps > 0 ? "yes" : f.fonts > 0 ? "unknown" : "no (image-only?)";
+    const facts = [
+      `PDF ${f.version ?? "?"}, ${f.pages} page(s)`,
+      `tagged: ${f.tagged ? "yes" : `no (MarkInfo ${f.marked ? "yes" : "no"}, StructTreeRoot ${f.structTree ? "yes" : "no"})`}`,
+      `language: ${f.lang ?? "none"}`,
+      `title: ${f.title ? `"${f.title.slice(0, 60)}"${f.displayDocTitle ? "" : " (not displayed: DisplayDocTitle false)"}` : "none"}`,
+      `extractable text: ${text}`,
+      ...(s
+        ? [
+            `structure: ${s.elements} element(s), ${s.headings} heading(s), ${s.tables} table(s)${s.tablesWithoutTh ? ` (${s.tablesWithoutTh} without TH)` : ""}`,
+          ]
+        : []),
+    ];
+    note = `downloadable PDF document ${where} — ${facts.join(" · ")} — these checks find gross failures only, never PDF/UA conformance: is the document accessible, or is an accessible alternative (tagged document or HTML) offered?`;
+  }
+  return {
+    ev: { file: doc.file, line: 1, selector: "", snippet: doc.source.slice(0, 160), note },
+    cls: stable(`pdf|${doc.document?.url ?? doc.file}`),
+    at: 0,
+  };
+}
+
 /** A stylesheet rule's declarations as one readable line — the agent judges the rule, so it
  *  must see what the rule actually says. */
 const declsText = (decls: Record<string, string>): string =>
@@ -1352,20 +1384,25 @@ export const SUBJECTS: Record<string, Subject> = {
     ]),
 
   // Office documents offered for download — the subject of "is there an accessible version?".
+  // A PDF the run READ (named as an input, or downloaded by `scan`) is the subject itself: it is
+  // listed with everything the reader established about it, so the adjudicator rules on 13.3
+  // with the document's own checks in front of it rather than the link alone.
   downloadDocs: (docs) =>
     docs.flatMap((d) =>
-      elementsByTag(d, "a")
-        // A `download` link is a download whatever its URL says: an extensionless
-        // `/telecharger?id=3` is still a document handed to the user.
-        .filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? "") || (attr(e, "download") !== undefined && attr(e, "href") !== undefined))
-        .map((e) =>
-          h(
-            d,
-            e,
-            `downloadable document: text="${t(e, 50)}" href="${attr(e, "href")}" — is an accessible version offered, and is it pertinent?`,
-            `download|${t(e, 50)}|${attr(e, "href")}`,
-          ),
-        ),
+      d.kind === "pdf"
+        ? [pdfDocumentAnchor(d)]
+        : elementsByTag(d, "a")
+            // A `download` link is a download whatever its URL says: an extensionless
+            // `/telecharger?id=3` is still a document handed to the user.
+            .filter((e) => DOWNLOAD_HREF.test(attr(e, "href") ?? "") || (attr(e, "download") !== undefined && attr(e, "href") !== undefined))
+            .map((e) =>
+              h(
+                d,
+                e,
+                `downloadable document: text="${t(e, 50)}" href="${attr(e, "href")}" — is an accessible version offered, and is it pertinent?`,
+                `download|${t(e, 50)}|${attr(e, "href")}`,
+              ),
+            ),
     ),
 
   // Content deliberately hidden from one rendering or the other — the subject of "is what is

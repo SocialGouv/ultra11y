@@ -40,7 +40,7 @@ describe("RGAA test-level automation contract", () => {
     expect(readme).toContain("30 `static` tests across 22 criteria");
     expect(readme).toContain("3 `rendered` tests across 3 criteria");
     expect(readme).toContain("24 distinct criteria that can produce a deterministic `NC`");
-    expect(readme).toContain("53 criteria receive a normative engine signal");
+    expect(readme).toContain("54 criteria receive a normative engine signal");
     expect(readme).toContain("225 `judgment` tests across 92 criteria");
     expect(readme).toContain("104 of 106 criteria require adjudication to earn `C`");
   });

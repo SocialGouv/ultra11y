@@ -106,7 +106,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 12.11 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
 | 13.1 | 0 / 0 / 4 | 0 / 1 / 0 | no | AI + signals |
 | 13.2 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
-| 13.3 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
+| 13.3 | 0 / 0 / 1 | 0 / 5 / 0 | no | AI + signals |
 | 13.4 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
 | 13.5 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
 | 13.6 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
@@ -363,7 +363,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 13.1.3 | judgment | — | — |
 | 13.1.4 | judgment | — | — |
 | 13.2.1 | judgment | — | — |
-| 13.3.1 | judgment | — | — |
+| 13.3.1 | judgment | — | `pdf-lang-missing`, `pdf-no-text`, `pdf-structure-shallow`, `pdf-title-missing`, `pdf-untagged` |
 | 13.4.1 | judgment | — | — |
 | 13.5.1 | judgment | — | — |
 | 13.6.1 | judgment | — | — |
