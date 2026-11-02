@@ -170,6 +170,12 @@ const listStructure: Rule = {
         // projected into a parent component's <ul> at render — its real parent is unknown
         // to static analysis, so this is not a definite violation.
         if (parent.tag === "template" || ancestors(el).some((a) => a.tag === "template" || (a.tag !== "#fragment" && rendersElsewhere(a.tag)))) continue;
+        // A fragment at the ROOT of a returned JSX expression has no parent in this file: the
+        // caller decides, typically `<ul>{children}</ul>` (egapro's CompliancePathOptions, #106).
+        // Only a fragment nested inside a known element still has a provable parent.
+        let host: typeof parent | null = parent;
+        while (host && host.tag === "#fragment") host = host.parent;
+        if (!host) continue;
         out.push({
           criteriaId: "1.3.1",
           el,

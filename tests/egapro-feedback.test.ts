@@ -59,6 +59,13 @@ describe("file-upload-labelledby.tsx — a field named by a caller's label is no
   });
 });
 
+describe("fragment-list-items.tsx — the <li>s of a returned fragment belong to the caller's <ul> (#106)", () => {
+  const audit = runAudit({ inputs: [`${FIX}fp/fragment-list-items.tsx`] });
+  it.skipIf(!IMPLEMENTED_PHASES.has("P0"))("raises no list-structure finding", () => {
+    expect(audit.findings.filter((f) => f.ruleId === "list-structure")).toEqual([]);
+  });
+});
+
 describe("axe best-practice channel", () => {
   it.skipIf(!IMPLEMENTED_PHASES.has("P1"))(
     "a best-practice-only axe violation (no wcag* tag) merges as advisory, not a criterion NC — an empty <th> is not an NC under any criterion",

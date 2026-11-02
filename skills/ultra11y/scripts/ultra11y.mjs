@@ -51569,6 +51569,9 @@ var listStructure = {
         const parent = el.parent;
         if (!parent || ["ul", "ol", "menu"].includes(parent.tag)) continue;
         if (parent.tag === "template" || ancestors(el).some((a) => a.tag === "template" || a.tag !== "#fragment" && rendersElsewhere(a.tag))) continue;
+        let host = parent;
+        while (host && host.tag === "#fragment") host = host.parent;
+        if (!host) continue;
         out2.push({
           criteriaId: "1.3.1",
           el,
