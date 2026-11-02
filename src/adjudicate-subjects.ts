@@ -169,6 +169,117 @@ const declsText = (decls: Record<string, string>): string =>
 
 const t = (el: El, n = 60): string => textContent(el).trim().replace(/\s+/g, " ").slice(0, n);
 
+// ---- RENDERED TEXT — what a reader of the page actually sees (#129) ---------------------
+//
+// The text subjects (foreign passages, sensory instructions, quotations, cryptic content) used
+// to read `textContent`, and on a component that is not the page's text. The JSX parser keeps
+// every `{…}` expression container as a raw text node — `{/* RGAA 9.2: … */}` and
+// `{isError && ( <Settings… /> )}` alike — so the « candidate foreign passages » of RGAA
+// 8.7/8.8 were, measured on a real run, 35 of 38 JSX comments and code fragments, and the
+// sensory instructions of 10.9/10.10 mostly code comments. On a capture, the `<script>`
+// payload of a framework (`self.__next_f.push(…)`) was read as a passage in English. Meanwhile
+// the page's one real English phrase (« Do Not Track », on its cookie page) was never shown.
+//
+// So these subjects read RENDERED text: never a comment, never the inside of an element the
+// browser does not render as text, and never a dynamic expression — whose value is unknown and
+// so proves nothing. A string LITERAL inside braces (`{" "}`, `{"Envoyer"}`) does render, and is
+// kept.
+
+/** Elements whose content is never rendered as page text. */
+const NON_RENDERED_TAGS = new Set(["script", "style", "template", "noscript"]);
+
+/** The element, or one of its ancestors, is a non-rendered container — and on a capture, `head`
+ *  holds no page text either. */
+const inNonRendered = (e: El): boolean =>
+  NON_RENDERED_TAGS.has(e.tag) || e.tag === "head" || ancestors(e).some((a) => NON_RENDERED_TAGS.has(a.tag) || a.tag === "head");
+
+/** The string a `{…}` container renders when it wraps a literal, else undefined (a comment, an
+ *  identifier, a call, a conditional: nothing the page is known to show). */
+function literalOfContainer(raw: string): string | undefined {
+  const m = /^\{\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\$]|\\.|\$(?!\{))*)`)\s*\}$/s.exec(raw);
+  if (!m) return undefined;
+  return (m[1] ?? m[2] ?? m[3] ?? "").replace(/\\(.)/g, "$1");
+}
+
+/** Remove every balanced `{…}` group (a lossy-JSX or single-file-component template's
+ *  expressions and mustaches), keeping the literal ones' value. */
+function stripExpressions(s: string): string {
+  let out = "";
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (c === "}" && depth > 0) {
+      depth--;
+      if (depth === 0) out += literalOfContainer(s.slice(start, i + 1)) ?? " ";
+    } else if (depth === 0) out += c;
+  }
+  return out;
+}
+
+/** What one text node renders, in the document it belongs to. */
+function renderedData(doc: Doc, data: string): string {
+  // In a JSX AST a text node that opens on `{` IS an expression container: JSXText cannot hold
+  // a brace.
+  if (doc.kind === "jsx-ast") return data.trimStart().startsWith("{") ? (literalOfContainer(data.trim()) ?? "") : data;
+  if (doc.kind === "jsx-lossy" || doc.kind === "sfc") return stripExpressions(data);
+  return data;
+}
+
+/** The element's OWN rendered text (its direct text children), whitespace-collapsed. */
+function ownRenderedText(doc: Doc, el: El): string {
+  if (inNonRendered(el)) return "";
+  return el.children
+    .filter((c) => c.type === "text")
+    .map((c) => renderedData(doc, (c as { data: string }).data))
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** The element's whole rendered text, descendants included. */
+function renderedText(doc: Doc, el: El): string {
+  const walk = (e: El): string => {
+    let out = "";
+    for (const c of e.children) {
+      if (c.type === "text") out += renderedData(doc, c.data);
+      else if (!NON_RENDERED_TAGS.has(c.tag)) out += walk(c);
+    }
+    return out;
+  };
+  return inNonRendered(el) ? "" : walk(el);
+}
+
+/** `t`, over rendered text. */
+const rt = (doc: Doc, el: El, n = 60): string => renderedText(doc, el).replace(/\s+/g, " ").trim().slice(0, n);
+
+/** Text-carrying props of a COMPONENT. On a component file the text a page shows is often a
+ *  prop (`<Alert description="…">`, `instructionText="…"`), and it is rendered text exactly as
+ *  much as a child is — only literal values: a dynamic one proves nothing. */
+const TEXT_PROP =
+  /^(?:label|title|subtitle|description|desc|hint|hinttext|text|legend|message|caption|heading|helper|helpertext|instructiontext|content|placeholder|tooltip|summary|detail|details|explanation|notice)$/i;
+
+/** Every run of rendered text in a document, with the element it belongs to. */
+function textRuns(doc: Doc): { el: El; text: string }[] {
+  const out: { el: El; text: string }[] = [];
+  const component = doc.kind === "jsx-ast" || doc.kind === "jsx-lossy" || doc.kind === "sfc";
+  for (const e of doc.elements) {
+    if (["title", "head", "html"].includes(e.tag) || inNonRendered(e)) continue;
+    const own = ownRenderedText(doc, e);
+    if (own) out.push({ el: e, text: own });
+    if (component && /^[A-Z]/.test(e.tag)) {
+      for (const [name, value] of Object.entries(e.attribs)) {
+        if (!TEXT_PROP.test(name) || typeof value !== "string" || value.trim() === "" || value.trim().startsWith("{")) continue;
+        out.push({ el: e, text: value.replace(/\s+/g, " ").trim() });
+      }
+    }
+  }
+  return out;
+}
+
 /** Nearest preceding heading text — the context a link/control is read in. */
 function nearestHeading(doc: Doc, el: El): string | undefined {
   const headings = elementsByTag(doc, "h1", "h2", "h3", "h4", "h5", "h6").filter((x) => x.start < el.start);
@@ -290,8 +401,16 @@ const ROUTER_IMPORT =
 // Words that MIGHT signal a passage in another language on a French-language interface. A
 // lead for the agent, never a finding: the decision protocol exempts proper nouns, technical
 // terms and borrowings in common use, and half of these are all three.
+//
+// The English function words are the ones French never spells the same way, so they are what a
+// passage in English is made of — « Do Not Track » carries none of the interface words below and
+// was never shown (#129). `do`, `not`, `of`, `to`… cannot be French words, and the subjects
+// that read this now read rendered text only, so code no longer feeds them.
+//
+// Letter-aware boundaries, not `\b`: JavaScript's `\b` knows only ASCII, so « Isère » read as
+// the English word « is » followed by something else.
 const FOREIGN_LEXICON =
-  /\b(?:the|and|with|your|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)\b/i;
+  /(?<![\p{L}\p{N}_'’-])(?:the|and|with|your|you|our|we|this|that|these|those|from|for|of|to|is|are|was|were|will|would|should|can't|don't|do|does|not|here|there|what|which|who|how|why|when|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)(?![\p{L}\p{N}_'’-])/iu;
 
 const CONTROL_TAGS = ["input", "select", "textarea"] as const;
 // The rest of the glossary's « champ de saisie de formulaire »: the native output elements it
@@ -357,6 +476,9 @@ function bulletParagraphRuns(doc: Doc): El[] {
   }
   return out;
 }
+// A site map, by its address or its name (`navMechanisms` reads links to it with the same words).
+const SITEMAP_ADDRESS = /plan[-_]du[-_]site|sitemap|site[-_]map/i;
+const SITEMAP_TEXT = /\bplan du site\b|\bsite ?map\b/i;
 const INTERACTIVE_TAGS = ["a", "button", "input", "select", "textarea", "summary", "details", "label"];
 
 /** An object/embed is ambiguous until its declared type or resource says what it carries.
@@ -376,6 +498,19 @@ function labelFor(doc: Doc, el: El): string {
   if (lbl) return t(lbl, 40);
   const wrapping = ancestors(el).find((a) => a.tag === "label");
   return wrapping ? t(wrapping, 40) : "";
+}
+
+/** The text `aria-labelledby` points at, when every id it names is in this document — else
+ *  undefined (a dynamic reference, or one resolved in another file: nothing is claimed). */
+function labelledByText(doc: Doc, el: El): string | undefined {
+  const ids = (attr(el, "aria-labelledby") ?? "").trim();
+  if (ids === "" || ids.startsWith("{")) return undefined;
+  const parts = ids.split(/\s+/).map((id) => doc.byId.get(id));
+  if (parts.some((p) => p === undefined)) return undefined;
+  return parts
+    .map((p) => rt(doc, p!, 60))
+    .join(" ")
+    .slice(0, 80);
 }
 
 /** `<label>` as a MARKUP TOKEN on the labelled control.
@@ -412,15 +547,24 @@ function viewportMeta(d: Doc): Harvested[] {
 
 /** Stylesheet evidence for a layout criterion: matching declarations in the source (inline
  *  `<style>`, a component's CSS, inline `style` attributes) and in the captured rules. */
-function cssEvidence(d: Doc, re: RegExp, captured: (r: { selector: string; decls: Record<string, string> }) => boolean, kind: string): Harvested[] {
+function cssEvidence(
+  docs: Doc[],
+  d: Doc,
+  re: RegExp,
+  captured: (r: { selector: string; decls: Record<string, string> }) => boolean,
+  kind: string,
+): Harvested[] {
   return [
     ...linesOf(d, re, 60).map((l) => hAt(d, l.line, "css", `${kind}-relevant declaration: ${l.text}`, `${kind}decl|${l.text}`)),
-    ...(d.signals?.css?.rules ?? [])
+    ...pageRules(docs, d)
       .filter(captured)
       .slice(0, 40)
-      .map((r) => hAt(d, 1, `css:${r.selector}`, `captured rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`, `${kind}css|${r.selector}`)),
+      .map((r) => hAt(d, 1, `css:${r.selector}`, `captured rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }${r.where}`, `${kind}css|${r.selector}`)),
   ];
 }
+
+const SENSORY =
+  /(?<![\p{L}-])(?:ci-dessus|ci-dessous|à droite|a droite|à gauche|a gauche|bouton (?:vert|rouge|bleu)|en rouge|en vert|le carré|la case de droite|above|below|to the right|to the left|green button|red button|round button)(?![\p{L}-])/iu;
 
 const INSTRUCTION =
   /\b(?:cliquez|cliquer|sélectionnez|selectionnez|utilisez|appuyez|touchez|consultez|reportez-vous|remplissez|choisissez|ci-après|ci-contre|ci-dessus|ci-dessous|à droite|à gauche|en haut|en bas|click|select|press|tap|use the|see the|fill in|choose)\b/i;
@@ -514,6 +658,311 @@ const MEASURED_SCS = ["1.3.4", "1.4.1", "1.4.3", "1.4.4", "1.4.10", "1.4.11", "1
  *  text, and an image's alt, to the accessible name (#108). */
 const insideRoleImg = (e: El): boolean => ancestors(e).some((a) => roleOf(a) === "img");
 
+// ---- NON-TEMPORAL MEDIA — RGAA 4.8/4.9 and 4.12/4.13 (#130) ------------------------------
+//
+// 4.8/4.9 had no subject of their own and inherited `images` from WCAG 1.1.1, so they were
+// handed a copy of 1.6's image list — and not the ECharts `<canvas>` charts that ARE the
+// non-temporal media of the site, because those sit inside a `role="img"` container that the
+// image harvest stops at. 4.12/4.13 got every `<svg>` instead, the 67 hidden DSFR pictograms
+// (`<svg aria-hidden="true">`) first: decoration, not media anyone consults.
+
+/** Hidden from assistive technology AND carrying no information of its own: `aria-hidden`,
+ *  `hidden`, or a presentational role, on the element or an ancestor. */
+const hiddenDecoration = (e: El): boolean =>
+  [e, ...ancestors(e)].some((a) => (attr(a, "aria-hidden") ?? "").trim().toLowerCase() === "true" || attr(a, "hidden") !== undefined) ||
+  ["presentation", "none"].includes(roleOf(e));
+
+/** A JSX component that renders a chart — a canvas or SVG the source never shows. */
+const CHART_COMPONENT =
+  /^(?:ReactECharts|EChartsReact|ECharts|ReactApexChart|ApexChart|Chart|ChartJs|Line|Bar|Doughnut|Pie|Radar|Scatter|Bubble|PolarArea|Plot|(?:Bar|Line|Area|Pie|Radar|RadialBar|Scatter|Composed|Funnel|Treemap|Sankey)Chart|Map|MapContainer|Stage)$/;
+
+/** The non-temporal media of a document, one per chart: a `<canvas>`, an outermost `<svg>` that
+ *  is not hidden decoration, a non-temporal `<object>`/`<embed>`, a chart component. Several
+ *  layers of one chart (ECharts draws more than one canvas, Recharts nests SVGs) are ONE medium,
+ *  the container that names it. */
+function nonTemporalMediaOf(d: Doc): { el: El; container?: El; name: string }[] {
+  const out: { el: El; container?: El; name: string }[] = [];
+  const seen = new Set<El>();
+  for (const e of d.elements) {
+    const isMedia =
+      e.tag === "canvas" ||
+      (e.tag === "svg" && !ancestors(e).some((a) => a.tag === "svg")) ||
+      (["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "temporal") ||
+      CHART_COMPONENT.test(e.tag);
+    if (!isMedia || hiddenDecoration(e) || inNonRendered(e)) continue;
+    const container = ancestors(e).find((a) => roleOf(a) === "img" || a.tag === "figure");
+    const key = container ?? e;
+    if (seen.has(key) || ancestors(e).some((a) => seen.has(a))) continue;
+    seen.add(key);
+    const figure = [e, ...ancestors(e)].find((a) => a.tag === "figure");
+    const caption = figure?.children.find((c): c is El => c.type === "element" && c.tag === "figcaption");
+    const candidates = [
+      container && roleOf(container) === "img" ? attr(container, "aria-label") : undefined,
+      attr(e, "aria-label"),
+      attr(e, "title"),
+      caption ? rt(d, caption, 80) : undefined,
+    ].filter((x): x is string => x !== undefined && x.trim() !== "");
+    // A literal name first; a dynamic one (`aria-label={caption}`) is shown as the expression it
+    // is, never as an empty name.
+    const name = candidates.find((x) => !x.trim().startsWith("{")) ?? candidates[0];
+    out.push({ el: e, ...(container ? { container } : {}), name: (name ?? "").replace(/\s+/g, " ").trim().slice(0, 100) });
+  }
+  return out;
+}
+
+const describeMedium = (d: Doc, m: { el: El; container?: El; name: string }): string => {
+  const kind = /^[A-Z]/.test(m.el.tag) ? `chart component <${m.el.tag}>` : `<${m.el.tag}>`;
+  const where = m.container ? ` in <${m.container.tag}${roleOf(m.container) ? ` role="${roleOf(m.container)}"` : ""}>` : "";
+  const fallback = ["canvas", "object", "embed"].includes(m.el.tag) ? rt(d, m.el, 60) : "";
+  return `${kind}${where} name="${m.name}"${fallback ? ` fallback="${fallback}"` : ""}`;
+};
+
+// ---- INFORMATION BY COLOUR — RGAA 3.1 (#130) ---------------------------------------------
+//
+// 3.1 asks whether information is given by colour ALONE. It inherited `colourPairs` and
+// `links`, and on a real run 180 of its 184 entries were links. What it is about — an element
+// whose STATE is drawn in colour: a stepper's current step, a bar coloured above a threshold,
+// a status badge, a field in error — was never surfaced. These are the markup traces such a
+// state leaves: a state attribute, a state modifier class, a class chosen by a condition.
+
+/** A data attribute naming a state, a level or a current position (`data-fr-current-step`). */
+const STATE_DATA_ATTR = /^data-(?:[\w-]*-)?(?:current|active|selected|state|status|level|severity|tone|step)(?:-[\w-]*)?$/i;
+const STATE_WORDS =
+  "active|current|selected|error|success|warning|valid|invalid|danger|done|complete|completed|pending|positive|negative|above|below|over|under|high|low|highlight|highlighted|alert|ok|ko";
+const STATE_SEGMENT = new RegExp(`(?:^|[-_])(?:is-|has-)?(?:${STATE_WORDS})$`, "i");
+const STATE_WHOLE = new RegExp(`^(?:is-|has-)?(?:${STATE_WORDS})$`, "i");
+const STATE_CAMEL = new RegExp(`[a-z](?:${STATE_WORDS.replace(/(^|\|)(\w)/g, (_m, sep: string, c: string) => `${sep}${c.toUpperCase()}`)})$`);
+
+/** The class tokens of an element that name a state (`fr-badge--success`, `is-active`, a CSS
+ *  module's `__dropHigh`). Utility spacing/size tokens never match: the state word must END a
+ *  BEM element or modifier, or the whole token. */
+function stateClasses(e: El): string[] {
+  const raw = attr(e, "class") ?? "";
+  if (raw.trim().startsWith("{")) return [];
+  return raw
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((c) => {
+      // BEM element or modifier (`fr-badge--success`, `Module__hash__dropHigh`): its last part.
+      if (/__|--/.test(c)) {
+        const seg = c.split(/__|--/).pop() ?? "";
+        return STATE_SEGMENT.test(seg) || STATE_CAMEL.test(seg);
+      }
+      // Otherwise only `is-active`/`has-error`, or the bare state word itself.
+      return STATE_WHOLE.test(c);
+    });
+}
+
+// ---- STYLESHEET RULES, ATTRIBUTED TO THE PAGE THAT RENDERS THEM — RGAA 3.3 (#130) ---------
+//
+// A captured page's css.json is the site's whole bundle: Next ships every component's CSS module
+// to every page. Each rule used to be anchored on every page, and the class collapse kept the
+// first — so the rules of FileUpload and DeclarationProcessPanel, which the home page never
+// renders, were all cited at `accueil/dom.html:1`. A rule now goes to the pages whose DOM has
+// an element it can apply to; failing that, to the pages that render its COMPONENT (a CSS
+// module's prefix, a BEM block — the state class `dropzoneDragging` exists only mid-drag, its
+// component is on the page); failing both, it is kept on the first page that carries it and
+// says so. Never dropped: a rule no captured page renders is still a rule of the site.
+
+interface SubjectCompound {
+  tag?: string;
+  ids: string[];
+  classes: string[];
+  attrs: string[];
+}
+
+const compoundCache = new Map<string, SubjectCompound[] | null>();
+
+/** The SUBJECT compound of each selector in a list — the part that names the element the
+ *  declarations land on. Ancestor parts and pseudo-classes are dropped, which can only make it
+ *  match MORE elements, never fewer: an over-approximation is the safe direction here. Null
+ *  when nothing in it can be checked against a DOM (`*`, `:root`, a malformed selector). */
+function subjectCompounds(selector: string): SubjectCompound[] | null {
+  const hit = compoundCache.get(selector);
+  if (hit !== undefined) return hit;
+  const parts: string[] = [];
+  let depth = 0;
+  let cur = "";
+  for (let i = 0; i < selector.length; i++) {
+    const c = selector[i]!;
+    if (c === "\\") {
+      cur += c + (selector[i + 1] ?? "");
+      i++;
+      continue;
+    }
+    if (c === "(" || c === "[") depth++;
+    if (c === ")" || c === "]") depth--;
+    if (c === "," && depth === 0) {
+      parts.push(cur);
+      cur = "";
+    } else cur += c;
+  }
+  parts.push(cur);
+  const out: SubjectCompound[] = [];
+  for (const part of parts) {
+    // The last compound: split on top-level combinators.
+    let last = "";
+    depth = 0;
+    for (let i = 0; i < part.length; i++) {
+      const c = part[i]!;
+      if (c === "\\") {
+        last += c + (part[i + 1] ?? "");
+        i++;
+        continue;
+      }
+      if (c === "(" || c === "[") depth++;
+      if (c === ")" || c === "]") depth--;
+      if (depth === 0 && /[\s>+~]/.test(c)) last = "";
+      else last += c;
+    }
+    // Pseudo-elements and pseudo-classes, with their arguments — but not a colon inside an
+    // attribute selector (`[href^="https:"]`).
+    let bare = "";
+    depth = 0;
+    let inPseudo = false;
+    let inBracket = false;
+    for (let i = 0; i < last.length; i++) {
+      const c = last[i]!;
+      if (c === "\\") {
+        if (!inPseudo) bare += c + (last[i + 1] ?? "");
+        i++;
+        continue;
+      }
+      if (inPseudo) {
+        if (c === "(") depth++;
+        else if (c === ")") depth--;
+        else if (depth === 0 && /[.#[]/.test(c)) {
+          inPseudo = false;
+          inBracket = c === "[";
+          bare += c;
+        }
+        continue;
+      }
+      if (c === "[") inBracket = true;
+      else if (c === "]") inBracket = false;
+      if (c === ":" && !inBracket) {
+        inPseudo = true;
+        depth = 0;
+      } else bare += c;
+    }
+    const unesc = (x: string) => x.replace(/\\(.)/g, "$1");
+    const tag = /^[a-zA-Z][\w-]*/.exec(bare)?.[0]?.toLowerCase();
+    const ids = [...bare.matchAll(/#((?:\\.|[\w-])+)/g)].map((m) => unesc(m[1]!));
+    const classes = [...bare.matchAll(/\.((?:\\.|[\w-])+)/g)].map((m) => unesc(m[1]!));
+    const attrs = [...bare.matchAll(/\[\s*([\w:-]+)/g)].map((m) => m[1]!.toLowerCase());
+    if (!tag && !ids.length && !classes.length && !attrs.length) {
+      compoundCache.set(selector, null);
+      return null;
+    }
+    out.push({ ...(tag ? { tag } : {}), ids, classes, attrs });
+  }
+  compoundCache.set(selector, out);
+  return out;
+}
+
+/** The component a class belongs to: a CSS module's file prefix, else a BEM block. */
+const componentKey = (cls: string): string | undefined => {
+  const m = /^(.+?)__|^(.+?)--/.exec(cls);
+  return m ? (m[1] ?? m[2]) : undefined;
+};
+/** A readable component name, for the note (`FileUpload-module-scss-module__x__y` → FileUpload). */
+const componentName = (cls: string): string | undefined => /^([A-Z][\w]*?)(?:[-_]module\b|_[a-z])/.exec(cls)?.[1];
+
+interface DomIndex {
+  tags: Set<string>;
+  ids: Set<string>;
+  classes: Set<string>;
+  keys: Set<string>;
+  elements: { tag: string; id?: string; classes: Set<string>; attrs: Set<string> }[];
+}
+const domIndexCache = new WeakMap<Doc, DomIndex>();
+function domIndex(d: Doc): DomIndex {
+  const hit = domIndexCache.get(d);
+  if (hit) return hit;
+  const idx: DomIndex = { tags: new Set(), ids: new Set(), classes: new Set(), keys: new Set(), elements: [] };
+  for (const e of d.elements) {
+    const classes = new Set((attr(e, "class") ?? "").split(/\s+/).filter(Boolean));
+    const id = attr(e, "id");
+    idx.tags.add(e.tag);
+    if (id) idx.ids.add(id);
+    for (const c of classes) {
+      idx.classes.add(c);
+      const k = componentKey(c);
+      if (k) idx.keys.add(k);
+    }
+    idx.elements.push({ tag: e.tag, ...(id ? { id } : {}), classes, attrs: new Set(Object.keys(e.attribs).map((a) => a.toLowerCase())) });
+  }
+  domIndexCache.set(d, idx);
+  return idx;
+}
+
+/** Can this rule apply to an element of this page — or, failing that, is its component here? */
+function ruleReach(d: Doc, selector: string): "rendered" | "component" | "absent" {
+  const compounds = subjectCompounds(selector);
+  if (!compounds) return "rendered";
+  const idx = domIndex(d);
+  const matches = (c: SubjectCompound) =>
+    (!c.tag || idx.tags.has(c.tag)) &&
+    c.ids.every((i) => idx.ids.has(i)) &&
+    c.classes.every((k) => idx.classes.has(k)) &&
+    idx.elements.some(
+      (e) => (!c.tag || e.tag === c.tag) && c.ids.every((i) => e.id === i) && c.classes.every((k) => e.classes.has(k)) && c.attrs.every((a) => e.attrs.has(a)),
+    );
+  if (compounds.some(matches)) return "rendered";
+  const component = compounds.some((c) => c.classes.some((k) => idx.classes.has(k) || (componentKey(k) !== undefined && idx.keys.has(componentKey(k)!))));
+  return component ? "component" : "absent";
+}
+
+type CssRule = NonNullable<NonNullable<Doc["signals"]>["css"]>["rules"][number];
+const attributionCache = new WeakMap<Doc[], Map<Doc, { rule: CssRule; reach: "rendered" | "component" | "absent" }[]>>();
+
+/** Every captured rule of every page, kept on the pages it reaches (see above). */
+function attributedRules(docs: Doc[]): Map<Doc, { rule: CssRule; reach: "rendered" | "component" | "absent" }[]> {
+  const hit = attributionCache.get(docs);
+  if (hit) return hit;
+  const out = new Map<Doc, { rule: CssRule; reach: "rendered" | "component" | "absent" }[]>();
+  const placed = new Set<string>();
+  const unplaced = new Map<string, { d: Doc; rule: CssRule }>();
+  for (const d of docs) {
+    const rules = d.signals?.css?.rules;
+    if (!rules) continue;
+    const mine: { rule: CssRule; reach: "rendered" | "component" | "absent" }[] = [];
+    for (const rule of rules) {
+      const key = `${rule.media ?? ""}|${rule.selector}|${JSON.stringify(rule.decls)}`;
+      const reach = ruleReach(d, rule.selector);
+      if (reach === "absent") {
+        if (!unplaced.has(key)) unplaced.set(key, { d, rule });
+        continue;
+      }
+      placed.add(key);
+      mine.push({ rule, reach });
+    }
+    out.set(d, mine);
+  }
+  for (const [key, { d, rule }] of unplaced) if (!placed.has(key)) out.get(d)!.push({ rule, reach: "absent" });
+  attributionCache.set(docs, out);
+  return out;
+}
+
+/** The captured rules attributed to this page, each with what the note should say about it. */
+function pageRules(docs: Doc[], d: Doc): (CssRule & { where: string })[] {
+  return (attributedRules(docs).get(d) ?? []).map(({ rule, reach }) => {
+    const comp = subjectCompounds(rule.selector)
+      ?.flatMap((c) => c.classes)
+      .map(componentName)
+      .find((x) => x !== undefined);
+    const where =
+      reach === "rendered"
+        ? comp
+          ? ` [component ${comp}]`
+          : ""
+        : reach === "component"
+          ? ` [component ${comp ?? "present"} is on this page; the state this rule targets was not captured]`
+          : ` [no captured page renders an element this rule targets — a state class, or a component on a page that was not captured]`;
+    return { ...rule, where };
+  });
+}
+
 export const SUBJECTS: Record<string, Subject> = {
   // Every image-like element and the alternative it carries. Class = (alt, src): the same
   // logo on 38 pages is one decision, not 38.
@@ -598,11 +1047,17 @@ export const SUBJECTS: Record<string, Subject> = {
     docs.flatMap((d) =>
       d.elements.filter(isFormField).map((e) => {
         const native = (CONTROL_TAGS as readonly string[]).includes(e.tag) || FIELD_TAGS.has(e.tag);
+        const labelledBy = labelledByText(d, e);
         return h(
           d,
           e,
-          `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${native ? "" : ` role="${roleOf(e)}"`}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}" title="${attr(e, "title") ?? ""}" required=${attr(e, "required") !== undefined || attr(e, "aria-required") === "true"} describedby="${attr(e, "aria-describedby") ?? ""}"`,
-          `control|${e.tag}|${attr(e, "type") ?? roleOf(e)}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
+          `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${native ? "" : ` role="${roleOf(e)}"`}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}"${labelledBy !== undefined ? ` labelledby-text="${labelledBy}"` : ""} title="${attr(e, "title") ?? ""}" required=${attr(e, "required") !== undefined || attr(e, "aria-required") === "true"} describedby="${attr(e, "aria-describedby") ?? ""}"`,
+          // EVERY naming mechanism is part of the identity (#130). The class used to be the
+          // `<label>` text and the `name` only, so on a step whose fields are named by
+          // `aria-labelledby` — no <label>, no name — every field collapsed into one class with
+          // a step-1 `aria-label` field and travelled as its `alsoAt`: the labels 11.2/11.4/11.5
+          // are ruled on were never shown.
+          `control|${e.tag}|${attr(e, "type") ?? roleOf(e)}|${labelFor(d, e)}|${attr(e, "name") ?? ""}|${attr(e, "aria-label") ?? ""}|${labelledBy ?? attr(e, "aria-labelledby") ?? ""}|${attr(e, "title") ?? ""}|${attr(e, "placeholder") ?? ""}`,
           labelElementTokens(d, e),
         );
       }),
@@ -885,22 +1340,25 @@ export const SUBJECTS: Record<string, Subject> = {
       ),
       ...d.elements
         .filter((e) => e.tag !== "html" && attr(e, "lang") !== undefined)
-        .map((e) => h(d, e, `lang="${attr(e, "lang")}" text="${t(e, 40)}"`, `lang|${attr(e, "lang")}|${t(e, 40)}`)),
-      ...d.elements
+        .map((e) => h(d, e, `lang="${attr(e, "lang")}" text="${rt(d, e, 40)}"`, `lang|${attr(e, "lang")}|${rt(d, e, 40)}`)),
+      // RENDERED text only (#129): a JSX comment, a code fragment or a framework's `<script>`
+      // payload is not a passage of the page. The run is the element's OWN text, so the
+      // candidate is the element that holds the phrase rather than each of its ancestors, and
+      // a phrase already inside a `lang` override is marked.
+      ...textRuns(d)
         .filter(
-          (e) =>
-            e.children.some((c) => c.type === "text" && c.data.trim() !== "") &&
-            FOREIGN_LEXICON.test(textContent(e)) &&
-            attr(e, "lang") === undefined &&
+          ({ el: e, text }) =>
+            FOREIGN_LEXICON.test(text) &&
+            ![e, ...ancestors(e)].some((a) => a.tag !== "html" && attr(a, "lang") !== undefined) &&
             roleOf(e) !== "img" &&
             !insideRoleImg(e),
         )
-        .map((e) =>
+        .map(({ el: e, text }) =>
           h(
             d,
             e,
-            `candidate foreign passage, NOT marked with lang: "${t(e, 60)}" — a proper noun, a technical term or a word in common use is exempt`,
-            `foreign|${t(e, 60)}`,
+            `candidate foreign passage, NOT marked with lang: "${text.slice(0, 80)}" — a proper noun, a technical term or a word in common use is exempt`,
+            `foreign|${text.slice(0, 60)}`,
           ),
         ),
     ]),
@@ -1104,12 +1562,16 @@ export const SUBJECTS: Record<string, Subject> = {
     ]),
 
   // Instructions that lean on a sensory characteristic alone.
+  //
+  // RENDERED text only (#129). This used to match the raw source line, so a component's code
+  // comments (« the legend below it », « pinned to the left of the title ») were handed to
+  // 10.9/10.10 as instructions the page gives. A component's literal text props are rendered
+  // text and stay in.
   sensoryText: (docs) =>
     docs.flatMap((d) =>
-      linesOf(
-        d,
-        /\b(?:ci-dessus|ci-dessous|à droite|a droite|à gauche|a gauche|bouton (?:vert|rouge|bleu)|en rouge|en vert|le carré|la case de droite|above|below|to the right|to the left|green button|red button|round button)\b/i,
-      ).map((l) => hAt(d, l.line, "text", `sensory-sounding instruction: ${l.text}`, `sensory|${l.text}`)),
+      textRuns(d)
+        .filter(({ text }) => SENSORY.test(text))
+        .map(({ el, text }) => h(d, el, `sensory-sounding instruction: "${text.slice(0, 120)}"`, `sensory|${text.slice(0, 100)}`)),
     ),
 
   // Time limits: session expiry, meta refresh, timed redirects.
@@ -1145,6 +1607,101 @@ export const SUBJECTS: Record<string, Subject> = {
       ),
     ]),
 
+  // RGAA 4.8/4.9 — the non-temporal media themselves (#130): a chart drawn in a `<canvas>` or
+  // an SVG, a non-temporal plug-in, a chart component. One per medium, named by the container
+  // that carries its alternative — which is what 4.8 (« a-t-il une alternative ? ») and 4.9
+  // (« est-elle pertinente ? ») are ruled on.
+  nonTemporalMedia: (docs) =>
+    docs.flatMap((d) =>
+      nonTemporalMediaOf(d).map((m) =>
+        h(
+          d,
+          m.el,
+          `${describeMedium(d, m)} — non-temporal media: is an alternative given (adjacent text, a data table, a text description), and does it convey the same information?`,
+          `ntmedia|${m.el.tag}|${m.name}|${attr(m.el, "src") ?? attr(m.el, "data") ?? ""}`,
+        ),
+      ),
+    ),
+
+  // RGAA 3.1 — elements whose STATE the page draws, and so may draw in colour alone (#130).
+  colourState: (docs) =>
+    docs.flatMap((d) =>
+      d.elements
+        .filter((e) => !inNonRendered(e))
+        .flatMap((e) => {
+          const marks: string[] = [];
+          const current = (attr(e, "aria-current") ?? "").trim().toLowerCase();
+          if (current !== "" && current !== "false" && !current.startsWith("{")) marks.push(`aria-current="${current}"`);
+          if ((attr(e, "aria-selected") ?? "").trim().toLowerCase() === "true") marks.push(`aria-selected="true"`);
+          for (const [name, value] of Object.entries(e.attribs)) if (STATE_DATA_ATTR.test(name)) marks.push(`${name}="${String(value).slice(0, 30)}"`);
+          for (const c of stateClasses(e)) marks.push(`class "${c}"`);
+          // A class or a style chosen by a condition — the shape a « coloured above a
+          // threshold » bar takes in a component.
+          for (const a of ["class", "style"]) {
+            const v = (attr(e, a) ?? "").trim();
+            if (v.startsWith("{") && /\?[^?:]*:|&&/.test(v)) marks.push(`${a} chosen by a condition ${v.replace(/\s+/g, " ").slice(0, 80)}`);
+          }
+          if (!marks.length) return [];
+          const text = rt(d, e, 50);
+          return [
+            h(
+              d,
+              e,
+              `<${e.tag}> state drawn by ${marks.join(", ")} text="${text}" — is this state ALSO given by text, shape or position, not by colour alone?`,
+              `colourstate|${e.tag}|${marks.map((m) => m.replace(/="[^"]*"$/, "")).join(",")}|${text}`,
+            ),
+          ];
+        }),
+    ),
+
+  // RGAA 12.3 — the site map page ITSELF (#130). `navMechanisms` finds the link that leads to
+  // it; « la page plan du site est-elle pertinente ? » is ruled on what the page lists, and
+  // where each entry leads.
+  siteMapPage: (docs) =>
+    docs.flatMap((d) => {
+      const page = pageOfDoc(d.file);
+      const titled = elementsByTag(d, "h1", "title").some((e) => SITEMAP_TEXT.test(rt(d, e, 80)));
+      const isSiteMap = titled || SITEMAP_ADDRESS.test(page ?? d.file.replace(/\\/g, "/").split("/").slice(-3).join("/"));
+      if (!isSiteMap) return [];
+      const main = elementsByTag(d, "main")[0];
+      const chrome = (e: El) => ancestors(e).some((a) => ["header", "footer"].includes(a.tag) || ["banner", "contentinfo"].includes(roleOf(a)));
+      const entries = d.elements.filter(
+        (e) =>
+          attr(e, "href") !== undefined &&
+          (main ? ancestors(e).includes(main) : !chrome(e)) &&
+          !ancestors(e).some((a) => a.tag === "nav" && /fil d|breadcrumb/i.test(`${attr(a, "aria-label") ?? ""} ${attr(a, "class") ?? ""}`)),
+      );
+      const where = page !== undefined ? `page="${page}"` : `source ${d.file}`;
+      const head = elementsByTag(d, "h1")[0] ?? main ?? elementsByTag(d, "html")[0] ?? entries[0];
+      const out: Harvested[] = [];
+      if (head)
+        out.push(
+          h(
+            d,
+            head,
+            `${where} — THE SITE MAP PAGE: ${entries.length} entr${entries.length === 1 ? "y" : "ies"}${
+              entries.length
+                ? `: ${entries
+                    .slice(0, 30)
+                    .map((e) => `"${rt(d, e, 30)}" → ${attr(e, "href")}`)
+                    .join(", ")}${entries.length > 30 ? " …" : ""}`
+                : ""
+            } — is it representative of the site's architecture?`,
+            `sitemappage|${page ?? d.file}`,
+          ),
+        );
+      for (const e of entries)
+        out.push(
+          h(
+            d,
+            e,
+            `site-map entry text="${rt(d, e, 60)}" href="${attr(e, "href")}" section="${nearestHeading(d, e) ?? ""}" — does it work, and lead to the page it names?`,
+            `sitemapentry|${rt(d, e, 60)}|${attr(e, "href")}`,
+          ),
+        );
+      return out;
+    }),
+
   // RGAA 4.11 — temporal players and the code that controls their consultation. This must
   // not inherit WCAG 2.1.1/2.1.2's page-wide union of pointer handlers and focusables: an
   // unrelated clickable card says nothing about whether an <audio> can be paused.
@@ -1168,18 +1725,17 @@ export const SUBJECTS: Record<string, Subject> = {
   // RGAA 4.12 — non-temporal plug-in/SVG/canvas media. Static instances are included too:
   // the adjudicator must first establish whether they expose consultation controls before it
   // can legitimately answer NA. Temporal players and generic event handlers stay out.
+  // Hidden decoration (`<svg aria-hidden="true">`) is not media anyone consults (#130).
   nonTemporalMediaControls: (docs) =>
     docs.flatMap((d) => [
-      ...d.elements
-        .filter((e) => e.tag === "svg" || e.tag === "canvas" || (["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "temporal"))
-        .map((e) =>
-          h(
-            d,
-            e,
-            `<${e.tag}> non-temporal media — inspect any pan/zoom/navigation/control function for keyboard and pointer operation`,
-            `non-temporal-media|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? attr(e, "id") ?? ""}`,
-          ),
+      ...nonTemporalMediaOf(d).map((m) =>
+        h(
+          d,
+          m.el,
+          `${describeMedium(d, m)} non-temporal media — inspect any pan/zoom/navigation/control function for keyboard and pointer operation`,
+          `non-temporal-media|${m.el.tag}|${m.name}|${attr(m.el, "src") ?? attr(m.el, "data") ?? ""}`,
         ),
+      ),
       ...linesOf(d, /\b(?:svgPanZoom|panzoom|zoomIn|zoomOut|getContext)\b/i).map((l) =>
         hAt(d, l.line, "media-control", `non-temporal media/control code: ${l.text}`, `non-temporal-control|${l.text}`),
       ),
@@ -1207,14 +1763,14 @@ export const SUBJECTS: Record<string, Subject> = {
       ...d.elements
         .filter((e) => /animation|transition/i.test(attr(e, "style") ?? ""))
         .map((e) => h(d, e, `inline visual animation: ${(attr(e, "style") ?? "").slice(0, 100)}`, `flash-inline|${attr(e, "style") ?? ""}`)),
-      ...(d.signals?.css?.rules ?? [])
+      ...pageRules(docs, d)
         .filter((r) => r.decls.animation !== undefined || r.decls.animationName !== undefined)
         .map((r) =>
           hAt(
             d,
             1,
             `css:${r.selector}`,
-            `stylesheet animation: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } — inspect keyframes for rapid opposing luminance changes`,
+            `stylesheet animation: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }${r.where} — inspect keyframes for rapid opposing luminance changes`,
             `flash-css|${r.selector}|${declsText(r.decls)}`,
           ),
         ),
@@ -1369,7 +1925,7 @@ export const SUBJECTS: Record<string, Subject> = {
             `orderinline|${(attr(e, "style") ?? "").slice(0, 80)}`,
           ),
         ),
-      ...(d.signals?.css?.rules ?? [])
+      ...pageRules(docs, d)
         .filter((r) => r.decls.order !== undefined || /-reverse/.test(r.decls.flexDirection ?? "") || /reverse/.test(r.decls.flexFlow ?? ""))
         .slice(0, 60)
         .map((r) =>
@@ -1377,7 +1933,7 @@ export const SUBJECTS: Record<string, Subject> = {
             d,
             1,
             `css:${r.selector}`,
-            `stylesheet reorders layout: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } — does it move meaning-bearing content?`,
+            `stylesheet reorders layout: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }${r.where} — does it move meaning-bearing content?`,
             `ordercss|${r.selector}`,
           ),
         ),
@@ -1545,15 +2101,12 @@ export const SUBJECTS: Record<string, Subject> = {
   // headings, tables and lists — which never held a quotation.
   quotes: (docs) =>
     docs.flatMap((d) => [
-      ...elementsByTag(d, "q", "blockquote").map((e) => h(d, e, `<${e.tag}> "${t(e, 80)}" — is it a quotation?`, `quote|${e.tag}|${t(e, 60)}`)),
+      ...elementsByTag(d, "q", "blockquote").map((e) => h(d, e, `<${e.tag}> "${rt(d, e, 80)}" — is it a quotation?`, `quote|${e.tag}|${rt(d, e, 60)}`)),
+      // Rendered text only (#129): a string in a JSX expression is code, not a quotation.
       ...d.elements
-        .filter(
-          (e) =>
-            !["q", "blockquote", "script", "style", "code", "pre"].includes(e.tag) &&
-            e.children.some((c) => c.type === "text" && /«[^»]{12,}»|“[^”]{12,}”|"[^"<>]{12,}"/.test(c.data)),
-        )
+        .filter((e) => !["q", "blockquote", "code", "pre"].includes(e.tag) && /«[^»]{12,}»|“[^”]{12,}”|"[^"<>]{12,}"/.test(ownRenderedText(d, e)))
         .slice(0, 40)
-        .map((e) => h(d, e, `quoted text without <q>/<blockquote>: "${t(e, 80)}" — a citation?`, `quotetext|${t(e, 60)}`)),
+        .map((e) => h(d, e, `quoted text without <q>/<blockquote>: "${rt(d, e, 80)}" — a citation?`, `quotetext|${rt(d, e, 60)}`)),
     ]),
 
   // RGAA 13.5/13.6 — « contenu cryptique (art ASCII, émoticône, syntaxe cryptique) ». It used
@@ -1562,12 +2115,10 @@ export const SUBJECTS: Record<string, Subject> = {
   cryptic: (docs) =>
     docs.flatMap((d) =>
       d.elements
-        .filter((e) => !["script", "style", "title", "head"].includes(e.tag))
+        // Rendered text only (#129): an emoji in a code comment is not content of the page.
+        .filter((e) => e.tag !== "title")
         .filter((e) => {
-          const own = e.children
-            .filter((c) => c.type === "text")
-            .map((c) => (c as { data: string }).data)
-            .join(" ");
+          const own = ownRenderedText(d, e);
           return CRYPTIC.test(own) || (e.tag === "pre" && /[^\w\s]{6,}/.test(own));
         })
         .slice(0, 40)
@@ -1575,8 +2126,8 @@ export const SUBJECTS: Record<string, Subject> = {
           h(
             d,
             e,
-            `cryptic content: "${t(e, 60)}" title="${attr(e, "title") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" — is an alternative given (title or adjacent definition)?`,
-            `cryptic|${t(e, 40)}`,
+            `cryptic content: "${rt(d, e, 60)}" title="${attr(e, "title") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" — is an alternative given (title or adjacent definition)?`,
+            `cryptic|${rt(d, e, 40)}`,
           ),
         ),
     ),
@@ -1640,16 +2191,19 @@ export const SUBJECTS: Record<string, Subject> = {
       ...linesOf(d, /(?:^|[\s;{])(?:color|background(?:-color)?)\s*:\s*[^;}"'<]+/i, 60)
         .filter((l) => !/\bstyle\s*=/.test(l.text))
         .map((l) => hAt(d, l.line, "css", `colour declaration: ${l.text}`, `colourdecl|${l.text}`)),
-      ...(d.signals?.css?.rules ?? [])
-        .filter((r) => r.decls.color !== undefined || r.decls.backgroundColor !== undefined || r.decls.background !== undefined)
+      // A longhand the browser expanded from a shorthand it did not set comes back EMPTY
+      // (`backgroundColor: ""`): that is no colour declaration, and it used to be shown as one.
+      ...pageRules(docs, d)
+        .map((r) => ({ r, fg: (r.decls.color ?? "").trim(), bg: (r.decls.backgroundColor || r.decls.background || "").trim() }))
+        .filter(({ fg, bg }) => fg !== "" || bg !== "")
         .slice(0, 60)
-        .map((r) =>
+        .map(({ r, fg, bg }) =>
           hAt(
             d,
             1,
             `css:${r.selector}`,
-            `stylesheet colours: ${r.selector.slice(0, 60)} { color: ${r.decls.color ?? "—"}; background: ${r.decls.backgroundColor ?? r.decls.background ?? "—"} }`,
-            `colourcss|${r.selector}|${r.decls.color ?? ""}|${r.decls.backgroundColor ?? r.decls.background ?? ""}`,
+            `stylesheet colours: ${r.selector.slice(0, 60)} { color: ${fg || "—"}; background: ${bg || "—"} }${r.where}`,
+            `colourcss|${r.selector}|${fg}|${bg}`,
           ),
         ),
     ]),
@@ -1684,6 +2238,7 @@ export const SUBJECTS: Record<string, Subject> = {
     docs.flatMap((d) => [
       ...viewportMeta(d),
       ...cssEvidence(
+        docs,
         d,
         /\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px|\boverflow(?:-y)?\s*:\s*(?:hidden|clip)|\bfont-size\s*:\s*\d+(?:\.\d+)?px/i,
         (r) => Boolean((r.decls.height ?? r.decls.maxHeight ?? "").endsWith("px") || /hidden|clip/.test(r.decls.overflow ?? r.decls.overflowY ?? "")),
@@ -1698,6 +2253,7 @@ export const SUBJECTS: Record<string, Subject> = {
     docs.flatMap((d) => [
       ...viewportMeta(d),
       ...cssEvidence(
+        docs,
         d,
         /\b(?:min-)?width\s*:\s*(?:3[2-9]\d|[4-9]\d\d|\d{4,})px|\bwhite-space\s*:\s*(?:nowrap|pre)\b|\boverflow-x\s*:/i,
         (r) =>
@@ -1714,6 +2270,7 @@ export const SUBJECTS: Record<string, Subject> = {
   textSpacing: (docs) =>
     docs.flatMap((d) =>
       cssEvidence(
+        docs,
         d,
         /\b(?:line-height|letter-spacing|word-spacing)\s*:|\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px/i,
         (r) =>
@@ -1730,7 +2287,7 @@ export const SUBJECTS: Record<string, Subject> = {
       ...linesOf(d, /@media[^{]*\borientation\b|\borientation\.lock\s*\(|\block(?:Orientation)?\s*\(\s*["'](?:portrait|landscape)|"orientation"\s*:/i).map(
         (l) => hAt(d, l.line, "orientation", `orientation-dependent code: ${l.text}`, `orientation|${l.text}`),
       ),
-      ...(d.signals?.css?.rules ?? [])
+      ...pageRules(docs, d)
         .filter((r) => /orientation/i.test(r.media ?? ""))
         .slice(0, 30)
         .map((r) =>
@@ -1738,7 +2295,7 @@ export const SUBJECTS: Record<string, Subject> = {
             d,
             1,
             `css:${r.selector}`,
-            `@media ${r.media} { ${r.selector.slice(0, 50)} { ${declsText(r.decls)} } }`,
+            `@media ${r.media} { ${r.selector.slice(0, 50)} { ${declsText(r.decls)} } }${r.where}`,
             `orientationcss|${r.media}|${r.selector}`,
           ),
         ),
@@ -1756,7 +2313,7 @@ export const SUBJECTS: Record<string, Subject> = {
           `focusrule|${l.text}`,
         ),
       ),
-      ...(d.signals?.css?.rules ?? [])
+      ...pageRules(docs, d)
         .filter((r) => /:focus/.test(r.selector))
         .slice(0, 40)
         .map((r) =>
@@ -1764,7 +2321,7 @@ export const SUBJECTS: Record<string, Subject> = {
             d,
             1,
             `css:${r.selector}`,
-            `captured focus rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`,
+            `captured focus rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }${r.where}`,
             `focuscss|${r.selector}|${declsText(r.decls)}`,
           ),
         ),
@@ -1830,12 +2387,18 @@ export const SUBJECTS: Record<string, Subject> = {
   // on the ones that name their target too, and a page with none of the leads had nothing to cite.
   instructions: (docs) =>
     docs.flatMap((d) =>
-      d.elements
-        .filter(
-          (e) => !["script", "style", "title", "head", "html", "body"].includes(e.tag) && e.children.some((c) => c.type === "text" && INSTRUCTION.test(c.data)),
-        )
+      // Rendered text only (#129) — see `textRuns`.
+      textRuns(d)
+        .filter(({ el, text }) => el.tag !== "body" && INSTRUCTION.test(text))
         .slice(0, 40)
-        .map((e) => h(d, e, `instruction: "${t(e, 100)}" — does it rely on shape, size or position alone?`, `instruction|${t(e, 80)}`)),
+        .map(({ el, text }) =>
+          h(
+            d,
+            el,
+            `instruction: "${text === ownRenderedText(d, el) ? rt(d, el, 100) : text.slice(0, 100)}" — does it rely on shape, size or position alone?`,
+            `instruction|${text.slice(0, 80)}`,
+          ),
+        ),
     ),
 
   // Content pinned over the page — what can obscure a focused element.
@@ -1844,7 +2407,7 @@ export const SUBJECTS: Record<string, Subject> = {
       ...d.elements
         .filter((e) => /position\s*:\s*(?:fixed|sticky)/.test(attr(e, "style") ?? ""))
         .map((e) => h(d, e, `pinned element (inline): ${(attr(e, "style") ?? "").slice(0, 60)} — can it cover a focused element?`, `sticky|${selectorFor(e)}`)),
-      ...(d.signals?.css?.rules ?? [])
+      ...pageRules(docs, d)
         .filter((r) => /^(?:fixed|sticky)$/.test((r.decls.position ?? "").trim()))
         .slice(0, 60)
         .map((r) =>
@@ -1852,7 +2415,7 @@ export const SUBJECTS: Record<string, Subject> = {
             d,
             1,
             `css:${r.selector}`,
-            `pinned by stylesheet: ${r.selector.slice(0, 60)} { position: ${r.decls.position} } — can it cover a focused element?`,
+            `pinned by stylesheet: ${r.selector.slice(0, 60)} { position: ${r.decls.position} }${r.where} — can it cover a focused element?`,
             `stickycss|${r.selector}`,
           ),
         ),
@@ -1992,7 +2555,8 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // Theme 12 — navigation.
     "12.1": ["navMechanisms"],
     "12.2": ["repeatedBlocks"],
-    "12.3": ["navMechanisms"],
+    // The site map page's own content first — 12.3 asks whether IT is pertinent (#130).
+    "12.3": ["siteMapPage", "navMechanisms"],
     "12.4": ["repeatedBlocks", "navMechanisms"],
     // The search engine is the criterion's subject, and `navMechanisms` is what finds it.
     "12.5": ["repeatedBlocks", "navMechanisms"],
@@ -2016,12 +2580,18 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "4.6": ["temporalMedia", "motion"],
     "4.7": ["temporalMedia"],
     "4.13": ["temporalMedia", "nonTemporalMediaControls"],
+    // 4.8/4.9 inherited `images` from WCAG 1.1.1 and were handed a copy of 1.6's image list,
+    // without the canvas charts that are the site's non-temporal media (#130).
+    "4.8": ["nonTemporalMedia"],
+    "4.9": ["nonTemporalMedia"],
     // 4.11/4.12 map to the same keyboard SCs but ask about disjoint media populations.
     // Inheriting the union handed both criteria every pointer handler and focusable in scope.
     "4.11": ["temporalMediaControls"],
     "4.12": ["nonTemporalMediaControls"],
     // Theme 3 — colour. The question is about what colour alone conveys, not the outline.
-    "3.1": ["colourPairs", "links"],
+    // What 3.1 is about is a STATE drawn in colour — a current step, a threshold bar, a status
+    // badge — and a chart, which encodes its series in colour (#130). Links follow.
+    "3.1": ["colourState", "nonTemporalMedia", "colourPairs", "links"],
     "3.2": ["colourPairs", "computedColours", "colourDecls", "rendered:1.4.3", "stylesheets"],
     "3.3": ["colourPairs", "colourDecls", "rendered:1.4.11", "controls", "buttons", "stylesheets"],
     // Theme 7 — scripts. "Is each script operable by keyboard AND pointer?" is about the
