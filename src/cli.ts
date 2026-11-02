@@ -22,8 +22,9 @@ import {
   averageRateLine,
   pageConformanceCell,
   writeReportFiles,
-  untestedNeedsRendering,
+  packPartialAudit,
   partialAuditBanner,
+  ranBrowser,
   withReportAnnexes,
 } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
@@ -2228,9 +2229,11 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
   // leaves needs-rendering criteria untested — warn prominently on the CLI, naming exactly
   // which criteria lack a dynamic verdict (the report itself carries the matching banner).
   // Scan stays opt-in but strongly advised.
-  const untested = isCore(standard) ? [] : untestedNeedsRendering(result);
+  // The SAME list the document prints (#100): before, the CLI ignored the verdicts the pack grid
+  // rules on and contradicted the report it had just written.
+  const untested = isCore(standard) ? [] : packPartialAudit(result, standard);
   const partial = untested.length > 0;
-  if (partial && !p.flags.json) console.error(`🚨 ${partialAuditBanner(lang, untested)}`);
+  if (partial && !p.flags.json) console.error(`🚨 ${partialAuditBanner(lang, untested, { scanned: ranBrowser(result) })}`);
   if (p.flags.json)
     console.log(
       JSON.stringify(
