@@ -440,6 +440,9 @@ export interface AxNode {
  *  ordinary source file — a rendered rule simply does not fire, which is why adding this tier
  *  cannot change any existing verdict. */
 export interface RenderSignals {
+  /** The loading markers the page still carried when it was captured (SnapshotMeta.loading).
+   *  Its findings stand; its silence proves nothing — the content was not there yet. */
+  capturedLoading?: string[];
   /** Computed style by document-order index. Absent when the digest failed verification. */
   styles?: Map<number, StyleEntry>;
   boxes?: Map<number, BoxEntry>;
@@ -549,7 +552,11 @@ export interface PageScope {
   //                    silence) and deliberately NOT the same word: telling the reader a page
   //                    has no snapshot when it has one is a different false statement, not a
   //                    smaller one. See pagesOf().
-  basis: "snapshot" | "attributed" | "not-audited";
+  //  • "loading"     — a snapshot was audited, but it was captured while the page still
+  //                    declared itself loading (SnapshotMeta.loading). Its findings are real;
+  //                    its silence is about content that was not on the page, so nothing may
+  //                    be concluded from it either.
+  basis: "snapshot" | "attributed" | "not-audited" | "loading";
 }
 
 /** One page's projection of the audit. Derived, never stored on the AuditResult: the full

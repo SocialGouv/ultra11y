@@ -520,7 +520,7 @@ export function scoreboardBlocks(result: AuditResult, standard: StandardId, lang
   if (orphans) out.push({ kind: "note", tone: "warn", runs: ticks(unattributedNote(orphans, lang)) });
   // One caveat per basis actually present — a "not audited" page must not be explained by the
   // sentence that asserts it has no snapshot.
-  for (const basis of ["attributed", "not-audited"] as const) {
+  for (const basis of ["attributed", "not-audited", "loading"] as const) {
     const note = derived.some((p) => p.basis === basis) ? pageBasisWarning(basis, lang) : undefined;
     if (note) out.push({ kind: "note", tone: "warn", runs: ticks(note) });
   }

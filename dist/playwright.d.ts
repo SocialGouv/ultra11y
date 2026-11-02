@@ -1,9 +1,15 @@
-import { C as CheckOptions, A as AuditLike } from './payload-BMFQTm5s.js';
+import { C as CheckOptions, A as AuditLike } from './payload-BrdH5eEV.js';
 
 interface PlaywrightPage {
     evaluate(script: string): Promise<unknown>;
     screenshot(opts: {
         fullPage: boolean;
+        clip?: {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        };
     }): Promise<Buffer>;
     url(): string;
     viewportSize?(): {

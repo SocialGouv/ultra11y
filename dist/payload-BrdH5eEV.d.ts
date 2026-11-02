@@ -21,6 +21,8 @@ interface SnapshotPayload {
     boxes?: unknown;
     css?: unknown;
     screenshot?: string;
+    /** The whole page, height-bounded (FULL_SCREENSHOT_MAX_HEIGHT) — for the report's reader. */
+    screenshotFull?: string;
     /** What the live probes measured, when the caller ran them. */
     probes?: unknown;
     /** What axe-core found on this page, when the caller ran it. */
@@ -41,8 +43,16 @@ interface CheckOptions {
     sources?: string[];
     /** Reproduction notes carried into the auditor ticket. */
     notes?: string;
-    /** Capture a viewport screenshot for the pixel tier (Playwright: on by default). */
+    /** Capture a viewport screenshot for the pixel tier (Playwright: on by default), and — when
+     *  the page is taller than the viewport — a full-page one beside it for the report. */
     screenshot?: boolean;
+    /** How long to wait, before collecting, for the page to stop declaring itself loading —
+     *  `aria-busy="true"`, an indeterminate progress bar, a « Chargement… » standing in for the
+     *  content (default 10 000 ms; `0` checks without waiting). A page still loading when it
+     *  runs out is recorded anyway, MARKED (`meta.loading`) and reported « capture en état de
+     *  chargement »: its findings count, its silence does not. Playwright only — Cypress records
+     *  the markers it sees but leaves the waiting to the test's own `should`. */
+    loadingTimeoutMs?: number;
     /** The path you NAVIGATED to. Given it, the fixture refuses to record a page the browser
      *  did not stay on — a guarded route that redirected, a session that expired — instead of
      *  filing that other screen under this page's `as`/`name`. Nothing about such a snapshot

@@ -38655,6 +38655,44 @@ var COLLECTED_CSS = [
   "cursor"
 ];
 var COLLECT_MAX_ELEMENTS = 5e3;
+var LOADING_STATE = `(() => {
+  const out = [];
+  const shown = (e) => {
+    const r = e.getBoundingClientRect();
+    if (r.width <= 0 && r.height <= 0) return false;
+    const s = getComputedStyle(e);
+    return s.display !== 'none' && s.visibility !== 'hidden';
+  };
+  const name = (e) => e.localName + (e.id ? '#' + e.id : '');
+  for (const e of Array.from(document.querySelectorAll('[aria-busy="true"]'))) if (shown(e)) out.push('aria-busy="true" ' + name(e));
+  for (const e of Array.from(document.querySelectorAll('[role="progressbar"]:not([aria-valuenow]), progress:not([value])'))) if (shown(e)) out.push('indeterminate progress ' + name(e));
+  const PHRASE = /^(chargement( en cours)?|veuillez patienter|loading|please wait)\\s*(\\.{1,3}|\u2026)?$/i;
+  const text = (e) => (e.textContent || '').replace(/\\s+/g, ' ').trim();
+  if (document.body) for (const e of Array.from(document.body.querySelectorAll('p,span,div,li,h1,h2,h3,h4,h5,h6,strong,em,output,[role="status"]'))) {
+    const t = text(e);
+    if (t.length > 40 || !PHRASE.test(t)) continue;
+    if (Array.from(e.children).some((c) => PHRASE.test(text(c)))) continue;
+    if (shown(e)) out.push('text "' + t + '" ' + name(e));
+  }
+  return out.slice(0, 10);
+})()`;
+async function waitForLoaded(page, timeoutMs, intervalMs = 150) {
+  const started = Date.now();
+  for (; ; ) {
+    let markers = [];
+    try {
+      const r = await page.evaluate(LOADING_STATE);
+      markers = Array.isArray(r) ? r.filter((m) => typeof m === "string") : [];
+    } catch {
+      return { markers: [], waitedMs: Date.now() - started };
+    }
+    const waitedMs = Date.now() - started;
+    if (!markers.length || waitedMs >= timeoutMs) return { markers, waitedMs };
+    await new Promise((resolve20) => setTimeout(resolve20, Math.min(intervalMs, Math.max(1, timeoutMs - waitedMs))));
+  }
+}
+var LOADING_TIMEOUT_MS = 1e4;
+var FULL_SCREENSHOT_MAX_HEIGHT = 8e3;
 var COLLECT_SNAPSHOT = `(() => {
   const PROPS = ${JSON.stringify(COLLECTED_CSS)};
   const MAX = ${COLLECT_MAX_ELEMENTS};
@@ -38766,6 +38804,12 @@ var COLLECT_SNAPSHOT = `(() => {
     lang: document.documentElement.getAttribute('lang') || '',
     url: location.href,
     viewport: { width: window.innerWidth, height: window.innerHeight },
+    // The document's full height, so the producer knows whether a full-page screenshot adds
+    // anything to the viewport one.
+    docHeight: Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0),
+    // Still loading at the instant of collection: the markers, or none. Every producer runs
+    // this same collector, so every producer can say so \u2014 see LOADING_STATE.
+    loading: ${LOADING_STATE},
     styles: { v: 1, entries: styles, truncated: truncated },
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };
@@ -38810,6 +38854,8 @@ function validateSnapshotMeta(raw) {
   if (m.route !== void 0 && typeof m.route !== "string") err2("meta.route", "route must be a string");
   if (m.notes !== void 0 && typeof m.notes !== "string") err2("meta.notes", "notes must be a string");
   if (m.doctype !== void 0 && typeof m.doctype !== "string") err2("meta.doctype", "doctype must be a string");
+  if (m.loading !== void 0 && (!Array.isArray(m.loading) || m.loading.some((s) => typeof s !== "string")))
+    err2("meta.loading", "loading must be an array of strings");
   if (m.sources !== void 0 && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
     err2("meta.sources", "sources must be an array of strings");
   if (issues.length) return { ok: false, issues };
@@ -38835,7 +38881,9 @@ function validateSnapshotMeta(raw) {
       // it does not name, so adding a field to the type is only ever half the change.
       ...typeof m.doctype === "string" ? { doctype: m.doctype } : {},
       ...Array.isArray(m.sources) ? { sources: m.sources } : {},
-      ...typeof m.notes === "string" ? { notes: m.notes } : {}
+      ...typeof m.notes === "string" ? { notes: m.notes } : {},
+      // Kept only when it says something: an empty list is a page that was ready.
+      ...Array.isArray(m.loading) && m.loading.length ? { loading: m.loading } : {}
     }
   };
 }
@@ -38875,6 +38923,12 @@ ${snap.dom}
     } catch {
     }
   }
+  if (snap.screenshotFullBase64) {
+    try {
+      writeFileSync5(join24(dir, "screen-full.png"), Buffer.from(snap.screenshotFullBase64, "base64"));
+    } catch {
+    }
+  }
   return dir;
 }
 function readJson2(file) {
@@ -38902,6 +38956,7 @@ function readSnapshot(dir) {
   const probes = readJson2(join24(dir, "probes.json"));
   const axe = readJson2(join24(dir, "axe.json"));
   const shot = join24(dir, "screen.png");
+  const full = join24(dir, "screen-full.png");
   return {
     meta: v.meta,
     dom,
@@ -38911,8 +38966,16 @@ function readSnapshot(dir) {
     ...css ? { css } : {},
     ...probes ? { probes } : {},
     ...axe ? { axe } : {},
-    ...existsSync13(shot) ? { screenshot: "screen.png" } : {}
+    ...existsSync13(shot) ? { screenshot: "screen.png" } : {},
+    ...existsSync13(full) ? { screenshotFull: "screen-full.png" } : {}
   };
+}
+function pageScreenshot(pagesDir, id) {
+  for (const f of ["screen-full.png", "screen.png"]) {
+    const p = join24(pagesDir, id, f);
+    if (existsSync13(p)) return p;
+  }
+  return void 0;
 }
 function readSnapshots(root) {
   const base = join24(root, PAGES_DIR);
@@ -38971,6 +39034,7 @@ function attachSignals(doc) {
   const axtree = readJson2(join24(dir, "axtree.json"));
   const css = readJson2(join24(dir, "css.json"));
   const meta2 = readJson2(join24(dir, "meta.json"));
+  const loading = Array.isArray(meta2?.loading) ? meta2.loading.filter((m) => typeof m === "string") : [];
   const probes = readJson2(join24(dir, "probes.json"));
   const axe = readJson2(join24(dir, "axe.json"));
   const shot = join24(dir, "screen.png");
@@ -38987,7 +39051,8 @@ function attachSignals(doc) {
     ...meta2?.doctype !== void 0 ? { doctype: meta2.doctype } : {},
     ...probes ? { probes } : {},
     ...axe ? { axe } : {},
-    ...truncated ? { truncated } : {}
+    ...truncated ? { truncated } : {},
+    ...loading.length ? { capturedLoading: loading } : {}
   };
   if (Object.keys(signals).length) doc.signals = signals;
 }
@@ -57028,15 +57093,18 @@ function foldDoc(acc, doc, graph) {
   const pageId = snapshotPageId(doc.file);
   if (pageId) {
     acc.pageIds.add(pageId);
-    const own = acc.pageSubjects.get(pageId) ?? /* @__PURE__ */ new Set();
-    for (const id of subjectsPresentIn(doc, own)) own.add(id);
-    acc.pageSubjects.set(pageId, own);
-    for (const ruleId of renderedRulesRan(doc.signals)) {
+    const placeholder = Boolean(doc.signals?.capturedLoading?.length);
+    if (!placeholder) {
+      const own = acc.pageSubjects.get(pageId) ?? /* @__PURE__ */ new Set();
+      for (const id of subjectsPresentIn(doc, own)) own.add(id);
+      acc.pageSubjects.set(pageId, own);
+    }
+    for (const ruleId of placeholder ? [] : renderedRulesRan(doc.signals)) {
       const seen = acc.renderedRan.get(ruleId) ?? /* @__PURE__ */ new Set();
       seen.add(pageId);
       acc.renderedRan.set(ruleId, seen);
     }
-    for (const pack of listPacks()) {
+    for (const pack of placeholder ? [] : listPacks()) {
       for (const rule of pack.rules ?? []) {
         if (!docRuleRan(doc, rule)) continue;
         const id = `pack:${pack.key}:${rule.id}`;
@@ -57048,7 +57116,7 @@ function foldDoc(acc, doc, graph) {
     const probes = doc.signals?.probes;
     if (probes) {
       const trusted = (probes.v ?? 1) >= PROBES_VERSION;
-      for (const sc of probes.probed ?? []) {
+      for (const sc of placeholder ? [] : probes.probed ?? []) {
         if (!trusted && WALK_DEPENDENT_SCS.includes(sc)) continue;
         const seen = acc.probedScs.get(sc) ?? /* @__PURE__ */ new Set();
         seen.add(pageId);
@@ -57064,7 +57132,7 @@ function foldDoc(acc, doc, graph) {
     }
     const axe = doc.signals?.axe;
     if (axe?.ran) {
-      acc.axeRan.add(pageId);
+      if (!placeholder) acc.axeRan.add(pageId);
       for (const sc of Object.keys(AXE_DECIDES)) acc.renderedScs.add(sc);
       for (const f of axeFindings(axe.violations ?? [], doc.file, pageId)) {
         const list = acc.byCriterion.get(f.criteriaId) ?? [];
@@ -62471,7 +62539,9 @@ function pageScopesFrom(snapshots) {
     ...s.meta.route ? { route: s.meta.route } : {},
     ...s.meta.sources ? { sources: s.meta.sources } : {},
     ...s.meta.notes ? { notes: s.meta.notes } : {},
-    basis: "snapshot"
+    // A capture taken while the page still declared itself loading is a snapshot of a
+    // placeholder: real findings, no conformity by silence (see PageScope.basis).
+    basis: s.meta.loading?.length ? "loading" : "snapshot"
   }));
 }
 function pageScopesFromSample(sample) {
@@ -62651,6 +62721,8 @@ var L = {
     source: "source",
     notAudited: "non audit\xE9",
     notAuditedNote: "Une page marqu\xE9e \xAB non audit\xE9 \xBB a bien un instantan\xE9, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformit\xE9 \u2014 relancez l'audit en incluant `.ultra11y/pages`.",
+    loading: "capture en \xE9tat de chargement",
+    loadingNote: "Une page marqu\xE9e \xAB capture en \xE9tat de chargement \xBB a \xE9t\xE9 enregistr\xE9e alors qu'elle s'annon\xE7ait encore en cours de chargement (`aria-busy`, indicateur de progression, \xAB Chargement\u2026 \xBB) : son contenu n'\xE9tait pas affich\xE9. Ses constats sont r\xE9els, mais l'absence de constat n'y vaut PAS conformit\xE9 \u2014 recapturez-la une fois charg\xE9e.",
     agentMark: "`C*` : conformit\xE9 tranch\xE9e par l'agent IA \xE0 partir des \xE9vidences cit\xE9es (gat\xE9), et non prouv\xE9e par le moteur d\xE9terministe.",
     humanMark: "`C\u2020` : conformit\xE9 tranch\xE9e par un auditeur humain nomm\xE9 \xE0 partir des \xE9vidences cit\xE9es (m\xEAme gate que l'agent), et non prouv\xE9e par le moteur d\xE9terministe.",
     originNote: (o) => `Les colonnes sont les URL des pages, relatives \xE0 \`${o}\`.`
@@ -62668,6 +62740,8 @@ var L = {
     source: "source",
     notAudited: "not audited",
     notAuditedNote: 'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming \u2014 re-run the audit with `.ultra11y/pages` in scope.',
+    loading: "captured while loading",
+    loadingNote: 'A page marked "captured while loading" was recorded while it still declared itself loading (`aria-busy`, a progress indicator, \xAB Loading\u2026 \xBB): its content was not on screen. Its findings are real, but absence of a finding there does NOT mean conforming \u2014 capture it again once it has loaded.',
     agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
     humanMark: "`C\u2020`: conformity ruled by a named human auditor from the evidence they cited (the agent's gate), not proven by the deterministic engine.",
     originNote: (o) => `Columns are the pages' URLs, relative to \`${o}\`.`
@@ -62688,11 +62762,11 @@ function ruledMark(decidedBy, status) {
 }
 function pageBasisWarning(basis, lang) {
   if (basis === "snapshot") return void 0;
-  return basis === "not-audited" ? L[lang].notAuditedNote : L[lang].basisNote;
+  return basis === "not-audited" ? L[lang].notAuditedNote : basis === "loading" ? L[lang].loadingNote : L[lang].basisNote;
 }
 function basisLabel(basis, lang) {
   const s = L[lang];
-  return basis === "snapshot" ? s.snapshot : basis === "not-audited" ? s.notAudited : s.source;
+  return basis === "snapshot" ? s.snapshot : basis === "not-audited" ? s.notAudited : basis === "loading" ? s.loading : s.source;
 }
 function unattributedNote(n, lang) {
   return L[lang].unattributed(n);
@@ -62799,6 +62873,7 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   }
   out2.push(`> ${s.note}`, "");
   if (derived.some((p) => p.basis === "attributed")) out2.push(`> \u26A0\uFE0F ${s.basisNote}`, "");
+  if (derived.some((p) => p.basis === "loading")) out2.push(`> \u26A0\uFE0F ${s.loadingNote}`, "");
   const origin = commonOrigin(derived);
   const originNote = pageOriginNote(origin, lang);
   if (originNote) out2.push(`> ${originNote}`, "");
@@ -63725,7 +63800,7 @@ function renderPageReport(result, page, opts = {}) {
   out2.push(`- **${s.rate}** : **${rate === null ? "\u2014" : `${rate} %`}** _(${s.rateNote})_`);
   out2.push(`- ${pageTallyNote(t3, lang)}`);
   out2.push(`- ${s.coverage(cov.decided, cov.total)}`, "");
-  if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${s.sourceWarn}`, "");
+  if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${page.basis === "loading" ? pageBasisWarning("loading", lang) : s.sourceWarn}`, "");
   const shot = opts.screenshots?.get(page.id);
   if (shot) out2.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
   else out2.push(`_${s.noScreenshot}_`, "");
@@ -64869,7 +64944,7 @@ function render(r, lang, opts) {
       out2.push(`- ${s.pageNcCriteria(failing.length)}${adv.length ? ` \xB7 ${adv.length} ${s.advCount}` : ""}`);
       const notes = pageScope.find((x) => x.id === pg.id)?.notes;
       if (notes) out2.push(`- _${notes}_`);
-      const shot = join33(PAGES_DIR, pg.id, "screen.png");
+      const shot = pageScreenshot(PAGES_DIR, pg.id) ?? join33(PAGES_DIR, pg.id, "screen.png");
       if (existsSync22(shot)) {
         let href = relative4(opts.outDir ?? ".", shot).split("\\").join("/");
         if (opts.outDir) {
@@ -69028,7 +69103,17 @@ var residualUndecidableReason = () => "Left as an explicit residual risk (not de
 var residualNotInWorklistReason = () => "Not in the adjudication that was folded (coverage gap) \u2014 no verdict was offered, so none was refused. Adjudicate this criterion.";
 var residualRejectedReason = (why) => `Adjudication refused by the gate \u2014 ${why.replace(/^criterion \S+: /, "")}. Re-adjudicate this criterion.`;
 var SNIPPET_SHOWN = 200;
-var CAPTURE_FILES = ["dom.html", "styles.json", "boxes.json", "css.json", "probes.json", "axe.json", "axtree.json", "screen.png"];
+var CAPTURE_FILES = [
+  "dom.html",
+  "styles.json",
+  "boxes.json",
+  "css.json",
+  "probes.json",
+  "axe.json",
+  "axtree.json",
+  "screen.png",
+  "screen-full.png"
+];
 var CAPTURE_FILE_LABEL = {
   fr: {
     "dom.html": "le DOM s\xE9rialis\xE9 par le navigateur",
@@ -69038,7 +69123,8 @@ var CAPTURE_FILE_LABEL = {
     "probes.json": "les mesures des sondes en direct",
     "axe.json": "les r\xE9sultats axe-core de la page",
     "axtree.json": "l'arbre d'accessibilit\xE9",
-    "screen.png": "la capture d'\xE9cran"
+    "screen.png": "la capture d'\xE9cran",
+    "screen-full.png": "la page enti\xE8re en capture d'\xE9cran"
   },
   en: {
     "dom.html": "the DOM the browser serialized",
@@ -69048,7 +69134,8 @@ var CAPTURE_FILE_LABEL = {
     "probes.json": "the live probes' measurements",
     "axe.json": "axe-core's results on the page",
     "axtree.json": "the accessibility tree",
-    "screen.png": "the screenshot"
+    "screen.png": "the screenshot",
+    "screen-full.png": "the whole page as a screenshot"
   }
 };
 function captureFilesPresent(files, cwd) {
@@ -70820,10 +70907,19 @@ const isFile = target.startsWith("/work/");
 const SNAPSHOT = process.env.ULTRA11Y_SNAPSHOT !== "0";
 const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
 const REFLOW = ${JSON.stringify(REFLOW_PROBE)};
+const LOADING = ${JSON.stringify(LOADING_STATE)};
 const browser = await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 try {
   const page = await browser.newPage();
   await page.goto(isFile ? "file://" + target : target, { waitUntil: "load", timeout: 45000 });
+  // Not while the page still declares itself loading (aria-busy, a spinner, \xAB Chargement\u2026 \xBB).
+  // Bounded: a page that never settles is collected anyway, and the collector marks it.
+  for (const end = Date.now() + ${LOADING_TIMEOUT_MS}; Date.now() < end; ) {
+    let markers = [];
+    try { markers = await page.evaluate(LOADING); } catch {}
+    if (!markers.length) break;
+    await page.waitForTimeout(150);
+  }
   // Collected FIRST, on the pristine page: axe's injected source and the 320px reflow
   // resize both come after, and a snapshot must be the page as the browser built it.
   let snapshot;
@@ -70831,6 +70927,12 @@ try {
     try {
       snapshot = await page.evaluate(COLLECT);
       try { snapshot.screenshot = (await page.screenshot({ fullPage: false })).toString("base64"); } catch {}
+      // The whole page beside it, height-bounded, for the report's reader.
+      try {
+        const vp = snapshot.viewport;
+        const height = Math.min(snapshot.docHeight || 0, ${FULL_SCREENSHOT_MAX_HEIGHT});
+        if (vp && height > vp.height) snapshot.screenshotFull = (await page.screenshot({ fullPage: true, clip: { x: 0, y: 0, width: vp.width, height } })).toString("base64");
+      } catch {}
     } catch {}
   }
   await page.addScriptTag({ content: axe.source });
@@ -70972,7 +71074,10 @@ function writeRunnerSnapshot(root, out2, target, page) {
     // cites the first as the component behind the DOM. Forwarding auth and notes but not these
     // left every source finding of a scanned sample « on no page » — the report could say which
     // URL a defect was measured on, never which URL the code defect lives on.
-    ...page?.sources?.length ? { sources: page.sources } : {}
+    ...page?.sources?.length ? { sources: page.sources } : {},
+    // Still loading when the browser collected it (#135): the report says so, and the audit
+    // concludes nothing from this page's silence.
+    ...collected.loading?.length ? { loading: collected.loading } : {}
   };
   const v = validateSnapshotMeta(meta2);
   if (!v.ok || !v.meta) return void 0;
@@ -71000,7 +71105,8 @@ function writeRunnerSnapshot(root, out2, target, page) {
       // the criteria AXE_DECIDES is usable. A RunnerOutput always carries `violations` because
       // a runner always runs axe — that is the one instrument neither runtime skips.
       axe: { violations: out2.violations, ran: true },
-      ...collected.screenshot ? { screenshotBase64: collected.screenshot } : {}
+      ...collected.screenshot ? { screenshotBase64: collected.screenshot } : {},
+      ...collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {}
     });
   } catch {
     return void 0;
@@ -71791,10 +71897,12 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
     await page.waitForLoadState("networkidle", { timeout: 8e3 }).catch(() => {
     });
     await page.waitForTimeout(1200);
+    await waitForLoaded(page, LOADING_TIMEOUT_MS);
     const landedUrl = page.url() || url;
     const httpStatus = typeof response?.status === "function" ? response.status() : void 0;
     let snapshot;
     let screenshot;
+    let screenshotFull;
     if (opts.snapshot !== false) {
       try {
         snapshot = await page.evaluate(COLLECT_SNAPSHOT);
@@ -71804,6 +71912,14 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
         try {
           screenshot = (await page.screenshot({ fullPage: false })).toString("base64");
         } catch {
+        }
+        const vp = snapshot.viewport;
+        const height = Math.min(snapshot.docHeight ?? 0, FULL_SCREENSHOT_MAX_HEIGHT);
+        if (vp && height > vp.height) {
+          try {
+            screenshotFull = (await page.screenshot({ fullPage: true, clip: { x: 0, y: 0, width: vp.width, height } })).toString("base64");
+          } catch {
+          }
         }
       }
     }
@@ -71930,7 +72046,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
       // Sorted for the same reason as `probed`: a persisted artefact that differs only by list
       // order shows up as a change in every diff of a committed `.ultra11y/pages` tree.
       ...skipped.length ? { skipped: [...skipped].sort((a, b) => a.sc.localeCompare(b.sc)) } : {},
-      ...snapshot ? { snapshot: { ...snapshot, ...screenshot ? { screenshot } : {} } } : {}
+      ...snapshot ? { snapshot: { ...snapshot, ...screenshot ? { screenshot } : {}, ...screenshotFull ? { screenshotFull } : {} } } : {}
     };
   } finally {
     await context.close();
@@ -75093,7 +75209,7 @@ function scoreboardBlocks(result, standard, lang, sheetHref) {
   ];
   const orphans = unattributedFindings(result).filter((f) => !f.advisory).length;
   if (orphans) out2.push({ kind: "note", tone: "warn", runs: ticks(unattributedNote(orphans, lang)) });
-  for (const basis of ["attributed", "not-audited"]) {
+  for (const basis of ["attributed", "not-audited", "loading"]) {
     const note = derived.some((p) => p.basis === basis) ? pageBasisWarning(basis, lang) : void 0;
     if (note) out2.push({ kind: "note", tone: "warn", runs: ticks(note) });
   }
@@ -75675,7 +75791,8 @@ function auditCollected(root, payload) {
     ...payload.boxes ? { boxes: payload.boxes } : {},
     ...payload.axtree ? { axtree: payload.axtree } : {},
     ...payload.css ? { css: payload.css } : {},
-    ...shot ? { screenshotBase64: shot } : {}
+    ...shot ? { screenshotBase64: shot } : {},
+    ...typeof payload.screenshotFull === "string" && payload.screenshotFull.trim() ? { screenshotFullBase64: payload.screenshotFull } : {}
   });
   return { ok: true, result: runAudit({ inputs: [join51(dir, "dom.html")] }) };
 }
@@ -75968,6 +76085,8 @@ export async function checkA11y(page, opts = {}) {
       ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
       ...(opts.sources ? { sources: opts.sources } : {}),
       ...(opts.notes ? { notes: opts.notes } : {}),
+      // Still loading when collected: marked, so the audit concludes nothing from its silence.
+      ...(collected.loading && collected.loading.length ? { loading: collected.loading } : {}),
     },
     dom: collected.dom,
     styles: collected.styles,
@@ -80560,7 +80679,7 @@ async function cmdPages(p) {
   const derived = derivePages(result, scope);
   const split = p.flags.split === "page";
   const outDir = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : void 0;
-  const shotOf = (id) => join56(PAGES_DIR, id, "screen.png");
+  const shotOf = (id) => pageScreenshot(PAGES_DIR, id) ?? join56(PAGES_DIR, id, "screen.png");
   const shotsRelative = (fileDir) => {
     const m = /* @__PURE__ */ new Map();
     for (const pg of derived) {
@@ -80738,7 +80857,9 @@ async function cmdSnapshot(p) {
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command, the
       // dev side-car, `scan` — writes it the one same way.
-      ...typeof payload.screenshot === "string" && payload.screenshot ? { screenshotBase64: payload.screenshot } : {}
+      ...typeof payload.screenshot === "string" && payload.screenshot ? { screenshotBase64: payload.screenshot } : {},
+      // The whole page, for the report's reader — never read by a rule.
+      ...typeof payload.screenshotFull === "string" && payload.screenshotFull ? { screenshotFullBase64: payload.screenshotFull } : {}
     });
   } catch (e) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);

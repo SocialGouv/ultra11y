@@ -1789,7 +1789,17 @@ const SNIPPET_SHOWN = 200;
  *  supplied that digest (src/snapshot.ts `writeSnapshot`) — and `axtree.json` is written by no
  *  capture path the engine ships. So a brief never names one from this list without having
  *  found it on disk. */
-export const CAPTURE_FILES = ["dom.html", "styles.json", "boxes.json", "css.json", "probes.json", "axe.json", "axtree.json", "screen.png"] as const;
+export const CAPTURE_FILES = [
+  "dom.html",
+  "styles.json",
+  "boxes.json",
+  "css.json",
+  "probes.json",
+  "axe.json",
+  "axtree.json",
+  "screen.png",
+  "screen-full.png",
+] as const;
 export type CaptureFile = (typeof CAPTURE_FILES)[number];
 
 const CAPTURE_FILE_LABEL: Record<Lang, Record<CaptureFile, string>> = {
@@ -1802,6 +1812,7 @@ const CAPTURE_FILE_LABEL: Record<Lang, Record<CaptureFile, string>> = {
     "axe.json": "les résultats axe-core de la page",
     "axtree.json": "l'arbre d'accessibilité",
     "screen.png": "la capture d'écran",
+    "screen-full.png": "la page entière en capture d'écran",
   },
   en: {
     "dom.html": "the DOM the browser serialized",
@@ -1812,6 +1823,7 @@ const CAPTURE_FILE_LABEL: Record<Lang, Record<CaptureFile, string>> = {
     "axe.json": "axe-core's results on the page",
     "axtree.json": "the accessibility tree",
     "screen.png": "the screenshot",
+    "screen-full.png": "the whole page as a screenshot",
   },
 };
 

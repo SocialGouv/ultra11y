@@ -38,7 +38,15 @@ import {
   TEXT_SPACING_PROBE,
 } from "./probes.js";
 import { sampleScope } from "./sample.js";
-import { COLLECT_SNAPSHOT, type CollectedPage, slugifyPageId } from "./snapshot.js";
+import {
+  COLLECT_SNAPSHOT,
+  type CollectedPage,
+  FULL_SCREENSHOT_MAX_HEIGHT,
+  LOADING_STATE,
+  LOADING_TIMEOUT_MS,
+  slugifyPageId,
+  waitForLoaded,
+} from "./snapshot.js";
 import { today } from "./util.js";
 
 export const LOCAL_ENGINE = "axe-core@playwright (local)";
@@ -630,6 +638,7 @@ export function probeSources(): Record<string, string> {
     // Page-snapshot collector (src/snapshot.ts) — evaluated in the browser by every snapshot
     // producer (E2E fixtures, the dev sidecar), so it is syntax-gated here like the probes.
     COLLECT_SNAPSHOT,
+    LOADING_STATE,
   };
 }
 
@@ -654,6 +663,10 @@ async function runOnPage(
     // report false "no h1 / not in a landmark". Bounded networkidle + a short settle.
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
     await page.waitForTimeout(1200);
+    // …and for the page to stop declaring itself loading (#135): `aria-busy`, a spinner, a
+    // « Chargement… » where the content will be. Bounded; a page still loading is collected
+    // all the same and marked by the collector, never filed as an ordinary capture.
+    await waitForLoaded(page, LOADING_TIMEOUT_MS);
 
     // The identity of what is ABOUT to be measured, captured here and nowhere later. The
     // probes below click buttons, and a click that routes (history.pushState) leaves
@@ -677,6 +690,7 @@ async function runOnPage(
     // the same (normal) viewport, so it shares the coordinate system of boxes.json.
     let snapshot: CollectedPage | undefined;
     let screenshot: string | undefined;
+    let screenshotFull: string | undefined;
     if (opts.snapshot !== false) {
       try {
         snapshot = (await page.evaluate(COLLECT_SNAPSHOT)) as CollectedPage;
@@ -689,6 +703,17 @@ async function runOnPage(
           screenshot = ((await page.screenshot({ fullPage: false })) as Buffer).toString("base64");
         } catch {
           /* pixel tier only — every other rendered rule still reads the digests */
+        }
+        // The whole page beside it, for the report's reader (#135); bounded in height, and
+        // only when the page is taller than the viewport — otherwise it is the same image.
+        const vp = snapshot.viewport;
+        const height = Math.min(snapshot.docHeight ?? 0, FULL_SCREENSHOT_MAX_HEIGHT);
+        if (vp && height > vp.height) {
+          try {
+            screenshotFull = ((await page.screenshot({ fullPage: true, clip: { x: 0, y: 0, width: vp.width, height } })) as Buffer).toString("base64");
+          } catch {
+            /* the report shows the viewport shot instead */
+          }
         }
       }
     }
@@ -889,7 +914,7 @@ async function runOnPage(
       // Sorted for the same reason as `probed`: a persisted artefact that differs only by list
       // order shows up as a change in every diff of a committed `.ultra11y/pages` tree.
       ...(skipped.length ? { skipped: [...skipped].sort((a, b) => a.sc.localeCompare(b.sc)) } : {}),
-      ...(snapshot ? { snapshot: { ...snapshot, ...(screenshot ? { screenshot } : {}) } } : {}),
+      ...(snapshot ? { snapshot: { ...snapshot, ...(screenshot ? { screenshot } : {}), ...(screenshotFull ? { screenshotFull } : {}) } } : {}),
     };
   } finally {
     await context.close();

@@ -55,6 +55,79 @@ export const COLLECTED_CSS: readonly string[] = [
 // larger than the DOM itself. Truncation is RECORDED, never silent.
 export const COLLECT_MAX_ELEMENTS = 5000;
 
+/** THE LOADING MARKERS — what says « this page is not there yet ».
+ *
+ *  egapro's `admin-declaration-detail` was recorded while it displayed « Chargement... »: the
+ *  data had not arrived, the capture held a header, a footer and one paragraph, and it counted
+ *  as an audited page all the same. Nothing about that snapshot looks wrong, which is what makes
+ *  it costly — every criterion about the missing content reads as silence.
+ *
+ *  So the page is asked, in the browser, whether it is still loading:
+ *  • `aria-busy="true"` on a rendered element — the one marker the platform defines;
+ *  • an indeterminate progress bar (`role=progressbar` with no `aria-valuenow`, `<progress>`
+ *    with no `value`) — a spinner, by its own declaration;
+ *  • a rendered element whose WHOLE text is a loading phrase (« Chargement… », « Chargement en
+ *    cours », « Veuillez patienter », « Loading… », « Please wait »). The whole text and the
+ *    innermost element only: a sentence that merely contains the word is content.
+ *  Returns the markers found, each named after its element; empty when the page is ready.
+ *  Bounded to ten — the point is made long before. */
+export const LOADING_STATE = `(() => {
+  const out = [];
+  const shown = (e) => {
+    const r = e.getBoundingClientRect();
+    if (r.width <= 0 && r.height <= 0) return false;
+    const s = getComputedStyle(e);
+    return s.display !== 'none' && s.visibility !== 'hidden';
+  };
+  const name = (e) => e.localName + (e.id ? '#' + e.id : '');
+  for (const e of Array.from(document.querySelectorAll('[aria-busy="true"]'))) if (shown(e)) out.push('aria-busy="true" ' + name(e));
+  for (const e of Array.from(document.querySelectorAll('[role="progressbar"]:not([aria-valuenow]), progress:not([value])'))) if (shown(e)) out.push('indeterminate progress ' + name(e));
+  const PHRASE = /^(chargement( en cours)?|veuillez patienter|loading|please wait)\\s*(\\.{1,3}|…)?$/i;
+  const text = (e) => (e.textContent || '').replace(/\\s+/g, ' ').trim();
+  if (document.body) for (const e of Array.from(document.body.querySelectorAll('p,span,div,li,h1,h2,h3,h4,h5,h6,strong,em,output,[role="status"]'))) {
+    const t = text(e);
+    if (t.length > 40 || !PHRASE.test(t)) continue;
+    if (Array.from(e.children).some((c) => PHRASE.test(text(c)))) continue;
+    if (shown(e)) out.push('text "' + t + '" ' + name(e));
+  }
+  return out.slice(0, 10);
+})()`;
+
+/** Wait, BOUNDED, for the page to stop declaring itself busy (see LOADING_STATE).
+ *
+ *  Polled from the caller's side so it works on any page object that can evaluate a string —
+ *  Playwright's, or a home-made harness — and never longer than `timeoutMs`: a page that stays
+ *  busy is recorded anyway, with the markers it still carried, and marked as such. A capture
+ *  that never happens is a missing page; a capture marked « loading » is a page the report can
+ *  be honest about. `timeoutMs: 0` checks once and does not wait. */
+export async function waitForLoaded(
+  page: { evaluate(script: string): Promise<unknown> },
+  timeoutMs: number,
+  intervalMs = 150,
+): Promise<{ markers: string[]; waitedMs: number }> {
+  const started = Date.now();
+  for (;;) {
+    let markers: string[] = [];
+    try {
+      const r = await page.evaluate(LOADING_STATE);
+      markers = Array.isArray(r) ? r.filter((m): m is string => typeof m === "string") : [];
+    } catch {
+      // A page that cannot answer is not known to be loading; the capture goes ahead as before.
+      return { markers: [], waitedMs: Date.now() - started };
+    }
+    const waitedMs = Date.now() - started;
+    if (!markers.length || waitedMs >= timeoutMs) return { markers, waitedMs };
+    await new Promise((resolve) => setTimeout(resolve, Math.min(intervalMs, Math.max(1, timeoutMs - waitedMs))));
+  }
+}
+
+/** How long a producer waits, by default, for a page to stop declaring itself loading. */
+export const LOADING_TIMEOUT_MS = 10_000;
+
+/** The tallest full-page screenshot taken, in CSS pixels. A whole page is what a reviewer
+ *  judges, but an infinite feed would otherwise produce an image nobody can open. */
+export const FULL_SCREENSHOT_MAX_HEIGHT = 8000;
+
 // Browser-context source, evaluated as a STRING (the engine's tsconfig ships no DOM lib —
 // see src/scan-local.ts). Registered in probeSources() so a typo fails CI instead of being
 // swallowed at run time. Returns { dom, styles, boxes } for the CURRENT page.
@@ -169,6 +242,12 @@ export const COLLECT_SNAPSHOT = `(() => {
     lang: document.documentElement.getAttribute('lang') || '',
     url: location.href,
     viewport: { width: window.innerWidth, height: window.innerHeight },
+    // The document's full height, so the producer knows whether a full-page screenshot adds
+    // anything to the viewport one.
+    docHeight: Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0),
+    // Still loading at the instant of collection: the markers, or none. Every producer runs
+    // this same collector, so every producer can say so — see LOADING_STATE.
+    loading: ${LOADING_STATE},
     styles: { v: 1, entries: styles, truncated: truncated },
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };

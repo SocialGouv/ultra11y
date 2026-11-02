@@ -53,6 +53,8 @@ export interface SnapshotPayload {
   boxes?: unknown;
   css?: unknown;
   screenshot?: string;
+  /** The whole page, height-bounded (FULL_SCREENSHOT_MAX_HEIGHT) — for the report's reader. */
+  screenshotFull?: string;
   /** What the live probes measured, when the caller ran them. */
   probes?: unknown;
   /** What axe-core found on this page, when the caller ran it. */
@@ -100,8 +102,16 @@ export interface CheckOptions {
   sources?: string[];
   /** Reproduction notes carried into the auditor ticket. */
   notes?: string;
-  /** Capture a viewport screenshot for the pixel tier (Playwright: on by default). */
+  /** Capture a viewport screenshot for the pixel tier (Playwright: on by default), and — when
+   *  the page is taller than the viewport — a full-page one beside it for the report. */
   screenshot?: boolean;
+  /** How long to wait, before collecting, for the page to stop declaring itself loading —
+   *  `aria-busy="true"`, an indeterminate progress bar, a « Chargement… » standing in for the
+   *  content (default 10 000 ms; `0` checks without waiting). A page still loading when it
+   *  runs out is recorded anyway, MARKED (`meta.loading`) and reported « capture en état de
+   *  chargement »: its findings count, its silence does not. Playwright only — Cypress records
+   *  the markers it sees but leaves the waiting to the test's own `should`. */
+  loadingTimeoutMs?: number;
   /** The path you NAVIGATED to. Given it, the fixture refuses to record a page the browser
    *  did not stay on — a guarded route that redirected, a session that expired — instead of
    *  filing that other screen under this page's `as`/`name`. Nothing about such a snapshot
@@ -195,13 +205,24 @@ export function stayedOnPage(expected: string, actual: string): boolean {
  *  same metadata — a page recorded by Cypress and the same page recorded by Playwright must
  *  land on one identity, or the per-page grid grows a phantom column. */
 export function buildPayload(
-  collected: { dom: string; styles?: unknown; boxes?: unknown; css?: unknown; title?: string; url?: string; viewport?: unknown; doctype?: string },
+  collected: {
+    dom: string;
+    styles?: unknown;
+    boxes?: unknown;
+    css?: unknown;
+    title?: string;
+    url?: string;
+    viewport?: unknown;
+    doctype?: string;
+    loading?: string[];
+  },
   url: string,
   runner: string,
   opts: CheckOptions,
   screenshot?: string,
   probes?: unknown,
   axe?: unknown,
+  screenshotFull?: string,
 ): SnapshotPayload {
   const id = opts.as || slugify(url);
   return {
@@ -226,12 +247,16 @@ export function buildPayload(
       ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
       ...(opts.sources ? { sources: opts.sources } : {}),
       ...(opts.notes ? { notes: opts.notes } : {}),
+      // Still loading when collected: named, so the report can say so and the audit concludes
+      // nothing from this page's silence.
+      ...(collected.loading?.length ? { loading: collected.loading } : {}),
     },
     dom: collected.dom,
     styles: collected.styles,
     boxes: collected.boxes,
     css: collected.css,
     ...(screenshot ? { screenshot } : {}),
+    ...(screenshotFull ? { screenshotFull } : {}),
     // What the live probes measured, when the caller asked for them. It rides in the payload
     // because `snapshot write` persists it beside the DOM — the audit that folds it runs later
     // and in another process, so a measurement kept in memory decides nothing.

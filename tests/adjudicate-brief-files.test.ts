@@ -82,6 +82,12 @@ describe("the brief names only the capture files that exist", () => {
     expect(captureFilesPresent([".ultra11y/pages/nowhere/dom.html"], a.root)).toEqual(["dom.html"]);
   });
 
+  it("names the whole-page screenshot when the producer took one (#135)", () => {
+    const png = Buffer.from("89504e470d0a1a0a", "hex").toString("base64");
+    const c = capture({ screenshotBase64: png, screenshotFullBase64: png } as Partial<Parameters<typeof writeSnapshot>[1]>);
+    expect(captureFilesPresent([join(c.pages, "aide", "dom.html")])).toEqual(["dom.html", "screen.png", "screen-full.png"]);
+  });
+
   it("the gate's needs-rendered-dom refusal lists the same files, and no phantom", () => {
     const { root } = capture({ styles: { v: 1, entries: [] } } as Partial<Parameters<typeof writeSnapshot>[1]>);
     const page = join(root, "page.html");

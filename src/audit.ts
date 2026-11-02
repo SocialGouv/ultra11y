@@ -607,12 +607,22 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   const pageId = snapshotPageId(doc.file);
   if (pageId) {
     acc.pageIds.add(pageId);
+    // A CAPTURE OF A PLACEHOLDER (#135). The page was recorded while it still declared itself
+    // loading, so what it holds is a spinner and a frame: its findings are real and are kept,
+    // but every COVERAGE credit below is withheld — a measurement that found nothing on content
+    // that was not there yet is not a measurement of that content. The page stays in scope, so
+    // « measured on every page » cannot be reached without it, and the criteria stay open.
+    const placeholder = Boolean(doc.signals?.capturedLoading?.length);
     // The subject fold, scoped to THIS page. Its own `skip` set, never the run-wide one:
     // sharing that would record a subject on the first page that carried it and on no other.
-    const own = acc.pageSubjects.get(pageId) ?? new Set<string>();
-    for (const id of subjectsPresentIn(doc, own)) own.add(id);
-    acc.pageSubjects.set(pageId, own);
-    for (const ruleId of renderedRulesRan(doc.signals)) {
+    // Not for a placeholder: « nothing of this kind on this page » would be read off a page
+    // whose content had not arrived.
+    if (!placeholder) {
+      const own = acc.pageSubjects.get(pageId) ?? new Set<string>();
+      for (const id of subjectsPresentIn(doc, own)) own.add(id);
+      acc.pageSubjects.set(pageId, own);
+    }
+    for (const ruleId of placeholder ? [] : renderedRulesRan(doc.signals)) {
       const seen = acc.renderedRan.get(ruleId) ?? new Set<string>();
       seen.add(pageId);
       acc.renderedRan.set(ruleId, seen);
@@ -621,7 +631,7 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
     // are credited the same way: on the pages whose capture carried the signal they read, and
     // on no others. Without this a criterion the pack decides from a doctype would be treated
     // as measured wherever a DOM was parsed — and cleared on the pages nobody captured.
-    for (const pack of listPacks()) {
+    for (const pack of placeholder ? [] : listPacks()) {
       for (const rule of pack.rules ?? []) {
         if (!docRuleRan(doc, rule)) continue;
         const id = `pack:${pack.key}:${rule.id}`;
@@ -640,7 +650,7 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
       // pressed no button all made the same claim as a complete one. Reading those files as if
       // they had been written under this engine's rule reinstates the defect the rule closed.
       const trusted = (probes.v ?? 1) >= PROBES_VERSION;
-      for (const sc of probes.probed ?? []) {
+      for (const sc of placeholder ? [] : (probes.probed ?? [])) {
         if (!trusted && WALK_DEPENDENT_SCS.includes(sc)) continue;
         const seen = acc.probedScs.get(sc) ?? new Set<string>();
         seen.add(pageId);
@@ -667,7 +677,7 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
     // a `color-contrast` hit is the same non-conformity whichever tier surfaced it.
     const axe = doc.signals?.axe;
     if (axe?.ran) {
-      acc.axeRan.add(pageId);
+      if (!placeholder) acc.axeRan.add(pageId);
       for (const sc of Object.keys(AXE_DECIDES)) acc.renderedScs.add(sc);
       for (const f of axeFindings(axe.violations ?? [], doc.file, pageId)) {
         const list = acc.byCriterion.get(f.criteriaId) ?? [];

@@ -23,7 +23,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { COLLECT_SNAPSHOT } from "../collector.js";
+import { COLLECT_SNAPSHOT, FULL_SCREENSHOT_MAX_HEIGHT, LOADING_TIMEOUT_MS, waitForLoaded } from "../collector.js";
 import {
   DOCUMENT_MAX_BYTES,
   DOCUMENT_MAX_COUNT,
@@ -42,7 +42,7 @@ import { type AuditLike, type CheckOptions, type ProbeTuning, auditSnapshot, bui
 // so the page object is structurally typed to exactly what is used.
 interface PlaywrightPage {
   evaluate(script: string): Promise<unknown>;
-  screenshot(opts: { fullPage: boolean }): Promise<Buffer>;
+  screenshot(opts: { fullPage: boolean; clip?: { x: number; y: number; width: number; height: number } }): Promise<Buffer>;
   url(): string;
   // Used only by the live probes (`probes: true`), so they stay optional: a page object that
   // cannot resize or press a key still records a snapshot exactly as before.
@@ -250,21 +250,49 @@ async function runAxe(page: PlaywrightPage, mode: boolean | "auto" | undefined):
   }
 }
 
+/** The full-page screenshot, height-bounded, or undefined when it adds nothing to the viewport
+ *  one (the page is no taller than the viewport) or could not be taken. Never fatal. */
+async function fullPageShot(page: PlaywrightPage, collected: { docHeight?: number; viewport?: unknown }): Promise<string | undefined> {
+  const vp = collected.viewport as { width?: number; height?: number } | undefined;
+  const height = Math.min(collected.docHeight ?? 0, FULL_SCREENSHOT_MAX_HEIGHT);
+  if (!vp?.width || !vp.height || height <= vp.height) return undefined;
+  try {
+    return (await page.screenshot({ fullPage: true, clip: { x: 0, y: 0, width: vp.width, height } })).toString("base64");
+  } catch {
+    return undefined;
+  }
+}
+
 /** Collect the current page, persist it as a snapshot, audit it, and fail on the threshold. */
 export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptions = {}): Promise<AuditLike> {
-  const collected = (await page.evaluate(COLLECT_SNAPSHOT)) as Parameters<typeof buildPayload>[0];
+  // NOT WHILE IT IS STILL LOADING (#135). A test that navigates and checks at once can land on
+  // the page's placeholder — « Chargement… » where the data will be — and a snapshot of that is
+  // a page nobody audited, filed as if it had been. Bounded: a page that never settles is
+  // recorded all the same, and the collector marks it (`meta.loading`).
+  const settled = await waitForLoaded(page, opts.loadingTimeoutMs ?? LOADING_TIMEOUT_MS);
+  const collected = (await page.evaluate(COLLECT_SNAPSHOT)) as Parameters<typeof buildPayload>[0] & { docHeight?: number };
+  if (collected.loading?.length) {
+    console.warn(
+      `ultra11y: capture en état de chargement — "${opts.as ?? opts.name ?? collected.url ?? page.url()}" still showed ${collected.loading.join(", ")} after ${settled.waitedMs} ms. ` +
+        "Recorded and marked: its findings count, its silence does not. Wait for the content in the test, or raise `loadingTimeoutMs`.",
+    );
+  }
 
   // A VIEWPORT screenshot, deliberately: the boxes come from getBoundingClientRect, which is
   // viewport-relative, so a full-page capture would put the two coordinate systems out of
   // step. It feeds the pixel tier — contrast over an image or a gradient, where the CSSOM
   // has no answer. A screenshot failure must never fail the accessibility check itself.
   let shot: string | undefined;
+  let fullShot: string | undefined;
   if (opts.screenshot !== false) {
     try {
       shot = (await page.screenshot({ fullPage: false })).toString("base64");
     } catch {
       /* pixel tier skipped for this page; every other rule still runs */
     }
+    // AND THE WHOLE PAGE, beside it (#135): a reviewer judges the page, not its first 720
+    // pixels. Separate file, so the pixel tier keeps the coordinates it shares with the boxes.
+    fullShot = await fullPageShot(page, collected);
   }
 
   const url = collected.url || page.url();
@@ -318,7 +346,7 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
   // recorded DOM the one the test built.
   const axe = await runAxe(page, opts.axe ?? "auto");
 
-  const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe);
+  const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe, fullShot);
   const result = auditSnapshot(payload);
   // After the snapshot (the page is recorded whatever happens here) and before the report (which
   // re-audits .ultra11y and so reads the documents too). Never fatal, like the probes.

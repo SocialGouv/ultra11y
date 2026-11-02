@@ -1201,3 +1201,91 @@ describe("the zoom and text-spacing probes compare against the normal rendering 
     expect(sels(pseudo.r.reflow.widening ?? [])).toEqual(["div#own"]);
   }, 120_000);
 });
+
+// ---------------------------------------------------------------------------------------------
+// #135 — A PAGE CAPTURED WHILE STILL LOADING, AND A SCREENSHOT OF ITS FIRST SCREEN ONLY.
+//
+// egapro's `admin-declaration-detail` was recorded on its « Chargement... » placeholder and
+// counted as audited; every `screen.png` showed the first 720 pixels of pages reviewers judge
+// whole. The fixture now waits — bounded — for the page to stop declaring itself loading, marks
+// a capture that never did, and writes the whole page beside the viewport shot.
+describe("the Playwright fixture does not record a placeholder as a page (#135)", () => {
+  const record = async (html: string, as: string, opts: Record<string, unknown> = {}) => {
+    const { checkA11y } = await import("../src/integrations/playwright.js");
+    const work = mkdtempSync(join(tmpdir(), "u11y-loading-"));
+    const page = await browser!.newPage({ viewport: { width: 1280, height: 720 } });
+    const cwd = process.cwd();
+    process.chdir(work);
+    try {
+      await page.setContent(html, { waitUntil: "load" });
+      await checkA11y(page as any, { as, name: as, failOn: false, axe: false, pdf: false, ...opts });
+    } finally {
+      process.chdir(cwd);
+      await page.close();
+    }
+    const dir = join(work, PAGES_DIR, as);
+    return { work, dir, meta: JSON.parse(readFileSync(join(dir, "meta.json"), "utf8")), dom: readFileSync(join(dir, "dom.html"), "utf8") };
+  };
+  const doc = (body: string) => `<!doctype html><html lang="fr"><head><title>Détail</title></head><body>${body}</body></html>`;
+
+  it("waits for aria-busy and the « Chargement... » placeholder to clear, then records the content", async () => {
+    if (!browserAvailable) return;
+    const { meta, dom } = await record(
+      doc(`<main id="m" aria-busy="true"><p>Chargement...</p></main>
+        <script>setTimeout(() => { const m = document.getElementById('m'); m.innerHTML = '<h1>Déclaration 2026</h1><p>Données chargées</p>'; m.removeAttribute('aria-busy'); }, 400);</script>`),
+      "attente",
+      { loadingTimeoutMs: 5_000 },
+    );
+    expect(meta.loading, "a page that finished loading is not marked").toBeUndefined();
+    expect(dom).toContain("Données chargées");
+    expect(dom).not.toContain("Chargement...");
+  }, 120_000);
+
+  it("records a page still loading at the bound, MARKED, and the audit reads it as a placeholder", async () => {
+    if (!browserAvailable) return;
+    const { work, meta } = await record(
+      doc(
+        `<main><div role="status"><p>Chargement...</p></div><div aria-busy="true" id="zone"><span>x</span></div><aside><span>Chargement   en cours…</span></aside></main>`,
+      ),
+      "bloquee",
+      {
+        loadingTimeoutMs: 300,
+      },
+    );
+    expect(meta.loading).toEqual(expect.arrayContaining(['aria-busy="true" div#zone', 'text "Chargement..." p', 'text "Chargement en cours…" span']));
+    // The page scope every report reads (the CLI's `pageScopesFrom(readSnapshots(...))`).
+    const { pageScopesFrom } = await import("../src/pages.js");
+    const { readSnapshots } = await import("../src/snapshot.js");
+    expect(pageScopesFrom(readSnapshots(work)).find((p) => p.id === "bloquee")?.basis).toBe("loading");
+  }, 120_000);
+
+  it("does not read a sentence that merely mentions loading as a loading marker", async () => {
+    if (!browserAvailable) return;
+    const { meta } = await record(
+      doc(`<main><p>Le chargement des données peut prendre une minute.</p><progress value="40" max="100">40 %</progress></main>`),
+      "phrase",
+      {
+        loadingTimeoutMs: 0,
+      },
+    );
+    expect(meta.loading).toBeUndefined();
+  }, 120_000);
+
+  it("writes the whole page, height-bounded, beside the viewport screenshot", async () => {
+    if (!browserAvailable) return;
+    const png = (file: string) => {
+      const b = readFileSync(file);
+      return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+    };
+    const long = await record(doc(`<main><h1>Haut</h1><div style="height:2600px"></div><p>Bas de page</p></main>`), "longue");
+    expect(png(join(long.dir, "screen.png")).height).toBe(720);
+    expect(png(join(long.dir, "screen-full.png")).height).toBeGreaterThan(2600);
+    // A page no taller than the viewport gains nothing from a second image.
+    const short = await record(doc(`<main><h1>Court</h1></main>`), "courte");
+    expect(existsSync(join(short.dir, "screen-full.png"))).toBe(false);
+    // Bounded: an endless feed does not produce an image nobody can open.
+    const { FULL_SCREENSHOT_MAX_HEIGHT } = await import("../src/collector.js");
+    const endless = await record(doc(`<main><div style="height:${FULL_SCREENSHOT_MAX_HEIGHT * 2}px"></div></main>`), "infinie");
+    expect(png(join(endless.dir, "screen-full.png")).height).toBe(FULL_SCREENSHOT_MAX_HEIGHT);
+  }, 120_000);
+});

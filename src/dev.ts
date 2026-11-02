@@ -284,7 +284,16 @@ async function readBody(req: IncomingMessage, limit = 64 * 1024 * 1024): Promise
 /** Audit one collected page: persist it as a snapshot, then run the engine over its DOM. */
 export function auditCollected(
   root: string,
-  payload: { meta?: unknown; dom?: unknown; styles?: StyleDigest; boxes?: BoxDigest; axtree?: AxNode; css?: CssDigest; screenshot?: unknown },
+  payload: {
+    meta?: unknown;
+    dom?: unknown;
+    styles?: StyleDigest;
+    boxes?: BoxDigest;
+    axtree?: AxNode;
+    css?: CssDigest;
+    screenshot?: unknown;
+    screenshotFull?: unknown;
+  },
 ): { ok: true; result: AuditResult } | { ok: false; error: string } {
   const v = validateSnapshotMeta(payload.meta);
   if (!v.ok || !v.meta) return { ok: false, error: v.issues.map((i) => `${i.path}: ${i.message}`).join("; ") };
@@ -304,6 +313,7 @@ export function auditCollected(
     ...(payload.axtree ? { axtree: payload.axtree } : {}),
     ...(payload.css ? { css: payload.css } : {}),
     ...(shot ? { screenshotBase64: shot } : {}),
+    ...(typeof payload.screenshotFull === "string" && payload.screenshotFull.trim() ? { screenshotFullBase64: payload.screenshotFull } : {}),
   });
   return { ok: true, result: runAudit({ inputs: [join(dir, "dom.html")] }) };
 }
