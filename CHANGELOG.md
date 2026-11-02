@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.57.5](https://github.com/SocialGouv/ultra11y/compare/v5.57.4...v5.57.5) (2026-11-02)
+
+
+### Bug Fixes
+
+* **rules:** silence three static false findings seen on egapro — a title read into a caption, a dl group a component returns, a Next <Link> ([#137](https://github.com/SocialGouv/ultra11y/issues/137)) ([9b27d73](https://github.com/SocialGouv/ultra11y/commit/9b27d73e6034f9c41b1bb689a7cd83dd5676b8f0))
+
 ## [5.57.4](https://github.com/SocialGouv/ultra11y/compare/v5.57.3...v5.57.4) (2026-11-02)
 
 
