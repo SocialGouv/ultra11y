@@ -81,7 +81,12 @@ export type PdfUnreadableReason = "not-pdf" | "encrypted" | "malformed" | "trunc
 
 const WS = new Set([0, 9, 10, 12, 13, 32]);
 const DELIM = new Set([0x28, 0x29, 0x3c, 0x3e, 0x5b, 0x5d, 0x7b, 0x7d, 0x2f, 0x25]);
-const isRegular = (c: number | undefined): boolean => c !== undefined && !WS.has(c) && !DELIM.has(c);
+/** Byte classes as a table — the content scan tests every byte, so a Set lookup per byte is the
+ *  hot path: 0 regular, 1 whitespace, 2 delimiter. */
+const CLASS = new Uint8Array(256);
+for (const c of WS) CLASS[c] = 1;
+for (const c of DELIM) CLASS[c] = 2;
+const isRegular = (c: number | undefined): boolean => c !== undefined && CLASS[c] === 0;
 
 /** Hard ceilings, so a hostile or broken file can cost bounded work and nothing more. */
 const MAX_NESTING = 64;
@@ -256,6 +261,9 @@ const MAX_DECODED_TOTAL = 256 * 1024 * 1024;
 const MAX_STREAM_DECODED = 64 * 1024 * 1024;
 
 const tooLarge = (): PdfUnreadable => new PdfUnreadable("too-large", `a decoded stream exceeds ${MAX_STREAM_DECODED} bytes`);
+/** A budget ran out. Never swallowed as « this part could not be read »: a caller that skips it
+ *  and moves on re-runs the same bomb on the next page, so it ends the read — unreadable. */
+const isTooLarge = (e: unknown): boolean => e instanceof PdfUnreadable && e.reason === "too-large";
 
 /** A growable byte buffer that refuses to grow past `MAX_STREAM_DECODED`. */
 class ByteSink {
@@ -363,38 +371,41 @@ function asciiHex(data: Buffer): Buffer {
   return Buffer.from(s, "hex");
 }
 
+/** ASCII85 through the same capped sink as every other decoder: each `z` is four bytes out for
+ *  one in, so behind a FlateDecode a few kilobytes become gigabytes — the cap has to bite while
+ *  decoding, not after. Whitespace is skipped byte by byte, never by rebuilding the string. */
 function ascii85(data: Buffer): Buffer {
-  let s = data.toString("latin1").replace(/\s+/g, "");
-  if (s.startsWith("<~")) s = s.slice(2);
-  const end = s.indexOf("~>");
-  if (end >= 0) s = s.slice(0, end);
-  const out: number[] = [];
-  let group: number[] = [];
-  const flush = (n: number): void => {
-    let v = 0;
-    for (const c of group) v = v * 85 + c;
-    const bytes = [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
-    out.push(...bytes.slice(0, n));
-  };
-  for (const ch of s) {
-    if (ch === "z" && group.length === 0) {
-      out.push(0, 0, 0, 0);
+  const out = new ByteSink();
+  let i = 0;
+  while (i < data.length && WS.has(data[i]!)) i++;
+  if (data[i] === 0x3c && data[i + 1] === 0x7e) i += 2; // `<~`
+  let v = 0;
+  let n = 0;
+  for (; i < data.length; i++) {
+    const c = data[i]!;
+    if (c === 0x7e) break; // `~>`
+    if (c === 0x7a && n === 0) {
+      out.fill(0, 4);
       continue;
     }
-    const c = ch.charCodeAt(0) - 33;
-    if (c < 0 || c > 84) continue;
-    group.push(c);
-    if (group.length === 5) {
-      flush(4);
-      group = [];
+    if (c < 33 || c > 117) continue; // whitespace, or junk a viewer skips too
+    v = v * 85 + (c - 33);
+    if (++n === 5) {
+      out.push((v >>> 24) & 0xff);
+      out.push((v >>> 16) & 0xff);
+      out.push((v >>> 8) & 0xff);
+      out.push(v & 0xff);
+      v = 0;
+      n = 0;
     }
   }
-  if (group.length) {
-    const n = group.length - 1;
-    while (group.length < 5) group.push(84);
-    flush(n);
+  if (n > 1) {
+    const keep = n - 1;
+    for (; n < 5; n++) v = v * 85 + 84;
+    const bytes = [(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff];
+    out.append(bytes.slice(0, keep));
   }
-  return Buffer.from(out);
+  return out.done();
 }
 
 function lzw(data: Buffer, earlyChange = 1): Buffer {
@@ -483,6 +494,9 @@ export class PdfDocument {
   objectStreams = false;
   private cache = new Map<number, PdfVal>();
   private objStmCache = new Map<number, { buf: Buffer; offsets: Map<number, number> }>();
+  /** Decoded bytes (or the error) per stream object: a content stream or form shared by every
+   *  page is decoded once, and counted once against the budget. */
+  private decoded = new Map<PdfStream, Buffer | Error>();
   private resolving = new Set<number>();
   private decodedTotal = 0;
   readonly text: string;
@@ -497,7 +511,7 @@ export class PdfDocument {
       // defect in the wild, and the cheapest proof it is right is that the catalog resolves.
       if (!isDict(this.get(this.trailer.get("Root")))) throw new PdfUnreadable("malformed", "the trailer's /Root does not resolve");
     } catch (e) {
-      if (e instanceof PdfUnreadable && e.reason === "too-large") throw e;
+      if (isTooLarge(e)) throw e;
       this.repair();
     }
   }
@@ -601,6 +615,7 @@ export class PdfDocument {
     this.repaired = true;
     this.xref.clear();
     this.cache.clear();
+    this.decoded.clear();
     const re = /(?:^|[\r\n\s])(\d{1,10})\s+(\d{1,5})\s+obj\b/g;
     for (let m = re.exec(this.text); m; m = re.exec(this.text)) {
       const at = m.index + m[0].indexOf(m[1]!);
@@ -626,7 +641,8 @@ export class PdfDocument {
       let o: PdfVal;
       try {
         o = this.get(new PdfRef(n, e.b));
-      } catch {
+      } catch (err) {
+        if (isTooLarge(err)) throw err;
         continue;
       }
       if (!(o instanceof PdfStream)) continue;
@@ -642,7 +658,8 @@ export class PdfDocument {
             if (!this.xref.has(objNum)) this.xref.set(objNum, { type: 2, a: n, b: i });
             i++;
           }
-        } catch {
+        } catch (err) {
+          if (isTooLarge(err)) throw err;
           /* an unreadable object stream contributes nothing */
         }
       }
@@ -655,7 +672,8 @@ export class PdfDocument {
             trailer.set("Root", new PdfRef(n, e.type === 1 ? e.b : 0));
             break;
           }
-        } catch {
+        } catch (err) {
+          if (isTooLarge(err)) throw err;
           /* keep scanning */
         }
       }
@@ -700,7 +718,8 @@ export class PdfDocument {
     if (v instanceof PdfRef) {
       try {
         return num(this.get(v));
-      } catch {
+      } catch (err) {
+        if (isTooLarge(err)) throw err;
         return undefined;
       }
     }
@@ -749,7 +768,7 @@ export class PdfDocument {
       this.cache.set(v.num, val);
       return val;
     } catch (err) {
-      if (err instanceof PdfUnreadable && err.reason === "too-large") throw err;
+      if (isTooLarge(err)) throw err;
       this.cache.set(v.num, null);
       return null;
     } finally {
@@ -769,8 +788,23 @@ export class PdfDocument {
     return Array.isArray(r) ? r : undefined;
   }
 
-  /** A stream's decoded bytes. Throws for an image codec or an unknown filter. */
+  /** A stream's decoded bytes. Throws for an image codec or an unknown filter — and throws the
+   *  same error again, without decoding again, when asked twice. */
   decode(s: PdfStream): Buffer {
+    const hit = this.decoded.get(s);
+    if (hit instanceof Error) throw hit;
+    if (hit) return hit;
+    try {
+      const data = this.decodeUncached(s);
+      this.decoded.set(s, data);
+      return data;
+    } catch (e) {
+      this.decoded.set(s, e instanceof Error ? e : new PdfUnreadable("malformed", String(e)));
+      throw e;
+    }
+  }
+
+  private decodeUncached(s: PdfStream): Buffer {
     let data: Buffer = this.buf.subarray(s.start, s.end);
     const fv = this.get(s.dict.get("Filter"));
     const filters = (Array.isArray(fv) ? fv : fv ? [fv] : []).map((f) => nameOf(this.get(f)) ?? "");
@@ -859,7 +893,8 @@ export interface PdfFacts {
   textOps: number;
   /** Image XObjects / inline images drawn. */
   images: number;
-  /** Every page's content could be decoded and scanned. When false, `textOps === 0` proves
+  /** The text question was answered: text was found, or every page's content — every stream,
+   *  every form it draws — resolved, decoded and was scanned. When false, `textOps === 0` proves
    *  nothing and no text verdict may be drawn. */
   contentScanned: boolean;
   structure?: PdfStructure;
@@ -872,6 +907,10 @@ export interface PdfFacts {
 const MAX_PAGES_SCANNED = 500;
 const MAX_STRUCT_NODES = 50_000;
 const MAX_FORM_DEPTH = 4;
+/** Content bytes the text scan tokenises per file, repeats included: past it the scan stops,
+ *  incomplete. One shared stream drawn by every page under a different /Resources is otherwise
+ *  re-tokenised page after page. */
+const MAX_SCANNED_TOTAL = 64 * 1024 * 1024;
 /** Files above this are not read at all — reported unreadable (`too-large`). */
 export const PDF_MAX_BYTES = 64 * 1024 * 1024;
 
@@ -907,7 +946,9 @@ export function readPdf(bytes: Uint8Array): PdfFacts {
   let version = hv[1]!;
   try {
     const doc = new PdfDocument(buf);
-    if (doc.trailer.has("Encrypt") && doc.get(doc.trailer.get("Encrypt")) !== null) {
+    // ANY /Encrypt entry, resolved or not: a dangling one still says the strings and streams are
+    // ciphertext, and reading ciphertext as text would invent every fact below.
+    if (doc.trailer.has("Encrypt")) {
       return unreadable("encrypted", "the file is encrypted; its strings and streams cannot be read without decrypting them", version);
     }
     const catalog = doc.dict(doc.trailer.get("Root"));
@@ -929,8 +970,8 @@ export function readPdf(bytes: Uint8Array): PdfFacts {
       if (title) titleSource = "xmp";
     }
 
-    const pages = collectPages(doc, catalog);
-    const content = scanContent(doc, pages);
+    const { pages, complete: treeComplete } = collectPages(doc, catalog);
+    const content = scanContent(doc, pages, treeComplete);
     const structure = structRoot ? walkStructure(doc, structRoot) : undefined;
     return {
       readable: true,
@@ -963,7 +1004,8 @@ function xmpTitle(doc: PdfDocument, catalog: PdfDict): string | undefined {
   let xml: string;
   try {
     xml = doc.decode(md).toString("utf8");
-  } catch {
+  } catch (e) {
+    if (isTooLarge(e)) throw e;
     return undefined;
   }
   const block = /<dc:title\b[^>]*>([\s\S]*?)<\/dc:title>/i.exec(xml)?.[1];
@@ -987,12 +1029,23 @@ interface PageRef {
   resources: PdfDict | undefined;
 }
 
-/** The page tree, flattened, with inherited /Resources resolved. Cycle-safe and bounded. */
-function collectPages(doc: PdfDocument, catalog: PdfDict): PageRef[] {
+/** The page tree, flattened, with inherited /Resources resolved. Cycle-safe and bounded.
+ *  `complete` is false when a /Kids entry does not resolve or the tree is cut by a bound: a page
+ *  the reader never saw may be the one that holds the text. */
+function collectPages(doc: PdfDocument, catalog: PdfDict): { pages: PageRef[]; complete: boolean } {
   const out: PageRef[] = [];
   const seen = new Set<PdfDict>();
+  let complete = true;
   const walk = (node: PdfDict | undefined, inherited: PdfDict | undefined, depth: number): void => {
-    if (!node || seen.has(node) || depth > MAX_NESTING || out.length >= MAX_PAGES_SCANNED * 4) return;
+    if (!node) {
+      complete = false;
+      return;
+    }
+    if (seen.has(node)) return; // a cycle: the node itself is already walked
+    if (depth > MAX_NESTING || out.length >= MAX_PAGES_SCANNED * 4) {
+      complete = false;
+      return;
+    }
     seen.add(node);
     const resources = doc.dict(node.get("Resources")) ?? inherited;
     const kids = doc.array(node.get("Kids"));
@@ -1001,23 +1054,42 @@ function collectPages(doc: PdfDocument, catalog: PdfDict): PageRef[] {
       out.push({ dict: node, resources });
       return;
     }
+    if (!kids && node.has("Kids")) complete = false;
     for (const k of kids ?? []) walk(doc.dict(k), resources, depth + 1);
   };
   walk(doc.dict(catalog.get("Pages")), undefined, 0);
-  return out;
+  return { pages: out, complete };
 }
 
 const TEXT_OPS = new Set(["Tj", "TJ", "'", '"']);
 
 /** Scan page content streams for text-showing operators, fonts and images. Stops early once
- *  text is found — the only question is whether ANY text exists. */
-function scanContent(doc: PdfDocument, pages: PageRef[]): { fonts: number; textOps: number; images: number; complete: boolean } {
+ *  text is found — the only question is whether ANY text exists.
+ *
+ *  `complete` answers « may the absence of text be concluded? ». It is false as soon as the scan
+ *  could not see something that might draw text: content that does not decode, a /Contents or
+ *  /XObject reference that does not resolve to a stream, a form nested deeper than
+ *  `MAX_FORM_DEPTH`, a page past `MAX_PAGES_SCANNED`, content past `MAX_SCANNED_TOTAL`. Text
+ *  found settles the question whatever else was missed. A budget overrun (`too-large`) is not « incomplete »: it ends the read. */
+function scanContent(doc: PdfDocument, pages: PageRef[], treeComplete: boolean): { fonts: number; textOps: number; images: number; complete: boolean } {
   let fonts = 0;
   let textOps = 0;
   let images = 0;
-  let complete = pages.length > 0;
+  let complete = pages.length > 0 && treeComplete;
   const fontSeen = new Set<PdfVal>();
   const formSeen = new Set<PdfStream>();
+  // Tokenising is the expensive part, and pages commonly share one content stream (a template, a
+  // blank back side). The result depends on the bytes and the resources the names resolve in,
+  // so it is remembered per (content streams, resources) pair: a repeat only re-adds its images.
+  const ids = new Map<PdfDict, number>();
+  const idOf = (o: PdfDict): number => {
+    let id = ids.get(o);
+    if (id === undefined) ids.set(o, (id = ids.size + 1));
+    return id;
+  };
+  const pageMemo = new Map<string, number>();
+  let scanned = 0;
+  let exhausted = false;
 
   const countFonts = (res: PdfDict | undefined): void => {
     const f = doc.dict(res?.get("Font"));
@@ -1029,48 +1101,89 @@ function scanContent(doc: PdfDocument, pages: PageRef[]): { fonts: number; textO
     }
   };
 
-  const scanStream = (data: Buffer, res: PdfDict | undefined, depth: number): void => {
+  /** Scans one content stream; returns the images it (and its forms) drew. */
+  const scanStream = (data: Buffer, res: PdfDict | undefined, depth: number): number => {
     countFonts(res);
+    scanned += data.length;
+    if (scanned > MAX_SCANNED_TOTAL) {
+      exhausted = true;
+      complete = false;
+      return 0;
+    }
     const xobjects = doc.dict(res?.get("XObject"));
     const ops = contentOperators(data);
     textOps += ops.text;
-    images += ops.inlineImages;
-    for (const name of ops.xobjects) {
+    let drawn = ops.inlineImages;
+    const uses = new Map<string, number>();
+    for (const name of ops.xobjects) uses.set(name, (uses.get(name) ?? 0) + 1);
+    for (const [name, count] of uses) {
       const xo = doc.get(xobjects?.get(name));
-      if (!(xo instanceof PdfStream)) continue;
-      const sub = nameOf(doc.get(xo.dict.get("Subtype")));
-      if (sub === "Image") images++;
-      else if (sub === "Form" && depth < MAX_FORM_DEPTH && !formSeen.has(xo)) {
-        formSeen.add(xo);
-        try {
-          scanStream(doc.decode(xo), doc.dict(xo.dict.get("Resources")) ?? res, depth + 1);
-        } catch {
-          complete = false;
-        }
+      if (!(xo instanceof PdfStream)) {
+        complete = false; // a dangling name or reference: whatever it drew went unseen
+        continue;
       }
+      const sub = nameOf(doc.get(xo.dict.get("Subtype")));
+      if (sub === "Image") drawn += count;
+      else if (sub === "Form") {
+        if (exhausted || formSeen.has(xo)) continue; // already scanned, or being scanned (a cycle)
+        if (depth >= MAX_FORM_DEPTH) {
+          complete = false;
+          continue;
+        }
+        formSeen.add(xo);
+        let form: Buffer;
+        try {
+          form = doc.decode(xo);
+        } catch (e) {
+          if (isTooLarge(e)) throw e;
+          complete = false;
+          continue;
+        }
+        drawn += scanStream(form, doc.dict(xo.dict.get("Resources")) ?? res, depth + 1);
+      } else if (sub !== "PS") complete = false; // no or unknown /Subtype: cannot say what it draws
     }
+    return drawn;
   };
 
   for (const [i, page] of pages.entries()) {
     if (i >= MAX_PAGES_SCANNED) {
-      if (textOps === 0) complete = false;
+      complete = false;
       break;
     }
-    const cv = doc.get(page.dict.get("Contents"));
-    const streams = (Array.isArray(cv) ? cv.map((c) => doc.get(c)) : [cv]).filter((s): s is PdfStream => s instanceof PdfStream);
+    // No /Contents (or a direct null) is an empty page. Anything else must yield streams.
+    const raw = page.dict.get("Contents");
+    const cv = doc.get(raw);
+    const entries = raw === undefined || raw === null ? [] : Array.isArray(cv) ? cv : [raw];
+    const streams: PdfStream[] = [];
+    for (const c of entries) {
+      const s = doc.get(c);
+      if (s instanceof PdfStream) streams.push(s);
+      else complete = false;
+    }
+    const key = `${streams.map((s) => s.start).join(",")}|${page.resources ? idOf(page.resources) : 0}`;
+    const memo = pageMemo.get(key);
+    if (memo !== undefined) {
+      countFonts(page.resources);
+      images += memo;
+      continue;
+    }
     // A page's content may be split across streams at any token boundary: concatenate first.
-    const parts: Buffer[] = [];
+    let data: Buffer;
     try {
-      for (const s of streams) parts.push(doc.decode(s), Buffer.from("\n"));
-    } catch {
+      const parts = streams.map((s) => doc.decode(s));
+      data = parts.length === 1 ? parts[0]! : Buffer.concat(parts.flatMap((p) => [p, Buffer.from("\n")]));
+    } catch (e) {
+      if (isTooLarge(e)) throw e;
       complete = false;
       countFonts(page.resources);
       continue;
     }
-    scanStream(Buffer.concat(parts), page.resources, 0);
-    if (textOps > 0) break;
+    const drawn = scanStream(data, page.resources, 0);
+    images += drawn;
+    pageMemo.set(key, drawn);
+    if (textOps > 0 || exhausted) break;
   }
-  return { fonts, textOps, images, complete };
+  return { fonts, textOps, images, complete: complete || textOps > 0 };
 }
 
 /** Tokenise a content stream just far enough to count operators: strings, hex strings, inline
@@ -1085,8 +1198,9 @@ export function contentOperators(data: Buffer): { text: number; inlineImages: nu
   const n = data.length;
   while (i < n) {
     const c = data[i]!;
-    if (WS.has(c)) {
+    if (CLASS[c] === 1) {
       i++;
+      while (i < n && CLASS[data[i]!] === 1) i++;
       continue;
     }
     if (c === 0x25) {
