@@ -2,7 +2,7 @@
   "source": "https://github.com/w3c/wcag",
   "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/",
   "license": "W3C Document License (code samples: W3C Software License)",
-  "fetchedAt": "2026-10-28",
+  "fetchedAt": "2026-11-02",
   "criteria": {
     "1.1.1": {
       "slug": "non-text-content",
@@ -731,11 +731,11 @@
         "whyitsimportant": "Flagging errors helps people with reduced sight and cognitive disabilities resolve them."
       },
       "good": {
-        "id": "ARIA21",
-        "title": "Using aria-invalid to Indicate An Error Field",
+        "id": "ARIA18",
+        "title": "Using aria-alertdialog to Identify Errors",
         "lang": "html",
-        "code": "<form name=\"signup\" id=\"signup\" method=\"post\" action=\"\">\n  <p id=\"errors\" aria-live=\"assertive\"></p>\n  <div>\n    <label for=\"first\">First Name (required)</label>\n    <input aria-invalid=\"false\" autocomplete=\"given-name\" id=\"first\" name=\"first\" type=\"text\">\n  </div>\n  <div>\n    <label for=\"last\">Last Name (required)</label>\n    <input aria-invalid=\"false\" autocomplete=\"family-name\" id=\"last\" name=\"last\" type=\"text\">\n  </div>\n  <div>\n    <label for=\"email\">Email (required)</label>\n    <input aria-invalid=\"false\" autocomplete=\"email\" id=\"email\" name=\"email\" type=\"text\">\n  </div>\n  <div>\n    <button id=\"button\" type=\"submit\">Sign Up</button>\n  </div>\n</form>",
-        "note": "Using aria-invalid on required fields The aria-invalid attribute is used on required fields that are empty when the form is submitted. A message above the form tells the user that there are form fields that need to be completed. HTML:"
+        "code": "<dialog aria-labelledby=\"alert-heading\" id=\"date-alert\" role=\"alertdialog\">\n  <h1 id=\"alert-heading\">Error</h1>\n  <p>Employee's Birth Date is after their hire date. Please verify the birth date and hire date.</p>\n  <button command=\"close\" commandfor=\"date-alert\" type=\"button\">Return to page and correct error</button>\n</dialog>",
+        "note": "Alert dialog This example shows how a notification using role=\"alertdialog\" can be used to notify someone they have entered invalid information."
       }
     },
     "3.3.2": {
@@ -803,7 +803,7 @@
       "slug": "name-role-value",
       "brief": {
         "goal": "People using assistive technology understand all components.",
-        "whattodo": "Give components correct names, roles, states, and values.",
+        "whattodo": "Give components appropriate names, roles, states, and values.",
         "whyitsimportant": "Assistive technology only works well when code is done properly."
       },
       "good": {

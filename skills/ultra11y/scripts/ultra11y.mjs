@@ -60599,9 +60599,13 @@ var wcag_default2 = {
       examples: [
         {
           lang: "html",
-          good: '<form name="signup" id="signup" method="post" action="">\n  <p id="errors" aria-live="assertive"></p>\n  <div>\n    <label for="first">First Name (required)</label>\n    <input aria-invalid="false" autocomplete="given-name" id="first" name="first" type="text">\n  </div>\n  <div>\n    <label for="last">Last Name (required)</label>\n    <input aria-invalid="false" autocomplete="family-name" id="last" name="last" type="text">\n  </div>\n  <div>\n    <label for="email">Email (required)</label>\n    <input aria-invalid="false" autocomplete="email" id="email" name="email" type="text">\n  </div>\n  <div>\n    <button id="button" type="submit">Sign Up</button>\n  </div>\n</form>',
+          good: `<dialog aria-labelledby="alert-heading" id="date-alert" role="alertdialog">
+  <h1 id="alert-heading">Error</h1>
+  <p>Employee's Birth Date is after their hire date. Please verify the birth date and hire date.</p>
+  <button command="close" commandfor="date-alert" type="button">Return to page and correct error</button>
+</dialog>`,
           note: {
-            en: "Good: Using aria-invalid to Indicate An Error Field (ARIA21)."
+            en: "Good: Using aria-alertdialog to Identify Errors (ARIA18)."
           }
         }
       ],
@@ -60714,7 +60718,7 @@ var wcag_default2 = {
         fr: "Nom, r\xF4le et valeur"
       },
       summary: {
-        en: "Give components correct names, roles, states, and values. People using assistive technology understand all components. Assistive technology only works well when code is done properly."
+        en: "Give components appropriate names, roles, states, and values. People using assistive technology understand all components. Assistive technology only works well when code is done properly."
       },
       examples: [
         {
