@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.54.4](https://github.com/SocialGouv/ultra11y/compare/v5.54.3...v5.54.4) (2026-11-02)
+
+
+### Bug Fixes
+
+* **adjudicate:** stop handing the adjudicator the presentational children of role="img" ([#109](https://github.com/SocialGouv/ultra11y/issues/109)) ([ebc8b85](https://github.com/SocialGouv/ultra11y/commit/ebc8b855ee60bebe19dce821375d778218013f8a))
+
 ## [5.54.3](https://github.com/SocialGouv/ultra11y/compare/v5.54.2...v5.54.3) (2026-11-02)
 
 
