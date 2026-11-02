@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.52.0](https://github.com/SocialGouv/ultra11y/compare/v5.51.2...v5.52.0) (2026-11-02)
+
+
+### Features
+
+* **adjudicate:** decidedBy: human — a named human auditor's verdict in the ledger and the reports ([#93](https://github.com/SocialGouv/ultra11y/issues/93)) ([9776ea3](https://github.com/SocialGouv/ultra11y/commit/9776ea3c1933f16ac00434300c5cf23e374cdf23))
+
 ## [5.51.2](https://github.com/SocialGouv/ultra11y/compare/v5.51.1...v5.51.2) (2026-11-02)
 
 
