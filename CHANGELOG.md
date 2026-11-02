@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.51.2](https://github.com/SocialGouv/ultra11y/compare/v5.51.1...v5.51.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **forms:** stop reporting a field labelled through aria-labelledby={expr} or a caller's <label htmlFor> as « sans étiquette » ([#96](https://github.com/SocialGouv/ultra11y/issues/96)) ([afc54f2](https://github.com/SocialGouv/ultra11y/commit/afc54f20c25b616c4be3025ca3285235ca719320))
+
 ## [5.51.1](https://github.com/SocialGouv/ultra11y/compare/v5.51.0...v5.51.1) (2026-11-02)
 
 
