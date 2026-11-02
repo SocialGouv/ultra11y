@@ -476,6 +476,12 @@ const MEASURED_SCS = ["1.3.4", "1.4.1", "1.4.3", "1.4.4", "1.4.10", "1.4.11", "1
 
 // ---- the subjects -------------------------------------------------------------------------
 
+/** Inside a `role="img"` container: the children of `img` are presentational (WAI-ARIA), so
+ *  nothing below it — no alt, no aria-label, no text — is in the accessibility tree. The
+ *  container IS the image. Only `img`: the children of a `button` or a `tab` still give their
+ *  text, and an image's alt, to the accessible name (#108). */
+const insideRoleImg = (e: El): boolean => ancestors(e).some((a) => (attr(a, "role") ?? "").trim().toLowerCase() === "img");
+
 export const SUBJECTS: Record<string, Subject> = {
   // Every image-like element and the alternative it carries. Class = (alt, src): the same
   // logo on 38 pages is one decision, not 38.
@@ -485,7 +491,7 @@ export const SUBJECTS: Record<string, Subject> = {
         // RGAA 1.1.3 is about nothing else: an image button is an image.
         .concat(elementsByTag(d, "input").filter((e) => (attr(e, "type") ?? "").trim().toLowerCase() === "image"))
         .concat(d.elements.filter((e) => attr(e, "role") === "img"))
-        .filter((e, i, a) => a.indexOf(e) === i)
+        .filter((e, i, a) => a.indexOf(e) === i && !insideRoleImg(e))
         .map((e) => {
           // The other mechanisms the RGAA tests name, when present — an image's verdict turns
           // on title, aria-labelledby, aria-hidden and its caption as much as on alt.
@@ -849,7 +855,14 @@ export const SUBJECTS: Record<string, Subject> = {
         .filter((e) => e.tag !== "html" && attr(e, "lang") !== undefined)
         .map((e) => h(d, e, `lang="${attr(e, "lang")}" text="${t(e, 40)}"`, `lang|${attr(e, "lang")}|${t(e, 40)}`)),
       ...d.elements
-        .filter((e) => e.children.some((c) => c.type === "text") && FOREIGN_LEXICON.test(textContent(e)) && attr(e, "lang") === undefined)
+        .filter(
+          (e) =>
+            e.children.some((c) => c.type === "text" && c.data.trim() !== "") &&
+            FOREIGN_LEXICON.test(textContent(e)) &&
+            attr(e, "lang") === undefined &&
+            roleOf(e) !== "img" &&
+            !insideRoleImg(e),
+        )
         .map((e) =>
           h(
             d,
