@@ -81,7 +81,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 10.13 | 0 / 0 / 3 | 0 / 1 / 0 | no | AI + signals |
 | 10.14 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
 | 11.1 | 1 / 0 / 2 | 5 / 8 / 0 | no | deterministic NC + AI residual |
-| 11.2 | 0 / 0 / 6 | 0 / 0 / 0 | no | AI |
+| 11.2 | 1 / 0 / 5 | 1 / 0 / 0 | no | deterministic NC + AI residual |
 | 11.3 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
 | 11.4 | 0 / 0 / 3 | 0 / 0 / 0 | no | AI |
 | 11.5 | 1 / 0 / 0 | 1 / 1 / 0 | no | deterministic NC + AI residual |
@@ -312,7 +312,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 11.2.2 | judgment | — | — |
 | 11.2.3 | judgment | — | — |
 | 11.2.4 | judgment | — | — |
-| 11.2.5 | judgment | — | — |
+| 11.2.5 | static | `field-label-in-name-mismatch` | — |
 | 11.2.6 | judgment | — | — |
 | 11.3.1 | judgment | — | — |
 | 11.3.2 | judgment | — | — |

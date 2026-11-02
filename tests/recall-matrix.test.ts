@@ -33,6 +33,7 @@ const SEED: Record<string, string> = {
   "label-in-name-mismatch": `<main><button aria-label="Submit">Send now</button></main>`,
   "form-label-in-name-mismatch": `<main><form><button aria-label="Submit">Send now</button></form></main>`,
   "link-label-in-name-mismatch": `<main><a href="/" aria-label="Go to the main page">Home</a></main>`,
+  "field-label-in-name-mismatch": `<main><form><label for="up">Upload your CSE opinion</label><input type="file" id="up" aria-label="Select files"></form></main>`,
   // images (1.1.1)
   "img-alt-missing": `<main><img src="x.png"></main>`,
   "input-image-alt-missing": `<main><input type="image" src="go.png"></main>`,

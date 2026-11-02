@@ -23,7 +23,7 @@ describe("RGAA test-level automation contract", () => {
       static: tiers.filter((tier) => tier === "static").length,
       rendered: tiers.filter((tier) => tier === "rendered").length,
       judgment: tiers.filter((tier) => tier === "judgment").length,
-    }).toEqual({ static: 28, rendered: 3, judgment: 227 });
+    }).toEqual({ static: 29, rendered: 3, judgment: 226 });
     expect(pack.criteria.filter((criterion) => Object.values(criterion.automation!.tests).includes("judgment"))).toHaveLength(92);
   });
 
@@ -37,11 +37,11 @@ describe("RGAA test-level automation contract", () => {
 
   it("keeps the public README aligned with the generated automation contract", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
-    expect(readme).toContain("28 `static` tests across 20 criteria");
+    expect(readme).toContain("29 `static` tests across 21 criteria");
     expect(readme).toContain("3 `rendered` tests across 3 criteria");
-    expect(readme).toContain("22 distinct criteria that can produce a deterministic `NC`");
-    expect(readme).toContain("51 criteria receive a normative engine signal");
-    expect(readme).toContain("227 `judgment` tests across 92 criteria");
+    expect(readme).toContain("23 distinct criteria that can produce a deterministic `NC`");
+    expect(readme).toContain("52 criteria receive a normative engine signal");
+    expect(readme).toContain("226 `judgment` tests across 92 criteria");
     expect(readme).toContain("104 of 106 criteria require adjudication to earn `C`");
   });
 
@@ -133,6 +133,7 @@ describe("RGAA test-level automation contract", () => {
         tier: "static",
         rules: ["axe:aria-input-field-name", "axe:aria-toggle-field-name", "axe:label", "axe:select-name", "control-label-missing"],
       },
+      { test: "11.2.5", tier: "static", rules: ["field-label-in-name-mismatch"] },
       { test: "11.5.1", tier: "static", rules: ["radio-checkbox-group-ungrouped"] },
       { test: "11.6.1", tier: "static", rules: ["fieldset-legend-missing"] },
       { test: "11.8.2", tier: "static", rules: ["pack:rgaa:optgroup-without-label"] },

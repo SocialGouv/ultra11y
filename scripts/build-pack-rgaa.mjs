@@ -151,6 +151,7 @@ const RULE_SC = {
   "skip-link-target-missing": ["2.4.1"], "bypass-blocks-missing": ["2.4.1"], "sortable-header-no-aria-sort": ["1.3.1"], "status-message-not-assertive": ["4.1.3"],
   "table-caption-missing": ["1.3.1"], "table-empty-data-cell": ["1.3.1"], "title-missing-empty": ["2.4.2"],
   "link-label-in-name-mismatch": ["2.5.3"],
+  "field-label-in-name-mismatch": ["2.5.3"],
   "invalid-aria-attr": ["4.1.2"], "invalid-aria-value": ["4.1.2"], "aria-required-attr": ["4.1.2"], "aria-prohibited-attr": ["4.1.2"],
   "dl-structure": ["1.3.1"], "on-input-context-change": ["3.2.2"],
 };
@@ -174,6 +175,10 @@ const JUDGMENT_CRITERIA = {
   "4.10": "« contrôlable par l’utilisateur » — l’arrêt/le réglage du son se constate au rendu, 1.4.2 ne prouve que l’absence d’autoplay détectable.",
   "8.4": "« le code de langue est-il pertinent ? » — 3.1.1 ne vérifie que la présence et la validité syntaxique de `lang`, pas sa cohérence avec la langue réelle du contenu.",
   "8.6": "« ce titre est-il pertinent ? » — 2.4.2 ne vérifie que la présence d’un `<title>` non vide.",
+  // One decisive rule now fails 11.2.5 (an aria-label that drops the visible <label>, #88), but
+  // that is a single condition of a single test: the criterion asks whether each label is
+  // PERTINENT, which no rule settles. It stays on the judgment side of the 11.1/11.2 split.
+  "11.2": "« chaque étiquette est-elle pertinente ? » — `field-label-in-name-mismatch` ne prouve que l’absence de l’intitulé visible dans un aria-label (11.2.5) ; la pertinence de l’étiquette se juge.",
   // Its tests are « static » because list-structure can PROVE a malformed list — but what they
   // ask about is « les informations regroupées VISUELLEMENT sous forme de liste », and the list
   // that fails them is the one drawn with no list markup at all. An absence of <ul> is not an
@@ -289,6 +294,8 @@ const RULE_TO_CRITERIA = {
   "radio-checkbox-group-ungrouped": ["11.5"], "date-fields-ungrouped": ["11.5"],
   "field-purpose-incomplete": ["11.1", "11.13"], "fieldset-legend-missing": ["11.6"], "form-button-empty-name": ["11.9"],
   "autocomplete-token-invalid": ["11.13"], "form-label-in-name-mismatch": ["11.9"],
+  // RGAA 11.2.5 condition 1: a field's aria-label must contain its visible <label> (#88).
+  "field-label-in-name-mismatch": ["11.2"],
   "error-not-associated": ["11.10"], "aria-invalid-no-description": ["11.10"],
   "axe:label": ["11.1"], "axe:form-field-multiple-labels": ["11.1"], "axe:select-name": ["11.1"], "axe:label-title-only": ["11.1"],
   // An ARIA field (role=textbox, combobox, checkbox, switch…) with no accessible name at all has
@@ -363,6 +370,7 @@ const DECISIVE_RULE_TESTS = {
   "11.1|axe:aria-toggle-field-name": ["1"],
   "11.6|fieldset-legend-missing": ["1"],
   "11.9|form-button-empty-name": ["1"],
+  "11.2|field-label-in-name-mismatch": ["5"],
   "11.9|form-label-in-name-mismatch": ["2"],
   "11.5|radio-checkbox-group-ungrouped": ["1"],
   "5.7|headers-attr-dangling": ["4"],

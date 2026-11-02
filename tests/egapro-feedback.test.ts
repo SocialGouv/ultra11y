@@ -162,4 +162,14 @@ describe("rgaa derivation", () => {
       expect(row?.candidateFindings?.some((finding) => finding.ruleId === "disabled-context-content")).toBe(true);
     }
   });
+  it.skipIf(!IMPLEMENTED_PHASES.has("P3"))(
+    "file-upload-aria-label.html — an aria-label replacing the visible <label> fails RGAA 11.2 (test 5) (egapro#4919)",
+    () => {
+      const audit = runAudit({ inputs: [`${FIX}missed/file-upload-aria-label.html`] });
+      expect(normative(audit.findings).map((f) => f.ruleId)).toContain("field-label-in-name-mismatch");
+      const row = derivePackResults(audit, "rgaa").find((entry) => entry.id === "11.2");
+      expect(row?.status).toBe("NC");
+      expect(row?.findings.some((finding) => finding.ruleId === "field-label-in-name-mismatch")).toBe(true);
+    },
+  );
 });
