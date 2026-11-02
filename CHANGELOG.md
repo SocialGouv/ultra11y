@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.55.5](https://github.com/SocialGouv/ultra11y/compare/v5.55.4...v5.55.5) (2026-11-02)
+
+
+### Bug Fixes
+
+* **report:** report --json carries the pack's own conformance rate, operands and resolved standard, and ultra11y_fold stays inside its cwd ([#125](https://github.com/SocialGouv/ultra11y/issues/125)) ([66e704b](https://github.com/SocialGouv/ultra11y/commit/66e704b2cdd16b61edbc52e82bfbc3b85a2a7f2b))
+
 ## [5.55.4](https://github.com/SocialGouv/ultra11y/compare/v5.55.3...v5.55.4) (2026-11-02)
 
 
