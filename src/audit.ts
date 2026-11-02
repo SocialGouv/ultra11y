@@ -39,6 +39,7 @@ import type { DepGraph } from "./graph/graph.js";
 import { discover } from "./discover.js";
 import { GRAPH_ONLY_EXT } from "./glob.js";
 import { readText, today } from "./util.js";
+import { resolveMessage } from "./messages.js";
 import { isPdfPath, loadPdfDoc, pdfDocFromBytes, readDocumentOrigin } from "./documents.js";
 import { PDF_MAX_BYTES } from "./parse/pdf.js";
 import { pdfCheckOutcomes } from "./rules/pdf.js";
@@ -896,7 +897,25 @@ function probeFindings(probes: NonNullable<RenderSignals["probes"]>, file: strin
     for (const h of hits) add(PROBE_WCAG[engine], `dyn-${engine}`, PROBE_SEVERITY[engine], h.selector, h.html, h.detail);
   }
   if (probes.reflow?.horizontalScroll) {
-    add("1.4.10", "dyn-reflow", "majeur", "document", "", "Horizontal scrolling at 320px width — content does not reflow.");
+    // Anchored on the first box the probe found widening the page, and naming them all — the
+    // element to change, rather than « document » and a sentence about a symptom. A capture
+    // older than the naming carries none, and the sentence then states the scroll alone.
+    const wide = probes.reflow.widening ?? [];
+    const widening = wide
+      .map((w) => w.selector)
+      .filter(Boolean)
+      .join(", ");
+    const params: Record<string, string> = widening ? { widening } : {};
+    add(
+      "1.4.10",
+      "dyn-reflow",
+      "majeur",
+      wide[0]?.selector ?? "document",
+      wide[0]?.html ?? "",
+      resolveMessage({ message: "", msg: { id: "dyn-reflow", params } }, "en"),
+    );
+    const f = out[out.length - 1];
+    if (f) f.msg = { id: "dyn-reflow", params };
   }
   return out;
 }

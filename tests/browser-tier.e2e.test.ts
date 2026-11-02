@@ -1057,3 +1057,147 @@ describe("the focus walk ignores a framework's dev-tools overlay", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// #134 — THE ZOOM AND TEXT-SPACING PROBES REPORT WHAT THE STRESS CHANGES, AND NOTHING ELSE.
+//
+// Measured on egapro (39 captures): about ninety hits, every one of them a DSFR icon-only button
+// whose label is hidden on purpose — just as hidden before the stress as after it — while the
+// one real defect went unseen: a « ? » help button in a row header that the spacing override
+// slides under the next column's input. Nothing clips there; the button is simply no longer the
+// element on top of its own centre. Each case below is asserted in both directions: the noise
+// gone AND the true positive kept, because a probe made quiet by never reporting is a deleted one.
+describe("the zoom and text-spacing probes compare against the normal rendering (#134)", () => {
+  // DSFR's shapes, reduced to their CSS: a rem-sized icon-only button whose label sits in an
+  // sr-only span (`.fr-btn--tooltip`), and a pagination link whose visible label is clipped by a
+  // max-width (`.fr-pagination__link--first`).
+  const ICON_ONLY = `<style>
+      .tip { display:inline-flex; overflow:hidden; white-space:nowrap; max-width:2rem; max-height:2rem; width:2rem; height:2rem; padding:.25rem .5rem; font-size:.875rem; }
+      .tip::before { content:''; flex:0 0 1.5rem; width:1.5rem; height:1.5rem; background:#000091; }
+      .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+      .first { display:inline-block; overflow:hidden; white-space:nowrap; max-width:2.5rem; font-size:1rem; }
+    </style>
+    <p>Effectif total <button type="button" class="tip"><span class="sr">Information sur l'effectif total</span></button></p>
+    <nav aria-label="Pagination"><a class="first" href="/p1">Première page de la liste</a></nav>`;
+  // The egapro step-1 table: fixed layout, a nowrap row header holding its label and a « ? »
+  // button, and an input in the next column inside a `position: relative` wrapper — which paints
+  // above whatever overflows into its cell. `fit()` sizes the first column to the label as THIS
+  // machine's fonts draw it, with a few pixels to spare, so the baseline fits wherever it runs.
+  const TABLE = (wrap: boolean) => `<style>
+      table { table-layout:fixed; border-collapse:collapse; }
+      th { white-space:${wrap ? "normal" : "nowrap"}; padding:8px 16px; font-size:.875rem; text-align:left; font-weight:400; }
+      td { padding:8px 16px; }
+      .grp { position:relative; }
+      .grp input { display:block; width:100%; box-sizing:border-box; padding:8px 16px; border:0; background:#eee; }
+      .q { display:inline-flex; width:2rem; height:2rem; padding:0; vertical-align:middle; }
+    </style>
+    <table id="t"><caption>Effectifs</caption><colgroup><col id="c1"><col id="c2"></colgroup>
+      <tbody><tr><th scope="row"><span id="lbl">Nombre de femmes et d'hommes en rémunération annuelle</span><button type="button" class="q" id="q" aria-label="Aide">?</button></th>
+      <td><div class="grp"><input id="w" aria-label="Femmes"></div></td></tr></tbody></table>
+    <script>
+      // In px, as egapro's columns are: the label and the button fit with 8px to spare, and the
+      // input column is wide enough that the button, doubled at 200 %, still lands on it.
+      const c1 = Math.ceil(document.getElementById('lbl').getBoundingClientRect().width) + 32 + 32 + 8;
+      document.getElementById('c1').style.width = c1 + 'px';
+      document.getElementById('c2').style.width = (c1 + 200) + 'px';
+      document.getElementById('t').style.width = (2 * c1 + 200) + 'px';
+    </script>`;
+  // The stress that only settles a frame later: the panel's height is set by a resize observer
+  // that defers the write to the next animation frame — DSFR's tab panels, which its own render
+  // loop resizes once the content has grown.
+  const DEFERRED = `<div id="panel" style="overflow:hidden"><p id="body" style="margin:0;font-size:1rem">Un panneau d'onglet dont la hauteur est recalculée à la frame suivante par le script du système de design.</p></div>
+    <script>
+      const panel = document.getElementById('panel'), body = document.getElementById('body');
+      panel.style.height = body.offsetHeight + 'px';
+      new ResizeObserver(() => requestAnimationFrame(() => { panel.style.height = body.offsetHeight + 'px'; })).observe(body);
+    </script>`;
+  // The seeded true positive the realworld fixture already carries: a fixed-height box.
+  // Its height is frozen in px at what the text needs at baseline, so the baseline shows every line
+  // wherever it runs, and both stresses then push lines out of the box.
+  const FIXED = `<p id="fixed" style="overflow:hidden;margin:0;width:20rem;font-size:1rem;line-height:1.25">Le réseau compte douze points de présence répartis sur quatre continents, et une latence médiane faible.</p>
+    <script>const f = document.getElementById('fixed'); f.style.height = f.offsetHeight + 'px';</script>`;
+
+  const probe = async (body: string, only: string[]) => {
+    const { runLiveProbes } = await import("../src/probes.js");
+    const page = await browser!.newPage({ viewport: { width: 1280, height: 720 } });
+    try {
+      await page.setContent(`<!doctype html><html lang="fr"><head><title>t</title></head><body><main>${body}</main></body></html>`, { waitUntil: "load" });
+      const r = await runLiveProbes(page, { only });
+      const fontSize = await page.evaluate("document.documentElement.style.fontSize");
+      const sheets = await page.evaluate("document.querySelectorAll('style').length");
+      return { r, fontSize, sheets };
+    } finally {
+      await page.close();
+    }
+  };
+  const sels = (hits: { selector: string }[]) => hits.map((h) => h.selector);
+
+  it("ignores icon-only controls whose label is hidden by design, at 200 % and under the spacing override", async () => {
+    if (!browserAvailable) return;
+    const { r } = await probe(ICON_ONLY, ["1.4.4", "1.4.12"]);
+    expect(r.probed).toEqual(expect.arrayContaining(["1.4.4", "1.4.12"]));
+    expect(sels(r.reflowZoom), "a label hidden before the stress was not lost by it").toEqual([]);
+    expect(sels(r.textSpacing), "a label hidden before the stress was not lost by it").toEqual([]);
+  }, 120_000);
+
+  it("still reports text the stress clips that the normal rendering showed", async () => {
+    if (!browserAvailable) return;
+    const { r } = await probe(FIXED, ["1.4.4", "1.4.12"]);
+    expect(sels(r.reflowZoom)).toContain("p#fixed");
+    expect(sels(r.textSpacing)).toContain("p#fixed");
+    expect(r.textSpacing[0]?.detail).toMatch(/entièrement visible au rendu normal/);
+  }, 120_000);
+
+  it("detects the help button the spacing override slides under the next column's input", async () => {
+    if (!browserAvailable) return;
+    const { r, fontSize, sheets } = await probe(TABLE(false), ["1.4.4", "1.4.12"]);
+    const spacing = r.textSpacing.find((h) => h.selector === "button#q");
+    expect(spacing, `hits: ${JSON.stringify(r.textSpacing)}`).toBeTruthy();
+    expect(spacing?.detail, "the finding names what now sits on top of the control").toContain("input#w");
+    expect(sels(r.reflowZoom), "the same overlap at 200 %").toContain("button#q");
+    // Measured and PUT BACK: the caller's page is as it was handed over.
+    expect(fontSize).toBe("");
+    expect(sheets).toBe(1);
+  }, 120_000);
+
+  it("does not report the same table once the header wraps — the fix, measured", async () => {
+    if (!browserAvailable) return;
+    const { r } = await probe(TABLE(true), ["1.4.4", "1.4.12"]);
+    expect(sels(r.textSpacing)).toEqual([]);
+    expect(sels(r.reflowZoom)).toEqual([]);
+  }, 120_000);
+
+  it("does not report a control that was already covered at baseline — only what the stress changed", async () => {
+    if (!browserAvailable) return;
+    const { r } = await probe(
+      `<div style="position:relative"><button id="under" type="button">Bouton recouvert</button><div style="position:absolute;inset:0;background:#fff"></div></div>`,
+      ["1.4.12"],
+    );
+    expect(sels(r.textSpacing)).toEqual([]);
+  }, 120_000);
+
+  it("waits for the relayout a script applies a frame later, and keeps a clip that does not resolve", async () => {
+    if (!browserAvailable) return;
+    const deferred = await probe(DEFERRED, ["1.4.4", "1.4.12"]);
+    expect(sels(deferred.r.reflowZoom), "the panel grows on the next frame — nothing was lost").toEqual([]);
+    expect(sels(deferred.r.textSpacing), "the panel grows on the next frame — nothing was lost").toEqual([]);
+    // The same panel with the script's write removed stays clipped, and is reported.
+    const stuck = await probe(DEFERRED.replace("new ResizeObserver", "void "), ["1.4.4"]);
+    expect(sels(stuck.r.reflowZoom)).toContain("div#panel");
+  }, 120_000);
+
+  it("names the box that widens the page at 320px, and not a table inside its own scroller", async () => {
+    if (!browserAvailable) return;
+    const wide = await probe(`<p>Texte</p><div id="wide" style="width:1200px"><span>Contenu</span></div>`, ["1.4.10"]);
+    expect(wide.r.reflow.horizontalScroll).toBe(true);
+    expect(sels(wide.r.reflow.widening ?? [])).toEqual(["div#wide"]);
+    expect(wide.r.reflow.widening?.[0]?.detail).toMatch(/déborde de \d+px/);
+    // A wide data table inside `overflow-x: auto` scrolls on its own and widens nothing.
+    const scroller = await probe(`<div style="overflow-x:auto"><table style="width:1200px"><tr><td>x</td></tr></table></div>`, ["1.4.10"]);
+    expect(scroller.r.reflow.horizontalScroll).toBe(false);
+    // A pseudo-element spilling out of its box has no box of its own to name: its owner is named.
+    const pseudo = await probe(`<style>#own::after{content:'';display:block;width:900px;height:1px}</style><div id="own">x</div>`, ["1.4.10"]);
+    expect(pseudo.r.reflow.horizontalScroll).toBe(true);
+    expect(sels(pseudo.r.reflow.widening ?? [])).toEqual(["div#own"]);
+  }, 120_000);
+});

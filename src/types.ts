@@ -469,7 +469,7 @@ export interface RenderSignals {
     inputOverflowReflow?: { selector: string; html: string; detail: string }[];
     inputOverflowZoom?: { selector: string; html: string; detail: string }[];
     inputOverflowSpacing?: { selector: string; html: string; detail: string }[];
-    reflow?: { horizontalScroll: boolean };
+    reflow?: { horizontalScroll: boolean; widening?: { selector: string; html: string; detail: string }[] };
     probed?: string[];
     /** Why a probe did not run, or did not finish. Never a verdict — the complement of
      *  `probed`, which is the only field allowed to license a conformity. */
@@ -815,6 +815,9 @@ export interface DynamicFinding {
   // Per-sample provenance (`scan --sample`): the originating sample page. Carried through
   // `mergeDynamic` onto the merged Finding's `sample` for ticket rendering. Optional.
   sample?: { id: string; name: string; auth?: boolean; notes?: string };
+  /** 1.4.10 only — the selectors of the boxes widening the page at 320px, when the probe named
+   *  them. Carried so a later `--lang` re-render keeps the cause in the sentence. */
+  widening?: string;
 }
 
 export interface DynamicResult {

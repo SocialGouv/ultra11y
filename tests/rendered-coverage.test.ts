@@ -91,6 +91,15 @@ describe("a live probe is the other way a criterion gets measured", () => {
     expect(r.findings.some((f) => f.ruleId === "dyn-reflow" && f.criteriaId === "1.4.10")).toBe(true);
   });
 
+  it("anchors the reflow finding on the box the probe found widening the page, and names it (#134)", () => {
+    const widening = [{ selector: "div.wide", html: '<div class="wide">', detail: "déborde de 880px à droite (largeur 1200px)" }];
+    const r = auditPages(1, () => ({ probes: { ...probed, reflow: { horizontalScroll: true, widening } } }));
+    const f = r.findings.find((x) => x.ruleId === "dyn-reflow");
+    expect(f?.selectorHint).toBe("div.wide");
+    expect(f?.message).toBe("Horizontal scrolling at 320px width — the page is widened by div.wide.");
+    expect(f?.msg).toEqual({ id: "dyn-reflow", params: { widening: "div.wide" } });
+  });
+
   it("credits only the criteria named in `probed` — silence is not a measurement", () => {
     const r = auditPages(2, () => ({ probes: { probed: ["1.4.10"] } }));
     expect(of(r, "1.4.10")?.status).toBe("C");

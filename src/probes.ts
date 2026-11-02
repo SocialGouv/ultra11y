@@ -144,57 +144,320 @@ function actionTimeout(limits: ProbeLimits, deadline?: ProbeDeadline): number {
   return Math.max(1, Math.min(limits.actionTimeoutMs, left || limits.actionTimeoutMs));
 }
 
+/** The custom elements frameworks inject in DEVELOPMENT only — their focusable controls live
+ *  in a shadow root and are no part of the audited product (#127). */
+export const DEV_TOOL_HOSTS: readonly string[] = ["nextjs-portal", "vite-error-overlay", "astro-dev-toolbar", "nuxt-devtools-container", "nuxt-devtools"];
+
+/** Two animation frames — the layout a script reacting to the stress (a resize observer, a
+ *  design system's own render loop) has had the chance to produce. Bounded by a timer, because
+ *  a page in a background tab may never paint and a probe must not wait on a frame that never
+ *  comes. */
+const FRAMES = `
+const __frames = () => new Promise((res) => {
+  let done = false;
+  const end = () => { if (!done) { done = true; res(true); } };
+  setTimeout(end, 200);
+  try { requestAnimationFrame(() => requestAnimationFrame(end)); } catch { end(); }
+});
+`;
+
 // The 320px reflow check (same semantics as the Docker RUNNER), mapped to 1.4.10.
-export const REFLOW_PROBE = `(() => {
+//
+// « Horizontal scroll: YES » is a fact nobody can act on. The page scrolls sideways because
+// SOMETHING in it is wider than 320px, and finding that something by hand means opening a
+// devtools and bisecting the DOM — so the probe names it. Only the OUTERMOST widening boxes are
+// kept: when `body { min-width: 1200px }` is the cause, every child of the body is wider than
+// the viewport too, and listing them would bury the one rule a developer has to change. A box
+// inside its own horizontal scroller (a data table in `overflow-x: auto`) does not widen the
+// page and is not named; neither is a `position: fixed` box, which the viewport never scrolls to.
+export const REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
+  await __frames();
   const el = document.scrollingElement || document.documentElement;
-  return { horizontalScroll: el.scrollWidth > el.clientWidth + 2 };
+  const vw = el.clientWidth;
+  const horizontalScroll = el.scrollWidth > vw + 2;
+  if (!horizontalScroll) return { horizontalScroll };
+  const sx = window.scrollX || 0;
+  const contained = (e) => {
+    for (let n = e.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+      if (getComputedStyle(n).overflowX !== 'visible') return true;
+    }
+    return false;
+  };
+  const boxes = new Set();
+  const outer = [];
+  const content = [];
+  for (const e of Array.from(document.querySelectorAll('body, body *'))) {
+    const r = e.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) continue;
+    const s = getComputedStyle(e);
+    if (s.position === 'fixed' || s.display === 'none' || s.visibility === 'hidden') continue;
+    const boxOver = r.right + sx - vw;
+    const contentOver = s.overflowX === 'visible' ? r.left + sx + e.scrollWidth - vw : 0;
+    if (boxOver <= 2 && contentOver <= 2) continue;
+    if (contained(e)) continue;
+    if (boxOver > 2) {
+      boxes.add(e);
+      let top = true;
+      for (let n = e.parentElement; n; n = n.parentElement) if (boxes.has(n)) { top = false; break; }
+      if (top) outer.push([e, 'déborde de ' + Math.round(boxOver) + 'px à droite (largeur ' + Math.round(r.width) + 'px)']);
+    } else {
+      content.push([e, 'son contenu (texte ou pseudo-élément) déborde de ' + Math.round(contentOver) + 'px à droite de la boîte']);
+    }
+  }
+  // A box wider than the viewport is the cause; failing one, the DEEPEST element whose own
+  // content (a long word, a ::before/::after) spills out — its ancestors only carry the spill.
+  const deepest = content.filter(([e]) => !content.some(([o]) => o !== e && e.contains(o)) && !Array.from(boxes).some((b) => e.contains(b)));
+  const widening = outer.concat(deepest).slice(0, 5).map(([e, d]) => ({ selector: __sel(e), html: __html(e), detail: d }));
+  return { horizontalScroll, widening };
 })()`;
 
-// 1.4.4 Resize Text: enlarge text to 200% and detect actual LOSS OF CONTENT — text
-// clipped in an overflow:hidden / nowrap / ellipsis container. (A mere horizontal
-// scrollbar at 200% text is NOT a 1.4.4 failure — 2D reflow is 1.4.10 — so we do not
-// flag page-level horizontal scroll here; only content the user can no longer read.)
-export const REFLOW_ZOOM_PROBE = `(() => { ${PRELUDE}
-  const root = document.documentElement;
-  const prev = root.style.fontSize;
-  root.style.fontSize = '200%';
-  const hits = [];
-  for (const e of Array.from(document.querySelectorAll('p,li,h1,h2,h3,h4,h5,h6,td,th,button,a,label,span'))) {
+/** THE STRESS LIBRARY — what the zoom and text-spacing probes share.
+ *
+ *  Both used to look at the page ONCE, after the stress, and report every element whose box
+ *  clipped its text. That reads design as defect: an icon-only button hides its label on
+ *  purpose (DSFR's `.fr-btn--tooltip`, `.fr-btn--close`, the first/last pagination links all
+ *  do), and about a hundred egapro findings were exactly that — text that was just as hidden
+ *  before the stress as after it. 1.4.4 and 1.4.12 are about what the stress TAKES AWAY, so the
+ *  page is measured twice and only the difference is reported:
+ *
+ *  • CLIPPING, per axis. An axis that already hid more than half a glyph at baseline is hidden
+ *    by design and is never reported; one that showed its content and then cuts it under the
+ *    stress is the loss the criteria describe. Half a glyph of slack, because a fixed-height box
+ *    routinely clips its descenders by a pixel or three, and that is not a design decision to
+ *    respect but the very box the stress is about to break.
+ *  • OVERLAP, by hit-testing. A control whose centre was its own at baseline and belongs to
+ *    another element under the stress has been slid under it — egapro's « ? » help buttons in a
+ *    table's row headers, pushed under the next column's input by the spacing override. No
+ *    clipping check can see that: nothing clips, the button is simply no longer on top.
+ *    `position: fixed`/`sticky` occluders are left to 2.4.11, whose criterion they are.
+ *  • RELAYOUT. A measurement taken synchronously after the stress reads a layout some scripts
+ *    have not finished reacting to — DSFR recomputes its tab panels' height on the next frame —
+ *    so the probes wait two animation frames, and confirm any candidate once more after a short
+ *    pause before reporting it.
+ *
+ *  An element the baseline did not see (not visible, or unreachable by hit-testing) is never
+ *  compared: an unknown baseline proves nothing either way. */
+const STRESS_LIB = `${FRAMES}
+const __pause = (ms) => new Promise((res) => setTimeout(res, ms));
+const __CONTROLS = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=link],[role=checkbox],[role=radio],[role=tab],[role=switch],[tabindex]:not([tabindex="-1"])';
+// How far the element's CONTENT — its text and its child boxes, as laid out — reaches past the
+// padding box its overflow clips at. Not \`scrollWidth\`: that counts a child's margin too, and
+// the spacing override gives every paragraph a 2em bottom margin, so a panel sized to its text
+// would read as « clipped » by a margin nobody can see. And not one Range over the whole
+// subtree either: an sr-only label is a 1px clipped box whose text is still laid out at full
+// width, and counting that text would call every icon-only button « clipped ». A descendant
+// that is not painted is skipped with everything inside it; one that clips its own overflow
+// counts by its own box, its content being its own measurement; a panel's padding is not
+// content, so a design system's tab container trimming its panel's bottom padding is not a loss.
+const __REPLACED = ['img', 'svg', 'video', 'canvas', 'iframe', 'object', 'embed', 'input', 'select', 'textarea', 'button', 'meter', 'progress', 'audio'];
+const __extent = (e) => {
+  let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+  const add = (q) => { if (!q || (!q.width && !q.height)) return; l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.right); b = Math.max(b, q.bottom); };
+  const range = document.createRange();
+  const walk = (n, depth) => {
+    for (const c of Array.from(n.childNodes)) {
+      if (c.nodeType === 3) {
+        if (!c.textContent || !c.textContent.trim()) continue;
+        range.selectNodeContents(c);
+        add(range.getBoundingClientRect());
+      } else if (c.nodeType === 1) {
+        const cs = getComputedStyle(c);
+        if (cs.display === 'contents') { if (depth < 40) walk(c, depth + 1); continue; }
+        if (!__vis(c)) continue;
+        // CONTENT, not decoration: a replaced element or a form control counts by its box, a
+        // box that clips counts by its box; any other element only through what it holds — its
+        // padding, its background and its margins are nothing a reader can lose.
+        if (__REPLACED.indexOf(c.localName) >= 0 || cs.overflowX !== 'visible' || cs.overflowY !== 'visible') add(c.getBoundingClientRect());
+        else if (depth < 40) walk(c, depth + 1);
+      }
+    }
+  };
+  walk(e, 0);
+  return l === Infinity ? null : { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
+};
+const __excess = (e) => {
+  const r = e.getBoundingClientRect();
+  const left = r.left + e.clientLeft, top = r.top + e.clientTop;
+  const right = left + e.clientWidth, bottom = top + e.clientHeight;
+  const t = __extent(e);
+  if (!t) return { x: 0, y: 0, sw: 1, sh: 1 };
+  return {
+    x: Math.max(0, t.right - right) + Math.max(0, left - t.left),
+    y: Math.max(0, t.bottom - bottom) + Math.max(0, top - t.top),
+    sw: Math.max(1, t.width),
+    sh: Math.max(1, t.height),
+  };
+};
+const __clipsX = (s) => s.overflowX === 'hidden' || s.overflowX === 'clip' || s.overflow === 'hidden' || s.textOverflow === 'ellipsis';
+const __clipsY = (s) => s.overflowY === 'hidden' || s.overflowY === 'clip' || s.overflow === 'hidden';
+const __clipBase = (sel) => {
+  const m = new Map();
+  for (const e of Array.from(document.querySelectorAll(sel))) {
     if (!__vis(e)) continue;
     if ((e.textContent || '').trim().length < 8) continue;
+    // Only a box that CLIPS can lose content by clipping, and the stress changes spacing and
+    // size, never a box's overflow — so the rest of the page is not measured at all.
     const s = getComputedStyle(e);
-    const clip = s.overflow === 'hidden' || s.overflowY === 'hidden' || s.overflowX === 'hidden';
-    const noWrap = s.whiteSpace === 'nowrap' || s.textOverflow === 'ellipsis';
-    if ((clip || noWrap) && (e.scrollHeight > e.clientHeight + 6 || e.scrollWidth > e.clientWidth + 6)) {
-      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqué/masqué à 200% (conteneur overflow:hidden / nowrap) — perte de contenu au zoom (1.4.4).' });
-    }
-    if (hits.length >= 12) break;
+    if (!__clipsX(s) && !__clipsY(s)) continue;
+    m.set(e, { ...__excess(e), slack: (parseFloat(s.fontSize) || 16) / 2 });
   }
-  root.style.fontSize = prev;
+  return m;
+};
+const __clipLost = (e, b, tol) => {
+  if (!e.isConnected || !__vis(e)) return false;
+  const s = getComputedStyle(e);
+  const now = __excess(e);
+  // Whole at baseline: any cut the stress makes is a loss. Cut by up to half a glyph (a fixed
+  // box shaving its descenders): the stress must cut MORE, in pixels and as a share of the
+  // content — a box sized in rem that hides a sliver at 100 % hides the same share at 200 %.
+  // Cut by more than that: hidden by design, never reported.
+  const lost = (clips, b0, s0, n0, s1) => {
+    if (!clips || n0 <= tol) return false;
+    if (b0 <= tol) return true;
+    if (b0 > Math.max(tol, b.slack)) return false;
+    return n0 - b0 > tol && n0 / s1 - b0 / s0 > 0.05;
+  };
+  return lost(__clipsX(s), b.x, b.sw, now.x, now.sw) || lost(__clipsY(s), b.y, b.sh, now.y, now.sh);
+};
+const __up = (n) => n.parentElement || (n.getRootNode && n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
+const __within = (n, e) => { for (; n; n = __up(n)) if (n === e) return true; return false; };
+const __fixedish = (n) => {
+  for (; n && n !== document.documentElement; n = __up(n)) {
+    if (${JSON.stringify(DEV_TOOL_HOSTS)}.indexOf((n.localName || '').toLowerCase()) >= 0) return true;
+    const p = getComputedStyle(n).position;
+    if (p === 'fixed' || p === 'sticky') return true;
+  }
+  return false;
+};
+const __topAt = (e) => {
+  let r = e.getBoundingClientRect();
+  if (r.width < 1 || r.height < 1) return undefined;
+  const inView = (r) => {
+    const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    return x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight;
+  };
+  if (!inView(r)) {
+    window.scrollTo({ left: Math.max(0, window.scrollX + r.left + r.width / 2 - window.innerWidth / 2), top: Math.max(0, window.scrollY + r.top + r.height / 2 - window.innerHeight / 2), behavior: 'instant' });
+    r = e.getBoundingClientRect();
+    if (!inView(r)) return undefined;
+  }
+  const x = r.left + r.width / 2, y = r.top + r.height / 2;
+  let t = document.elementFromPoint(x, y);
+  // Into open shadow roots: the host is not what sits on top, its rendered content is — and a
+  // dev-tools overlay's fixed layer lives in there.
+  for (let i = 0; t && t.shadowRoot && i < 8; i++) {
+    const d = t.shadowRoot.elementFromPoint(x, y);
+    if (!d || d === t) break;
+    t = d;
+  }
+  if (!t) return undefined;
+  if (__within(t, e)) return null;
+  if (t.tagName === 'LABEL' && t.control === e) return null;
+  if (__within(e, t)) return undefined;
+  return t;
+};
+const __hitBase = () => {
+  const m = new Set();
+  for (const e of Array.from(document.querySelectorAll(__CONTROLS))) {
+    if (!__vis(e)) continue;
+    if (__topAt(e) === null) m.add(e);
+  }
+  return m;
+};
+const __covered = (e) => {
+  if (!e.isConnected || !__vis(e)) return null;
+  const t = __topAt(e);
+  if (!t || __fixedish(t)) return null;
+  return t;
+};
+const __compare = async (base, tol, clipDetail, coverDetail, max) => {
+  const look = () => {
+    const clip = [];
+    for (const [e, b] of base.clip) if (__clipLost(e, b, tol)) clip.push(e);
+    const cover = [];
+    for (const e of base.hit) { const t = __covered(e); if (t) cover.push([e, t]); }
+    return { clip, cover };
+  };
+  await __frames();
+  let first = look();
+  if (first.clip.length || first.cover.length) {
+    await __pause(150);
+    await __frames();
+    const again = look();
+    const stillClip = new Set(again.clip);
+    const stillCover = new Map(again.cover);
+    first = { clip: first.clip.filter((e) => stillClip.has(e)), cover: first.cover.filter(([e]) => stillCover.has(e)).map(([e]) => [e, stillCover.get(e)]) };
+  }
+  const hits = [];
+  for (const e of first.clip) {
+    if (hits.length >= max) break;
+    hits.push({ selector: __sel(e), html: __html(e), detail: clipDetail });
+  }
+  for (const [e, t] of first.cover) {
+    if (hits.length >= max) break;
+    hits.push({ selector: __sel(e), html: __html(e), detail: coverDetail.replace('{by}', __sel(t)) });
+  }
   return hits;
+};
+`;
+
+// 1.4.4 Resize Text: enlarge text to 200% and detect actual LOSS OF CONTENT — text the
+// stress clips that the normal rendering showed, or a control it slides under another element.
+// (A mere horizontal scrollbar at 200% text is NOT a 1.4.4 failure — 2D reflow is 1.4.10 — so
+// we do not flag page-level horizontal scroll here; only content the user can no longer read.)
+// Self-contained: the baseline, the stress and its undoing all happen inside the one evaluate.
+export const REFLOW_ZOOM_PROBE = `(async () => { ${PRELUDE} ${STRESS_LIB}
+  const root = document.documentElement;
+  const prev = root.style.fontSize;
+  const sx = window.scrollX, sy = window.scrollY;
+  const base = { clip: __clipBase('p,li,h1,h2,h3,h4,h5,h6,td,th,button,a,label,span,div'), hit: __hitBase() };
+  window.scrollTo({ left: sx, top: sy, behavior: 'instant' });
+  root.style.fontSize = '200%';
+  try {
+    return await __compare(base, 6,
+      'Texte tronqué/masqué à 200 % alors qu\\'il était entièrement visible au rendu normal — perte de contenu au zoom.',
+      'Contrôle recouvert par {by} à 200 % alors qu\\'il ne l\\'était pas au rendu normal — chevauchement, le contrôle n\\'est plus atteignable à cet endroit.',
+      12);
+  } finally {
+    root.style.fontSize = prev;
+    window.scrollTo({ left: sx, top: sy, behavior: 'instant' });
+  }
 })()`;
 
 // 1.4.12 Text Spacing override (line-height 1.5, letter 0.12em, word 0.16em, p 2em).
 export const TEXT_SPACING_CSS =
   "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }";
 
-export const TEXT_SPACING_PROBE = `(() => { ${PRELUDE}
-  const hits = [];
-  for (const e of Array.from(document.querySelectorAll('p,li,span,a,button,h1,h2,h3,h4,h5,h6,td,th,label,div'))) {
-    if (!__vis(e)) continue;
-    if ((e.textContent || '').trim().length < 8) continue;
-    const s = getComputedStyle(e);
-    const clipped = (s.overflowX === 'hidden' || s.overflowY === 'hidden' || s.overflow === 'hidden') && (e.scrollHeight > e.clientHeight + 2 || e.scrollWidth > e.clientWidth + 2);
-    const ellipsis = s.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 2;
-    if (clipped || ellipsis) {
-      // No criterion id in the text: every rendering already names the criterion this finding
-      // belongs to, and a hard-coded « 1.4.12 » is a WCAG number appearing inside a deliverable
-      // that may be keyed on another standard entirely.
-      hits.push({ selector: __sel(e), html: __html(e), detail: 'Texte tronqué/masqué sous l\\'espacement de texte imposé — perte de contenu.' });
-    }
-    if (hits.length >= 20) break;
+/** THE TEXT-SPACING BASELINE, recorded BEFORE the override is injected.
+ *
+ *  The override is a stylesheet the CALLER injects (`addStyleTag`, whose capability is checked
+ *  apart), so the probe cannot take its own « before » the way the zoom probe does. This step
+ *  takes it and parks it on `window`; `TEXT_SPACING_PROBE` reads it once the stylesheet is in
+ *  and throws without it — a comparison with nothing is not a measurement, and must surface as a
+ *  skipped criterion rather than as a clean page. */
+export const TEXT_SPACING_BASELINE_STEP = `(() => { ${PRELUDE} ${STRESS_LIB}
+  const sx = window.scrollX, sy = window.scrollY;
+  window.__u11ySpacingBase = { clip: __clipBase('p,li,span,a,button,h1,h2,h3,h4,h5,h6,td,th,label,div'), hit: __hitBase() };
+  window.scrollTo({ left: sx, top: sy, behavior: 'instant' });
+  return true;
+})()`;
+
+export const TEXT_SPACING_PROBE = `(async () => { ${PRELUDE} ${STRESS_LIB}
+  const base = window.__u11ySpacingBase;
+  delete window.__u11ySpacingBase;
+  if (!base) throw new Error('ultra11y: the text-spacing baseline was not recorded before the override, so nothing can be compared');
+  const sx = window.scrollX, sy = window.scrollY;
+  try {
+    // No criterion id in the text: every rendering already names the criterion this finding
+    // belongs to, and a hard-coded « 1.4.12 » is a WCAG number appearing inside a deliverable
+    // that may be keyed on another standard entirely.
+    return await __compare(base, 2,
+      'Texte tronqué/masqué sous l\\'espacement de texte imposé alors qu\\'il était entièrement visible au rendu normal — perte de contenu.',
+      'Contrôle recouvert par {by} sous l\\'espacement de texte imposé alors qu\\'il ne l\\'était pas au rendu normal — chevauchement, le contrôle n\\'est plus atteignable à cet endroit.',
+      20);
+  } finally {
+    window.scrollTo({ left: sx, top: sy, behavior: 'instant' });
   }
-  return hits;
 })()`;
 
 // 2.4.7 Focus Visible — pass 1: tag each focusable + snapshot its unfocused style.
@@ -308,9 +571,6 @@ export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFoc
 // Pass 2 (after each Tab): is the active element a tagged focusable whose focus PROXY
 // (itself, or its label for a custom control) is UNCHANGED vs the unfocused snapshot?
 // If so, focus produced no visible indicator.
-/** The custom elements frameworks inject in DEVELOPMENT only — their focusable controls live
- *  in a shadow root and are no part of the audited product (#127). */
-export const DEV_TOOL_HOSTS: readonly string[] = ["nextjs-portal", "vite-error-overlay", "astro-dev-toolbar", "nuxt-devtools-container", "nuxt-devtools"];
 
 export const FOCUS_CHECK_PROBE = `(() => {
   const e = document.activeElement;
@@ -975,7 +1235,7 @@ export async function runLiveProbes(page: Any, opts: LiveProbeOptions = {}): Pro
       return true;
     });
     if (narrowed) {
-      const r = await bounded("1.4.10", async () => (await page.evaluate(REFLOW_PROBE)) as { horizontalScroll: boolean });
+      const r = await bounded("1.4.10", async () => (await page.evaluate(REFLOW_PROBE)) as LiveProbeResult["reflow"]);
       // The viewport goes back whatever the probe did — the caller's next assertion must not
       // be measuring a 320px page. Outside `bounded`, and outside every early return: a
       // restore the budget could skip is a page handed back in the wrong shape.
@@ -987,9 +1247,13 @@ export async function runLiveProbes(page: Any, opts: LiveProbeOptions = {}): Pro
     }
   }
   if (want("1.4.12") && canStyle) {
+    // The « before » first: the probe reports only what the override CHANGES, so the page is
+    // measured untouched, then stressed. A baseline that failed leaves nothing to compare, and
+    // the criterion is skipped rather than measured against nothing.
+    const based = await bounded("1.4.12", async () => (await page.evaluate(TEXT_SPACING_BASELINE_STEP)) as unknown);
     // Tagged so it can be removed again — an injected stylesheet left behind would change
     // every measurement the caller makes after this call.
-    const handle = await bounded("1.4.12", () => page.addStyleTag({ content: TEXT_SPACING_CSS }));
+    const handle = based === null ? null : await bounded("1.4.12", () => page.addStyleTag({ content: TEXT_SPACING_CSS }));
     if (handle) {
       const r = await bounded("1.4.12", async () => (await page.evaluate(TEXT_SPACING_PROBE)) as ProbeHit[]);
       await page.evaluate(REMOVE_TEXT_SPACING_STEP).catch(() => {});
@@ -1286,7 +1550,9 @@ export interface LiveProbeResult {
   keyboardTrap: ProbeHit[];
   reflowZoom: ProbeHit[];
   textSpacing: ProbeHit[];
-  reflow: { horizontalScroll: boolean };
+  /** `widening` names the outermost boxes wider than the viewport — what a developer has to
+   *  change. Absent when the page does not scroll, or from a producer that predates the naming. */
+  reflow: { horizontalScroll: boolean; widening?: ProbeHit[] };
   /** 4.1.3 — content updated by an interaction outside any live region. Present only when the
    *  caller opted in: unlike every other probe here, this one TYPES INTO the page. */
   liveRegion?: ProbeHit[];

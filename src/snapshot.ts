@@ -103,7 +103,8 @@ export interface SnapshotProbes {
   inputOverflowReflow?: { selector: string; html: string; detail: string }[];
   inputOverflowZoom?: { selector: string; html: string; detail: string }[];
   inputOverflowSpacing?: { selector: string; html: string; detail: string }[];
-  reflow?: { horizontalScroll: boolean };
+  /** `widening` — the outermost boxes wider than the 320px viewport, when the producer named them. */
+  reflow?: { horizontalScroll: boolean; widening?: { selector: string; html: string; detail: string }[] };
   probed?: string[];
   /** Why a probe did not run — or did not FINISH — when it did not. The complement of
    *  `probed`, carried for the report and never for a verdict. */
