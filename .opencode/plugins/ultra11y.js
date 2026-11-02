@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 // does not carry it, so a user's own ultra11y.js is never clobbered. Kept as text, not as
 // an export (see above).
 const ULTRA11Y_OPENCODE_PLUGIN = "ULTRA11Y_OPENCODE_PLUGIN";
-const ULTRA11Y_PLUGIN_VERSION = "5.57.3";
+const ULTRA11Y_PLUGIN_VERSION = "5.57.4";
 const PLUGIN_ID = "ultra11y";
 const SKILL_NAMES = ["ultra11y", "review-a11y"];
 

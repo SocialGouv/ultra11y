@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.57.4](https://github.com/SocialGouv/ultra11y/compare/v5.57.3...v5.57.4) (2026-11-02)
+
+
+### Bug Fixes
+
+* **capture:** wait for a page to stop loading before collecting, mark a capture that never did, and add a full-page screenshot ([#135](https://github.com/SocialGouv/ultra11y/issues/135)) ([#143](https://github.com/SocialGouv/ultra11y/issues/143)) ([4b64b34](https://github.com/SocialGouv/ultra11y/commit/4b64b347bad5744098138511988ef8d5949803d3))
+
 ## [5.57.3](https://github.com/SocialGouv/ultra11y/compare/v5.57.2...v5.57.3) (2026-11-02)
 
 
