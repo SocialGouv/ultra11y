@@ -49872,6 +49872,11 @@ function visuallyRenderedText(el) {
   for (const child of el.children) walk3(child);
   return collapse(out2);
 }
+function labelledbyIsDynamic(el) {
+  const literal = attr(el, "aria-labelledby");
+  if (literal === void 0) return hasBoundAttr(el, "aria-labelledby");
+  return literal.includes("{");
+}
 function ariaLabelledbyText(el, doc) {
   const ids2 = attr(el, "aria-labelledby");
   if (!ids2) return "";
@@ -49886,7 +49891,7 @@ var NAMELESS_BY_DEFAULT = /* @__PURE__ */ new Set(["submit", "reset"]);
 function accessibleName(el, doc) {
   const labelledby = ariaLabelledbyText(el, doc);
   if (labelledby) return labelledby;
-  if (hasBoundAttr(el, "aria-labelledby") && !attr(el, "aria-labelledby")) return "\xA0";
+  if (labelledbyIsDynamic(el)) return "\xA0";
   const ariaLabel = (boundAttr(el, "aria-label") ?? "").trim();
   if (ariaLabel) return ariaLabel;
   if (el.tag === "img" || el.tag === "area") {
@@ -49918,8 +49923,7 @@ function isFormField2(el) {
   return true;
 }
 function controlLabel(el, doc) {
-  if (attr(el, "aria-labelledby") && ariaLabelledbyText(el, doc) || hasBoundAttr(el, "aria-labelledby") && !attr(el, "aria-labelledby"))
-    return { hasLabel: true, via: "aria-labelledby" };
+  if (attr(el, "aria-labelledby") && ariaLabelledbyText(el, doc) || labelledbyIsDynamic(el)) return { hasLabel: true, via: "aria-labelledby" };
   if ((boundAttr(el, "aria-label") ?? "").trim()) return { hasLabel: true, via: "aria-label" };
   const id = attr(el, "id");
   if (id) {
@@ -52176,6 +52180,7 @@ var controlLabelMissing = {
       if (via === "title") continue;
       if (hasDynamicSpread(el)) continue;
       if (hasAttr(el, "placeholder")) continue;
+      if ((attr(el, "id") ?? "").includes("{")) continue;
       out2.push({
         criteriaId: "4.1.2",
         el,

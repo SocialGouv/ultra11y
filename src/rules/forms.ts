@@ -62,6 +62,11 @@ const controlLabelMissing: Rule = {
       // aria-label/aria-labelledby we can't see — don't assert a missing label.
       if (hasDynamicSpread(el)) continue;
       if (hasAttr(el, "placeholder")) continue; // reported by placeholder-as-label
+      // An id the CALLER supplies (`id={inputId}`) can be targeted by any `<label htmlFor>` the
+      // caller renders: the shared-component pattern. Nothing in this document can prove the
+      // field unlabelled, and a blocking NC on it is a guess (#94). The rendered tier, where
+      // ids are resolved, decides — `axe:label` and this very rule on the page snapshots.
+      if ((attr(el, "id") ?? "").includes("{")) continue;
       out.push({
         criteriaId: "4.1.2",
         el,
