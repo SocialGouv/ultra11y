@@ -54892,7 +54892,10 @@ var PdfUnreadable = class extends Error {
 };
 var WS = /* @__PURE__ */ new Set([0, 9, 10, 12, 13, 32]);
 var DELIM = /* @__PURE__ */ new Set([40, 41, 60, 62, 91, 93, 123, 125, 47, 37]);
-var isRegular = (c2) => c2 !== void 0 && !WS.has(c2) && !DELIM.has(c2);
+var CLASS = new Uint8Array(256);
+for (const c2 of WS) CLASS[c2] = 1;
+for (const c2 of DELIM) CLASS[c2] = 2;
+var isRegular = (c2) => c2 !== void 0 && CLASS[c2] === 0;
 var MAX_NESTING = 64;
 var Lexer = class {
   buf;
@@ -55042,6 +55045,7 @@ var Lexer = class {
 var MAX_DECODED_TOTAL = 256 * 1024 * 1024;
 var MAX_STREAM_DECODED = 64 * 1024 * 1024;
 var tooLarge = () => new PdfUnreadable("too-large", `a decoded stream exceeds ${MAX_STREAM_DECODED} bytes`);
+var isTooLarge = (e) => e instanceof PdfUnreadable && e.reason === "too-large";
 var ByteSink = class {
   buf = Buffer.alloc(4096);
   length = 0;
@@ -55141,37 +55145,37 @@ function asciiHex(data2) {
   return Buffer.from(s, "hex");
 }
 function ascii85(data2) {
-  let s = data2.toString("latin1").replace(/\s+/g, "");
-  if (s.startsWith("<~")) s = s.slice(2);
-  const end = s.indexOf("~>");
-  if (end >= 0) s = s.slice(0, end);
-  const out2 = [];
-  let group = [];
-  const flush = (n) => {
-    let v = 0;
-    for (const c2 of group) v = v * 85 + c2;
-    const bytes = [v >>> 24 & 255, v >>> 16 & 255, v >>> 8 & 255, v & 255];
-    out2.push(...bytes.slice(0, n));
-  };
-  for (const ch of s) {
-    if (ch === "z" && group.length === 0) {
-      out2.push(0, 0, 0, 0);
+  const out2 = new ByteSink();
+  let i2 = 0;
+  while (i2 < data2.length && WS.has(data2[i2])) i2++;
+  if (data2[i2] === 60 && data2[i2 + 1] === 126) i2 += 2;
+  let v = 0;
+  let n = 0;
+  for (; i2 < data2.length; i2++) {
+    const c2 = data2[i2];
+    if (c2 === 126) break;
+    if (c2 === 122 && n === 0) {
+      out2.fill(0, 4);
       continue;
     }
-    const c2 = ch.charCodeAt(0) - 33;
-    if (c2 < 0 || c2 > 84) continue;
-    group.push(c2);
-    if (group.length === 5) {
-      flush(4);
-      group = [];
+    if (c2 < 33 || c2 > 117) continue;
+    v = v * 85 + (c2 - 33);
+    if (++n === 5) {
+      out2.push(v >>> 24 & 255);
+      out2.push(v >>> 16 & 255);
+      out2.push(v >>> 8 & 255);
+      out2.push(v & 255);
+      v = 0;
+      n = 0;
     }
   }
-  if (group.length) {
-    const n = group.length - 1;
-    while (group.length < 5) group.push(84);
-    flush(n);
+  if (n > 1) {
+    const keep = n - 1;
+    for (; n < 5; n++) v = v * 85 + 84;
+    const bytes = [v >>> 24 & 255, v >>> 16 & 255, v >>> 8 & 255, v & 255];
+    out2.append(bytes.slice(0, keep));
   }
-  return Buffer.from(out2);
+  return out2.done();
 }
 function lzw(data2, earlyChange = 1) {
   const out2 = new ByteSink();
@@ -55240,6 +55244,9 @@ var PdfDocument = class {
   objectStreams = false;
   cache = /* @__PURE__ */ new Map();
   objStmCache = /* @__PURE__ */ new Map();
+  /** Decoded bytes (or the error) per stream object: a content stream or form shared by every
+   *  page is decoded once, and counted once against the budget. */
+  decoded = /* @__PURE__ */ new Map();
   resolving = /* @__PURE__ */ new Set();
   decodedTotal = 0;
   text;
@@ -55251,7 +55258,7 @@ var PdfDocument = class {
       this.readXrefChain();
       if (!isDict(this.get(this.trailer.get("Root")))) throw new PdfUnreadable("malformed", "the trailer's /Root does not resolve");
     } catch (e) {
-      if (e instanceof PdfUnreadable && e.reason === "too-large") throw e;
+      if (isTooLarge(e)) throw e;
       this.repair();
     }
   }
@@ -55349,6 +55356,7 @@ var PdfDocument = class {
     this.repaired = true;
     this.xref.clear();
     this.cache.clear();
+    this.decoded.clear();
     const re = /(?:^|[\r\n\s])(\d{1,10})\s+(\d{1,5})\s+obj\b/g;
     for (let m = re.exec(this.text); m; m = re.exec(this.text)) {
       const at = m.index + m[0].indexOf(m[1]);
@@ -55371,7 +55379,8 @@ var PdfDocument = class {
       let o;
       try {
         o = this.get(new PdfRef(n, e.b));
-      } catch {
+      } catch (err2) {
+        if (isTooLarge(err2)) throw err2;
         continue;
       }
       if (!(o instanceof PdfStream)) continue;
@@ -55387,7 +55396,8 @@ var PdfDocument = class {
             if (!this.xref.has(objNum)) this.xref.set(objNum, { type: 2, a: n, b: i2 });
             i2++;
           }
-        } catch {
+        } catch (err2) {
+          if (isTooLarge(err2)) throw err2;
         }
       }
     }
@@ -55399,7 +55409,8 @@ var PdfDocument = class {
             trailer.set("Root", new PdfRef(n, e.type === 1 ? e.b : 0));
             break;
           }
-        } catch {
+        } catch (err2) {
+          if (isTooLarge(err2)) throw err2;
         }
       }
     }
@@ -55438,7 +55449,8 @@ var PdfDocument = class {
     if (v instanceof PdfRef) {
       try {
         return num2(this.get(v));
-      } catch {
+      } catch (err2) {
+        if (isTooLarge(err2)) throw err2;
         return void 0;
       }
     }
@@ -55485,7 +55497,7 @@ var PdfDocument = class {
       this.cache.set(v.num, val);
       return val;
     } catch (err2) {
-      if (err2 instanceof PdfUnreadable && err2.reason === "too-large") throw err2;
+      if (isTooLarge(err2)) throw err2;
       this.cache.set(v.num, null);
       return null;
     } finally {
@@ -55502,8 +55514,22 @@ var PdfDocument = class {
     const r = this.get(v);
     return Array.isArray(r) ? r : void 0;
   }
-  /** A stream's decoded bytes. Throws for an image codec or an unknown filter. */
+  /** A stream's decoded bytes. Throws for an image codec or an unknown filter — and throws the
+   *  same error again, without decoding again, when asked twice. */
   decode(s) {
+    const hit = this.decoded.get(s);
+    if (hit instanceof Error) throw hit;
+    if (hit) return hit;
+    try {
+      const data2 = this.decodeUncached(s);
+      this.decoded.set(s, data2);
+      return data2;
+    } catch (e) {
+      this.decoded.set(s, e instanceof Error ? e : new PdfUnreadable("malformed", String(e)));
+      throw e;
+    }
+  }
+  decodeUncached(s) {
     let data2 = this.buf.subarray(s.start, s.end);
     const fv = this.get(s.dict.get("Filter"));
     const filters = (Array.isArray(fv) ? fv : fv ? [fv] : []).map((f) => nameOf2(this.get(f)) ?? "");
@@ -55539,6 +55565,7 @@ function pdfText(v) {
 var MAX_PAGES_SCANNED = 500;
 var MAX_STRUCT_NODES = 5e4;
 var MAX_FORM_DEPTH = 4;
+var MAX_SCANNED_TOTAL = 64 * 1024 * 1024;
 var PDF_MAX_BYTES = 64 * 1024 * 1024;
 function unreadable(reason, detail, version) {
   return {
@@ -55569,7 +55596,7 @@ function readPdf(bytes) {
   let version = hv[1];
   try {
     const doc = new PdfDocument(buf);
-    if (doc.trailer.has("Encrypt") && doc.get(doc.trailer.get("Encrypt")) !== null) {
+    if (doc.trailer.has("Encrypt")) {
       return unreadable("encrypted", "the file is encrypted; its strings and streams cannot be read without decrypting them", version);
     }
     const catalog = doc.dict(doc.trailer.get("Root"));
@@ -55588,8 +55615,8 @@ function readPdf(bytes) {
       title = xmpTitle(doc, catalog);
       if (title) titleSource = "xmp";
     }
-    const pages = collectPages(doc, catalog);
-    const content = scanContent(doc, pages);
+    const { pages, complete: treeComplete } = collectPages(doc, catalog);
+    const content = scanContent(doc, pages, treeComplete);
     const structure = structRoot ? walkStructure(doc, structRoot) : void 0;
     return {
       readable: true,
@@ -55621,7 +55648,8 @@ function xmpTitle(doc, catalog) {
   let xml;
   try {
     xml = doc.decode(md).toString("utf8");
-  } catch {
+  } catch (e) {
+    if (isTooLarge(e)) throw e;
     return void 0;
   }
   const block = /<dc:title\b[^>]*>([\s\S]*?)<\/dc:title>/i.exec(xml)?.[1];
@@ -55633,8 +55661,17 @@ function xmpTitle(doc, catalog) {
 function collectPages(doc, catalog) {
   const out2 = [];
   const seen = /* @__PURE__ */ new Set();
+  let complete = true;
   const walk3 = (node, inherited, depth) => {
-    if (!node || seen.has(node) || depth > MAX_NESTING || out2.length >= MAX_PAGES_SCANNED * 4) return;
+    if (!node) {
+      complete = false;
+      return;
+    }
+    if (seen.has(node)) return;
+    if (depth > MAX_NESTING || out2.length >= MAX_PAGES_SCANNED * 4) {
+      complete = false;
+      return;
+    }
     seen.add(node);
     const resources = doc.dict(node.get("Resources")) ?? inherited;
     const kids = doc.array(node.get("Kids"));
@@ -55643,19 +55680,29 @@ function collectPages(doc, catalog) {
       out2.push({ dict: node, resources });
       return;
     }
+    if (!kids && node.has("Kids")) complete = false;
     for (const k of kids ?? []) walk3(doc.dict(k), resources, depth + 1);
   };
   walk3(doc.dict(catalog.get("Pages")), void 0, 0);
-  return out2;
+  return { pages: out2, complete };
 }
 var TEXT_OPS2 = /* @__PURE__ */ new Set(["Tj", "TJ", "'", '"']);
-function scanContent(doc, pages) {
+function scanContent(doc, pages, treeComplete) {
   let fonts = 0;
   let textOps = 0;
   let images = 0;
-  let complete = pages.length > 0;
+  let complete = pages.length > 0 && treeComplete;
   const fontSeen = /* @__PURE__ */ new Set();
   const formSeen = /* @__PURE__ */ new Set();
+  const ids2 = /* @__PURE__ */ new Map();
+  const idOf = (o) => {
+    let id = ids2.get(o);
+    if (id === void 0) ids2.set(o, id = ids2.size + 1);
+    return id;
+  };
+  const pageMemo = /* @__PURE__ */ new Map();
+  let scanned = 0;
+  let exhausted = false;
   const countFonts = (res) => {
     const f = doc.dict(res?.get("Font"));
     if (!f) return;
@@ -55667,44 +55714,83 @@ function scanContent(doc, pages) {
   };
   const scanStream = (data2, res, depth) => {
     countFonts(res);
+    scanned += data2.length;
+    if (scanned > MAX_SCANNED_TOTAL) {
+      exhausted = true;
+      complete = false;
+      return 0;
+    }
     const xobjects = doc.dict(res?.get("XObject"));
     const ops = contentOperators(data2);
     textOps += ops.text;
-    images += ops.inlineImages;
-    for (const name2 of ops.xobjects) {
+    let drawn = ops.inlineImages;
+    const uses = /* @__PURE__ */ new Map();
+    for (const name2 of ops.xobjects) uses.set(name2, (uses.get(name2) ?? 0) + 1);
+    for (const [name2, count] of uses) {
       const xo = doc.get(xobjects?.get(name2));
-      if (!(xo instanceof PdfStream)) continue;
-      const sub = nameOf2(doc.get(xo.dict.get("Subtype")));
-      if (sub === "Image") images++;
-      else if (sub === "Form" && depth < MAX_FORM_DEPTH && !formSeen.has(xo)) {
-        formSeen.add(xo);
-        try {
-          scanStream(doc.decode(xo), doc.dict(xo.dict.get("Resources")) ?? res, depth + 1);
-        } catch {
-          complete = false;
-        }
+      if (!(xo instanceof PdfStream)) {
+        complete = false;
+        continue;
       }
+      const sub = nameOf2(doc.get(xo.dict.get("Subtype")));
+      if (sub === "Image") drawn += count;
+      else if (sub === "Form") {
+        if (exhausted || formSeen.has(xo)) continue;
+        if (depth >= MAX_FORM_DEPTH) {
+          complete = false;
+          continue;
+        }
+        formSeen.add(xo);
+        let form;
+        try {
+          form = doc.decode(xo);
+        } catch (e) {
+          if (isTooLarge(e)) throw e;
+          complete = false;
+          continue;
+        }
+        drawn += scanStream(form, doc.dict(xo.dict.get("Resources")) ?? res, depth + 1);
+      } else if (sub !== "PS") complete = false;
     }
+    return drawn;
   };
   for (const [i2, page] of pages.entries()) {
     if (i2 >= MAX_PAGES_SCANNED) {
-      if (textOps === 0) complete = false;
+      complete = false;
       break;
     }
-    const cv = doc.get(page.dict.get("Contents"));
-    const streams = (Array.isArray(cv) ? cv.map((c2) => doc.get(c2)) : [cv]).filter((s) => s instanceof PdfStream);
-    const parts2 = [];
+    const raw = page.dict.get("Contents");
+    const cv = doc.get(raw);
+    const entries = raw === void 0 || raw === null ? [] : Array.isArray(cv) ? cv : [raw];
+    const streams = [];
+    for (const c2 of entries) {
+      const s = doc.get(c2);
+      if (s instanceof PdfStream) streams.push(s);
+      else complete = false;
+    }
+    const key2 = `${streams.map((s) => s.start).join(",")}|${page.resources ? idOf(page.resources) : 0}`;
+    const memo = pageMemo.get(key2);
+    if (memo !== void 0) {
+      countFonts(page.resources);
+      images += memo;
+      continue;
+    }
+    let data2;
     try {
-      for (const s of streams) parts2.push(doc.decode(s), Buffer.from("\n"));
-    } catch {
+      const parts2 = streams.map((s) => doc.decode(s));
+      data2 = parts2.length === 1 ? parts2[0] : Buffer.concat(parts2.flatMap((p) => [p, Buffer.from("\n")]));
+    } catch (e) {
+      if (isTooLarge(e)) throw e;
       complete = false;
       countFonts(page.resources);
       continue;
     }
-    scanStream(Buffer.concat(parts2), page.resources, 0);
-    if (textOps > 0) break;
+    const drawn = scanStream(data2, page.resources, 0);
+    images += drawn;
+    pageMemo.set(key2, drawn);
+    if (textOps > 0 || exhausted) break;
   }
-  return { fonts, textOps, images, complete };
+  return { fonts, textOps, images, complete: complete || textOps > 0 };
 }
 function contentOperators(data2) {
   let text = 0;
@@ -55715,8 +55801,9 @@ function contentOperators(data2) {
   const n = data2.length;
   while (i2 < n) {
     const c2 = data2[i2];
-    if (WS.has(c2)) {
+    if (CLASS[c2] === 1) {
       i2++;
+      while (i2 < n && CLASS[data2[i2]] === 1) i2++;
       continue;
     }
     if (c2 === 37) {
@@ -73590,7 +73677,7 @@ import { join as join49 } from "path";
 
 // src/html.ts
 var MARK4 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
-var CLASS = { C: "c", NC: "nc", NA: "na", manual: "m" };
+var CLASS2 = { C: "c", NC: "nc", NA: "na", manual: "m" };
 var T3 = {
   fr: {
     skip: "Aller au contenu",
@@ -73677,7 +73764,7 @@ function cellHtml(c2, tag) {
   if (c2.colspan && c2.colspan > 1) attrs.push(`colspan="${c2.colspan}"`);
   let inner;
   if (c2.status) {
-    inner = `<span class="st st-${CLASS[c2.status]}">${esc2(MARK4[c2.status])}</span>`;
+    inner = `<span class="st st-${CLASS2[c2.status]}">${esc2(MARK4[c2.status])}</span>`;
   } else {
     inner = c2.text === "" ? "\u2014" : runHtml({ text: c2.text, mono: c2.mono, strong: c2.strong, ...c2.href ? { href: c2.href } : {} });
   }
