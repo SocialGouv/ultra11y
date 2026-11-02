@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.55.4](https://github.com/SocialGouv/ultra11y/compare/v5.55.3...v5.55.4) (2026-11-02)
+
+
+### Bug Fixes
+
+* **collector:** count the elements a <noscript> reparses into, so analytics pixels no longer void the style digest ([#123](https://github.com/SocialGouv/ultra11y/issues/123)) ([a2a90e9](https://github.com/SocialGouv/ultra11y/commit/a2a90e913b5ee79314117234ea94df74e2ac9dbb))
+
 ## [5.55.3](https://github.com/SocialGouv/ultra11y/compare/v5.55.2...v5.55.3) (2026-11-02)
 
 
