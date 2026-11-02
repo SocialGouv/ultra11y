@@ -309,6 +309,68 @@ describe("applyAdjudication — partial fold", () => {
     expect(rClean.audit.adjudicated?.rejected).toBeUndefined();
   });
 
+  // #131/#132 on egapro: a lot of 11 out of 46 criteria folded as `{ ok: true, rejected: 35 }` —
+  // the 35 were only the criteria absent from that lot. A gap offers no verdict, so the gate
+  // refused none: it is counted apart, and `rejected` keeps meaning « verdicts turned down ».
+  describe("a partial worklist (a lot) is not a pile of refusals (#132)", () => {
+    const lot = () => {
+      const audit = auditPage();
+      const all = buildAdjudicationWorklist(audit);
+      const inLot = all.slice(0, 2).map((i) => ({ ...i, verdict: "manual" as const, reason: "undecidable" }));
+      return { audit, all, inLot, outOfLot: all.slice(2).map((i) => i.criteriaId) };
+    };
+
+    it("counts the criteria absent from the lot in notInWorklist, not in rejected", () => {
+      const { audit, inLot, outOfLot } = lot();
+      expect(outOfLot.length).toBeGreaterThan(0);
+      const r = applyAdjudication(audit, file(inLot));
+
+      expect(r.stillManual).toBe(inLot.length);
+      expect(r.rejected).toBe(0);
+      expect(r.rejectedCriteria).toEqual([]);
+      expect(r.notInWorklist).toEqual(outOfLot);
+      expect(r.issues).toEqual([]); // nothing to list under « refused by the gate »
+      expect(r.audit.adjudicated?.rejected).toBeUndefined();
+      // Still to assess, and said to be a gap — never « refused by the gate ».
+      for (const id of outOfLot) {
+        const reason = r.audit.residualRisks.find((x) => x.criteriaId === id)?.reason ?? "";
+        expect(reason, id).toMatch(/coverage gap/i);
+        expect(reason, id).not.toMatch(/refused by the gate/i);
+      }
+      expect(r.ok).toBe(false); // the audit is not fully adjudicated, and does not claim to be
+    });
+
+    it("still counts a verdict the gate refused inside the lot as rejected", () => {
+      const { audit, inLot, outOfLot } = lot();
+      const bad = [{ ...inLot[0]!, verdict: null }, ...inLot.slice(1)];
+      const r = applyAdjudication(audit, file(bad));
+
+      expect(r.rejected).toBe(1);
+      expect(r.rejectedCriteria).toEqual([inLot[0]!.criteriaId]);
+      expect(r.issues.join("\n")).toMatch(/unadjudicated|verdict is null/i);
+      expect(r.issues.join("\n")).not.toMatch(/coverage gap/i);
+      expect(r.notInWorklist).toEqual(outOfLot);
+    });
+
+    it("a complete file has no gap and folds ok", () => {
+      const { audit, all } = lot();
+      const r = applyAdjudication(audit, file(all.map((i) => ({ ...i, verdict: "manual" as const, reason: "undecidable" }))));
+      expect(r.notInWorklist).toEqual([]);
+      expect(r.ok).toBe(true);
+    });
+
+    it("strict mode still refuses a gap, naming it", () => {
+      const { audit, inLot, outOfLot } = lot();
+      const r = applyAdjudication(audit, file(inLot), { strict: true });
+      expect(r.ok).toBe(false);
+      expect(r.applied + r.stillManual).toBe(0);
+      expect(r.rejected).toBe(0);
+      expect(r.notInWorklist).toEqual(outOfLot);
+      expect(r.issues.join("\n")).toMatch(/coverage gap/i);
+      expect(r.audit).toBe(audit);
+    });
+  });
+
   it("strict mode restores the all-or-nothing fold", () => {
     const { audit, items } = withOneNull();
     const r = applyAdjudication(audit, file(items), { strict: true });
@@ -319,13 +381,14 @@ describe("applyAdjudication — partial fold", () => {
     expect(r.audit).toBe(audit); // the audit is returned untouched
   });
 
-  it("refuses a coverage gap without costing the criteria that were ruled on", () => {
+  it("leaves a coverage gap to assess without costing the criteria that were ruled on", () => {
     const audit = auditPage();
     const all = buildAdjudicationWorklist(audit).map((i) => clearWith(i, "assessed conforming from source"));
     const missing = all[0]!.criteriaId;
     const r = applyAdjudication(audit, file(all.slice(1)));
 
-    expect(r.rejectedCriteria).toContain(missing);
+    expect(r.ok).toBe(false); // the fold is incomplete…
+    expect(r.notInWorklist).toEqual([missing]); // …because of a gap, named as one
     expect(r.applied).toBeGreaterThan(0);
     expect(r.audit.residualRisks.find((x) => x.criteriaId === missing)!.reason).toMatch(/coverage gap/i);
   });

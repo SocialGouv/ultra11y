@@ -293,7 +293,8 @@ export const WRITE_TOOLS: ToolDecl[] = [
       "WRITES TO THE PROJECT (with write:true): land the verdicts you wrote on the ultra11y_adjudicate worklist — the counterpart of `verify --apply`. " +
       "Send the decisions only (criteriaId, verdict, justification, citations, findings, reason): the server re-derives the evidence and applies the " +
       "SAME gate — a C must cite the evidence it cleared, an NC must carry groundable findings. Partial by default: a refused verdict stays « to assess » " +
-      "and is listed in rejectedCriteria with its reason; strict:true lands nothing if anything is refused. Dry-run by default (the gate's verdict, " +
+      "and is listed in rejectedCriteria with its reason; an open criterion the file never mentions is not a refusal and is listed apart in notInWorklist; " +
+      "strict:true lands nothing if anything is refused. Dry-run by default (the gate's verdict, " +
       "nothing written); write:true writes <out>/audit-latest.json, and ledger:true records the ACCEPTED verdicts in the verdict ledger.",
     inputSchema: {
       type: "object",

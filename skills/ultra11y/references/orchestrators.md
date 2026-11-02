@@ -61,8 +61,8 @@ $ENGINE verify --manual --in "$RUN/audit-latest.json" --out "$RUN" --json
 #    snippet } copied from the criterion's own evidence (references/judgment.md).
 
 # 4. FOLD — partial by default: every verdict the gate accepts lands, every refusal is named
-#    in `rejectedCriteria[]` / `issues[]`, and a criterion absent from the file is refused as a
-#    coverage gap. A verdict for a criterion a previous fold already decided is refused too
+#    in `rejectedCriteria[]` / `issues[]`, and a criterion absent from the file — a coverage
+#    gap, not a refusal — is named apart in `notInWorklist[]` and stays to assess. A verdict for a criterion a previous fold already decided is refused too
 #    (« not open for adjudication »), so re-applying a file on the written-back audit is safe.
 #    Exit 1 only when nothing landed. `--strict` makes it all-or-nothing (exit 1
 #    on any refusal, audit left untouched).
@@ -220,9 +220,11 @@ Read exit codes from the process, **not** from a pipeline — `cmd --json | head
 - `audit --json` → the `AuditResult` (also at `<out>/audit-latest.json`): `findings[]` with
   stable `findingId`, `criteriaId`, `severity`, `file`, `line`; `residualRisks[]`;
   `conformancePct` — the **automatic static pass rate**, not a conformance rate.
-- `verify --apply --json` → `{ ok, auditPath, applied, stillManual, rejected, rejectedCriteria[], issues[],
-  conformancePct, findings, grounding }`; `ok: false` when nothing landed. Count on
-  `applied + stillManual + rejected`, never on the exit code alone.
+- `verify --apply --json` → `{ ok, auditPath, applied, stillManual, rejected, rejectedCriteria[], notInWorklist[],
+  issues[], conformancePct, findings, grounding }`; `ok: false` when nothing landed. `rejected` counts only
+  the verdicts the gate refused; the open criteria the file never mentioned (a lot, a truncated
+  sweep) are `notInWorklist[]`. Count on `applied + stillManual + rejected + notInWorklist.length`,
+  never on the exit code alone.
 - With `--prune`, **`ok: false` does not mean "nothing was applied"**. The CLI computes the
   coverage and grounding verdicts first, but `applyPrune` writes the pruned
   `audit-latest.json` and repairs the `--ledger` file BEFORE `ok` is derived — so a trial that

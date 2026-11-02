@@ -902,6 +902,13 @@ export interface ApplyAdjudicationResult {
   /** The ids behind `rejected`, in file order — so a caller can name them without re-parsing
    *  `issues` (one criterion can raise several). */
   rejectedCriteria: string[];
+  /** Open criteria the file does not mention at all — « hors de la liste ». NOT refusals: no
+   *  verdict was offered, so none was refused. A lot (a partial worklist) leaves every other
+   *  criterion here by construction, and counting those as `rejected` read as if the gate had
+   *  turned down verdicts nobody wrote (11 ruled of 46 reported « 35 rejected »). They stay
+   *  « to assess » and keep `ok` false — the fold is incomplete — but they are named apart.
+   *  In strict mode they are also carried in `issues`, since a gap still voids the whole fold. */
+  notInWorklist: string[];
   grounding: GroundingSummary;
 }
 
@@ -1038,6 +1045,14 @@ export function applyAdjudication(
   };
   /** An open criterion this adjudication deliberately does not carry. Not a gate violation. */
   const uncovered = (criteriaId: string) => notFolded.add(criteriaId);
+  /** An open criterion the file never mentions and the caller did not declare. Not a refusal
+   *  either — nothing was offered — so it is kept out of `itemIssues` (what `rejected` counts)
+   *  and out of the partial fold's `issues`, and reported apart as `notInWorklist`. */
+  const gapIssues = new Map<string, string>();
+  const gap = (criteriaId: string) => {
+    notFolded.add(criteriaId);
+    gapIssues.set(criteriaId, `criterion ${criteriaId}: missing from the adjudication (coverage gap)`);
+  };
   // Spelling first, decisions second: "na" is NA, and rejecting the run over the case of a
   // verdict taught the caller nothing about accessibility. Everything below stays fail-closed.
   canonicalizeAdjudication(adj);
@@ -1059,14 +1074,14 @@ export function applyAdjudication(
       open.add(item.criteriaId);
       if (byId.has(item.criteriaId)) continue;
       if (Object.hasOwn(expected, item.criteriaId)) uncovered(item.criteriaId);
-      else blame(item.criteriaId, `criterion ${item.criteriaId}: missing from the adjudication (coverage gap)`);
+      else gap(item.criteriaId);
     }
   } else {
     for (const r of audit.residualRisks) {
       open.add(r.criteriaId);
       if (byId.has(r.criteriaId)) continue;
       if (Object.hasOwn(expected, r.criteriaId)) uncovered(r.criteriaId);
-      else blame(r.criteriaId, `criterion ${r.criteriaId}: missing from the adjudication (coverage gap)`);
+      else gap(r.criteriaId);
     }
   }
 
@@ -1462,9 +1477,20 @@ export function applyAdjudication(
     }
   }
 
-  // STRICT: the historical file-level fold. One refusal, nothing lands.
-  if (opts.strict && issues.length) {
-    return { ok: false, audit, issues, applied: 0, stillManual: 0, rejected: 0, rejectedCriteria: [], grounding };
+  const notInWorklist = [...gapIssues.keys()];
+  // STRICT: the historical file-level fold. One refusal — or one gap — and nothing lands.
+  if (opts.strict && (issues.length || notInWorklist.length)) {
+    return {
+      ok: false,
+      audit,
+      issues: [...gapIssues.values(), ...issues],
+      applied: 0,
+      stillManual: 0,
+      rejected: 0,
+      rejectedCriteria: [],
+      notInWorklist,
+      grounding,
+    };
   }
   // PARTIAL: a refused criterion is dropped, the rest folds. `rejectedCriteria` keeps file
   // order and de-duplicates, since one criterion can raise several issues. It counts only the
@@ -1472,7 +1498,9 @@ export function applyAdjudication(
   const rejectedCriteria = adj.items.map((it) => it.criteriaId).filter((id) => itemIssues.has(id));
   for (const id of itemIssues.keys()) if (!rejectedCriteria.includes(id)) rejectedCriteria.push(id);
   const rejectedSet = notFolded;
-  const rejectedWhy = (id: string) => expected[id] ?? residualRejectedReason(itemIssues.get(id)?.[0] ?? "refused by the gate");
+  const rejectedWhy = (id: string) =>
+    expected[id] ?? (gapIssues.has(id) ? residualNotInWorklistReason() : residualRejectedReason(itemIssues.get(id)?.[0] ?? "refused by the gate"));
+  const complete = issues.length === 0 && notInWorklist.length === 0;
 
   // Apply: clone the audit, update the decided criteria + append agent findings.
   const next: AuditResult = structuredClone(audit);
@@ -1562,7 +1590,7 @@ export function applyAdjudication(
     // resolve them — but they never touch a WCAG criterion's status.
     next.findings = [...next.findings, ...newFindings];
     next.adjudicated = { date: adj.auditDate, applied, stillManual, ...(rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {}) };
-    return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
+    return { ok: complete, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, notInWorklist, grounding };
   }
 
   for (const it of adj.items) {
@@ -1627,7 +1655,7 @@ export function applyAdjudication(
     .map((r) => (rejectedSet.has(r.criteriaId) ? { ...r, reason: rejectedWhy(r.criteriaId) } : r));
   recomputeTallies(next);
   next.adjudicated = { date: adj.auditDate, applied, stillManual, ...(rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {}) };
-  return { ok: issues.length === 0, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, grounding };
+  return { ok: complete, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, notInWorklist, grounding };
 }
 
 /** A severity the ENGINE understands, from whatever the model wrote.
@@ -1745,6 +1773,10 @@ const residualUndecidableReason = () => "Left as an explicit residual risk (not 
 /** Why a criterion is still to assess after a PARTIAL fold: its verdict was refused. Carries
  *  the first refusal verbatim, so the reader (and the next adjudication pass) sees the actual
  *  contract violation rather than a bare « to assess ». */
+/** Not a refusal: the fold that ran simply did not carry this criterion (a lot, a truncated
+ *  sweep). Said as such so the report never reads it as a verdict the gate turned down. */
+const residualNotInWorklistReason = () =>
+  "Not in the adjudication that was folded (coverage gap) — no verdict was offered, so none was refused. Adjudicate this criterion.";
 const residualRejectedReason = (why: string) => `Adjudication refused by the gate — ${why.replace(/^criterion \S+: /, "")}. Re-adjudicate this criterion.`;
 
 /** Characters of a harvested snippet the brief prints. Long enough that the element is

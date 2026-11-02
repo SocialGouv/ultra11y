@@ -3719,6 +3719,7 @@ function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): num
           stillManual: r.stillManual,
           rejected: r.rejected,
           rejectedCriteria: r.rejectedCriteria,
+          notInWorklist: r.notInWorklist,
           replayed: rp.fresh.length,
           stale: rp.stale,
           obsolete: rp.obsolete,
@@ -3761,6 +3762,19 @@ function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): num
   return 0;
 }
 
+/** Name the open criteria a fold did not carry, APART from the refusals. A lot (a partial
+ *  worklist) leaves every other criterion out by construction; listing them under « refused by
+ *  the gate » read as if verdicts had been turned down that nobody wrote (#132). */
+function reportNotInWorklist(ids: string[], lang: Lang): void {
+  if (!ids.length) return;
+  const shown = ids.slice(0, 40).join(", ") + (ids.length > 40 ? ` … +${ids.length - 40}` : "");
+  console.error(
+    lang === "fr"
+      ? `ℹ ${ids.length} critère(s) hors de la liste — absent(s) de ce fichier, rien n'a été refusé ; ils restent à évaluer : ${shown}`
+      : `ℹ ${ids.length} criterion(ia) not in this worklist — absent from this file, nothing was refused; they stay to assess: ${shown}`,
+  );
+}
+
 /** `verify --apply <adjudication.json> --in <audit.json> --out <dir>` — fold an AI
  *  adjudication of the manual criteria back into the audit, fail-closed, then rewrite the
  *  audit JSON so `report`/`prd` re-render with the adjudicated statuses. */
@@ -3798,6 +3812,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
     else {
       console.error(lang === "fr" ? `✗ Adjudication rejetée (${r.issues.length} problème(s)) :` : `✗ Adjudication rejected (${r.issues.length} issue(s)):`);
       for (const i of r.issues) console.error(`  ✗ ${i}`);
+      reportNotInWorklist(r.notInWorklist, lang);
     }
     return 1;
   }
@@ -3809,6 +3824,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
     );
     for (const i of r.issues) console.error(`  ✗ ${i}`);
   }
+  if (!p.flags.json) reportNotInWorklist(r.notInWorklist, lang);
   // Persist the updated audit so report/prd re-render with the adjudicated statuses.
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
   mkdirSync(out, { recursive: true });
@@ -3865,6 +3881,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
           stillManual: r.stillManual,
           rejected: r.rejected,
           rejectedCriteria: r.rejectedCriteria,
+          notInWorklist: r.notInWorklist,
           issues: r.issues,
           conformancePct: r.audit.conformancePct,
           findings: r.audit.findings.length,
@@ -3877,8 +3894,8 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   else
     console.log(
       lang === "fr"
-        ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""} → ${auditPath}`
-        : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} → ${auditPath}`,
+        ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} hors de la liste` : ""} → ${auditPath}`
+        : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} not in this worklist` : ""} → ${auditPath}`,
     );
   return 0;
 }
@@ -4280,6 +4297,7 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
     console.error(lang === "fr" ? `✗ Adjudication rejetée (${r.issues.length} problème(s)) :` : `✗ Adjudication rejected (${r.issues.length} issue(s)):`);
     for (const i of r.issues.slice(0, 40)) console.error(`  ✗ ${i}`);
     if (r.issues.length > 40) console.error(`  … +${r.issues.length - 40}`);
+    reportNotInWorklist(r.notInWorklist, lang);
     return 1;
   }
   if (r.rejected > 0) {
@@ -4291,6 +4309,7 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
     for (const i of r.issues.slice(0, 40)) console.error(`  ✗ ${i}`);
     if (r.issues.length > 40) console.error(`  … +${r.issues.length - 40}`);
   }
+  reportNotInWorklist(r.notInWorklist, lang);
   mkdirSync(out, { recursive: true });
   const auditPath = join(out, "audit-latest.json");
   writeFileSync(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}\n`);
@@ -4331,8 +4350,8 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
   }
   console.log(
     lang === "fr"
-      ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""} → ${auditPath}`
-      : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} → ${auditPath}`,
+      ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} hors de la liste` : ""} → ${auditPath}`
+      : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} not in this worklist` : ""} → ${auditPath}`,
   );
   return 0;
 }
