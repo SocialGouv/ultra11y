@@ -27,6 +27,11 @@ export interface ComponentDef {
   controlHasName: boolean; // control already bears a literal name (text or literal aria-label) — a passed name prop is dead, not lost
   spreadsProps: boolean; // control has {...props}
   forwardsAria: boolean; // control has aria-label/labelledby set to an expression
+  // The props the component body READS (a destructured binding it references, or a
+  // `props.x` access); null when that cannot be told (a rest/whole `props` object that
+  // travels on, a nested pattern…). Set only on a control-rendering component: a name prop
+  // it reads went somewhere — a <caption>, a heading — so it was not lost at the boundary.
+  readsProps?: string[] | null;
 }
 
 export interface FileGraphNode {
@@ -127,6 +132,70 @@ function posOf(node: AstNode): { line: number; col: number } {
   return { line: node.loc?.start.line ?? 1, col: (node.loc?.start.column ?? 0) + 1 };
 }
 
+// Every identifier the body references as a value — not a non-computed member property
+// (`file.name`) nor a non-computed object key (`{ title: x }`). Over-collecting only makes
+// a prop look read, which silences the rule: the conservative direction.
+function referencedNames(body: unknown): AstNode[] {
+  const skip = new Set<AstNode>();
+  const out: AstNode[] = [];
+  walkAst(body, (n) => {
+    if ((n.type === "MemberExpression" || n.type === "OptionalMemberExpression") && !n.computed) {
+      const prop = asNode(n.property);
+      if (prop) skip.add(prop);
+    } else if ((n.type === "ObjectProperty" || n.type === "ObjectMethod") && !n.computed && !n.shorthand) {
+      const key = asNode(n.key);
+      if (key) skip.add(key);
+    } else if (n.type === "Identifier" && !skip.has(n)) out.push(n);
+  });
+  return out;
+}
+
+function identName(n: AstNode | undefined): string {
+  return n?.type === "Identifier" && typeof n.name === "string" ? n.name : "";
+}
+
+// Which props does the component read? See ComponentDef.readsProps.
+function readsProps(fnNode: AstNode): string[] | null {
+  let param = asNodes(fnNode.params)[0];
+  if (!param) return []; // takes no props: whatever is passed is dropped
+  if (param.type === "AssignmentPattern") param = asNode(param.left);
+  const refs = referencedNames(fnNode.body);
+  if (param?.type === "ObjectPattern") {
+    const used: string[] = [];
+    for (const prop of asNodes(param.properties)) {
+      if (prop.type === "RestElement") {
+        const rest = identName(asNode(prop.argument));
+        if (!rest || refs.some((r) => r.name === rest)) return null; // the rest travels on: any prop may
+        continue;
+      }
+      const key = asNode(prop.key);
+      const keyName = identName(key) || (key?.type === "StringLiteral" && typeof key.value === "string" ? key.value : "");
+      if (prop.type !== "ObjectProperty" || prop.computed || !keyName) return null;
+      let value = asNode(prop.value);
+      if (value?.type === "AssignmentPattern") value = asNode(value.left);
+      const local = identName(value);
+      if (!local) return null; // nested pattern
+      if (refs.some((r) => r.name === local)) used.push(keyName);
+    }
+    return used;
+  }
+  const whole = identName(param);
+  if (!whole) return null;
+  const used: string[] = [];
+  const members = new Set<AstNode>();
+  walkAst(fnNode.body, (n) => {
+    if ((n.type !== "MemberExpression" && n.type !== "OptionalMemberExpression") || n.computed) return;
+    const obj = asNode(n.object);
+    const prop = identName(asNode(n.property));
+    if (obj && identName(obj) === whole && prop) {
+      members.add(obj);
+      used.push(prop);
+    }
+  });
+  // `props` used any other way (spread, passed on, destructured in the body) → cannot tell.
+  return refs.some((r) => r.name === whole && !members.has(r)) ? null : used;
+}
+
 function analyzeComponent(name: string, file: string, fnNode: AstNode): ComponentDef {
   const control = findControl(fnNode);
   if (!control) {
@@ -157,7 +226,19 @@ function analyzeComponent(name: string, file: string, fnNode: AstNode): Componen
   // icon button like `aria-label={isPlus ? "…" : "…"}`.
   const controlHasName = literalAriaName || forwardsAria || hasLiteralText(control);
   const rendersIconOnlyControl = hasIconChild(control) && !hasLiteralText(control) && !literalAriaName && !forwardsAria;
-  return { name, file, line, col, hasControl: true, rendersIconOnlyControl, acceptsName, controlHasName, spreadsProps, forwardsAria };
+  return {
+    name,
+    file,
+    line,
+    col,
+    hasControl: true,
+    rendersIconOnlyControl,
+    acceptsName,
+    controlHasName,
+    spreadsProps,
+    forwardsAria,
+    readsProps: readsProps(fnNode),
+  };
 }
 
 // A .vue/.svelte/.astro SFC has no top-level JS function to declare "the component"

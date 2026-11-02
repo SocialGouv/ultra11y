@@ -28,6 +28,7 @@ import { parseInlineStyle } from "./color.js";
 import type { Evidence } from "./adjudicate.js";
 import { AXE_WCAG } from "./axe-map.js";
 import { computedTextPairs, renderedRulesFor, renderedRulesRan } from "./rules/rendered.js";
+import { rendersNativeLink } from "./rules/rule.js";
 
 /** Mask the parts of a text that change between runs without the code changing.
  *
@@ -1487,7 +1488,9 @@ export const SUBJECTS: Record<string, Subject> = {
       ...d.elements
         .filter(
           (e) =>
-            !INTERACTIVE_TAGS.includes(e.tag) && Object.keys(e.attribs).some((k) => /^on(click|mousedown|mouseup|mouseenter|pointerdown|touchstart)$/i.test(k)),
+            !INTERACTIVE_TAGS.includes(e.tag) &&
+            !rendersNativeLink(d, e) && // Next's <Link href> IS an <a href> (#133)
+            Object.keys(e.attribs).some((k) => /^on(click|mousedown|mouseup|mouseenter|pointerdown|touchstart)$/i.test(k)),
         )
         .map((e) => h(d, e, `<${e.tag}> carries a pointer handler but is not natively interactive — keyboard equivalent?`, `clickable|${e.tag}|${t(e, 40)}`)),
       ...linesOf(d, /\bon(?:MouseDown|PointerDown|TouchStart)\s*=/).map((l) =>

@@ -222,6 +222,17 @@ const emptyHeading: Rule = {
 // nothing outside a <dl>. Broken either way, the relationship is purely visual.
 const DL_ALLOWED = new Set(["dt", "dd", "div", "script", "template", "slot", "#fragment"]);
 
+/** A <dt>/<dd> reached only through <div> groups (which a <dl> admits) and fragments, up to
+ *  the root of a returned JSX expression (or an SFC's <template>), is placed by the caller:
+ *  egapro's `<dl><InfoRow/></dl>`, InfoRow returning `<div><dt/><dd/></div>` (#133). Its
+ *  parent is unknown, not missing. An HTML file has no caller, so its root stays decisive. */
+function groupParentUnknown(doc: Doc, el: El): boolean {
+  if (doc.kind !== "jsx-ast" && doc.kind !== "jsx-lossy" && doc.kind !== "sfc") return false;
+  let p = el.parent;
+  while (p && (p.tag === "div" || p.tag === "#fragment")) p = p.parent;
+  return p === null || (doc.kind === "sfc" && p.tag === "template" && p.parent === null);
+}
+
 const dlStructure: Rule = {
   id: "dl-structure",
   criteria: ["1.3.1"],
@@ -241,6 +252,7 @@ const dlStructure: Rule = {
       if (el.tag !== "dt" && el.tag !== "dd") continue;
       const chain = ancestors(el);
       if (chain.some((a) => a.tag === "dl" || !isIntrinsic(a.tag))) continue; // inside a dl, or a component may supply one
+      if (groupParentUnknown(doc, el)) continue;
       out.push({ criteriaId: "1.3.1", el, msgId: "dl-structure.orphan", params: { tag: el.tag } });
     }
     return out;

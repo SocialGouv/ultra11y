@@ -140,13 +140,20 @@ const crossPropDrilledNameLost: CrossRule = {
     const findings = [];
     for (const el of doc.elements) {
       if (!isComponentUsage(el)) continue;
-      const passed = NAME_PROPS_PASSED.find((p) => (attr(el, p) ?? "").trim() !== "");
-      if (!passed) continue;
+      const given = NAME_PROPS_PASSED.filter((p) => (attr(el, p) ?? "").trim() !== "");
+      if (!given.length) continue;
       const def = resolveUsage(graph, doc.file, el.tag);
       // Fire only when the control would otherwise be NAMELESS: it must render a control,
       // not accept a name from props, AND not already carry a literal name (else the passed
       // prop is dead code, not a real 4.1.2 non-conformity).
       if (!def?.hasControl || def.acceptsName || def.controlHasName) continue;
+      // …and only for a name prop the component provably never reads. One it reads went
+      // somewhere — egapro's SelectedFilesTable renders its `title` as the <caption> (#133);
+      // when what it reads cannot be told, nothing is proven lost.
+      const reads = def.readsProps;
+      if (!reads) continue;
+      const passed = given.find((p) => !reads.includes(p));
+      if (!passed) continue;
       findings.push({
         criteriaId: "4.1.2",
         el,
