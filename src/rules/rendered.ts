@@ -296,6 +296,8 @@ function borderColours(css: Record<string, string>): RGBA[] {
 // itself. Three independent ways to pass — deliberately generous, because a false
 // "non-conforming" here is far more costly than a missed one, and the remaining failures (a
 // borderless input on a same-coloured background) are unambiguous.
+const VISUALLY_HIDDEN_CLASS = /(^|\s)(fr-sr-only|sr-only|visually-hidden|visuallyhidden)(\s|$)/;
+
 const renderedNonTextContrast: Rule = {
   id: "rendered-nontext-contrast",
   criteria: ["1.4.11"],
@@ -315,6 +317,11 @@ const renderedNonTextContrast: Rule = {
       if (el.tag === "input" && ["button", "submit", "reset"].includes(type) && WORD.test(el.attribs.value ?? "")) continue;
       const css = styleAt(doc, i)?.css;
       if (!css || invisible(css)) continue;
+      // A visually hidden control (sr-only class, or a box of at most 1×1 px) has nothing visible
+      // to delimit: the control a sighted user operates is another element (#118).
+      if (VISUALLY_HIDDEN_CLASS.test(el.attribs.class ?? "")) continue;
+      const box = doc.signals?.boxes?.get(i);
+      if (box && box.w <= 1 && box.h <= 1) continue;
       // A shadow or an outline can BE the boundary, and neither is a colour we can compare
       // simply. Decline rather than guess.
       if (css.boxShadow && css.boxShadow !== "none") continue;
@@ -326,6 +333,12 @@ const renderedNonTextContrast: Rule = {
       // A transparent control is filled by whatever is behind it: the surroundings.
       const fill = own && own.a >= 1 ? own : surrounding.color;
       if (contrastRatio(fill, surrounding.color) >= 3) continue; // the fill draws the boundary
+      // An icon-only BUTTON is identified by its glyph, which icon fonts and DSFR masks paint in
+      // `currentColor`: 1.4.11 then asks 3:1 for that glyph, not a boundary (#118). Fields
+      // still need one — a borderless input has no glyph to stand in for it.
+      const isButton = el.tag === "button" || (el.tag === "input" && ["button", "submit", "reset"].includes(type));
+      const glyph = parseColor(css.color ?? "");
+      if (isButton && glyph && glyph.a >= 1 && contrastRatio(glyph, surrounding.color) >= 3) continue;
       const borders = borderColours(css);
       if (borders.some((b) => contrastRatio(b, surrounding.color) >= 3 || contrastRatio(b, fill) >= 3)) continue;
       // No fill contrast and no contrasting border: nothing marks where the control is.

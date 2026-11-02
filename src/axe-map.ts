@@ -325,6 +325,27 @@ export function isAxeAdvisory(ruleId: string, tags: string[] | undefined): boole
   return AXE_ADVISORY_EXCEPTIONS[ruleId] ?? axeAdvisory(tags);
 }
 
+/** How ONE axe node merges: its severity and whether it is advisory. The rule-level decision
+ *  (`severityFromImpact`, `isAxeAdvisory`) with the node-level corrections a rule needs.
+ *
+ *  `label-title-only` (#117) is pinned normative for parity with the static twin
+ *  `control-name-title-only`, whose defect is a field named by `title` ALONE — a weak name,
+ *  « mineur », never a missing one. axe also fires it on a field named by a visually hidden
+ *  `aria-labelledby` target: that field has a programmatic name and fails no criterion, so the
+ *  node is advisory. Neither case is ever a blocking 4.1.2 failure. */
+export function axeNodeTreatment(
+  ruleId: string,
+  tags: string[] | undefined,
+  impact: string | null | undefined,
+  nodeHtml: string | undefined,
+): { severity: Severity; advisory: boolean } {
+  if (ruleId === "label-title-only") {
+    const labelledby = /\saria-labelledby\s*=\s*["'][^"']*\S[^"']*["']/i.test(nodeHtml ?? "");
+    return { severity: "mineur", advisory: labelledby || isAxeAdvisory(ruleId, tags) };
+  }
+  return { severity: severityFromImpact(impact), advisory: isAxeAdvisory(ruleId, tags) };
+}
+
 /** Resolve an axe rule to a WCAG SC: the curated map first (deliberate, e.g.
  *  color-contrast → 1.4.3), then axe's own wcag tags, then the 4.1.2 fallback. */
 export function scForAxe(ruleId: string, tags?: string[]): string {

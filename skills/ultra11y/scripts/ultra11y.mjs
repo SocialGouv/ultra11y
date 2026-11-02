@@ -40598,6 +40598,7 @@ function borderColours(css) {
   }
   return out2;
 }
+var VISUALLY_HIDDEN_CLASS = /(^|\s)(fr-sr-only|sr-only|visually-hidden|visuallyhidden)(\s|$)/;
 var renderedNonTextContrast = {
   id: "rendered-nontext-contrast",
   criteria: ["1.4.11"],
@@ -40614,6 +40615,9 @@ var renderedNonTextContrast = {
       if (el.tag === "input" && ["button", "submit", "reset"].includes(type) && WORD.test(el.attribs.value ?? "")) continue;
       const css = styleAt(doc, i2)?.css;
       if (!css || invisible(css)) continue;
+      if (VISUALLY_HIDDEN_CLASS.test(el.attribs.class ?? "")) continue;
+      const box = doc.signals?.boxes?.get(i2);
+      if (box && box.w <= 1 && box.h <= 1) continue;
       if (css.boxShadow && css.boxShadow !== "none") continue;
       if ((css.outlineStyle ?? "none") !== "none" && Number.parseFloat(css.outlineWidth ?? "0") > 0) continue;
       const surrounding = el.parent ? backdropOf(doc, index, el.parent) : void 0;
@@ -40621,6 +40625,9 @@ var renderedNonTextContrast = {
       const own = parseColor(css.backgroundColor ?? "");
       const fill = own && own.a >= 1 ? own : surrounding.color;
       if (contrastRatio(fill, surrounding.color) >= 3) continue;
+      const isButton3 = el.tag === "button" || el.tag === "input" && ["button", "submit", "reset"].includes(type);
+      const glyph = parseColor(css.color ?? "");
+      if (isButton3 && glyph && glyph.a >= 1 && contrastRatio(glyph, surrounding.color) >= 3) continue;
       const borders = borderColours(css);
       if (borders.some((b) => contrastRatio(b, surrounding.color) >= 3 || contrastRatio(b, fill) >= 3)) continue;
       out2.push({
@@ -40973,6 +40980,13 @@ function axeAdvisory(tags) {
 }
 function isAxeAdvisory(ruleId, tags) {
   return AXE_ADVISORY_EXCEPTIONS[ruleId] ?? axeAdvisory(tags);
+}
+function axeNodeTreatment(ruleId, tags, impact, nodeHtml) {
+  if (ruleId === "label-title-only") {
+    const labelledby = /\saria-labelledby\s*=\s*["'][^"']*\S[^"']*["']/i.test(nodeHtml ?? "");
+    return { severity: "mineur", advisory: labelledby || isAxeAdvisory(ruleId, tags) };
+  }
+  return { severity: severityFromImpact(impact), advisory: isAxeAdvisory(ruleId, tags) };
 }
 function scForAxe(ruleId, tags) {
   return AXE_WCAG[ruleId] ?? scFromWcagTags(tags) ?? FALLBACK_SC;
@@ -50070,10 +50084,10 @@ function visibleLabelText(el) {
   return collapse(out2);
 }
 var NOT_INTITULE_CLASS = /(^|\s)(fr-hint-text|fr-sr-only|sr-only|visually-hidden|visuallyhidden|hint-text|help-text)(\s|$)/;
-var VISUALLY_HIDDEN_CLASS = /(^|\s)(fr-sr-only|sr-only|visually-hidden|visuallyhidden)(\s|$)/;
+var VISUALLY_HIDDEN_CLASS2 = /(^|\s)(fr-sr-only|sr-only|visually-hidden|visuallyhidden)(\s|$)/;
 var FIELD_DESCENDANT = /* @__PURE__ */ new Set(["input", "select", "textarea", "button", "datalist", "output"]);
 function primaryLabelText(label) {
-  if ([label, ...ancestors(label)].some((e) => VISUALLY_HIDDEN_CLASS.test(attr(e, "class") ?? ""))) return "";
+  if ([label, ...ancestors(label)].some((e) => VISUALLY_HIDDEN_CLASS2.test(attr(e, "class") ?? ""))) return "";
   let out2 = "";
   const nonText = /* @__PURE__ */ new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img", "svg"]);
   const walk3 = (n) => {
@@ -56349,10 +56363,9 @@ function axeFindings(violations, file, page) {
   for (const v of violations) {
     if (!v?.id) continue;
     const criteriaId = scForAxe(v.id, v.tags);
-    const severity = severityFromImpact(v.impact);
-    const advisory = isAxeAdvisory(v.id, v.tags);
     const nodes = v.nodes?.length ? v.nodes : [{ target: [], html: "" }];
     for (const n of nodes) {
+      const { severity, advisory } = axeNodeTreatment(v.id, v.tags, v.impact, n.html);
       out2.push({
         ruleId: `axe:${v.id}`,
         criteriaId,
@@ -69953,9 +69966,8 @@ function toDynamicResult(out2, target, lang = "en", engine = "axe-core@playwrigh
   const findings = [];
   for (const v of out2.violations) {
     const criteriaId = scForAxe(v.id, v.tags);
-    const severity = severityFromImpact(v.impact);
-    const advisory = isAxeAdvisory(v.id, v.tags);
     for (const n of v.nodes.length ? v.nodes : [{ target: [], html: "" }]) {
+      const { severity, advisory } = axeNodeTreatment(v.id, v.tags, v.impact, n.html);
       findings.push({
         criteriaId,
         axeRule: v.id,
