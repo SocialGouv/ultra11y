@@ -16,6 +16,16 @@ export default defineConfig({
     // there, and `process.chdir` is process-wide. Run alongside the others it silently moved
     // the cwd out from under whichever file happened to share its worker, and the failures
     // landed somewhere else entirely (language resolution, which reads the repo it is in).
-    exclude: [...configDefaults.exclude, "tests/fixtures/**", "audits/**", "tests/perf-shape.test.ts", "tests/browser-tier.e2e.test.ts"],
+    //
+    // tests/opencode-smoke.e2e.test.ts boots real OpenCode servers (both majors, when
+    // installed) and is run on its own: `pnpm run test:opencode`.
+    exclude: [
+      ...configDefaults.exclude,
+      "tests/fixtures/**",
+      "audits/**",
+      "tests/perf-shape.test.ts",
+      "tests/browser-tier.e2e.test.ts",
+      "tests/opencode-smoke.e2e.test.ts",
+    ],
   },
 });

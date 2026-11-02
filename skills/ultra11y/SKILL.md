@@ -135,7 +135,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/verify.md` | The `check`/`verify` gates |
 | `references/false-positives.md` | Where a finding may still be wrong, and how to refute it |
 | `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
-| `references/harnesses.md` | Where this runs: Claude Code, Codex CLI, OpenCode, and the AGENTS.md fallback |
+| `references/harnesses.md` | Where this runs: Claude Code, Codex CLI, OpenCode 1.x and 2.x, and the AGENTS.md fallback |
 | `references/orchestrators.md` | Driving the engine from a workflow engine / non-GitHub CI: pinning, the six-step pipeline, exit codes, the ticket set as JSON for any tracker |
 | `references/ci.md` | `--format sarif\|github`: inline PR annotations, code scanning, job summary |
 | `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |

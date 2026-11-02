@@ -108,6 +108,7 @@ import { diffAgainstBaseline, baselineSummary, findingId, parseFailOn, findingsA
 import { repoRoot, resolveEnginePath, writeHook, writeCi } from "./init.js";
 import { installForTargets, parseTargets, statusReport, uninstallForTargets } from "./install/index.js";
 import { agentsMdBlock } from "./install/agents-md.js";
+import { parseOpencodeMajorFlag } from "./install/opencode.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { toSarif } from "./sarif.js";
 import { annotations, pagesComment, prComment, stepSummary } from "./annotate.js";
@@ -194,7 +195,7 @@ Usage:
   ultra11y import   --from file <report.json> | --from ara <id> [--source <adapter>] [--out <dir>] [--json]
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
-  ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
+  ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
   ultra11y status   [--json] [--project] [--browser [--cwd <dir>]]   (doctor: which agents run the review; --browser asks whether the scan tier resolves here)
   ultra11y dev      [--port <n>] [--root <dir>] [--standard <pack>] [--lang auto|en|fr]   (dev side-car: live overlay + per-page dashboard)
@@ -644,6 +645,9 @@ function isCommand(s: string | undefined): s is Command {
 }
 
 const VALUE_FLAGS = new Set([
+  // `install --opencode --opencode-version 1|2`: the OpenCode major to wire for, instead of
+  // asking the `opencode` on PATH.
+  "opencode-version",
   // `judge --refute <VERIFY.todo.json>`: put already-written claims on trial, through the same
   // transport the adjudication pass uses.
   "refute",
@@ -2068,7 +2072,19 @@ function cmdInstall(p: ParsedArgs): number {
     console.log(agentsMdBlock(repoRoot() ?? process.cwd()));
     if (targets.length === 1) return 0;
   }
-  const results = installForTargets({ targets, project: p.flags.project === true, dryRun, skills: p.flags["no-skills"] !== true });
+  // OpenCode 1 and 2 load the plugin from different directories; detected unless given.
+  const oc = parseOpencodeMajorFlag(p.flags["opencode-version"]);
+  if (oc.error) {
+    console.error(`ultra11y install: ${oc.error}`);
+    return 2;
+  }
+  const results = installForTargets({
+    targets,
+    project: p.flags.project === true,
+    dryRun,
+    skills: p.flags["no-skills"] !== true,
+    opencodeVersion: oc.major,
+  });
   return reportInstall(results, dryRun ? "would wire" : "wired");
 }
 

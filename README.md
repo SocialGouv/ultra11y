@@ -17,7 +17,7 @@ pull request — you never type the skill's name:
 |---|---|
 | **Claude Code** | `/plugin marketplace add SocialGouv/ultra11y` then `/plugin install ultra11y@ultra11y` |
 | **OpenAI Codex CLI** | `codex plugin marketplace add SocialGouv/ultra11y` then `codex plugin add ultra11y@ultra11y` |
-| **OpenCode** | `npx ultra11y install --opencode` — or pin `"plugin": ["ultra11y@latest"]` in `opencode.json` |
+| **OpenCode** 1.x and 2.x | `npx ultra11y install --opencode` — or pin `"plugins": ["ultra11y@latest"]` in `opencode.json` (OpenCode 1: `"plugin"`) |
 | **Anything else** | `npx ultra11y install --agents-md` (no hook API: see the caveat below) |
 
 <sub>Prefer the skills only, without the automatic hook? `npx skills add SocialGouv/ultra11y`
@@ -87,14 +87,15 @@ so `review-a11y` runs before the work goes out — you never type the skill's na
 ```
 /plugin marketplace add SocialGouv/ultra11y          # Claude Code
 codex plugin marketplace add SocialGouv/ultra11y     # Codex CLI
-npx ultra11y install --opencode                  # OpenCode
+npx ultra11y install --opencode                  # OpenCode 1.x or 2.x (detected; --opencode-version 1|2)
 ```
 
 Codex's hook engine is a near-clone of Claude Code's — same events, same envelope, and it
 exports `${CLAUDE_PLUGIN_ROOT}` too — so both harnesses share one `hooks/hooks.json`.
-OpenCode has no permission-decision channel, so there the gate surfaces as a **failed bash
-call whose error message carries the findings**. Per-harness deltas, the Codex feature flag
-and the trust prompt: [`skills/ultra11y/references/harnesses.md`](skills/ultra11y/references/harnesses.md).
+OpenCode has no permission-decision channel, so there the gate surfaces as a **failed shell
+call whose error message carries the findings**. One plugin file serves OpenCode 1 and
+OpenCode 2, whose plugin APIs differ: V2 reads its `setup(ctx)`, V1 its `server()`.
+Per-harness deltas, the Codex feature flag and the trust prompt: [`skills/ultra11y/references/harnesses.md`](skills/ultra11y/references/harnesses.md).
 
 Four things worth knowing, because they bound what "automatic" means here:
 
