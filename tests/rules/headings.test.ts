@@ -47,6 +47,22 @@ describe("h1-missing — framework shell templates", () => {
   });
 });
 
+// #106 — egapro's CompliancePathOptions: a component returns a fragment of <li>s that its
+// caller places inside <ul>{children}</ul>. The fragment at the ROOT of a returned expression
+// has no parent in this file.
+describe("list-structure — a fragment of <li>s returned to the caller (#106)", () => {
+  it("does not report the items of a component that returns a fragment", () => {
+    const src = `function Items() { return (<><li>Informer le CSE</li><li>Transmettre l'avis</li></>); }
+      function List({ children }) { return (<div><p>Obligations</p><ul>{children}</ul></div>); }
+      export function Page() { return <List><Items /></List>; }`;
+    expect(findOf(src, "list-structure", "Options.tsx")).toHaveLength(0);
+  });
+  it("still reports a <li> under a fragment nested inside a known non-list element", () => {
+    expect(findOf(`export function F() { return (<div><><li>a</li></></div>); }`, "list-structure", "F.tsx")).toHaveLength(1);
+    expect(findOf(`export function F() { return (<div><li>a</li></div>); }`, "list-structure", "F.tsx")).toHaveLength(1);
+  });
+});
+
 describe("list-structure — slotted <li> (SFC named slots / component children)", () => {
   it("does not flag a <li> inside a <template> slot definition", () => {
     expect(findOf(`<template><li>a</li></template>`, "list-structure", "C.vue")).toHaveLength(0);
