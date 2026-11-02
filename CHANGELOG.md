@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.56.1](https://github.com/SocialGouv/ultra11y/compare/v5.56.0...v5.56.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **pdf:** text detection stays incomplete on unresolved references and deep forms, ASCII85 decodes under the stream cap, any /Encrypt is unreadable ([#122](https://github.com/SocialGouv/ultra11y/issues/122)) ([c1df165](https://github.com/SocialGouv/ultra11y/commit/c1df1652dde1c7d7d7e03147c8d3b753d547a5ea))
+
 # [5.56.0](https://github.com/SocialGouv/ultra11y/compare/v5.55.5...v5.56.0) (2026-11-02)
 
 
