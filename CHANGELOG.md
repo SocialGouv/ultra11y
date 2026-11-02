@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.54.3](https://github.com/SocialGouv/ultra11y/compare/v5.54.2...v5.54.3) (2026-11-02)
+
+
+### Bug Fixes
+
+* **rules:** list-structure no longer reports the <li>s of a fragment returned to the caller ([#107](https://github.com/SocialGouv/ultra11y/issues/107)) ([f46aa76](https://github.com/SocialGouv/ultra11y/commit/f46aa76e066191c1ecbe57b23278d3373ae05dcb))
+
 ## [5.54.2](https://github.com/SocialGouv/ultra11y/compare/v5.54.1...v5.54.2) (2026-11-02)
 
 
