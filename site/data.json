@@ -73,23 +73,23 @@
     ],
     "tests": {
       "total": 258,
-      "static": 29,
+      "static": 30,
       "rendered": 3,
-      "judgment": 226,
-      "decidable": 32
+      "judgment": 225,
+      "decidable": 33
     },
     "levels": {
       "det": 2,
-      "nc": 21,
+      "nc": 22,
       "hint": 29,
-      "llm": 54
+      "llm": 53
     },
-    "provable": 23,
+    "provable": 24,
     "deterministic": [
       "8.3",
       "8.5"
     ],
-    "touched": 52,
+    "touched": 53,
     "cNeedsJudgment": 104
   },
   "wcag": {
@@ -99,7 +99,7 @@
     "judgment": 38
   },
   "engine": {
-    "staticRules": 96,
+    "staticRules": 97,
     "crossRules": 7,
     "renderedRules": 6,
     "packRules": 4,
@@ -109,8 +109,8 @@
   "sources": [
     {
       "key": "static",
-      "touched": 42,
-      "decisive": 19,
+      "touched": 43,
+      "decisive": 20,
       "signalOnly": 23
     },
     {
@@ -165,7 +165,7 @@
     "overallPct": 47
   },
   "tests": {
-    "fixtures": 136
+    "fixtures": 137
   },
   "criteria": [
     {
@@ -294,10 +294,16 @@
       "id": "1.9",
       "theme": 1,
       "title": "Chaque légende d’image est-elle, si nécessaire, correctement reliée à l’image correspondante ?",
-      "level": "llm",
-      "sources": [],
-      "decisiveSources": [],
-      "decisive": [],
+      "level": "nc",
+      "sources": [
+        "static"
+      ],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "figure-caption-unassociated"
+      ],
       "signals": [],
       "advisory": [],
       "tests": 5

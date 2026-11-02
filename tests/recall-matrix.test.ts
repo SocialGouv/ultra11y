@@ -35,6 +35,7 @@ const SEED: Record<string, string> = {
   "link-label-in-name-mismatch": `<main><a href="/" aria-label="Go to the main page">Home</a></main>`,
   "field-label-in-name-mismatch": `<main><form><label for="up">Upload your CSE opinion</label><input type="file" id="up" aria-label="Select files"></form></main>`,
   // images (1.1.1)
+  "figure-caption-unassociated": `<main><figure><img src="c.png" alt="Courbe"><figcaption>Evolution in 2025</figcaption></figure></main>`,
   "img-alt-missing": `<main><img src="x.png"></main>`,
   "input-image-alt-missing": `<main><input type="image" src="go.png"></main>`,
   "object-embed-no-name": `<main><object data="chart.svg"></object></main>`,

@@ -345,6 +345,32 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
       en: () => `Add aria-label/title describing the content (and text fallback content inside <object>…</object>), or aria-hidden="true" if decorative.`,
     },
   },
+  "figure-caption-unassociated": {
+    message: {
+      fr: (p) => {
+        const m = String(p.missing).split(",");
+        const parts = [
+          m.includes("role") ? `pas de role="figure" ou "group"` : "",
+          m.includes("aria-label") ? "pas d'aria-label" : "",
+          m.includes("aria-label-mismatch") ? "un aria-label différent de la légende" : "",
+        ].filter(Boolean);
+        return `<figure> légendée (« ${p.caption} ») : ${parts.join(", ")} — la légende n'est pas reliée à l'image (test RGAA 1.9.1).`;
+      },
+      en: (p) => {
+        const m = String(p.missing).split(",");
+        const parts = [
+          m.includes("role") ? `no role="figure" or "group"` : "",
+          m.includes("aria-label") ? "no aria-label" : "",
+          m.includes("aria-label-mismatch") ? "an aria-label that differs from the caption" : "",
+        ].filter(Boolean);
+        return `Captioned <figure> ("${p.caption}"): ${parts.join(", ")} — the caption is not tied to the image.`;
+      },
+    },
+    remediation: {
+      fr: (p) => `Ajoutez role="figure" et aria-label="${p.caption}" sur la balise <figure>, identique au contenu du <figcaption>.`,
+      en: (p) => `Add role="figure" and aria-label="${p.caption}" to the <figure>, identical to the <figcaption> content.`,
+    },
+  },
   "chart-no-accessible-name": {
     message: {
       fr: (p) => `Graphique (<${p.tag}> ${p.cls}) sans nom accessible — alternative textuelle manquante.`,

@@ -248,6 +248,10 @@
     "presentational-spacing": {
       "advisory": false,
       "severity": "majeur"
+    },
+    "figure-caption-unassociated": {
+      "advisory": false,
+      "severity": "majeur"
     }
   },
   "themes": [
@@ -1126,17 +1130,24 @@
       ],
       "wcag": ["1.1.1", "4.1.2"],
       "appliesTo": {
-        "ruleIds": []
+        "ruleIds": ["figure-caption-unassociated"]
       },
       "automation": {
         "tests": {
-          "1": "judgment",
+          "1": "static",
           "2": "judgment",
           "3": "judgment",
           "4": "judgment",
           "5": "judgment"
         },
-        "rules": []
+        "rules": [
+          {
+            "id": "figure-caption-unassociated",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
       }
     },
     {

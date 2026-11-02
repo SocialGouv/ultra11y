@@ -179,4 +179,14 @@ describe("rgaa derivation", () => {
       expect(row?.findings.some((finding) => finding.ruleId === "field-label-in-name-mismatch")).toBe(true);
     },
   );
+  it.skipIf(!IMPLEMENTED_PHASES.has("P3"))(
+    "figure-caption-unassociated.html — a captioned chart <figure> with no role/aria-label fails RGAA 1.9 (test 1) (egapro#4921)",
+    () => {
+      const audit = runAudit({ inputs: [`${FIX}missed/figure-caption-unassociated.html`] });
+      // Advisory under WCAG: the core grid must not turn it into a 1.1.1 NC.
+      expect(normative(audit.findings).map((f) => f.ruleId)).not.toContain("figure-caption-unassociated");
+      const row = derivePackResults(audit, "rgaa").find((entry) => entry.id === "1.9");
+      expect(row?.status).toBe("NC");
+    },
+  );
 });

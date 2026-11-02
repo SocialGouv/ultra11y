@@ -23,7 +23,7 @@ describe("RGAA test-level automation contract", () => {
       static: tiers.filter((tier) => tier === "static").length,
       rendered: tiers.filter((tier) => tier === "rendered").length,
       judgment: tiers.filter((tier) => tier === "judgment").length,
-    }).toEqual({ static: 29, rendered: 3, judgment: 226 });
+    }).toEqual({ static: 30, rendered: 3, judgment: 225 });
     expect(pack.criteria.filter((criterion) => Object.values(criterion.automation!.tests).includes("judgment"))).toHaveLength(92);
   });
 
@@ -37,11 +37,11 @@ describe("RGAA test-level automation contract", () => {
 
   it("keeps the public README aligned with the generated automation contract", () => {
     const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
-    expect(readme).toContain("29 `static` tests across 21 criteria");
+    expect(readme).toContain("30 `static` tests across 22 criteria");
     expect(readme).toContain("3 `rendered` tests across 3 criteria");
-    expect(readme).toContain("23 distinct criteria that can produce a deterministic `NC`");
-    expect(readme).toContain("52 criteria receive a normative engine signal");
-    expect(readme).toContain("226 `judgment` tests across 92 criteria");
+    expect(readme).toContain("24 distinct criteria that can produce a deterministic `NC`");
+    expect(readme).toContain("53 criteria receive a normative engine signal");
+    expect(readme).toContain("225 `judgment` tests across 92 criteria");
     expect(readme).toContain("104 of 106 criteria require adjudication to earn `C`");
   });
 
@@ -93,6 +93,7 @@ describe("RGAA test-level automation contract", () => {
     expect(automated).toEqual([
       { test: "1.1.2", tier: "rendered", rules: ["axe:area-alt"] },
       { test: "1.1.3", tier: "static", rules: ["axe:input-image-alt", "input-image-alt-missing"] },
+      { test: "1.9.1", tier: "static", rules: ["figure-caption-unassociated"] },
       { test: "2.1.1", tier: "static", rules: ["axe:frame-title", "iframe-title-missing"] },
       { test: "5.7.2", tier: "static", rules: ["table-scope-invalid"] },
       { test: "5.7.3", tier: "static", rules: ["table-scope-invalid"] },
