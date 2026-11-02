@@ -178,6 +178,15 @@ const L = {
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
     partialAudit: (list: string) =>
       `Audit partiel — les critères « à restituer » (${list}) n'ont pas été testés. Lancez \`ultra11y scan --sample\` (Playwright + axe + sondes) sur l'échantillon, puis fusionnez avec \`scan --merge\`.`,
+    // #100 — a browser pass DID run: re-advising `scan --sample` sends the reader in a circle.
+    partialAuditScanned: (list: string, notes: string) =>
+      `Audit partiel — un passage navigateur a eu lieu, mais les critères « à restituer » (${list}) n'y ont pas été mesurés. ${notes}`,
+    partialAuditLive:
+      "Régions live : elles ne se mesurent qu'avec les interactions actives, qu'un scan authentifié (`--storage-state`) ou `--no-interact` coupe — enregistrez ces pages avec la fixture Playwright (`checkA11y` / `sweepSample`) ou relancez `scan` avec les interactions.",
+    partialAuditRendered:
+      "Couleur, contraste et focus se mesurent sur les captures : chacune doit porter une empreinte de styles (`styles.json`) acceptée par le moteur ; une capture dont l'empreinte est absente ou refusée ne mesure rien — recapturez-la avec une version à jour.",
+    partialAuditProbes:
+      "Zoom, reflow, espacement, survol, piège clavier et focus masqué se mesurent par les sondes : relancez `scan --sample` (ou la fixture avec `probes: true`) sur les pages qui n'ont pas été sondées.",
     // Task 5 — « Constats par page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Constats par page",
     perPageNote: "Pour chaque page de l'échantillon : sa capture d'écran et les critères non conformes relevés sur cette page.",
@@ -409,6 +418,14 @@ const L = {
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
     partialAudit: (list: string) =>
       `Partial audit — the needs-rendering criteria (${list}) were not tested. Run \`ultra11y scan --sample\` (Playwright + axe + probes) on the sample, then merge with \`scan --merge\`.`,
+    partialAuditScanned: (list: string, notes: string) =>
+      `Partial audit — a browser pass ran, but the needs-rendering criteria (${list}) were not measured by it. ${notes}`,
+    partialAuditLive:
+      "Live regions: they are only measured with interactions on, which an authenticated scan (`--storage-state`) or `--no-interact` turns off — record those pages with the Playwright fixture (`checkA11y` / `sweepSample`) or re-run `scan` with interactions.",
+    partialAuditRendered:
+      "Colour, contrast and focus are measured on the captures: each needs a style digest (`styles.json`) the engine accepts; a capture whose digest is missing or refused measures nothing — recapture it with an up-to-date version.",
+    partialAuditProbes:
+      "Zoom, reflow, spacing, hover, keyboard trap and focus obscured are measured by the probes: re-run `scan --sample` (or the fixture with `probes: true`) on the pages that were not probed.",
     // Task 5 — « Findings per page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Findings per page",
     perPageNote: "For each sample page: its screenshot and the criteria found non-conforming on that page.",
@@ -620,10 +637,34 @@ export function establishedScs(derived: readonly PackCriterionResult[]): Set<str
 /** The partial-audit advisory text (no leading `> `) — shared by the report banner and the
  *  CLI warning (src/cli.ts cmdReport) so the two can never drift. Names ONLY the criteria
  *  in `untested` (default: all of them — the no-scan-at-all case). */
-export function partialAuditBanner(lang: Lang, untested: string[] = NEEDS_RENDERING.map((c) => c.sc)): string {
+export function partialAuditBanner(lang: Lang, untested: string[] = NEEDS_RENDERING.map((c) => c.sc), ctx: { scanned?: boolean } = {}): string {
   const set = new Set(untested);
   const labels = NEEDS_RENDERING.filter((c) => set.has(c.sc)).map((c) => c.label[lang]);
-  return L[lang].partialAudit(labels.join(", "));
+  if (!ctx.scanned) return L[lang].partialAudit(labels.join(", "));
+  // A browser pass ran and still left these: name what closes each kind, not « scan again ».
+  const notes = [
+    set.has("4.1.3") ? L[lang].partialAuditLive : "",
+    untested.some((sc) => RENDERED_TIER_SCS.has(sc)) ? L[lang].partialAuditRendered : "",
+    untested.some((sc) => sc !== "4.1.3" && !RENDERED_TIER_SCS.has(sc)) ? L[lang].partialAuditProbes : "",
+  ].filter(Boolean);
+  return L[lang].partialAuditScanned(labels.join(", "), notes.join(" "));
+}
+
+// The needs-rendering SCs the RENDERED tier measures from a capture's style/stylesheet digest
+// (src/rules/rendered.ts): text contrast, link colour, non-text contrast, orientation lock,
+// focus visibility. The others come from the live probes, and 4.1.3 from the interactions.
+const RENDERED_TIER_SCS = new Set(["1.3.4", "1.4.1", "1.4.3", "1.4.11", "2.4.7"]);
+
+/** Did any browser pass contribute to this audit — a scan stamp, or audited captures? */
+export function ranBrowser(r: AuditResult): boolean {
+  return (r.scope.scan?.testedScs?.length ?? 0) > 0 || (r.scope.captures?.files ?? 0) > 0 || (r.scope.pagesAudited?.length ?? 0) > 0;
+}
+
+/** THE pack report's partial-audit list — one definition for the document, the CLI warning and
+ *  `report --json`, so they can never disagree again (#100): the needs-rendering SCs nothing
+ *  measured AND the pack grid does not rule on. */
+export function packPartialAudit(r: AuditResult, standard: string): string[] {
+  return untestedNeedsRendering(r, establishedScs(derivePackResults(r, standard)));
 }
 
 // A normalized row the renderer is agnostic about: one labelled criterion + its status/findings.
@@ -1812,7 +1853,7 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   ax.push(`> ⚠️ ${s.warn}`, "");
   // Partial-audit advisory (owner decision): names EXACTLY the untested criteria, with the
   // command that tests them. Labels only — no criterion-shaped token, so `check` accepts it.
-  if (opts.partialAudit?.length) ax.push(`> 🚨 ${partialAuditBanner(lang, opts.partialAudit)}`, "");
+  if (opts.partialAudit?.length) ax.push(`> 🚨 ${partialAuditBanner(lang, opts.partialAudit, { scanned: ranBrowser(r) })}`, "");
   if (!pageScope.length) ax.push(`> 🧭 ${s.noPagesNoteTech}`, "");
   if (opts.derivedOf) ax.push(`> ↪️ ${s.derived(opts.derivedOf)}`, "");
   if (r.scope.truncated) ax.push(`> ✂️ ${s.truncated(r.scope.truncated.limit, r.scope.truncated.total, r.scope.truncated.skipped)}`, "");

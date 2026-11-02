@@ -63007,6 +63007,11 @@ var L5 = {
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
     partialAudit: (list) => `Audit partiel \u2014 les crit\xE8res \xAB \xE0 restituer \xBB (${list}) n'ont pas \xE9t\xE9 test\xE9s. Lancez \`ultra11y scan --sample\` (Playwright + axe + sondes) sur l'\xE9chantillon, puis fusionnez avec \`scan --merge\`.`,
+    // #100 — a browser pass DID run: re-advising `scan --sample` sends the reader in a circle.
+    partialAuditScanned: (list, notes) => `Audit partiel \u2014 un passage navigateur a eu lieu, mais les crit\xE8res \xAB \xE0 restituer \xBB (${list}) n'y ont pas \xE9t\xE9 mesur\xE9s. ${notes}`,
+    partialAuditLive: "R\xE9gions live : elles ne se mesurent qu'avec les interactions actives, qu'un scan authentifi\xE9 (`--storage-state`) ou `--no-interact` coupe \u2014 enregistrez ces pages avec la fixture Playwright (`checkA11y` / `sweepSample`) ou relancez `scan` avec les interactions.",
+    partialAuditRendered: "Couleur, contraste et focus se mesurent sur les captures : chacune doit porter une empreinte de styles (`styles.json`) accept\xE9e par le moteur ; une capture dont l'empreinte est absente ou refus\xE9e ne mesure rien \u2014 recapturez-la avec une version \xE0 jour.",
+    partialAuditProbes: "Zoom, reflow, espacement, survol, pi\xE8ge clavier et focus masqu\xE9 se mesurent par les sondes : relancez `scan --sample` (ou la fixture avec `probes: true`) sur les pages qui n'ont pas \xE9t\xE9 sond\xE9es.",
     // Task 5 — « Constats par page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Constats par page",
     perPageNote: "Pour chaque page de l'\xE9chantillon : sa capture d'\xE9cran et les crit\xE8res non conformes relev\xE9s sur cette page.",
@@ -63206,6 +63211,10 @@ var L5 = {
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
     partialAudit: (list) => `Partial audit \u2014 the needs-rendering criteria (${list}) were not tested. Run \`ultra11y scan --sample\` (Playwright + axe + probes) on the sample, then merge with \`scan --merge\`.`,
+    partialAuditScanned: (list, notes) => `Partial audit \u2014 a browser pass ran, but the needs-rendering criteria (${list}) were not measured by it. ${notes}`,
+    partialAuditLive: "Live regions: they are only measured with interactions on, which an authenticated scan (`--storage-state`) or `--no-interact` turns off \u2014 record those pages with the Playwright fixture (`checkA11y` / `sweepSample`) or re-run `scan` with interactions.",
+    partialAuditRendered: "Colour, contrast and focus are measured on the captures: each needs a style digest (`styles.json`) the engine accepts; a capture whose digest is missing or refused measures nothing \u2014 recapture it with an up-to-date version.",
+    partialAuditProbes: "Zoom, reflow, spacing, hover, keyboard trap and focus obscured are measured by the probes: re-run `scan --sample` (or the fixture with `probes: true`) on the pages that were not probed.",
     // Task 5 — « Findings per page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Findings per page",
     perPageNote: "For each sample page: its screenshot and the criteria found non-conforming on that page.",
@@ -63350,10 +63359,23 @@ function establishedScs(derived) {
   }
   return out2;
 }
-function partialAuditBanner(lang, untested = NEEDS_RENDERING.map((c2) => c2.sc)) {
+function partialAuditBanner(lang, untested = NEEDS_RENDERING.map((c2) => c2.sc), ctx = {}) {
   const set = new Set(untested);
   const labels = NEEDS_RENDERING.filter((c2) => set.has(c2.sc)).map((c2) => c2.label[lang]);
-  return L5[lang].partialAudit(labels.join(", "));
+  if (!ctx.scanned) return L5[lang].partialAudit(labels.join(", "));
+  const notes = [
+    set.has("4.1.3") ? L5[lang].partialAuditLive : "",
+    untested.some((sc) => RENDERED_TIER_SCS.has(sc)) ? L5[lang].partialAuditRendered : "",
+    untested.some((sc) => sc !== "4.1.3" && !RENDERED_TIER_SCS.has(sc)) ? L5[lang].partialAuditProbes : ""
+  ].filter(Boolean);
+  return L5[lang].partialAuditScanned(labels.join(", "), notes.join(" "));
+}
+var RENDERED_TIER_SCS = /* @__PURE__ */ new Set(["1.3.4", "1.4.1", "1.4.3", "1.4.11", "2.4.7"]);
+function ranBrowser(r) {
+  return (r.scope.scan?.testedScs?.length ?? 0) > 0 || (r.scope.captures?.files ?? 0) > 0 || (r.scope.pagesAudited?.length ?? 0) > 0;
+}
+function packPartialAudit(r, standard) {
+  return untestedNeedsRendering(r, establishedScs(derivePackResults(r, standard)));
 }
 function tallyRows(rows) {
   return {
@@ -64033,7 +64055,7 @@ function render(r, lang, opts) {
   if (r.scope.dedup) ax.push(`- **${s.dedup}** : ${r.scope.dedup.canonicalFiles} ${s.canonical}, ${r.scope.dedup.duplicateFiles} ${s.duplicate}`);
   ax.push("");
   ax.push(`> \u26A0\uFE0F ${s.warn}`, "");
-  if (opts.partialAudit?.length) ax.push(`> \u{1F6A8} ${partialAuditBanner(lang, opts.partialAudit)}`, "");
+  if (opts.partialAudit?.length) ax.push(`> \u{1F6A8} ${partialAuditBanner(lang, opts.partialAudit, { scanned: ranBrowser(r) })}`, "");
   if (!pageScope.length) ax.push(`> \u{1F9ED} ${s.noPagesNoteTech}`, "");
   if (opts.derivedOf) ax.push(`> \u21AA\uFE0F ${s.derived(opts.derivedOf)}`, "");
   if (r.scope.truncated) ax.push(`> \u2702\uFE0F ${s.truncated(r.scope.truncated.limit, r.scope.truncated.total, r.scope.truncated.skipped)}`, "");
@@ -79646,9 +79668,9 @@ async function cmdReport(p) {
   if (p.flags.html === true) {
     html = emitHtml(result, { outDir: out2, standard, lang, ...manifest ? { evidence: manifest } : {}, inlineBudget: budgetOf(p) });
   }
-  const untested = isCore(standard) ? [] : untestedNeedsRendering(result);
+  const untested = isCore(standard) ? [] : packPartialAudit(result, standard);
   const partial = untested.length > 0;
-  if (partial && !p.flags.json) console.error(`\u{1F6A8} ${partialAuditBanner(lang, untested)}`);
+  if (partial && !p.flags.json) console.error(`\u{1F6A8} ${partialAuditBanner(lang, untested, { scanned: ranBrowser(result) })}`);
   if (p.flags.json)
     console.log(
       JSON.stringify(
