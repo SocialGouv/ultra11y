@@ -48507,11 +48507,12 @@ var PROBE_KEYS = {
   "4.1.3": ["liveRegion"]
 };
 var MEASURED_SCS = ["1.3.4", "1.4.1", "1.4.3", "1.4.4", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
+var insideRoleImg = (e) => ancestors(e).some((a) => (attr(a, "role") ?? "").trim().toLowerCase() === "img");
 var SUBJECTS = {
   // Every image-like element and the alternative it carries. Class = (alt, src): the same
   // logo on 38 pages is one decision, not 38.
   images: (docs) => docs.flatMap(
-    (d) => elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas").concat(elementsByTag(d, "input").filter((e) => (attr(e, "type") ?? "").trim().toLowerCase() === "image")).concat(d.elements.filter((e) => attr(e, "role") === "img")).filter((e, i2, a) => a.indexOf(e) === i2).map((e) => {
+    (d) => elementsByTag(d, "img", "svg", "area", "object", "embed", "canvas").concat(elementsByTag(d, "input").filter((e) => (attr(e, "type") ?? "").trim().toLowerCase() === "image")).concat(d.elements.filter((e) => attr(e, "role") === "img")).filter((e, i2, a) => a.indexOf(e) === i2 && !insideRoleImg(e)).map((e) => {
       const extra = ["title", "aria-labelledby", "aria-hidden", "role", "aria-describedby", "longdesc"].filter((a) => attr(e, a) !== void 0).map((a) => ` ${a}="${(attr(e, a) ?? "").slice(0, 60)}"`).join("");
       const figure = ancestors(e).some((a) => a.tag === "figure");
       return h(
@@ -48783,7 +48784,9 @@ var SUBJECTS = {
       )
     ),
     ...d.elements.filter((e) => e.tag !== "html" && attr(e, "lang") !== void 0).map((e) => h(d, e, `lang="${attr(e, "lang")}" text="${t(e, 40)}"`, `lang|${attr(e, "lang")}|${t(e, 40)}`)),
-    ...d.elements.filter((e) => e.children.some((c2) => c2.type === "text") && FOREIGN_LEXICON.test(textContent(e)) && attr(e, "lang") === void 0).map(
+    ...d.elements.filter(
+      (e) => e.children.some((c2) => c2.type === "text" && c2.data.trim() !== "") && FOREIGN_LEXICON.test(textContent(e)) && attr(e, "lang") === void 0 && roleOf(e) !== "img" && !insideRoleImg(e)
+    ).map(
       (e) => h(
         d,
         e,
