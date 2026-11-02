@@ -8,13 +8,16 @@ import {
   emptyLedger,
   entriesFrom,
   portableFile,
+  evidenceAnchorsOf,
   evidenceFingerprint,
+  identityFile,
   isLedger,
   ledgerPath,
   mergeLedger,
   pruneLedger,
   readLedger,
   replayLedger,
+  verdictStillHolds,
   writeLedger,
 } from "../src/ledger.js";
 import { PAGES_DIR } from "../src/snapshot.js";
@@ -503,9 +506,8 @@ describe("the ledger on disk", () => {
 // and `entriesFrom` recorded them as such. One ledger committed from a CI runner carried 196
 // `/home/runner/work/<repo>/<repo>/.ultra11y/pages/…/dom.html` citations: readable by nobody,
 // all of them captures. `canonicalFile` is already the identity every reader keys on, so the
-// store now spells captures that way. Ordinary source files stay exactly as harvested: the
-// readers compare them lexically against today's harvest, and a store spelled differently
-// would stale, un-anchor and un-prune valid verdicts.
+// store now spells captures that way. Without a root, ordinary source files stay exactly as
+// harvested; with one, they are written relative to it (see « root-aware file identity »).
 describe("portableFile", () => {
   it("names a capture by its published .ultra11y/pages identity, wherever it was written", () => {
     expect(portableFile(`/home/runner/work/x/x/${PAGES_DIR}/accueil/dom.html`)).toBe(`${PAGES_DIR}/accueil/dom.html`);
@@ -580,3 +582,142 @@ describe("entriesFrom writes portable capture paths", () => {
     expect(entries.flatMap((e) => e.evidenceFiles ?? [])).toContain(f);
   });
 });
+
+// A COMMITTED LEDGER CARRIES ROOT-RELATIVE SOURCE CITATIONS (#85).
+//
+// #80 made captures portable and left ordinary source files as harvested, because every reader
+// compared them lexically: a store spelled relative to the audited root against a harvest
+// spelled absolute staled valid verdicts (the silent-file guard), never moved a stored line
+// (re-anchoring) and never pruned a withdrawn finding. The identity is now root-aware on both
+// sides, and a ledger recorded before it — fingerprinted over the as-harvested spelling — still
+// holds.
+describe("root-aware file identity", () => {
+  const TWO = PAGE_HTML.replace('<a href="/pricing">Read more</a>', '<a href="/pricing">Read more</a>\n<a href="/contact">Talk to sales</a>');
+  /** A repository root holding one ordinary source file, harvested by its ABSOLUTE path. */
+  const repo = (html = PAGE_HTML) => {
+    const root = mkdtempSync(join(tmpdir(), "u11y-ledger-root-"));
+    mkdirSync(join(root, "src"));
+    const f = join(root, "src", "a.html");
+    writeFileSync(f, html);
+    return { root, f };
+  };
+  /** `verify --apply --ledger` from `root` — or, with `legacy`, the writer as it was before. */
+  const record = (root: string, f: string, legacy = false) => {
+    const audit = auditOf(f);
+    const adj = file(adjudicate(buildAdjudicationWorklist(audit, { cwd: root })));
+    const r = applyAdjudication(audit, adj, { cwd: root });
+    const accepted = new Set(adj.items.map((i) => i.criteriaId).filter((id) => !r.rejectedCriteria.includes(id)));
+    return mergeLedger(undefined, "wcag", entriesFrom(adj, accepted, audit.date, legacy ? undefined : root));
+  };
+
+  it("names a capture by its published identity, a file under the root relative to it, anything else as given", () => {
+    expect(identityFile(`/home/runner/work/x/x/${PAGES_DIR}/accueil/dom.html`, "/repo")).toBe(`${PAGES_DIR}/accueil/dom.html`);
+    expect(identityFile("/repo/src/a.html", "/repo")).toBe("src/a.html");
+    expect(identityFile("/repo/src/a.html", "/repo/")).toBe("src/a.html");
+    expect(identityFile("/elsewhere/src/a.html", "/repo")).toBe("/elsewhere/src/a.html");
+    expect(identityFile("src/a.html", "/repo")).toBe("src/a.html");
+    expect(identityFile("/repo/src/a.html"), "no root: the as-harvested spelling").toBe("/repo/src/a.html");
+    expect(portableFile("/repo/src/a.html", "/repo")).toBe("src/a.html");
+  });
+
+  it("records ordinary source citations and evidence files relative to the audited root", () => {
+    const { root, f } = repo();
+    const ledger = record(root, f);
+    const files = ledger.entries.flatMap((e) => [...(e.citations ?? []).map((c) => c.file), ...(e.evidenceFiles ?? [])]);
+    expect(files.length).toBeGreaterThan(0);
+    expect(new Set(files)).toEqual(new Set(["src/a.html"]));
+    // …and the absolute harvest of the same file replays it, fingerprint and all.
+    const rp = replayLedger(auditOf(f), ledger, { cwd: root });
+    expect(rp.stale).toEqual([]);
+    expect(rp.fresh.length).toBe(ledger.entries.length);
+  });
+
+  it("silent-file guard: a relative stored file is the absolute file that contributed today", () => {
+    const { root, f } = repo();
+    const today = buildAdjudicationWorklist(auditOf(f), { cwd: root }).find((i) => i.evidence.length)!.evidence;
+    const entry = {
+      criteriaId: "x",
+      verdict: "C" as const,
+      evidenceFingerprint: "sha256:recorded-over-a-larger-set",
+      evidenceAnchors: evidenceAnchorsOf(today, root),
+      evidenceFiles: ["src/a.html"],
+      evidenceCount: today.length + 1,
+      date: "2026-10-29",
+      decidedBy: "agent" as const,
+    };
+    expect(verdictStillHolds(entry, today, { harvestComplete: true, fileExists: () => true, root })).toEqual({ holds: true });
+  });
+
+  it("KEEPS a relative-store verdict over an absolute harvest whose code shrank", () => {
+    const { root, f } = repo(TWO);
+    const ledger = record(root, f);
+    writeFileSync(f, TWO.replace('\n<a href="/contact">Talk to sales</a>', ""));
+    const rp = replayLedger(auditOf(f), ledger, { cwd: root });
+    expect(rp.stale).toEqual([]);
+    expect(rp.fresh.length).toBeGreaterThan(0);
+  });
+
+  it("re-anchors a relative stored citation onto today's absolute file and shifted line", () => {
+    const { root, f } = repo();
+    const ledger = record(root, f);
+    // Further than the citation drift, so only re-anchoring can save the verdict.
+    const pad = `<!--\n${"inert\n".repeat(CITE_SHIFT)}-->`;
+    writeFileSync(f, PAGE_HTML.replace('<html lang="en">', `<html lang="en">\n${pad}`));
+    const shifted = auditOf(f);
+    const rp = replayLedger(shifted, ledger, { cwd: root });
+    expect(rp.stale).toEqual([]);
+    const stored = ledger.entries.find((e) => e.criteriaId === "1.1.1")!.citations![0]!;
+    const moved = rp.adj.items.find((i) => i.criteriaId === "1.1.1")!.citations![0]!;
+    expect(typeof moved === "string" ? moved : { file: moved.file, line: moved.line }).toEqual({ file: f, line: stored.line + CITE_SHIFT + 2 });
+    const r = applyAdjudication(shifted, rp.adj, { cwd: root, residualReasons: rp.residualReasons });
+    expect(r.rejected).toBe(0);
+    expect(r.applied).toBeGreaterThan(0);
+  });
+
+  it("prunes a relative stored finding the reviewer withdrew from an absolute harvest", () => {
+    const root = "/repo";
+    const ledger = mergeLedger(undefined, "rgaa", [
+      {
+        criteriaId: "1.1",
+        verdict: "NC",
+        findings: [
+          { file: "src/card.tsx", line: 12, selector: "img.logo", message: "missing alt" } as AgentFindingLike,
+          { file: "src/hero.tsx", line: 3, selector: "img", message: "decorative alt" } as AgentFindingLike,
+        ],
+        evidenceFingerprint: "sha256:1.1",
+        evidenceCount: 2,
+        date: "2026-10-29",
+        decidedBy: "agent",
+      },
+    ]);
+    const withdrawn = {
+      n: 1,
+      criteriaId: "1.1",
+      file: "/repo/src/card.tsx",
+      line: 12,
+      selector: "img.logo",
+      claim: "missing alt",
+      verdict: "refuted" as const,
+      note: "",
+      kind: "nc" as const,
+    };
+    const result = pruneLedger(ledger, [withdrawn], [], [], root);
+    expect(result.removedFindings).toBe(1);
+    expect(result.ledger.entries[0]!.findings?.map((x) => x.file)).toEqual(["src/hero.tsx"]);
+  });
+
+  it("keeps a ledger recorded under the legacy as-harvested spelling alive", () => {
+    const { root, f } = repo(TWO);
+    const legacy = record(root, f, true);
+    expect(legacy.entries.flatMap((e) => e.evidenceFiles ?? [])).toContain(f);
+    // The fingerprint fast path, in the legacy spelling…
+    expect(replayLedger(auditOf(f), legacy, { cwd: root }).stale).toEqual([]);
+    // …and the anchor set and file guard, once the code shrank.
+    writeFileSync(f, TWO.replace('\n<a href="/contact">Talk to sales</a>', ""));
+    const rp = replayLedger(auditOf(f), legacy, { cwd: root });
+    expect(rp.stale).toEqual([]);
+    expect(rp.fresh.length).toBeGreaterThan(0);
+  });
+});
+
+const CITE_SHIFT = 15;
