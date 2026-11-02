@@ -48424,6 +48424,67 @@ function pdfDocumentAnchor(doc) {
 }
 var declsText = (decls) => Object.entries(decls).map(([k, v]) => `${k}: ${v}`).join("; ").slice(0, 100);
 var t = (el, n = 60) => textContent(el).trim().replace(/\s+/g, " ").slice(0, n);
+var NON_RENDERED_TAGS = /* @__PURE__ */ new Set(["script", "style", "template", "noscript"]);
+var inNonRendered = (e) => NON_RENDERED_TAGS.has(e.tag) || e.tag === "head" || ancestors(e).some((a) => NON_RENDERED_TAGS.has(a.tag) || a.tag === "head");
+function literalOfContainer(raw) {
+  const m = /^\{\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\$]|\\.|\$(?!\{))*)`)\s*\}$/s.exec(raw);
+  if (!m) return void 0;
+  return (m[1] ?? m[2] ?? m[3] ?? "").replace(/\\(.)/g, "$1");
+}
+function stripExpressions(s) {
+  let out2 = "";
+  let depth = 0;
+  let start2 = 0;
+  for (let i2 = 0; i2 < s.length; i2++) {
+    const c2 = s[i2];
+    if (c2 === "{") {
+      if (depth === 0) start2 = i2;
+      depth++;
+    } else if (c2 === "}" && depth > 0) {
+      depth--;
+      if (depth === 0) out2 += literalOfContainer(s.slice(start2, i2 + 1)) ?? " ";
+    } else if (depth === 0) out2 += c2;
+  }
+  return out2;
+}
+function renderedData(doc, data2) {
+  if (doc.kind === "jsx-ast") return data2.trimStart().startsWith("{") ? literalOfContainer(data2.trim()) ?? "" : data2;
+  if (doc.kind === "jsx-lossy" || doc.kind === "sfc") return stripExpressions(data2);
+  return data2;
+}
+function ownRenderedText(doc, el) {
+  if (inNonRendered(el)) return "";
+  return el.children.filter((c2) => c2.type === "text").map((c2) => renderedData(doc, c2.data)).join("").replace(/\s+/g, " ").trim();
+}
+function renderedText(doc, el) {
+  const walk3 = (e) => {
+    let out2 = "";
+    for (const c2 of e.children) {
+      if (c2.type === "text") out2 += renderedData(doc, c2.data);
+      else if (!NON_RENDERED_TAGS.has(c2.tag)) out2 += walk3(c2);
+    }
+    return out2;
+  };
+  return inNonRendered(el) ? "" : walk3(el);
+}
+var rt = (doc, el, n = 60) => renderedText(doc, el).replace(/\s+/g, " ").trim().slice(0, n);
+var TEXT_PROP = /^(?:label|title|subtitle|description|desc|hint|hinttext|text|legend|message|caption|heading|helper|helpertext|instructiontext|content|placeholder|tooltip|summary|detail|details|explanation|notice)$/i;
+function textRuns(doc) {
+  const out2 = [];
+  const component = doc.kind === "jsx-ast" || doc.kind === "jsx-lossy" || doc.kind === "sfc";
+  for (const e of doc.elements) {
+    if (["title", "head", "html"].includes(e.tag) || inNonRendered(e)) continue;
+    const own = ownRenderedText(doc, e);
+    if (own) out2.push({ el: e, text: own });
+    if (component && /^[A-Z]/.test(e.tag)) {
+      for (const [name2, value] of Object.entries(e.attribs)) {
+        if (!TEXT_PROP.test(name2) || typeof value !== "string" || value.trim() === "" || value.trim().startsWith("{")) continue;
+        out2.push({ el: e, text: value.replace(/\s+/g, " ").trim() });
+      }
+    }
+  }
+  return out2;
+}
 function nearestHeading(doc, el) {
   const headings2 = elementsByTag(doc, "h1", "h2", "h3", "h4", "h5", "h6").filter((x) => x.start < el.start);
   const last = headings2[headings2.length - 1];
@@ -48512,7 +48573,7 @@ var CRYPTIC = new RegExp("\\p{Extended_Pictographic}|(?:^|\\s)[:;=][-']?[)(DPp/\
 var TEMPORAL_MEDIA_HOST = /(youtube|youtu\.be|vimeo|dailymotion|soundcloud|spotify|twitch|wistia|brightcove|jwplayer|videopress|podcast|player|vid[eé]o|audio|baladodiffusion|\.(?:mp4|webm|ogv|ogg|mov|m4v|mp3|wav|m4a|m3u8))/i;
 var TEMPORAL_MEDIA_VALUE = /(?:^|[/.?=&_-])(?:audio|video|player|podcast|mp[34]|webm|ogg|ogv|wav|m4a|mov|avi|mpeg)(?:$|[/.?=&_-])/i;
 var ROUTER_IMPORT = /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
-var FOREIGN_LEXICON = /\b(?:the|and|with|your|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)\b/i;
+var FOREIGN_LEXICON = /(?<![\p{L}\p{N}_'’-])(?:the|and|with|your|you|our|we|this|that|these|those|from|for|of|to|is|are|was|were|will|would|should|can't|don't|do|does|not|here|there|what|which|who|how|why|when|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)(?![\p{L}\p{N}_'’-])/iu;
 var CONTROL_TAGS = ["input", "select", "textarea"];
 var FIELD_TAGS = /* @__PURE__ */ new Set(["datalist", "output", "progress", "meter"]);
 var FIELD_ROLES = /* @__PURE__ */ new Set(["textbox", "searchbox", "combobox", "listbox", "checkbox", "radio", "switch", "slider", "spinbutton", "progressbar", "option"]);
@@ -48566,6 +48627,8 @@ function bulletParagraphRuns(doc) {
   }
   return out2;
 }
+var SITEMAP_ADDRESS = /plan[-_]du[-_]site|sitemap|site[-_]map/i;
+var SITEMAP_TEXT = /\bplan du site\b|\bsite ?map\b/i;
 var INTERACTIVE_TAGS = ["a", "button", "input", "select", "textarea", "summary", "details", "label"];
 function embeddedMediaKind(el) {
   const type = (attr(el, "type") ?? "").toLowerCase();
@@ -48580,6 +48643,13 @@ function labelFor(doc, el) {
   if (lbl) return t(lbl, 40);
   const wrapping = ancestors(el).find((a) => a.tag === "label");
   return wrapping ? t(wrapping, 40) : "";
+}
+function labelledByText(doc, el) {
+  const ids2 = (attr(el, "aria-labelledby") ?? "").trim();
+  if (ids2 === "" || ids2.startsWith("{")) return void 0;
+  const parts2 = ids2.split(/\s+/).map((id) => doc.byId.get(id));
+  if (parts2.some((p) => p === void 0)) return void 0;
+  return parts2.map((p) => rt(doc, p, 60)).join(" ").slice(0, 80);
 }
 function labelElementTokens(doc, el) {
   const id = attr(el, "id");
@@ -48598,12 +48668,13 @@ function viewportMeta(d) {
     return h(d, m, `<meta name="viewport" content="${content}">${blocks ? " \u2014 RESTRICTS zoom" : ""}`, `viewport|${content}`);
   });
 }
-function cssEvidence(d, re, captured, kind) {
+function cssEvidence(docs, d, re, captured, kind) {
   return [
     ...linesOf(d, re, 60).map((l) => hAt(d, l.line, "css", `${kind}-relevant declaration: ${l.text}`, `${kind}decl|${l.text}`)),
-    ...(d.signals?.css?.rules ?? []).filter(captured).slice(0, 40).map((r) => hAt(d, 1, `css:${r.selector}`, `captured rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`, `${kind}css|${r.selector}`))
+    ...pageRules(docs, d).filter(captured).slice(0, 40).map((r) => hAt(d, 1, `css:${r.selector}`, `captured rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }${r.where}`, `${kind}css|${r.selector}`))
   ];
 }
+var SENSORY = /(?<![\p{L}-])(?:ci-dessus|ci-dessous|à droite|a droite|à gauche|a gauche|bouton (?:vert|rouge|bleu)|en rouge|en vert|le carré|la case de droite|above|below|to the right|to the left|green button|red button|round button)(?![\p{L}-])/iu;
 var INSTRUCTION = /\b(?:cliquez|cliquer|sélectionnez|selectionnez|utilisez|appuyez|touchez|consultez|reportez-vous|remplissez|choisissez|ci-après|ci-contre|ci-dessus|ci-dessous|à droite|à gauche|en haut|en bas|click|select|press|tap|use the|see the|fill in|choose)\b/i;
 function isTabbable(e) {
   const ti = attr(e, "tabindex");
@@ -48677,6 +48748,203 @@ var PROBE_KEYS = {
 };
 var MEASURED_SCS = ["1.3.4", "1.4.1", "1.4.3", "1.4.4", "1.4.10", "1.4.11", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
 var insideRoleImg = (e) => ancestors(e).some((a) => roleOf(a) === "img");
+var hiddenDecoration = (e) => [e, ...ancestors(e)].some((a) => (attr(a, "aria-hidden") ?? "").trim().toLowerCase() === "true" || attr(a, "hidden") !== void 0) || ["presentation", "none"].includes(roleOf(e));
+var CHART_COMPONENT = /^(?:ReactECharts|EChartsReact|ECharts|ReactApexChart|ApexChart|Chart|ChartJs|Line|Bar|Doughnut|Pie|Radar|Scatter|Bubble|PolarArea|Plot|(?:Bar|Line|Area|Pie|Radar|RadialBar|Scatter|Composed|Funnel|Treemap|Sankey)Chart|Map|MapContainer|Stage)$/;
+function nonTemporalMediaOf(d) {
+  const out2 = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const e of d.elements) {
+    const isMedia = e.tag === "canvas" || e.tag === "svg" && !ancestors(e).some((a) => a.tag === "svg") || ["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "temporal" || CHART_COMPONENT.test(e.tag);
+    if (!isMedia || hiddenDecoration(e) || inNonRendered(e)) continue;
+    const container = ancestors(e).find((a) => roleOf(a) === "img" || a.tag === "figure");
+    const key2 = container ?? e;
+    if (seen.has(key2) || ancestors(e).some((a) => seen.has(a))) continue;
+    seen.add(key2);
+    const figure = [e, ...ancestors(e)].find((a) => a.tag === "figure");
+    const caption = figure?.children.find((c2) => c2.type === "element" && c2.tag === "figcaption");
+    const candidates2 = [
+      container && roleOf(container) === "img" ? attr(container, "aria-label") : void 0,
+      attr(e, "aria-label"),
+      attr(e, "title"),
+      caption ? rt(d, caption, 80) : void 0
+    ].filter((x) => x !== void 0 && x.trim() !== "");
+    const name2 = candidates2.find((x) => !x.trim().startsWith("{")) ?? candidates2[0];
+    out2.push({ el: e, ...container ? { container } : {}, name: (name2 ?? "").replace(/\s+/g, " ").trim().slice(0, 100) });
+  }
+  return out2;
+}
+var describeMedium = (d, m) => {
+  const kind = /^[A-Z]/.test(m.el.tag) ? `chart component <${m.el.tag}>` : `<${m.el.tag}>`;
+  const where = m.container ? ` in <${m.container.tag}${roleOf(m.container) ? ` role="${roleOf(m.container)}"` : ""}>` : "";
+  const fallback = ["canvas", "object", "embed"].includes(m.el.tag) ? rt(d, m.el, 60) : "";
+  return `${kind}${where} name="${m.name}"${fallback ? ` fallback="${fallback}"` : ""}`;
+};
+var STATE_DATA_ATTR = /^data-(?:[\w-]*-)?(?:current|active|selected|state|status|level|severity|tone|step)(?:-[\w-]*)?$/i;
+var STATE_WORDS = "active|current|selected|error|success|warning|valid|invalid|danger|done|complete|completed|pending|positive|negative|above|below|over|under|high|low|highlight|highlighted|alert|ok|ko";
+var STATE_SEGMENT = new RegExp(`(?:^|[-_])(?:is-|has-)?(?:${STATE_WORDS})$`, "i");
+var STATE_WHOLE = new RegExp(`^(?:is-|has-)?(?:${STATE_WORDS})$`, "i");
+var STATE_CAMEL = new RegExp(`[a-z](?:${STATE_WORDS.replace(/(^|\|)(\w)/g, (_m, sep8, c2) => `${sep8}${c2.toUpperCase()}`)})$`);
+function stateClasses(e) {
+  const raw = attr(e, "class") ?? "";
+  if (raw.trim().startsWith("{")) return [];
+  return raw.split(/\s+/).filter(Boolean).filter((c2) => {
+    if (/__|--/.test(c2)) {
+      const seg = c2.split(/__|--/).pop() ?? "";
+      return STATE_SEGMENT.test(seg) || STATE_CAMEL.test(seg);
+    }
+    return STATE_WHOLE.test(c2);
+  });
+}
+var compoundCache = /* @__PURE__ */ new Map();
+function subjectCompounds(selector) {
+  const hit = compoundCache.get(selector);
+  if (hit !== void 0) return hit;
+  const parts2 = [];
+  let depth = 0;
+  let cur = "";
+  for (let i2 = 0; i2 < selector.length; i2++) {
+    const c2 = selector[i2];
+    if (c2 === "\\") {
+      cur += c2 + (selector[i2 + 1] ?? "");
+      i2++;
+      continue;
+    }
+    if (c2 === "(" || c2 === "[") depth++;
+    if (c2 === ")" || c2 === "]") depth--;
+    if (c2 === "," && depth === 0) {
+      parts2.push(cur);
+      cur = "";
+    } else cur += c2;
+  }
+  parts2.push(cur);
+  const out2 = [];
+  for (const part of parts2) {
+    let last = "";
+    depth = 0;
+    for (let i2 = 0; i2 < part.length; i2++) {
+      const c2 = part[i2];
+      if (c2 === "\\") {
+        last += c2 + (part[i2 + 1] ?? "");
+        i2++;
+        continue;
+      }
+      if (c2 === "(" || c2 === "[") depth++;
+      if (c2 === ")" || c2 === "]") depth--;
+      if (depth === 0 && /[\s>+~]/.test(c2)) last = "";
+      else last += c2;
+    }
+    let bare = "";
+    depth = 0;
+    let inPseudo = false;
+    let inBracket = false;
+    for (let i2 = 0; i2 < last.length; i2++) {
+      const c2 = last[i2];
+      if (c2 === "\\") {
+        if (!inPseudo) bare += c2 + (last[i2 + 1] ?? "");
+        i2++;
+        continue;
+      }
+      if (inPseudo) {
+        if (c2 === "(") depth++;
+        else if (c2 === ")") depth--;
+        else if (depth === 0 && /[.#[]/.test(c2)) {
+          inPseudo = false;
+          inBracket = c2 === "[";
+          bare += c2;
+        }
+        continue;
+      }
+      if (c2 === "[") inBracket = true;
+      else if (c2 === "]") inBracket = false;
+      if (c2 === ":" && !inBracket) {
+        inPseudo = true;
+        depth = 0;
+      } else bare += c2;
+    }
+    const unesc = (x) => x.replace(/\\(.)/g, "$1");
+    const tag = /^[a-zA-Z][\w-]*/.exec(bare)?.[0]?.toLowerCase();
+    const ids2 = [...bare.matchAll(/#((?:\\.|[\w-])+)/g)].map((m) => unesc(m[1]));
+    const classes = [...bare.matchAll(/\.((?:\\.|[\w-])+)/g)].map((m) => unesc(m[1]));
+    const attrs = [...bare.matchAll(/\[\s*([\w:-]+)/g)].map((m) => m[1].toLowerCase());
+    if (!tag && !ids2.length && !classes.length && !attrs.length) {
+      compoundCache.set(selector, null);
+      return null;
+    }
+    out2.push({ ...tag ? { tag } : {}, ids: ids2, classes, attrs });
+  }
+  compoundCache.set(selector, out2);
+  return out2;
+}
+var componentKey = (cls) => {
+  const m = /^(.+?)__|^(.+?)--/.exec(cls);
+  return m ? m[1] ?? m[2] : void 0;
+};
+var componentName = (cls) => /^([A-Z][\w]*?)(?:[-_]module\b|_[a-z])/.exec(cls)?.[1];
+var domIndexCache = /* @__PURE__ */ new WeakMap();
+function domIndex(d) {
+  const hit = domIndexCache.get(d);
+  if (hit) return hit;
+  const idx = { tags: /* @__PURE__ */ new Set(), ids: /* @__PURE__ */ new Set(), classes: /* @__PURE__ */ new Set(), keys: /* @__PURE__ */ new Set(), elements: [] };
+  for (const e of d.elements) {
+    const classes = new Set((attr(e, "class") ?? "").split(/\s+/).filter(Boolean));
+    const id = attr(e, "id");
+    idx.tags.add(e.tag);
+    if (id) idx.ids.add(id);
+    for (const c2 of classes) {
+      idx.classes.add(c2);
+      const k = componentKey(c2);
+      if (k) idx.keys.add(k);
+    }
+    idx.elements.push({ tag: e.tag, ...id ? { id } : {}, classes, attrs: new Set(Object.keys(e.attribs).map((a) => a.toLowerCase())) });
+  }
+  domIndexCache.set(d, idx);
+  return idx;
+}
+function ruleReach(d, selector) {
+  const compounds = subjectCompounds(selector);
+  if (!compounds) return "rendered";
+  const idx = domIndex(d);
+  const matches = (c2) => (!c2.tag || idx.tags.has(c2.tag)) && c2.ids.every((i2) => idx.ids.has(i2)) && c2.classes.every((k) => idx.classes.has(k)) && idx.elements.some(
+    (e) => (!c2.tag || e.tag === c2.tag) && c2.ids.every((i2) => e.id === i2) && c2.classes.every((k) => e.classes.has(k)) && c2.attrs.every((a) => e.attrs.has(a))
+  );
+  if (compounds.some(matches)) return "rendered";
+  const component = compounds.some((c2) => c2.classes.some((k) => idx.classes.has(k) || componentKey(k) !== void 0 && idx.keys.has(componentKey(k))));
+  return component ? "component" : "absent";
+}
+var attributionCache = /* @__PURE__ */ new WeakMap();
+function attributedRules(docs) {
+  const hit = attributionCache.get(docs);
+  if (hit) return hit;
+  const out2 = /* @__PURE__ */ new Map();
+  const placed = /* @__PURE__ */ new Set();
+  const unplaced = /* @__PURE__ */ new Map();
+  for (const d of docs) {
+    const rules = d.signals?.css?.rules;
+    if (!rules) continue;
+    const mine = [];
+    for (const rule of rules) {
+      const key2 = `${rule.media ?? ""}|${rule.selector}|${JSON.stringify(rule.decls)}`;
+      const reach = ruleReach(d, rule.selector);
+      if (reach === "absent") {
+        if (!unplaced.has(key2)) unplaced.set(key2, { d, rule });
+        continue;
+      }
+      placed.add(key2);
+      mine.push({ rule, reach });
+    }
+    out2.set(d, mine);
+  }
+  for (const [key2, { d, rule }] of unplaced) if (!placed.has(key2)) out2.get(d).push({ rule, reach: "absent" });
+  attributionCache.set(docs, out2);
+  return out2;
+}
+function pageRules(docs, d) {
+  return (attributedRules(docs).get(d) ?? []).map(({ rule, reach }) => {
+    const comp = subjectCompounds(rule.selector)?.flatMap((c2) => c2.classes).map(componentName).find((x) => x !== void 0);
+    const where = reach === "rendered" ? comp ? ` [component ${comp}]` : "" : reach === "component" ? ` [component ${comp ?? "present"} is on this page; the state this rule targets was not captured]` : ` [no captured page renders an element this rule targets \u2014 a state class, or a component on a page that was not captured]`;
+    return { ...rule, where };
+  });
+}
 var SUBJECTS = {
   // Every image-like element and the alternative it carries. Class = (alt, src): the same
   // logo on 38 pages is one decision, not 38.
@@ -48734,11 +49002,17 @@ var SUBJECTS = {
   controls: (docs) => docs.flatMap(
     (d) => d.elements.filter(isFormField).map((e) => {
       const native = CONTROL_TAGS.includes(e.tag) || FIELD_TAGS.has(e.tag);
+      const labelledBy = labelledByText(d, e);
       return h(
         d,
         e,
-        `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${native ? "" : ` role="${roleOf(e)}"`}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}" title="${attr(e, "title") ?? ""}" required=${attr(e, "required") !== void 0 || attr(e, "aria-required") === "true"} describedby="${attr(e, "aria-describedby") ?? ""}"`,
-        `control|${e.tag}|${attr(e, "type") ?? roleOf(e)}|${labelFor(d, e)}|${attr(e, "name") ?? ""}`,
+        `<${e.tag}${attr(e, "type") ? ` type="${attr(e, "type")}"` : ""}${native ? "" : ` role="${roleOf(e)}"`}> label="${labelFor(d, e)}" placeholder="${attr(e, "placeholder") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" aria-labelledby="${attr(e, "aria-labelledby") ?? ""}"${labelledBy !== void 0 ? ` labelledby-text="${labelledBy}"` : ""} title="${attr(e, "title") ?? ""}" required=${attr(e, "required") !== void 0 || attr(e, "aria-required") === "true"} describedby="${attr(e, "aria-describedby") ?? ""}"`,
+        // EVERY naming mechanism is part of the identity (#130). The class used to be the
+        // `<label>` text and the `name` only, so on a step whose fields are named by
+        // `aria-labelledby` — no <label>, no name — every field collapsed into one class with
+        // a step-1 `aria-label` field and travelled as its `alsoAt`: the labels 11.2/11.4/11.5
+        // are ruled on were never shown.
+        `control|${e.tag}|${attr(e, "type") ?? roleOf(e)}|${labelFor(d, e)}|${attr(e, "name") ?? ""}|${attr(e, "aria-label") ?? ""}|${labelledBy ?? attr(e, "aria-labelledby") ?? ""}|${attr(e, "title") ?? ""}|${attr(e, "placeholder") ?? ""}`,
         labelElementTokens(d, e)
       );
     })
@@ -48952,15 +49226,19 @@ var SUBJECTS = {
         `declaredlang|${attr(e, "lang") ?? ""}`
       )
     ),
-    ...d.elements.filter((e) => e.tag !== "html" && attr(e, "lang") !== void 0).map((e) => h(d, e, `lang="${attr(e, "lang")}" text="${t(e, 40)}"`, `lang|${attr(e, "lang")}|${t(e, 40)}`)),
-    ...d.elements.filter(
-      (e) => e.children.some((c2) => c2.type === "text" && c2.data.trim() !== "") && FOREIGN_LEXICON.test(textContent(e)) && attr(e, "lang") === void 0 && roleOf(e) !== "img" && !insideRoleImg(e)
+    ...d.elements.filter((e) => e.tag !== "html" && attr(e, "lang") !== void 0).map((e) => h(d, e, `lang="${attr(e, "lang")}" text="${rt(d, e, 40)}"`, `lang|${attr(e, "lang")}|${rt(d, e, 40)}`)),
+    // RENDERED text only (#129): a JSX comment, a code fragment or a framework's `<script>`
+    // payload is not a passage of the page. The run is the element's OWN text, so the
+    // candidate is the element that holds the phrase rather than each of its ancestors, and
+    // a phrase already inside a `lang` override is marked.
+    ...textRuns(d).filter(
+      ({ el: e, text }) => FOREIGN_LEXICON.test(text) && ![e, ...ancestors(e)].some((a) => a.tag !== "html" && attr(a, "lang") !== void 0) && roleOf(e) !== "img" && !insideRoleImg(e)
     ).map(
-      (e) => h(
+      ({ el: e, text }) => h(
         d,
         e,
-        `candidate foreign passage, NOT marked with lang: "${t(e, 60)}" \u2014 a proper noun, a technical term or a word in common use is exempt`,
-        `foreign|${t(e, 60)}`
+        `candidate foreign passage, NOT marked with lang: "${text.slice(0, 80)}" \u2014 a proper noun, a technical term or a word in common use is exempt`,
+        `foreign|${text.slice(0, 60)}`
       )
     )
   ]),
@@ -49123,11 +49401,13 @@ var SUBJECTS = {
     ...d.elements.filter((e) => attr(e, "accesskey") !== void 0).map((e) => h(d, e, `accesskey="${attr(e, "accesskey")}" on <${e.tag}> "${t(e, 40)}"`, `accesskey|${attr(e, "accesskey")}`))
   ]),
   // Instructions that lean on a sensory characteristic alone.
+  //
+  // RENDERED text only (#129). This used to match the raw source line, so a component's code
+  // comments (« the legend below it », « pinned to the left of the title ») were handed to
+  // 10.9/10.10 as instructions the page gives. A component's literal text props are rendered
+  // text and stay in.
   sensoryText: (docs) => docs.flatMap(
-    (d) => linesOf(
-      d,
-      /\b(?:ci-dessus|ci-dessous|à droite|a droite|à gauche|a gauche|bouton (?:vert|rouge|bleu)|en rouge|en vert|le carré|la case de droite|above|below|to the right|to the left|green button|red button|round button)\b/i
-    ).map((l) => hAt(d, l.line, "text", `sensory-sounding instruction: ${l.text}`, `sensory|${l.text}`))
+    (d) => textRuns(d).filter(({ text }) => SENSORY.test(text)).map(({ el, text }) => h(d, el, `sensory-sounding instruction: "${text.slice(0, 120)}"`, `sensory|${text.slice(0, 100)}`))
   ),
   // Time limits: session expiry, meta refresh, timed redirects.
   timers: (docs) => docs.flatMap((d) => [
@@ -49152,6 +49432,81 @@ var SUBJECTS = {
       (e) => h(d, e, `<${e.tag} autoplay=${attr(e, "autoplay") !== void 0} controls=${attr(e, "controls") !== void 0}>`, `media|${e.tag}`)
     )
   ]),
+  // RGAA 4.8/4.9 — the non-temporal media themselves (#130): a chart drawn in a `<canvas>` or
+  // an SVG, a non-temporal plug-in, a chart component. One per medium, named by the container
+  // that carries its alternative — which is what 4.8 (« a-t-il une alternative ? ») and 4.9
+  // (« est-elle pertinente ? ») are ruled on.
+  nonTemporalMedia: (docs) => docs.flatMap(
+    (d) => nonTemporalMediaOf(d).map(
+      (m) => h(
+        d,
+        m.el,
+        `${describeMedium(d, m)} \u2014 non-temporal media: is an alternative given (adjacent text, a data table, a text description), and does it convey the same information?`,
+        `ntmedia|${m.el.tag}|${m.name}|${attr(m.el, "src") ?? attr(m.el, "data") ?? ""}`
+      )
+    )
+  ),
+  // RGAA 3.1 — elements whose STATE the page draws, and so may draw in colour alone (#130).
+  colourState: (docs) => docs.flatMap(
+    (d) => d.elements.filter((e) => !inNonRendered(e)).flatMap((e) => {
+      const marks = [];
+      const current = (attr(e, "aria-current") ?? "").trim().toLowerCase();
+      if (current !== "" && current !== "false" && !current.startsWith("{")) marks.push(`aria-current="${current}"`);
+      if ((attr(e, "aria-selected") ?? "").trim().toLowerCase() === "true") marks.push(`aria-selected="true"`);
+      for (const [name2, value] of Object.entries(e.attribs)) if (STATE_DATA_ATTR.test(name2)) marks.push(`${name2}="${String(value).slice(0, 30)}"`);
+      for (const c2 of stateClasses(e)) marks.push(`class "${c2}"`);
+      for (const a of ["class", "style"]) {
+        const v = (attr(e, a) ?? "").trim();
+        if (v.startsWith("{") && /\?[^?:]*:|&&/.test(v)) marks.push(`${a} chosen by a condition ${v.replace(/\s+/g, " ").slice(0, 80)}`);
+      }
+      if (!marks.length) return [];
+      const text = rt(d, e, 50);
+      return [
+        h(
+          d,
+          e,
+          `<${e.tag}> state drawn by ${marks.join(", ")} text="${text}" \u2014 is this state ALSO given by text, shape or position, not by colour alone?`,
+          `colourstate|${e.tag}|${marks.map((m) => m.replace(/="[^"]*"$/, "")).join(",")}|${text}`
+        )
+      ];
+    })
+  ),
+  // RGAA 12.3 — the site map page ITSELF (#130). `navMechanisms` finds the link that leads to
+  // it; « la page plan du site est-elle pertinente ? » is ruled on what the page lists, and
+  // where each entry leads.
+  siteMapPage: (docs) => docs.flatMap((d) => {
+    const page = pageOfDoc(d.file);
+    const titled = elementsByTag(d, "h1", "title").some((e) => SITEMAP_TEXT.test(rt(d, e, 80)));
+    const isSiteMap = titled || SITEMAP_ADDRESS.test(page ?? d.file.replace(/\\/g, "/").split("/").slice(-3).join("/"));
+    if (!isSiteMap) return [];
+    const main2 = elementsByTag(d, "main")[0];
+    const chrome = (e) => ancestors(e).some((a) => ["header", "footer"].includes(a.tag) || ["banner", "contentinfo"].includes(roleOf(a)));
+    const entries = d.elements.filter(
+      (e) => attr(e, "href") !== void 0 && (main2 ? ancestors(e).includes(main2) : !chrome(e)) && !ancestors(e).some((a) => a.tag === "nav" && /fil d|breadcrumb/i.test(`${attr(a, "aria-label") ?? ""} ${attr(a, "class") ?? ""}`))
+    );
+    const where = page !== void 0 ? `page="${page}"` : `source ${d.file}`;
+    const head = elementsByTag(d, "h1")[0] ?? main2 ?? elementsByTag(d, "html")[0] ?? entries[0];
+    const out2 = [];
+    if (head)
+      out2.push(
+        h(
+          d,
+          head,
+          `${where} \u2014 THE SITE MAP PAGE: ${entries.length} entr${entries.length === 1 ? "y" : "ies"}${entries.length ? `: ${entries.slice(0, 30).map((e) => `"${rt(d, e, 30)}" \u2192 ${attr(e, "href")}`).join(", ")}${entries.length > 30 ? " \u2026" : ""}` : ""} \u2014 is it representative of the site's architecture?`,
+          `sitemappage|${page ?? d.file}`
+        )
+      );
+    for (const e of entries)
+      out2.push(
+        h(
+          d,
+          e,
+          `site-map entry text="${rt(d, e, 60)}" href="${attr(e, "href")}" section="${nearestHeading(d, e) ?? ""}" \u2014 does it work, and lead to the page it names?`,
+          `sitemapentry|${rt(d, e, 60)}|${attr(e, "href")}`
+        )
+      );
+    return out2;
+  }),
   // RGAA 4.11 — temporal players and the code that controls their consultation. This must
   // not inherit WCAG 2.1.1/2.1.2's page-wide union of pointer handlers and focusables: an
   // unrelated clickable card says nothing about whether an <audio> can be paused.
@@ -49171,13 +49526,14 @@ var SUBJECTS = {
   // RGAA 4.12 — non-temporal plug-in/SVG/canvas media. Static instances are included too:
   // the adjudicator must first establish whether they expose consultation controls before it
   // can legitimately answer NA. Temporal players and generic event handlers stay out.
+  // Hidden decoration (`<svg aria-hidden="true">`) is not media anyone consults (#130).
   nonTemporalMediaControls: (docs) => docs.flatMap((d) => [
-    ...d.elements.filter((e) => e.tag === "svg" || e.tag === "canvas" || ["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "temporal").map(
-      (e) => h(
+    ...nonTemporalMediaOf(d).map(
+      (m) => h(
         d,
-        e,
-        `<${e.tag}> non-temporal media \u2014 inspect any pan/zoom/navigation/control function for keyboard and pointer operation`,
-        `non-temporal-media|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? attr(e, "id") ?? ""}`
+        m.el,
+        `${describeMedium(d, m)} non-temporal media \u2014 inspect any pan/zoom/navigation/control function for keyboard and pointer operation`,
+        `non-temporal-media|${m.el.tag}|${m.name}|${attr(m.el, "src") ?? attr(m.el, "data") ?? ""}`
       )
     ),
     ...linesOf(d, /\b(?:svgPanZoom|panzoom|zoomIn|zoomOut|getContext)\b/i).map(
@@ -49201,12 +49557,12 @@ var SUBJECTS = {
       (e) => h(d, e, `<script> \u2014 inspect for luminance/colour states toggled rapidly`, `flash-script|${attr(e, "src") ?? t(e, 80)}`)
     ),
     ...d.elements.filter((e) => /animation|transition/i.test(attr(e, "style") ?? "")).map((e) => h(d, e, `inline visual animation: ${(attr(e, "style") ?? "").slice(0, 100)}`, `flash-inline|${attr(e, "style") ?? ""}`)),
-    ...(d.signals?.css?.rules ?? []).filter((r) => r.decls.animation !== void 0 || r.decls.animationName !== void 0).map(
+    ...pageRules(docs, d).filter((r) => r.decls.animation !== void 0 || r.decls.animationName !== void 0).map(
       (r) => hAt(
         d,
         1,
         `css:${r.selector}`,
-        `stylesheet animation: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } \u2014 inspect keyframes for rapid opposing luminance changes`,
+        `stylesheet animation: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }${r.where} \u2014 inspect keyframes for rapid opposing luminance changes`,
         `flash-css|${r.selector}|${declsText(r.decls)}`
       )
     ),
@@ -49339,12 +49695,12 @@ var SUBJECTS = {
         `orderinline|${(attr(e, "style") ?? "").slice(0, 80)}`
       )
     ),
-    ...(d.signals?.css?.rules ?? []).filter((r) => r.decls.order !== void 0 || /-reverse/.test(r.decls.flexDirection ?? "") || /reverse/.test(r.decls.flexFlow ?? "")).slice(0, 60).map(
+    ...pageRules(docs, d).filter((r) => r.decls.order !== void 0 || /-reverse/.test(r.decls.flexDirection ?? "") || /reverse/.test(r.decls.flexFlow ?? "")).slice(0, 60).map(
       (r) => hAt(
         d,
         1,
         `css:${r.selector}`,
-        `stylesheet reorders layout: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} } \u2014 does it move meaning-bearing content?`,
+        `stylesheet reorders layout: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }${r.where} \u2014 does it move meaning-bearing content?`,
         `ordercss|${r.selector}`
       )
     )
@@ -49477,24 +49833,23 @@ var SUBJECTS = {
   // without them (« … », “…”, "…" of a dozen characters or more). It inherited `structure` —
   // headings, tables and lists — which never held a quotation.
   quotes: (docs) => docs.flatMap((d) => [
-    ...elementsByTag(d, "q", "blockquote").map((e) => h(d, e, `<${e.tag}> "${t(e, 80)}" \u2014 is it a quotation?`, `quote|${e.tag}|${t(e, 60)}`)),
-    ...d.elements.filter(
-      (e) => !["q", "blockquote", "script", "style", "code", "pre"].includes(e.tag) && e.children.some((c2) => c2.type === "text" && /«[^»]{12,}»|“[^”]{12,}”|"[^"<>]{12,}"/.test(c2.data))
-    ).slice(0, 40).map((e) => h(d, e, `quoted text without <q>/<blockquote>: "${t(e, 80)}" \u2014 a citation?`, `quotetext|${t(e, 60)}`))
+    ...elementsByTag(d, "q", "blockquote").map((e) => h(d, e, `<${e.tag}> "${rt(d, e, 80)}" \u2014 is it a quotation?`, `quote|${e.tag}|${rt(d, e, 60)}`)),
+    // Rendered text only (#129): a string in a JSX expression is code, not a quotation.
+    ...d.elements.filter((e) => !["q", "blockquote", "code", "pre"].includes(e.tag) && /«[^»]{12,}»|“[^”]{12,}”|"[^"<>]{12,}"/.test(ownRenderedText(d, e))).slice(0, 40).map((e) => h(d, e, `quoted text without <q>/<blockquote>: "${rt(d, e, 80)}" \u2014 a citation?`, `quotetext|${rt(d, e, 60)}`))
   ]),
   // RGAA 13.5/13.6 — « contenu cryptique (art ASCII, émoticône, syntaxe cryptique) ». It used
   // to inherit `images` through WCAG 1.1.1, so a page with an emoticon and no image closed both
   // criteria « non applicable » over the very content they are about.
   cryptic: (docs) => docs.flatMap(
-    (d) => d.elements.filter((e) => !["script", "style", "title", "head"].includes(e.tag)).filter((e) => {
-      const own = e.children.filter((c2) => c2.type === "text").map((c2) => c2.data).join(" ");
+    (d) => d.elements.filter((e) => e.tag !== "title").filter((e) => {
+      const own = ownRenderedText(d, e);
       return CRYPTIC.test(own) || e.tag === "pre" && /[^\w\s]{6,}/.test(own);
     }).slice(0, 40).map(
       (e) => h(
         d,
         e,
-        `cryptic content: "${t(e, 60)}" title="${attr(e, "title") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" \u2014 is an alternative given (title or adjacent definition)?`,
-        `cryptic|${t(e, 40)}`
+        `cryptic content: "${rt(d, e, 60)}" title="${attr(e, "title") ?? ""}" aria-label="${attr(e, "aria-label") ?? ""}" \u2014 is an alternative given (title or adjacent definition)?`,
+        `cryptic|${rt(d, e, 40)}`
       )
     )
   ),
@@ -49543,13 +49898,15 @@ var SUBJECTS = {
   // CSS de couleurs de fond et de police ». Inline `style` colours are `colourPairs`.
   colourDecls: (docs) => docs.flatMap((d) => [
     ...linesOf(d, /(?:^|[\s;{])(?:color|background(?:-color)?)\s*:\s*[^;}"'<]+/i, 60).filter((l) => !/\bstyle\s*=/.test(l.text)).map((l) => hAt(d, l.line, "css", `colour declaration: ${l.text}`, `colourdecl|${l.text}`)),
-    ...(d.signals?.css?.rules ?? []).filter((r) => r.decls.color !== void 0 || r.decls.backgroundColor !== void 0 || r.decls.background !== void 0).slice(0, 60).map(
-      (r) => hAt(
+    // A longhand the browser expanded from a shorthand it did not set comes back EMPTY
+    // (`backgroundColor: ""`): that is no colour declaration, and it used to be shown as one.
+    ...pageRules(docs, d).map((r) => ({ r, fg: (r.decls.color ?? "").trim(), bg: (r.decls.backgroundColor || r.decls.background || "").trim() })).filter(({ fg, bg }) => fg !== "" || bg !== "").slice(0, 60).map(
+      ({ r, fg, bg }) => hAt(
         d,
         1,
         `css:${r.selector}`,
-        `stylesheet colours: ${r.selector.slice(0, 60)} { color: ${r.decls.color ?? "\u2014"}; background: ${r.decls.backgroundColor ?? r.decls.background ?? "\u2014"} }`,
-        `colourcss|${r.selector}|${r.decls.color ?? ""}|${r.decls.backgroundColor ?? r.decls.background ?? ""}`
+        `stylesheet colours: ${r.selector.slice(0, 60)} { color: ${fg || "\u2014"}; background: ${bg || "\u2014"} }${r.where}`,
+        `colourcss|${r.selector}|${fg}|${bg}`
       )
     )
   ]),
@@ -49580,6 +49937,7 @@ var SUBJECTS = {
   zoom: (docs) => docs.flatMap((d) => [
     ...viewportMeta(d),
     ...cssEvidence(
+      docs,
       d,
       /\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px|\boverflow(?:-y)?\s*:\s*(?:hidden|clip)|\bfont-size\s*:\s*\d+(?:\.\d+)?px/i,
       (r) => Boolean((r.decls.height ?? r.decls.maxHeight ?? "").endsWith("px") || /hidden|clip/.test(r.decls.overflow ?? r.decls.overflowY ?? "")),
@@ -49592,6 +49950,7 @@ var SUBJECTS = {
   reflow: (docs) => docs.flatMap((d) => [
     ...viewportMeta(d),
     ...cssEvidence(
+      docs,
       d,
       /\b(?:min-)?width\s*:\s*(?:3[2-9]\d|[4-9]\d\d|\d{4,})px|\bwhite-space\s*:\s*(?:nowrap|pre)\b|\boverflow-x\s*:/i,
       (r) => Boolean(/^(?:3[2-9]\d|[4-9]\d\d|\d{4,})px$/.test((r.decls.width ?? r.decls.minWidth ?? "").trim()) || /nowrap|pre/.test(r.decls.whiteSpace ?? "")),
@@ -49605,6 +49964,7 @@ var SUBJECTS = {
   // !important (the decisive rules), any spacing at all, and a box too small to grow.
   textSpacing: (docs) => docs.flatMap(
     (d) => cssEvidence(
+      docs,
       d,
       /\b(?:line-height|letter-spacing|word-spacing)\s*:|\b(?:max-)?height\s*:\s*\d+(?:\.\d+)?px/i,
       (r) => r.decls.lineHeight !== void 0 || r.decls.letterSpacing !== void 0 || r.decls.wordSpacing !== void 0 || (r.decls.height ?? "").endsWith("px"),
@@ -49618,12 +49978,12 @@ var SUBJECTS = {
     ...linesOf(d, /@media[^{]*\borientation\b|\borientation\.lock\s*\(|\block(?:Orientation)?\s*\(\s*["'](?:portrait|landscape)|"orientation"\s*:/i).map(
       (l) => hAt(d, l.line, "orientation", `orientation-dependent code: ${l.text}`, `orientation|${l.text}`)
     ),
-    ...(d.signals?.css?.rules ?? []).filter((r) => /orientation/i.test(r.media ?? "")).slice(0, 30).map(
+    ...pageRules(docs, d).filter((r) => /orientation/i.test(r.media ?? "")).slice(0, 30).map(
       (r) => hAt(
         d,
         1,
         `css:${r.selector}`,
-        `@media ${r.media} { ${r.selector.slice(0, 50)} { ${declsText(r.decls)} } }`,
+        `@media ${r.media} { ${r.selector.slice(0, 50)} { ${declsText(r.decls)} } }${r.where}`,
         `orientationcss|${r.media}|${r.selector}`
       )
     )
@@ -49639,12 +49999,12 @@ var SUBJECTS = {
         `focusrule|${l.text}`
       )
     ),
-    ...(d.signals?.css?.rules ?? []).filter((r) => /:focus/.test(r.selector)).slice(0, 40).map(
+    ...pageRules(docs, d).filter((r) => /:focus/.test(r.selector)).slice(0, 40).map(
       (r) => hAt(
         d,
         1,
         `css:${r.selector}`,
-        `captured focus rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }`,
+        `captured focus rule: ${r.selector.slice(0, 60)} { ${declsText(r.decls)} }${r.where}`,
         `focuscss|${r.selector}|${declsText(r.decls)}`
       )
     )
@@ -49700,19 +50060,27 @@ var SUBJECTS = {
   // already lean on a sensory word; this adds every instruction, because a conformity is ruled
   // on the ones that name their target too, and a page with none of the leads had nothing to cite.
   instructions: (docs) => docs.flatMap(
-    (d) => d.elements.filter(
-      (e) => !["script", "style", "title", "head", "html", "body"].includes(e.tag) && e.children.some((c2) => c2.type === "text" && INSTRUCTION.test(c2.data))
-    ).slice(0, 40).map((e) => h(d, e, `instruction: "${t(e, 100)}" \u2014 does it rely on shape, size or position alone?`, `instruction|${t(e, 80)}`))
+    (d) => (
+      // Rendered text only (#129) — see `textRuns`.
+      textRuns(d).filter(({ el, text }) => el.tag !== "body" && INSTRUCTION.test(text)).slice(0, 40).map(
+        ({ el, text }) => h(
+          d,
+          el,
+          `instruction: "${text === ownRenderedText(d, el) ? rt(d, el, 100) : text.slice(0, 100)}" \u2014 does it rely on shape, size or position alone?`,
+          `instruction|${text.slice(0, 80)}`
+        )
+      )
+    )
   ),
   // Content pinned over the page — what can obscure a focused element.
   stickies: (docs) => docs.flatMap((d) => [
     ...d.elements.filter((e) => /position\s*:\s*(?:fixed|sticky)/.test(attr(e, "style") ?? "")).map((e) => h(d, e, `pinned element (inline): ${(attr(e, "style") ?? "").slice(0, 60)} \u2014 can it cover a focused element?`, `sticky|${selectorFor(e)}`)),
-    ...(d.signals?.css?.rules ?? []).filter((r) => /^(?:fixed|sticky)$/.test((r.decls.position ?? "").trim())).slice(0, 60).map(
+    ...pageRules(docs, d).filter((r) => /^(?:fixed|sticky)$/.test((r.decls.position ?? "").trim())).slice(0, 60).map(
       (r) => hAt(
         d,
         1,
         `css:${r.selector}`,
-        `pinned by stylesheet: ${r.selector.slice(0, 60)} { position: ${r.decls.position} } \u2014 can it cover a focused element?`,
+        `pinned by stylesheet: ${r.selector.slice(0, 60)} { position: ${r.decls.position} }${r.where} \u2014 can it cover a focused element?`,
         `stickycss|${r.selector}`
       )
     )
@@ -49836,7 +50204,8 @@ var PACK_SUBJECTS = {
     // Theme 12 — navigation.
     "12.1": ["navMechanisms"],
     "12.2": ["repeatedBlocks"],
-    "12.3": ["navMechanisms"],
+    // The site map page's own content first — 12.3 asks whether IT is pertinent (#130).
+    "12.3": ["siteMapPage", "navMechanisms"],
     "12.4": ["repeatedBlocks", "navMechanisms"],
     // The search engine is the criterion's subject, and `navMechanisms` is what finds it.
     "12.5": ["repeatedBlocks", "navMechanisms"],
@@ -49860,12 +50229,18 @@ var PACK_SUBJECTS = {
     "4.6": ["temporalMedia", "motion"],
     "4.7": ["temporalMedia"],
     "4.13": ["temporalMedia", "nonTemporalMediaControls"],
+    // 4.8/4.9 inherited `images` from WCAG 1.1.1 and were handed a copy of 1.6's image list,
+    // without the canvas charts that are the site's non-temporal media (#130).
+    "4.8": ["nonTemporalMedia"],
+    "4.9": ["nonTemporalMedia"],
     // 4.11/4.12 map to the same keyboard SCs but ask about disjoint media populations.
     // Inheriting the union handed both criteria every pointer handler and focusable in scope.
     "4.11": ["temporalMediaControls"],
     "4.12": ["nonTemporalMediaControls"],
     // Theme 3 — colour. The question is about what colour alone conveys, not the outline.
-    "3.1": ["colourPairs", "links"],
+    // What 3.1 is about is a STATE drawn in colour — a current step, a threshold bar, a status
+    // badge — and a chart, which encodes its series in colour (#130). Links follow.
+    "3.1": ["colourState", "nonTemporalMedia", "colourPairs", "links"],
     "3.2": ["colourPairs", "computedColours", "colourDecls", "rendered:1.4.3", "stylesheets"],
     "3.3": ["colourPairs", "colourDecls", "rendered:1.4.11", "controls", "buttons", "stylesheets"],
     // Theme 7 — scripts. "Is each script operable by keyboard AND pointer?" is about the
