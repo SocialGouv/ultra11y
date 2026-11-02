@@ -29,6 +29,23 @@ describe("control-label-missing (11.1)", () => {
   it("does not double-report a placeholder-only field", () => {
     expect(findOf(`<input type="text" placeholder="Nom">`, "control-label-missing")).toHaveLength(0);
   });
+
+  // #94 — egapro#4919's fix was refused by the gate it was meant to satisfy.
+  describe("a name the source cannot see is not a missing name (#94)", () => {
+    it("aria-labelledby holding a JSX expression is present, value unknown", () => {
+      const src = `export function F({ labelId }) { return <input aria-labelledby={labelId} type="file" />; }`;
+      expect(findOf(src, "control-label-missing", "F.tsx")).toHaveLength(0);
+    });
+    it("a field whose id comes from its caller may be labelled by the caller's <label htmlFor>", () => {
+      const src = `export function F({ inputId }) { return <input id={inputId} type="file" />; }`;
+      expect(findOf(src, "control-label-missing", "F.tsx")).toHaveLength(0);
+    });
+    it("still fires: literal id with no label, no id at all, an empty or dangling literal labelledby", () => {
+      expect(findOf(`export function F() { return <input id="n" type="text" />; }`, "control-label-missing", "F.tsx")).toHaveLength(1);
+      expect(findOf(`export function F() { return <input type="text" />; }`, "control-label-missing", "F.tsx")).toHaveLength(1);
+      expect(findOf(`export function F() { return <input aria-labelledby="ghost" type="text" />; }`, "control-label-missing", "F.tsx")).toHaveLength(1);
+    });
+  });
 });
 
 describe("placeholder-as-label (11.1)", () => {

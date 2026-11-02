@@ -52,6 +52,13 @@ describe("egapro-feedback — false positives (must raise zero normative NC)", (
   });
 });
 
+describe("file-upload-labelledby.tsx — a field named by a caller's label is not « sans étiquette » (#94)", () => {
+  const audit = runAudit({ inputs: [`${FIX}fp/file-upload-labelledby.tsx`] });
+  it.skipIf(!IMPLEMENTED_PHASES.has("P0"))("raises no control-label-missing", () => {
+    expect(audit.findings.filter((f) => f.ruleId === "control-label-missing")).toEqual([]);
+  });
+});
+
 describe("axe best-practice channel", () => {
   it.skipIf(!IMPLEMENTED_PHASES.has("P1"))(
     "a best-practice-only axe violation (no wcag* tag) merges as advisory, not a criterion NC — an empty <th> is not an NC under any criterion",

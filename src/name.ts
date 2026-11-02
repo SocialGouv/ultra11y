@@ -239,6 +239,17 @@ export function visuallyRenderedText(el: El): string {
   return collapse(out);
 }
 
+/** An aria-labelledby whose value the parse cannot know: a framework binding
+ *  (`:aria-labelledby`, `v-bind:`, where the literal attribute is absent) or a JSX expression
+ *  (`aria-labelledby={labelId}`, serialised with its braces). It names the element — the ids
+ *  are just not resolvable here — so it must never be read as the literal id `{labelId}` and
+ *  reported dangling (#94). Same treatment `aria-label={x}` has always had. */
+export function labelledbyIsDynamic(el: El): boolean {
+  const literal = attr(el, "aria-labelledby");
+  if (literal === undefined) return hasBoundAttr(el, "aria-labelledby");
+  return literal.includes("{");
+}
+
 function ariaLabelledbyText(el: El, doc: Doc): string {
   const ids = attr(el, "aria-labelledby");
   if (!ids) return "";
@@ -258,7 +269,7 @@ export function accessibleName(el: El, doc: Doc): string {
   //    names the element — treat as present so we don't hallucinate a missing name)
   const labelledby = ariaLabelledbyText(el, doc);
   if (labelledby) return labelledby;
-  if (hasBoundAttr(el, "aria-labelledby") && !attr(el, "aria-labelledby")) return " ";
+  if (labelledbyIsDynamic(el)) return " ";
   // 2. aria-label (incl. dynamic `:aria-label`/`v-bind:` binding → value unknown but present)
   const ariaLabel = (boundAttr(el, "aria-label") ?? "").trim();
   if (ariaLabel) return ariaLabel;
@@ -306,8 +317,7 @@ export function controlLabel(el: El, doc: Doc): LabelInfo {
   // Mirror accessibleName's guard: a labelledby is a real label only when it resolves to
   // text, OR is a DYNAMIC binding (present but value unknown). A literal aria-labelledby
   // whose target is missing/empty names nothing — the field is effectively unlabeled.
-  if ((attr(el, "aria-labelledby") && ariaLabelledbyText(el, doc)) || (hasBoundAttr(el, "aria-labelledby") && !attr(el, "aria-labelledby")))
-    return { hasLabel: true, via: "aria-labelledby" };
+  if ((attr(el, "aria-labelledby") && ariaLabelledbyText(el, doc)) || labelledbyIsDynamic(el)) return { hasLabel: true, via: "aria-labelledby" };
   if ((boundAttr(el, "aria-label") ?? "").trim()) return { hasLabel: true, via: "aria-label" };
   const id = attr(el, "id");
   if (id) {
