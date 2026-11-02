@@ -19,6 +19,9 @@ import { parseSitemapUrls, crawlUrls, crawlBound, nameFromUrl } from "./crawl.js
 import { sampleScope } from "./sample.js";
 import {
   COLLECT_SNAPSHOT,
+  FULL_SCREENSHOT_MAX_HEIGHT,
+  LOADING_STATE,
+  LOADING_TIMEOUT_MS,
   PAGES_DIR,
   SNAPSHOT_VERSION,
   slugifyPageId,
@@ -56,10 +59,19 @@ const isFile = target.startsWith("/work/");
 const SNAPSHOT = process.env.ULTRA11Y_SNAPSHOT !== "0";
 const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
 const REFLOW = ${JSON.stringify(REFLOW_PROBE)};
+const LOADING = ${JSON.stringify(LOADING_STATE)};
 const browser = await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 try {
   const page = await browser.newPage();
   await page.goto(isFile ? "file://" + target : target, { waitUntil: "load", timeout: 45000 });
+  // Not while the page still declares itself loading (aria-busy, a spinner, « Chargement… »).
+  // Bounded: a page that never settles is collected anyway, and the collector marks it.
+  for (const end = Date.now() + ${LOADING_TIMEOUT_MS}; Date.now() < end; ) {
+    let markers = [];
+    try { markers = await page.evaluate(LOADING); } catch {}
+    if (!markers.length) break;
+    await page.waitForTimeout(150);
+  }
   // Collected FIRST, on the pristine page: axe's injected source and the 320px reflow
   // resize both come after, and a snapshot must be the page as the browser built it.
   let snapshot;
@@ -67,6 +79,12 @@ try {
     try {
       snapshot = await page.evaluate(COLLECT);
       try { snapshot.screenshot = (await page.screenshot({ fullPage: false })).toString("base64"); } catch {}
+      // The whole page beside it, height-bounded, for the report's reader.
+      try {
+        const vp = snapshot.viewport;
+        const height = Math.min(snapshot.docHeight || 0, ${FULL_SCREENSHOT_MAX_HEIGHT});
+        if (vp && height > vp.height) snapshot.screenshotFull = (await page.screenshot({ fullPage: true, clip: { x: 0, y: 0, width: vp.width, height } })).toString("base64");
+      } catch {}
     } catch {}
   }
   await page.addScriptTag({ content: axe.source });
@@ -217,7 +235,8 @@ export interface RunnerOutput {
   // The PRISTINE page as the browser built it (COLLECT_SNAPSHOT + a viewport screenshot,
   // base64). Absent when snapshotting was off or the collection failed — in which case the
   // page keeps its findings but earns no snapshot, and therefore no conforming-by-silence.
-  snapshot?: CollectedPage & { screenshot?: string };
+  /** `screenshotFull`: the whole page, height-bounded, beside the viewport shot (#135). */
+  snapshot?: CollectedPage & { screenshot?: string; screenshotFull?: string };
   // WHERE the browser was when the measurement started — read right after goto + settle,
   // before any probe could click something that routes. `url` above is read at the END and
   // is the address the run finished on; only this one is the identity of what was audited.
@@ -335,6 +354,9 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
     // left every source finding of a scanned sample « on no page » — the report could say which
     // URL a defect was measured on, never which URL the code defect lives on.
     ...(page?.sources?.length ? { sources: page.sources } : {}),
+    // Still loading when the browser collected it (#135): the report says so, and the audit
+    // concludes nothing from this page's silence.
+    ...(collected.loading?.length ? { loading: collected.loading } : {}),
   };
   // The producer is untrusted input even when it is us: a page id becomes a directory name.
   const v = validateSnapshotMeta(meta);
@@ -364,6 +386,7 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
       // a runner always runs axe — that is the one instrument neither runtime skips.
       axe: { violations: out.violations, ran: true },
       ...(collected.screenshot ? { screenshotBase64: collected.screenshot } : {}),
+      ...(collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {}),
     });
   } catch {
     return undefined;

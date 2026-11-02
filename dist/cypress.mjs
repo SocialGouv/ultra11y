@@ -40,6 +40,27 @@ var COLLECTED_CSS = [
   "cursor"
 ];
 var COLLECT_MAX_ELEMENTS = 5e3;
+var LOADING_STATE = `(() => {
+  const out = [];
+  const shown = (e) => {
+    const r = e.getBoundingClientRect();
+    if (r.width <= 0 && r.height <= 0) return false;
+    const s = getComputedStyle(e);
+    return s.display !== 'none' && s.visibility !== 'hidden';
+  };
+  const name = (e) => e.localName + (e.id ? '#' + e.id : '');
+  for (const e of Array.from(document.querySelectorAll('[aria-busy="true"]'))) if (shown(e)) out.push('aria-busy="true" ' + name(e));
+  for (const e of Array.from(document.querySelectorAll('[role="progressbar"]:not([aria-valuenow]), progress:not([value])'))) if (shown(e)) out.push('indeterminate progress ' + name(e));
+  const PHRASE = /^(chargement( en cours)?|veuillez patienter|loading|please wait)\\s*(\\.{1,3}|\u2026)?$/i;
+  const text = (e) => (e.textContent || '').replace(/\\s+/g, ' ').trim();
+  if (document.body) for (const e of Array.from(document.body.querySelectorAll('p,span,div,li,h1,h2,h3,h4,h5,h6,strong,em,output,[role="status"]'))) {
+    const t = text(e);
+    if (t.length > 40 || !PHRASE.test(t)) continue;
+    if (Array.from(e.children).some((c) => PHRASE.test(text(c)))) continue;
+    if (shown(e)) out.push('text "' + t + '" ' + name(e));
+  }
+  return out.slice(0, 10);
+})()`;
 var COLLECT_SNAPSHOT = `(() => {
   const PROPS = ${JSON.stringify(COLLECTED_CSS)};
   const MAX = ${COLLECT_MAX_ELEMENTS};
@@ -151,6 +172,12 @@ var COLLECT_SNAPSHOT = `(() => {
     lang: document.documentElement.getAttribute('lang') || '',
     url: location.href,
     viewport: { width: window.innerWidth, height: window.innerHeight },
+    // The document's full height, so the producer knows whether a full-page screenshot adds
+    // anything to the viewport one.
+    docHeight: Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0),
+    // Still loading at the instant of collection: the markers, or none. Every producer runs
+    // this same collector, so every producer can say so \u2014 see LOADING_STATE.
+    loading: ${LOADING_STATE},
     styles: { v: 1, entries: styles, truncated: truncated },
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };
@@ -184,7 +211,7 @@ function stayedOnPage(expected, actual) {
   if (a === void 0 || b === void 0) return true;
   return a === b;
 }
-function buildPayload(collected, url, runner, opts, screenshot, probes, axe) {
+function buildPayload(collected, url, runner, opts, screenshot, probes, axe, screenshotFull) {
   const id = opts.as || slugify(url);
   return {
     meta: {
@@ -207,13 +234,17 @@ function buildPayload(collected, url, runner, opts, screenshot, probes, axe) {
       ...collected.doctype !== void 0 ? { doctype: collected.doctype } : {},
       ...opts.auth !== void 0 ? { auth: opts.auth } : {},
       ...opts.sources ? { sources: opts.sources } : {},
-      ...opts.notes ? { notes: opts.notes } : {}
+      ...opts.notes ? { notes: opts.notes } : {},
+      // Still loading when collected: named, so the report can say so and the audit concludes
+      // nothing from this page's silence.
+      ...collected.loading?.length ? { loading: collected.loading } : {}
     },
     dom: collected.dom,
     styles: collected.styles,
     boxes: collected.boxes,
     css: collected.css,
     ...screenshot ? { screenshot } : {},
+    ...screenshotFull ? { screenshotFull } : {},
     // What the live probes measured, when the caller asked for them. It rides in the payload
     // because `snapshot write` persists it beside the DOM — the audit that folds it runs later
     // and in another process, so a measurement kept in memory decides nothing.

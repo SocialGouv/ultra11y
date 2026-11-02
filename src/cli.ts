@@ -119,6 +119,7 @@ import {
   readSnapshots,
   type SnapshotProbes,
   validateSnapshotMeta,
+  pageScreenshot,
   writeSnapshot,
   type AxNode,
   type BoxDigest,
@@ -1711,7 +1712,8 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   // the reviewer actually opens. So when writing to a directory we copy each screenshot
   // into it (`assets/<page-id>.png`) and link that; stdout mode keeps the relative
   // reference, since there is no output directory to be self-contained.
-  const shotOf = (id: string): string => join(PAGES_DIR, id, "screen.png");
+  // The whole page when the producer took it (#135), the viewport shot otherwise.
+  const shotOf = (id: string): string => pageScreenshot(PAGES_DIR, id) ?? join(PAGES_DIR, id, "screen.png");
   const shotsRelative = (fileDir: string): Map<string, string> => {
     const m = new Map<string, string>();
     for (const pg of derived) {
@@ -1918,6 +1920,7 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
     axtree?: AxNode;
     css?: CssDigest;
     screenshot?: unknown;
+    screenshotFull?: unknown;
     probes?: SnapshotProbes;
     axe?: unknown;
   };
@@ -1957,6 +1960,8 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command, the
       // dev side-car, `scan` — writes it the one same way.
       ...(typeof payload.screenshot === "string" && payload.screenshot ? { screenshotBase64: payload.screenshot } : {}),
+      // The whole page, for the report's reader — never read by a rule.
+      ...(typeof payload.screenshotFull === "string" && payload.screenshotFull ? { screenshotFullBase64: payload.screenshotFull } : {}),
     });
   } catch (e) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);

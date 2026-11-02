@@ -12,7 +12,9 @@
 //     styles.json   computed-style digest, joined to the DOM by document-order index
 //     boxes.json    bounding boxes, same join key
 //     axtree.json   accessibility tree as the browser computed it
-//     screen.png    full-page screenshot (pixel tier)
+//     screen.png    viewport screenshot (pixel tier — shares boxes.json's coordinates)
+//     screen-full.png  the whole page, height-bounded, when it is taller than the viewport —
+//                   what a reviewer judges; never read by a rule
 //
 // `dom.html` is deliberately an ORDINARY capture: it carries the same
 // `<!-- ultra11y:capture … -->` provenance comment the unit-test harvester writes, so the
@@ -70,6 +72,13 @@ export interface SnapshotMeta {
   // SOURCE findings — see src/pages.ts.
   sources?: string[];
   notes?: string;
+  /** The page was collected while it still declared itself loading — `aria-busy="true"`, an
+   *  indeterminate progress bar, a « Chargement… » standing for the content — after the
+   *  producer had waited as long as it was allowed to. The markers it still carried, named.
+   *  Absent = ready (or a producer that predates the check). Such a capture is reported
+   *  « capture en état de chargement » and never concludes a conformity by silence: the
+   *  content it would have been about was not on the page. */
+  loading?: string[];
 }
 
 /** What the LIVE probes measured on this page, when the producer ran them. Persisted beside
@@ -127,6 +136,11 @@ export interface Snapshot {
   /** The screenshot's bytes, base64, as a producer hands them over. Set on WRITE — a
    *  producer holds bytes, not a path. `writeSnapshot` turns it into `screen.png`. */
   screenshotBase64?: string;
+  /** The whole page, height-bounded, base64 — written as `screen-full.png`. For the reader of
+   *  the report; the pixel tier keeps the viewport shot, whose coordinates match boxes.json. */
+  screenshotFullBase64?: string;
+  /** Path of the full-page screenshot on disk, relative to the snapshot dir. Set on READ. */
+  screenshotFull?: string;
 }
 
 /** What the browser-side collector (`COLLECT_SNAPSHOT`) returns. Every snapshot producer —
@@ -145,6 +159,11 @@ export interface CollectedPage {
    *  `dom` is `documentElement.outerHTML`, which does not contain it, so this is the only
    *  place it survives the trip out of the browser (see SnapshotMeta.doctype). */
   doctype?: string;
+  /** The loading markers still on the page when it was collected (LOADING_STATE); empty or
+   *  absent when it was ready. */
+  loading?: string[];
+  /** The document's scroll height — whether a full-page screenshot adds anything. */
+  docHeight?: number;
 }
 
 // ---- page identity --------------------------------------------------------------------
@@ -221,6 +240,8 @@ export function validateSnapshotMeta(raw: unknown): SnapshotValidation {
   if (m.route !== undefined && typeof m.route !== "string") err("meta.route", "route must be a string");
   if (m.notes !== undefined && typeof m.notes !== "string") err("meta.notes", "notes must be a string");
   if (m.doctype !== undefined && typeof m.doctype !== "string") err("meta.doctype", "doctype must be a string");
+  if (m.loading !== undefined && (!Array.isArray(m.loading) || m.loading.some((s) => typeof s !== "string")))
+    err("meta.loading", "loading must be an array of strings");
   if (m.sources !== undefined && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
     err("meta.sources", "sources must be an array of strings");
 
@@ -248,6 +269,8 @@ export function validateSnapshotMeta(raw: unknown): SnapshotValidation {
       ...(typeof m.doctype === "string" ? { doctype: m.doctype } : {}),
       ...(Array.isArray(m.sources) ? { sources: m.sources as string[] } : {}),
       ...(typeof m.notes === "string" ? { notes: m.notes } : {}),
+      // Kept only when it says something: an empty list is a page that was ready.
+      ...(Array.isArray(m.loading) && m.loading.length ? { loading: m.loading as string[] } : {}),
     },
   };
 }
@@ -289,6 +312,13 @@ export function writeSnapshot(root: string, snap: Snapshot): string {
       /* pixel tier skipped for this page — every other rule still runs */
     }
   }
+  if (snap.screenshotFullBase64) {
+    try {
+      writeFileSync(join(dir, "screen-full.png"), Buffer.from(snap.screenshotFullBase64, "base64"));
+    } catch {
+      /* the report shows the viewport shot instead */
+    }
+  }
   return dir;
 }
 
@@ -324,6 +354,7 @@ export function readSnapshot(dir: string): Snapshot | null {
   const probes = readJson<SnapshotProbes>(join(dir, "probes.json"));
   const axe = readJson<NonNullable<RenderSignals["axe"]>>(join(dir, "axe.json"));
   const shot = join(dir, "screen.png");
+  const full = join(dir, "screen-full.png");
   return {
     meta: v.meta,
     dom,
@@ -334,7 +365,18 @@ export function readSnapshot(dir: string): Snapshot | null {
     ...(probes ? { probes } : {}),
     ...(axe ? { axe } : {}),
     ...(existsSync(shot) ? { screenshot: "screen.png" } : {}),
+    ...(existsSync(full) ? { screenshotFull: "screen-full.png" } : {}),
   };
+}
+
+/** The screenshot a READER of the report should see for a page: the whole page when the
+ *  producer took it, the viewport otherwise; undefined when there is none. */
+export function pageScreenshot(pagesDir: string, id: string): string | undefined {
+  for (const f of ["screen-full.png", "screen.png"]) {
+    const p = join(pagesDir, id, f);
+    if (existsSync(p)) return p;
+  }
+  return undefined;
 }
 
 /** Every snapshot under `<root>/.ultra11y/pages`, id-sorted. Unreadable ones are skipped
@@ -397,7 +439,15 @@ export function alignedBoxes(dom: string, boxes: BoxDigest, doc?: Doc): Map<numb
 // Lives in its own LEAF module (src/collector.ts) so the published test-runner plugins can
 // import it without dragging the parser — and therefore the whole engine — into a browser
 // bundle. Re-exported here because this is where every reader looks for it.
-export { COLLECTED_CSS, COLLECT_MAX_ELEMENTS, COLLECT_SNAPSHOT } from "./collector.js";
+export {
+  COLLECTED_CSS,
+  COLLECT_MAX_ELEMENTS,
+  COLLECT_SNAPSHOT,
+  FULL_SCREENSHOT_MAX_HEIGHT,
+  LOADING_STATE,
+  LOADING_TIMEOUT_MS,
+  waitForLoaded,
+} from "./collector.js";
 
 // ---- attaching signals to a parsed Doc ---------------------------------------------------
 
@@ -462,7 +512,8 @@ export function attachSignals(doc: Doc): void {
   const boxes = readJson<BoxDigest>(join(dir, "boxes.json"));
   const axtree = readJson<AxNode>(join(dir, "axtree.json"));
   const css = readJson<CssDigest>(join(dir, "css.json"));
-  const meta = readJson<{ doctype?: string }>(join(dir, "meta.json"));
+  const meta = readJson<{ doctype?: string; loading?: unknown }>(join(dir, "meta.json"));
+  const loading = Array.isArray(meta?.loading) ? meta.loading.filter((m): m is string => typeof m === "string") : [];
   const probes = readJson<SnapshotProbes>(join(dir, "probes.json"));
   const axe = readJson<NonNullable<RenderSignals["axe"]>>(join(dir, "axe.json"));
   const shot = join(dir, "screen.png");
@@ -482,6 +533,7 @@ export function attachSignals(doc: Doc): void {
     ...(probes ? { probes } : {}),
     ...(axe ? { axe } : {}),
     ...(truncated ? { truncated } : {}),
+    ...(loading.length ? { capturedLoading: loading } : {}),
   };
   if (Object.keys(signals).length) doc.signals = signals;
 }

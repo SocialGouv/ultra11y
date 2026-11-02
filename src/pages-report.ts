@@ -25,7 +25,7 @@
 // this module pure and testable.
 import { prdUnits } from "./prd.js";
 import { renderAuditorUnit, type AuditorCropLookup } from "./auditor.js";
-import { agentMarkNote, basisLabel, formatRate, humanMarkNote, pageView, ruledMark, unattributedFindings } from "./pages.js";
+import { agentMarkNote, basisLabel, formatRate, humanMarkNote, pageBasisWarning, pageView, ruledMark, unattributedFindings } from "./pages.js";
 import {
   CORE,
   type StandardId,
@@ -327,7 +327,9 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
   // A source-only page cannot earn conformity by silence. Say so ON THE PAGE, not only in a
   // legend the reader may never reach — this is the sentence that stops a clean-looking
   // sheet from being read as a clean page.
-  if (page.basis !== "snapshot") out.push(`> ⚠️ ${s.sourceWarn}`, "");
+  // A page captured while loading DOES have a snapshot — of a placeholder — so it carries its
+  // own sentence rather than the « no snapshot » one.
+  if (page.basis !== "snapshot") out.push(`> ⚠️ ${page.basis === "loading" ? pageBasisWarning("loading", lang) : s.sourceWarn}`, "");
 
   const shot = opts.screenshots?.get(page.id);
   if (shot) out.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");

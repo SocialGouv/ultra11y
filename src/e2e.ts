@@ -137,6 +137,8 @@ export async function checkA11y(page, opts = {}) {
       ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
       ...(opts.sources ? { sources: opts.sources } : {}),
       ...(opts.notes ? { notes: opts.notes } : {}),
+      // Still loading when collected: marked, so the audit concludes nothing from its silence.
+      ...(collected.loading && collected.loading.length ? { loading: collected.loading } : {}),
     },
     dom: collected.dom,
     styles: collected.styles,

@@ -33,7 +33,7 @@ import { automatability, compareSC, scTitle } from "./wcag.js";
 /** The page scope recorded on an AuditResult, from the snapshots that were ingested. A
  *  snapshot's presence IS what earns the page its "snapshot" basis. */
 export function pageScopesFrom(
-  snapshots: { meta: { id: string; name: string; url: string; auth?: boolean; route?: string; sources?: string[]; notes?: string } }[],
+  snapshots: { meta: { id: string; name: string; url: string; auth?: boolean; route?: string; sources?: string[]; notes?: string; loading?: string[] } }[],
 ): PageScope[] {
   return snapshots.map((s) => ({
     id: s.meta.id,
@@ -43,7 +43,9 @@ export function pageScopesFrom(
     ...(s.meta.route ? { route: s.meta.route } : {}),
     ...(s.meta.sources ? { sources: s.meta.sources } : {}),
     ...(s.meta.notes ? { notes: s.meta.notes } : {}),
-    basis: "snapshot" as const,
+    // A capture taken while the page still declared itself loading is a snapshot of a
+    // placeholder: real findings, no conformity by silence (see PageScope.basis).
+    basis: s.meta.loading?.length ? ("loading" as const) : ("snapshot" as const),
   }));
 }
 
@@ -405,6 +407,9 @@ const L = {
     notAudited: "non audité",
     notAuditedNote:
       "Une page marquée « non audité » a bien un instantané, mais CET audit ne l'a pas lu (il ne portait que sur les sources). L'absence de constat n'y vaut donc PAS conformité — relancez l'audit en incluant `.ultra11y/pages`.",
+    loading: "capture en état de chargement",
+    loadingNote:
+      "Une page marquée « capture en état de chargement » a été enregistrée alors qu'elle s'annonçait encore en cours de chargement (`aria-busy`, indicateur de progression, « Chargement… ») : son contenu n'était pas affiché. Ses constats sont réels, mais l'absence de constat n'y vaut PAS conformité — recapturez-la une fois chargée.",
     agentMark: "`C*` : conformité tranchée par l'agent IA à partir des évidences citées (gaté), et non prouvée par le moteur déterministe.",
     humanMark:
       "`C†` : conformité tranchée par un auditeur humain nommé à partir des évidences citées (même gate que l'agent), et non prouvée par le moteur déterministe.",
@@ -426,6 +431,9 @@ const L = {
     notAudited: "not audited",
     notAuditedNote:
       'A page marked "not audited" does have a snapshot, but THIS audit never read it (it covered sources only). Absence of a finding there does NOT mean conforming — re-run the audit with `.ultra11y/pages` in scope.',
+    loading: "captured while loading",
+    loadingNote:
+      'A page marked "captured while loading" was recorded while it still declared itself loading (`aria-busy`, a progress indicator, « Loading… »): its content was not on screen. Its findings are real, but absence of a finding there does NOT mean conforming — capture it again once it has loaded.',
     agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
     humanMark: "`C†`: conformity ruled by a named human auditor from the evidence they cited (the agent's gate), not proven by the deterministic engine.",
     originNote: (o: string) => `Columns are the pages' URLs, relative to \`${o}\`.`,
@@ -469,14 +477,14 @@ export function ruledMark(decidedBy: string | undefined, status: Status): string
  *  needs no caveat. */
 export function pageBasisWarning(basis: PageScope["basis"], lang: Lang): string | undefined {
   if (basis === "snapshot") return undefined;
-  return basis === "not-audited" ? L[lang].notAuditedNote : L[lang].basisNote;
+  return basis === "not-audited" ? L[lang].notAuditedNote : basis === "loading" ? L[lang].loadingNote : L[lang].basisNote;
 }
 
 /** The one-word label for a page's basis, so no surface invents its own. A "not-audited" page
  *  must NOT read as "source": it has a snapshot, and saying otherwise is a different untruth. */
 export function basisLabel(basis: PageScope["basis"], lang: Lang): string {
   const s = L[lang];
-  return basis === "snapshot" ? s.snapshot : basis === "not-audited" ? s.notAudited : s.source;
+  return basis === "snapshot" ? s.snapshot : basis === "not-audited" ? s.notAudited : basis === "loading" ? s.loading : s.source;
 }
 
 /** Honesty rule 1, as one sentence: findings no page could claim are reported, never spread. */
@@ -698,6 +706,7 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
   }
   out.push(`> ${s.note}`, "");
   if (derived.some((p) => p.basis === "attributed")) out.push(`> ⚠️ ${s.basisNote}`, "");
+  if (derived.some((p) => p.basis === "loading")) out.push(`> ⚠️ ${s.loadingNote}`, "");
 
   const origin = commonOrigin(derived);
   const originNote = pageOriginNote(origin, lang);

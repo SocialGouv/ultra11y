@@ -108,6 +108,22 @@ Opt-in, and path-only: a query or fragment the app appends to its own route is t
 instruction. A page reported missing is a bug in your seeding; a page reported under the wrong
 name is a false conformance claim.
 
+## A page that has not finished loading (`loadingTimeoutMs`)
+
+A test that navigates and checks at once can land on the page's placeholder — « Chargement… »
+where the data will be. Before collecting, the fixture waits (10 s by default, bounded) for the
+page to stop declaring itself loading: no rendered `aria-busy="true"`, no indeterminate progress
+bar (`role=progressbar` without `aria-valuenow`, `<progress>` without `value`), no element whose
+whole text is a loading phrase (« Chargement… », « Chargement en cours », « Veuillez
+patienter », « Loading… », « Please wait »).
+
+A page still loading when the bound runs out is recorded anyway, **marked**: `meta.json`
+carries `loading` (the markers it still showed), a warning is printed, and the page's basis is
+`loading` — « capture en état de chargement » in every report. Its findings count; its silence
+concludes nothing. `loadingTimeoutMs: 0` checks without waiting. `scan --runtime local` and the
+Docker runner wait the same way; Cypress records the markers but leaves the waiting to the
+test's own `should`.
+
 ## Playwright
 
 ```js
@@ -174,7 +190,10 @@ can use the same command.
 
 Playwright captures a **viewport screenshot** and sends it with the payload — that is what
 feeds `rendered-contrast-pixel` (contrast over a gradient or a background image, the one case
-computed styles cannot express). `screenshot: false` skips it.
+computed styles cannot express). When the page is taller than the viewport it also captures
+the **whole page** (height capped at 8000 px) as `screen-full.png`, which is what the reports
+show a reviewer; the pixel tier keeps the viewport shot, whose coordinates match `boxes.json`.
+`screenshot: false` skips both.
 
 Cypress used to have none: `cy.screenshot()` writes to a path Cypress chooses and names, so
 the browser side never learns where the file went. The **`after:screenshot`** event is the

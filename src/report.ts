@@ -23,7 +23,7 @@ import {
   renderPageGrid,
   renderRedirected,
 } from "./pages.js";
-import { PAGES_DIR } from "./snapshot.js";
+import { PAGES_DIR, pageScreenshot } from "./snapshot.js";
 import { pageCoverage, pageCriterionRows, pageRatePct, pageTally } from "./pages-report.js";
 import { mdLink, mdText } from "./md.js";
 import { isLinkableUrl } from "./util.js";
@@ -1753,7 +1753,9 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
       if (notes) out.push(`- _${notes}_`);
       // The screenshot the snapshot already holds, copied next to the report so the directory
       // travels intact — CI uploads `audits/` alone.
-      const shot = join(PAGES_DIR, pg.id, "screen.png");
+      // The whole page when the producer took it (#135) — a reviewer judges the page, not its
+      // first screen — the viewport shot otherwise.
+      const shot = pageScreenshot(PAGES_DIR, pg.id) ?? join(PAGES_DIR, pg.id, "screen.png");
       if (existsSync(shot)) {
         let href = relative(opts.outDir ?? ".", shot)
           .split("\\")

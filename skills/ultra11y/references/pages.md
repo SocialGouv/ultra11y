@@ -293,7 +293,7 @@ page, which would invent non-conformities. A shared component matches the first 
 deterministically rather than being duplicated onto each. The count spans both channels: a pack
 finding no page claims is counted too.
 
-**2. "No finding here" means conforming only for a page whose real DOM was audited.** Three
+**2. "No finding here" means conforming only for a page whose real DOM was audited.** Four
 bases, and only the first earns `C` by silence:
 
 | `basis` | What it means | Silence means |
@@ -301,8 +301,9 @@ bases, and only the first earns `C` by silence:
 | `snapshot` | this audit read the page's serialized DOM | conforming, for the `static` criteria |
 | `attributed` | no snapshot — only source findings were mapped onto it | nothing; the criteria stay `manual` |
 | `not-audited` | a snapshot exists, but **this** audit never read it | nothing; the criteria stay `manual` |
+| `loading` | the snapshot was captured while the page still declared itself loading (`meta.loading`: `aria-busy`, a spinner, « Chargement… ») | nothing; its findings count, but none of its measurements credits coverage |
 
-For the last two, **absence of evidence is not evidence of absence**: no rule ran against that
+For the last three, **absence of evidence is not evidence of absence**: no rule ran against that
 page's document, so its undecided criteria stay `manual` rather than earning a verdict by
 silence. The grid marks which is which, and warns when any page is not a snapshot.
 
