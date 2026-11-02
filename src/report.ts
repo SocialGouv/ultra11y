@@ -2029,6 +2029,24 @@ export function renderPackReport(r: AuditResult, pack: StandardPack, lang: Lang 
   return joinReportDocuments(docs.report, docs.annex);
 }
 
+/** The automatic rate's own two operands, computed exactly as `packConformancePct` computes
+ *  its ratio — one formula, published with its numerator and its denominator so a reader can
+ *  tell it apart from the conformity rate above it at a glance. */
+function automaticRate(derived: ReturnType<typeof derivePackResults>): { pct: number; validated: number; decided: number } {
+  const validated = derived.filter((d) => d.status === "C" && !isAdjudicated(d.decidedBy) && !isProvisionalJudgmentInapplicable(d)).length;
+  return { pct: packConformancePct(derived), validated, decided: validated + derived.filter((d) => d.status === "NC").length };
+}
+
+/** The two rates a pack report prints, with their operands, from the same grid the document
+ *  renders: the conformity rate it headlines (validated ÷ applicable) and the automatic rate of
+ *  its annex. `report --json` carries these, never the WCAG core's `conformancePct` (#116). */
+export function packReportRates(
+  r: AuditResult,
+  pack: StandardPack,
+): { conformance: ConformanceRate; automatic: { pct: number; validated: number; decided: number } } {
+  return { conformance: conformanceRate(reportTotals(packReportGroups(r, pack))), automatic: automaticRate(derivePackResults(r, pack.key)) };
+}
+
 /** A derived report for a country standards pack (RGAA, …), projected from the WCAG audit — both
  *  documents. */
 export function renderPackReportDocuments(
@@ -2047,11 +2065,7 @@ export function renderPackReportDocuments(
   const groups = packReportGroups(r, pack, lang);
   const rows = groups.flatMap((g) => g.rows);
   const tally = reportTotals(groups);
-  // The automatic rate's own two operands, computed exactly as `packConformancePct` computes
-  // its ratio — one formula, published with its numerator and its denominator so a reader can
-  // tell it apart from the conformity rate above it at a glance.
-  const autoValidated = derived.filter((d) => d.status === "C" && !isAdjudicated(d.decidedBy) && !isProvisionalJudgmentInapplicable(d)).length;
-  const autoDecided = autoValidated + derived.filter((d) => d.status === "NC").length;
+  const auto = automaticRate(derived);
   return render(r, lang, {
     std,
     groupHead: L[lang].byTheme,
@@ -2059,8 +2073,8 @@ export function renderPackReportDocuments(
     derivedOf: std,
     standard: pack.key,
     partialAudit: untestedNeedsRendering(r, establishedScs(derived)),
-    headerRatePct: packConformancePct(derived),
-    conformance: { rate: conformanceRate(tally), provenance: decisionProvenance(rows), autoDecided, autoValidated },
+    headerRatePct: auto.pct,
+    conformance: { rate: conformanceRate(tally), provenance: decisionProvenance(rows), autoDecided: auto.decided, autoValidated: auto.validated },
     // Forwarded, unlike before: without it the per-page screenshots resolved against the
     // CWD instead of the report's own directory, so a pack report written to `audits/`
     // carried links that only worked when read from the repo root.

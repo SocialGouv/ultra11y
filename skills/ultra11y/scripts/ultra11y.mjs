@@ -2,7 +2,7 @@
 
 // src/cli.ts
 import { realpathSync as realpathSync8, writeFileSync as writeFileSync23, mkdirSync as mkdirSync20, existsSync as existsSync41, readFileSync as readFileSync37, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
-import { join as join54, relative as relative6, resolve as resolve18, sep as sep7, dirname as dirname21 } from "path";
+import { join as join54, relative as relative6, resolve as resolve18, sep as sep7, dirname as dirname22 } from "path";
 import { fileURLToPath as fileURLToPath6, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
@@ -64223,14 +64223,20 @@ function renderPackReport(r, pack, lang = "en", outDir, cropFor) {
   const docs = renderPackReportDocuments(r, pack, lang, outDir, cropFor);
   return joinReportDocuments(docs.report, docs.annex);
 }
+function automaticRate(derived) {
+  const validated = derived.filter((d) => d.status === "C" && !isAdjudicated(d.decidedBy) && !isProvisionalJudgmentInapplicable(d)).length;
+  return { pct: packConformancePct(derived), validated, decided: validated + derived.filter((d) => d.status === "NC").length };
+}
+function packReportRates(r, pack) {
+  return { conformance: conformanceRate(reportTotals(packReportGroups(r, pack))), automatic: automaticRate(derivePackResults(r, pack.key)) };
+}
 function renderPackReportDocuments(r, pack, lang = "en", outDir, cropFor) {
   const derived = derivePackResults(r, pack.key);
   const std = `${pack.name} ${pack.baseVersion}`;
   const groups = packReportGroups(r, pack, lang);
   const rows = groups.flatMap((g) => g.rows);
   const tally = reportTotals(groups);
-  const autoValidated = derived.filter((d) => d.status === "C" && !isAdjudicated(d.decidedBy) && !isProvisionalJudgmentInapplicable(d)).length;
-  const autoDecided = autoValidated + derived.filter((d) => d.status === "NC").length;
+  const auto = automaticRate(derived);
   return render(r, lang, {
     std,
     groupHead: L5[lang].byTheme,
@@ -64238,8 +64244,8 @@ function renderPackReportDocuments(r, pack, lang = "en", outDir, cropFor) {
     derivedOf: std,
     standard: pack.key,
     partialAudit: untestedNeedsRendering(r, establishedScs(derived)),
-    headerRatePct: packConformancePct(derived),
-    conformance: { rate: conformanceRate(tally), provenance: decisionProvenance(rows), autoDecided, autoValidated },
+    headerRatePct: auto.pct,
+    conformance: { rate: conformanceRate(tally), provenance: decisionProvenance(rows), autoDecided: auto.decided, autoValidated: auto.validated },
     // Forwarded, unlike before: without it the per-page screenshots resolved against the
     // CWD instead of the report's own directory, so a pack report written to `audits/`
     // carried links that only worked when read from the repo root.
@@ -75787,8 +75793,8 @@ ${xs.map(line).join("\n")}` : t3.none;
 import { createInterface as createInterface2 } from "readline";
 
 // src/mcp/handlers.ts
-import { existsSync as existsSync39, mkdirSync as mkdirSync19, readFileSync as readFileSync35, realpathSync as realpathSync6, statSync as statSync19, writeFileSync as writeFileSync22 } from "fs";
-import { isAbsolute as isAbsolute5, join as join52, resolve as resolve16, sep as sep5 } from "path";
+import { existsSync as existsSync39, lstatSync as lstatSync2, mkdirSync as mkdirSync19, readFileSync as readFileSync35, realpathSync as realpathSync6, statSync as statSync19, writeFileSync as writeFileSync22 } from "fs";
+import { basename as basename4, dirname as dirname20, isAbsolute as isAbsolute5, join as join52, resolve as resolve16, sep as sep5 } from "path";
 
 // src/criteria-view.ts
 var CriteriaLookupError = class extends Error {
@@ -76596,7 +76602,9 @@ function handleFix(args2, cwd) {
   }
 }
 function handleFold(args2, cwd) {
-  const adj = adjudicationArg(args2);
+  const outArg = str2(args2.out);
+  const outDir = outArg === void 0 ? cwd : containedPath(outArg, cwd, "out");
+  const adj = adjudicationArg(args2, cwd);
   standardOf({ standard: adj.standard });
   const asked = str2(args2.standard);
   if (asked !== void 0 && standardOf(args2) !== adj.standard) {
@@ -76606,7 +76614,7 @@ function handleFold(args2, cwd) {
   const auditFile = str2(args2.audit_file);
   let base;
   if (auditFile) {
-    const path = resolve16(cwd, auditFile);
+    const path = containedPath(auditFile, cwd, "audit_file");
     try {
       base = unwrapAudit(JSON.parse(readFileSync35(path, "utf8")));
     } catch {
@@ -76636,7 +76644,6 @@ function handleFold(args2, cwd) {
       next: landed ? "Dry run: nothing was written. Re-call with write:true (and ledger:true to record the accepted verdicts) to land them." : "Nothing landed. Fix the refused verdicts listed in issues \u2014 cite the evidence a C cleared, ground every NC finding \u2014 and fold again."
     };
   }
-  const outDir = resolve16(cwd, str2(args2.out) ?? ".");
   mkdirSync19(outDir, { recursive: true });
   const auditPath = join52(outDir, "audit-latest.json");
   writeFileSync22(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}
@@ -76657,15 +76664,44 @@ function handleFold(args2, cwd) {
   }
   return { ...summary, written: true, auditPath, ...ledger ? { ledger } : {} };
 }
-function adjudicationArg(args2) {
+function containedPath(raw, cwd, field) {
+  const refuse = () => {
+    throw new ToolError(`\`${field}\` is outside the project: ${raw}. The fold reads and writes inside its cwd only.`);
+  };
+  const target = resolve16(cwd, raw);
+  let existing = target;
+  const rest = [];
+  for (; ; ) {
+    try {
+      lstatSync2(existing);
+      break;
+    } catch {
+      const parent = dirname20(existing);
+      if (parent === existing) break;
+      rest.unshift(basename4(existing));
+      existing = parent;
+    }
+  }
+  let real;
+  try {
+    real = join52(realpathSync6(existing), ...rest);
+  } catch {
+    return refuse();
+  }
+  const root = realpathSync6(cwd);
+  if (real !== root && !real.startsWith(root + sep5)) refuse();
+  return target;
+}
+function adjudicationArg(args2, cwd) {
   const inline = args2.adjudication;
   const file = str2(args2.adjudication_file);
   if (inline !== void 0 && file) throw new ToolError("pass `adjudication` or `adjudication_file`, not both.");
   let v = inline;
   if (file) {
     if (!isAbsolute5(file)) throw new ToolError("`adjudication_file` must be an absolute path.");
+    const path = containedPath(file, cwd, "adjudication_file");
     try {
-      v = JSON.parse(readFileSync35(file, "utf8"));
+      v = JSON.parse(readFileSync35(path, "utf8"));
     } catch {
       throw new ToolError(`\`adjudication_file\` not found or not valid JSON: ${file}`);
     }
@@ -77141,16 +77177,19 @@ var WRITE_TOOLS = [
           type: "object",
           description: "The filled adjudication: { kind: 'adjudication', standard, items: [...] }, as ultra11y_adjudicate's worklist with your verdicts."
         },
-        adjudication_file: { type: "string", description: "Absolute path to an adjudication JSON file to fold instead." },
+        adjudication_file: { type: "string", description: "Absolute path, inside cwd, to an adjudication JSON file to fold instead." },
         audit_file: {
           type: "string",
-          description: "Absolute path (or relative to cwd) to the audit JSON to fold into, like `--in`. Default: audit the project now, as ultra11y_adjudicate did."
+          description: "Absolute path (or relative to cwd), inside cwd, to the audit JSON to fold into, like `--in`. Default: audit the project now, as ultra11y_adjudicate did."
         },
         globs: globsProp,
         standard: { type: "string", description: "Must match the adjudication's own standard when given." },
         strict: { type: "boolean", description: "All-or-nothing: a single refused verdict discards the whole fold." },
         write: { type: "boolean", description: "Actually write the folded audit (default: dry-run, returns the gate's verdict)." },
-        out: { type: "string", description: "Directory, relative to cwd, for audit-latest.json. Default: the project root, as `verify --apply`." },
+        out: {
+          type: "string",
+          description: "Directory, relative to cwd and inside it, for audit-latest.json. Default: the project root, as `verify --apply`."
+        },
         ledger: { type: "boolean", description: "With write:true, also record the accepted verdicts in .ultra11y/verdicts/<standard>.json." },
         lang: langProp
       },
@@ -77487,12 +77526,12 @@ var DECLARED = new Set([...TOOLS2, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
 import { existsSync as existsSync40, readdirSync as readdirSync8, readFileSync as readFileSync36, realpathSync as realpathSync7, statSync as statSync20 } from "fs";
-import { basename as basename4, dirname as dirname20, join as join53, resolve as resolve17, sep as sep6 } from "path";
+import { basename as basename5, dirname as dirname21, join as join53, resolve as resolve17, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath5 } from "url";
 var SKILL_NAME = "ultra11y";
 var URI_SCHEME = "skill://";
 function resolveSkillRoot(moduleDir) {
-  const here = moduleDir ?? dirname20(fileURLToPath5(import.meta.url));
+  const here = moduleDir ?? dirname21(fileURLToPath5(import.meta.url));
   const candidates2 = [resolve17(here, ".."), resolve17(here, "..", "skills", SKILL_NAME), resolve17(here, "..", "..", "skills", SKILL_NAME)];
   return candidates2.find((dir) => existsSync40(join53(dir, "SKILL.md")));
 }
@@ -77504,7 +77543,7 @@ function listResources(moduleDir) {
   if (!existsSync40(refDir)) return out2;
   for (const file of readdirSync8(refDir).sort()) {
     if (!file.endsWith(".md")) continue;
-    out2.push(describe(root, join53("references", file), `${SKILL_NAME} reference: ${basename4(file, ".md")}`));
+    out2.push(describe(root, join53("references", file), `${SKILL_NAME} reference: ${basename5(file, ".md")}`));
   }
   return out2;
 }
@@ -79024,7 +79063,7 @@ async function cmdAudit(p) {
     const asFile = out2.toLowerCase().endsWith(".json");
     const target = asFile ? out2 : join54(out2, "audit-latest.json");
     try {
-      mkdirSync20(asFile ? dirname21(out2) : out2, { recursive: true });
+      mkdirSync20(asFile ? dirname22(out2) : out2, { recursive: true });
       writeFileSync23(target, JSON.stringify(document, null, 2) + "\n");
       console.error(lang === "fr" ? `\u2192 audit \xE9crit dans ${target}` : `\u2192 audit written to ${target}`);
     } catch {
@@ -79705,15 +79744,18 @@ async function cmdReport(p) {
   const untested = isCore(standard) ? [] : packPartialAudit(result, standard);
   const partial = untested.length > 0;
   if (partial && !p.flags.json) console.error(`\u{1F6A8} ${partialAuditBanner(lang, untested, { scanned: ranBrowser(result) })}`);
+  const rates = isCore(standard) ? void 0 : packReportRates(result, loadPack(standard));
   if (p.flags.json)
     console.log(
       JSON.stringify(
         {
           path,
           annexPath,
-          conformancePct: result.conformancePct,
+          conformancePct: rates ? rates.conformance.applicable === 0 ? null : rates.conformance.pct : result.conformancePct,
+          ...rates ? { conformance: rates.conformance, automaticPct: rates.automatic.pct, automatic: rates.automatic } : {},
           date: result.date,
-          standard: typeof p.flags.standard === "string" ? p.flags.standard : "wcag",
+          // The resolved key (`--standard RGAA` → "rgaa"), never the raw flag.
+          standard,
           ...html ? { htmlPath: html.index, htmlSinglePath: html.composite } : {},
           ...partial ? { partialAudit: true, untestedCriteria: untested } : {}
         },
@@ -80031,7 +80073,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out2}), then: node scripts/ultra11y.m
     const rel2 = ".ultra11y/capture-setup.mjs";
     const out2 = join54(root, rel2);
     try {
-      mkdirSync20(dirname21(out2), { recursive: true });
+      mkdirSync20(dirname22(out2), { recursive: true });
       writeFileSync23(out2, captureSetup());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out2}: ${e instanceof Error ? e.message : String(e)}`);
@@ -80316,7 +80358,7 @@ function cmdVerify(p) {
     const trial = conformityTrial(p, standard, lang);
     const expected = [...expectedNc, ...buildConformityWorklist(trial.claims, expectedNc.length, Number.POSITIVE_INFINITY)];
     const r = applyVerdicts(items, expected);
-    const ctx = readVerifyContext(dirname21(resolve18(apply)));
+    const ctx = readVerifyContext(dirname22(resolve18(apply)));
     const absentItems = r.failures.filter((f) => !items.includes(f));
     const absentC = absentItems.filter((f) => f.kind === "c").length;
     const sourceDiffers = ctx ? !sameConformitySource(ctx.conformities, trial.source) : absentC > 0 && !items.some((it) => it.kind === "c");
