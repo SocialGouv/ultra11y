@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.56.2](https://github.com/SocialGouv/ultra11y/compare/v5.56.1...v5.56.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **probes:** ignore a framework's dev-tools overlay in the focus walk, so 2.4.7 and 2.4.11 are measured in dev mode ([#128](https://github.com/SocialGouv/ultra11y/issues/128)) ([cc24c81](https://github.com/SocialGouv/ultra11y/commit/cc24c81d8e7cf2da84ef3dbe38a19927174f1dd6))
+
 ## [5.56.1](https://github.com/SocialGouv/ultra11y/compare/v5.56.0...v5.56.1) (2026-11-02)
 
 
