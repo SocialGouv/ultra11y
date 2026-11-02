@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { PhaseInfo } from "./orchestrate.js";
+import type { OrchestrationManifest, PhaseInfo } from "./orchestrate.js";
 import { verdictRulesMd } from "./verdict-rules.js";
 
 // ---------------------------------------------------------------------------
@@ -300,21 +300,15 @@ ${footer}`,
   };
 }
 
-export function runbookMd(
-  phases: PhaseInfo[],
-  runAbs: string,
-  engineAbs: string,
-  unrendered: string[] = [],
-  verify: VerifyCommandContext & { standard?: string } = { report: "<report.md>", flags: `--in ${join(runAbs, "audit-latest.json")}` },
-): string {
+/** The sequential RUNBOOK — ONE RENDERER of the orchestration manifest (#82): every command it
+ *  prints is the manifest's own step command, so the prose and the data cannot drift. */
+export function runbookMd(manifest: OrchestrationManifest, unrendered: string[] = []): string {
+  const { phases, run: runAbs } = manifest;
   const status = phases
     .map((p) => `| ${p.name} | \`${p.worklist}\` | ${p.ready ? `ready (${p.items} item(s))` : "not ready"} | \`${p.prerequisite}\` |`)
     .join("\n");
-  const engine = `node ${engineAbs}`;
-  const vr = phases.find((p) => p.name === "verify-report");
-  const verifyGen = vr?.prerequisite ?? `${engine} verify --report ${verify.report} ${verify.flags} --out ${runAbs}`;
-  const verifyApply = vr?.apply ?? `${engine} verify --apply ${join(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}`;
-  const std = verify.standard ? ` --standard ${verify.standard}` : "";
+  const engine = `node ${manifest.engine}`;
+  const cmd = (id: string): string => manifest.steps.find((st) => st.id === id)?.command ?? "";
   // RENDER FIRST, WHEN NOTHING HAS BEEN RENDERED — at the top, above the phase table, because
   // it is the one step that changes what every phase below costs. Measured on a real cascade:
   // 80 criteria to adjudicate from source alone, 41 once one page was scanned. Three passes and
@@ -351,12 +345,12 @@ ${status}
 
 ## The loop (play every role yourself, one item at a time)
 
-1. **Audit** (if not done): \`${engine} audit "<globs>" --graph --out ${runAbs}\` → \`${join(runAbs, "audit-latest.json")}\`.
-2. **Adjudicate the residual criteria** — \`${engine} verify --manual --in ${join(runAbs, "audit-latest.json")} --out ${runAbs}\` writes \`${join(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold — gated per verdict, so a refusal costs its own criterion and no other: \`${engine} verify --apply ${join(runAbs, "ADJUDICATE.todo.json")} --in ${join(runAbs, "audit-latest.json")} --out ${runAbs}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
-3. **Report**: \`${engine} report --in ${join(runAbs, "audit-latest.json")} --out ${runAbs}\`.
-4. **Verify the report's claims** — \`${verifyGen}\` writes \`${join(runAbs, "VERIFY.todo.json")}\` (and \`${join(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${verifyApply}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that — regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
-5. **Gate**: \`${engine} check --report ${verify.report}${std} --semantic --verdicts ${join(runAbs, "VERIFY.todo.json")}\` must exit 0 before presenting anything.
-6. **Fix & re-audit**: \`${engine} fix <globs> --write --iterate\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
+1. **Audit** (if not done): \`${cmd("audit")}\` → \`${join(runAbs, "audit-latest.json")}\`.
+2. **Adjudicate the residual criteria** — \`${cmd("adjudicate-worklist")}\` writes \`${join(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold — gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
+3. **Report**: \`${cmd("report")}\`.
+4. **Verify the report's claims** — \`${cmd("verify-worklist")}\` writes \`${join(runAbs, "VERIFY.todo.json")}\` (and \`${join(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that — regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
+5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
+6. **Fix & re-audit**: \`${cmd("fix")}\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
 With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` — you stay the sole writer either way.
 `;

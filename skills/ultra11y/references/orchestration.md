@@ -17,6 +17,10 @@ paths and the real item ids baked in:
 node scripts/ultra11y.mjs orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list]
 ```
 
+`orchestrate --run <dir> --manifest --json` prints the same loop as data — each step's
+command/argv, inputs, outputs, exit-code contract and next step — for an orchestrator that is not
+Claude Code (see `references/orchestrators.md`). The RUNBOOK is one renderer of it.
+
 The `verify-report` commands it emits — generation, fold, the refuter's fold line and the
 semantic gate — all carry **one run context**: the run's audit (`--in <RUN>/audit-latest.json`,
 or the `--in` the list was generated with), its `--standard`, and the explicit conformity source

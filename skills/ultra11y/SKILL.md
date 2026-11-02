@@ -349,6 +349,7 @@ node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --
 node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --in audits/audit-latest.json --manual --out audits
 node scripts/ultra11y.mjs verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json --out audits
 node scripts/ultra11y.mjs orchestrate --run audits                           # fan the judgment phases out (--eco for the sequential path)
+node scripts/ultra11y.mjs orchestrate --run audits --manifest --json         # the same loop as data, for any other orchestrator
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --out audits  # → audits/wcag-YYYY-MM-DD.md
 node scripts/ultra11y.mjs prd     --in audits/audit-latest.json              # the same auditor block as a backlog
 node scripts/ultra11y.mjs tickets --in audits/audit-latest.json --dry-run    # file it: GitHub/GitLab/Jira

@@ -73453,13 +73453,11 @@ Return (structured output): \`{ "verdicts": [{ "n", "verdict", "note" }] }\` \u2
 ${footer}`
   };
 }
-function runbookMd(phases, runAbs, engineAbs, unrendered = [], verify = { report: "<report.md>", flags: `--in ${join49(runAbs, "audit-latest.json")}` }) {
+function runbookMd(manifest, unrendered = []) {
+  const { phases, run: runAbs } = manifest;
   const status = phases.map((p) => `| ${p.name} | \`${p.worklist}\` | ${p.ready ? `ready (${p.items} item(s))` : "not ready"} | \`${p.prerequisite}\` |`).join("\n");
-  const engine = `node ${engineAbs}`;
-  const vr = phases.find((p) => p.name === "verify-report");
-  const verifyGen = vr?.prerequisite ?? `${engine} verify --report ${verify.report} ${verify.flags} --out ${runAbs}`;
-  const verifyApply = vr?.apply ?? `${engine} verify --apply ${join49(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}`;
-  const std = verify.standard ? ` --standard ${verify.standard}` : "";
+  const engine = `node ${manifest.engine}`;
+  const cmd = (id) => manifest.steps.find((st) => st.id === id)?.command ?? "";
   const renderFirst = unrendered.length ? `
 > \u26A0\uFE0F **Render before you adjudicate.** ${unrendered.length} criterion(ia) in this run need a rendered page and
 > nothing has been snapshotted: no reading of the source can settle them, and every pass over them
@@ -73490,12 +73488,12 @@ ${status}
 
 ## The loop (play every role yourself, one item at a time)
 
-1. **Audit** (if not done): \`${engine} audit "<globs>" --graph --out ${runAbs}\` \u2192 \`${join49(runAbs, "audit-latest.json")}\`.
-2. **Adjudicate the residual criteria** \u2014 \`${engine} verify --manual --in ${join49(runAbs, "audit-latest.json")} --out ${runAbs}\` writes \`${join49(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join49(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${engine} verify --apply ${join49(runAbs, "ADJUDICATE.todo.json")} --in ${join49(runAbs, "audit-latest.json")} --out ${runAbs}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
-3. **Report**: \`${engine} report --in ${join49(runAbs, "audit-latest.json")} --out ${runAbs}\`.
-4. **Verify the report's claims** \u2014 \`${verifyGen}\` writes \`${join49(runAbs, "VERIFY.todo.json")}\` (and \`${join49(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join49(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${verifyApply}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
-5. **Gate**: \`${engine} check --report ${verify.report}${std} --semantic --verdicts ${join49(runAbs, "VERIFY.todo.json")}\` must exit 0 before presenting anything.
-6. **Fix & re-audit**: \`${engine} fix <globs> --write --iterate\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
+1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join49(runAbs, "audit-latest.json")}\`.
+2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join49(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join49(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
+3. **Report**: \`${cmd("report")}\`.
+4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join49(runAbs, "VERIFY.todo.json")}\` (and \`${join49(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join49(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
+5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
+6. **Fix & re-audit**: \`${cmd("fix")}\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
 With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join49(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` \u2014 you stay the sole writer either way.
 `;
@@ -73521,11 +73519,35 @@ function verifyRunContext(runDir) {
   const run2 = resolve15(runDir);
   const ctx = readVerifyContext(run2);
   const standard = runStandard(run2);
-  const flags2 = [`--in ${ctx?.in ?? join50(run2, "audit-latest.json")}`];
-  if (standard) flags2.push(`--standard ${standard}`);
-  if (ctx?.conformities.source === "file") flags2.push(`--conformities ${ctx.conformities.path}`);
-  if (ctx?.conformities.source === "disabled") flags2.push("--no-conformities");
-  return { report: ctx && ctx.report !== "-" ? ctx.report : "<report.md>", flags: flags2.join(" "), ...standard ? { standard } : {} };
+  const flagArgs = ["--in", ctx?.in ?? join50(run2, "audit-latest.json")];
+  if (standard) flagArgs.push("--standard", standard);
+  if (ctx?.conformities.source === "file") flagArgs.push("--conformities", ctx.conformities.path);
+  if (ctx?.conformities.source === "disabled") flagArgs.push("--no-conformities");
+  return {
+    report: ctx && ctx.report !== "-" ? ctx.report : REPORT_PLACEHOLDER,
+    flags: flagArgs.join(" "),
+    flagArgs,
+    ...standard ? { standard } : {}
+  };
+}
+var GLOBS_PLACEHOLDER = "<globs>";
+var REPORT_PLACEHOLDER = "<report.md>";
+function engineArgs(run2) {
+  const audit2 = join50(run2, "audit-latest.json");
+  const v = verifyRunContext(run2);
+  return {
+    audit: ["audit", GLOBS_PLACEHOLDER, "--graph", "--out", run2],
+    "adjudicate-worklist": ["verify", "--manual", "--in", audit2, "--out", run2],
+    "adjudicate-fold": ["verify", "--apply", join50(run2, "ADJUDICATE.todo.json"), "--in", audit2, "--out", run2],
+    report: ["report", "--in", audit2, "--out", run2],
+    "verify-worklist": ["verify", "--report", v.report, ...v.flagArgs, "--out", run2],
+    "verify-fold": ["verify", "--apply", join50(run2, "VERIFY.todo.json"), "--report", v.report, ...v.flagArgs],
+    gate: ["check", "--report", v.report, ...v.standard ? ["--standard", v.standard] : [], "--semantic", "--verdicts", join50(run2, "VERIFY.todo.json")],
+    fix: ["fix", GLOBS_PLACEHOLDER, "--write", "--iterate"]
+  };
+}
+function renderCommand(engineAbs, args2) {
+  return `node ${engineAbs} ${args2.map((a) => a === GLOBS_PLACEHOLDER ? `"${a}"` : a).join(" ")}`;
 }
 function listPhases(runDir, engineAbs) {
   const run2 = resolve15(runDir);
@@ -73555,7 +73577,7 @@ function listPhases(runDir, engineAbs) {
     } catch {
     }
   }
-  const vctx = verifyRunContext(run2);
+  const args2 = engineArgs(run2);
   return [
     {
       name: "adjudicate",
@@ -73563,8 +73585,8 @@ function listPhases(runDir, engineAbs) {
       worklist: adjPath,
       items: adjIds.length,
       ids: adjIds,
-      prerequisite: `node ${engineAbs} verify --manual --in ${join50(run2, "audit-latest.json")} --out ${run2}`,
-      apply: `node ${engineAbs} verify --apply ${adjPath} --in ${join50(run2, "audit-latest.json")} --out ${run2}`
+      prerequisite: renderCommand(engineAbs, args2["adjudicate-worklist"]),
+      apply: renderCommand(engineAbs, args2["adjudicate-fold"])
     },
     {
       name: "verify-report",
@@ -73572,10 +73594,142 @@ function listPhases(runDir, engineAbs) {
       worklist: verPath,
       items: verIds.length,
       ids: verIds,
-      prerequisite: `node ${engineAbs} verify --report ${vctx.report} ${vctx.flags} --out ${run2}`,
-      apply: `node ${engineAbs} verify --apply ${verPath} --report ${vctx.report} ${vctx.flags}`
+      prerequisite: renderCommand(engineAbs, args2["verify-worklist"]),
+      apply: renderCommand(engineAbs, args2["verify-fold"])
     }
   ];
+}
+var EXIT_USAGE = "usage / bad input (missing or unreadable file, unknown flag value)";
+function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
+  const run2 = resolve15(runDir);
+  const args2 = engineArgs(run2);
+  const phases = listPhases(run2, engineAbs);
+  const v = verifyRunContext(run2);
+  const audit2 = join50(run2, "audit-latest.json");
+  const adjTodo = join50(run2, "ADJUDICATE.todo.json");
+  const verTodo = join50(run2, "VERIFY.todo.json");
+  const placeholder = (f) => f === GLOBS_PLACEHOLDER || f === REPORT_PLACEHOLDER;
+  const ready = (inputs) => inputs.every((f) => placeholder(f) || existsSync37(f));
+  const engine = (id, title, inputs, outputs, exit, next) => ({
+    id,
+    kind: "engine",
+    title,
+    command: renderCommand(engineAbs, args2[id]),
+    argv: ["node", engineAbs, ...args2[id]],
+    inputs,
+    outputs,
+    exit,
+    ready: ready(inputs),
+    next
+  });
+  const judgment = (id, ph, role, title, inputs, next) => ({
+    id,
+    kind: "judgment",
+    title,
+    role,
+    contract: join50(run2, "orchestration", "agents", `${role}.md`),
+    worklist: ph.worklist,
+    items: ph.items,
+    batches: toBatches(ph.ids, batchSize),
+    schema: phaseSpec(ph.name).schema,
+    inputs,
+    outputs: [ph.worklist],
+    ready: ph.ready && ph.items > 0,
+    next
+  });
+  const [adj, ver] = phases;
+  const verAudit = v.flagArgs[v.flagArgs.indexOf("--in") + 1];
+  return {
+    kind: "ultra11y-orchestration-manifest",
+    schemaVersion: 1,
+    run: run2,
+    engine: engineAbs,
+    ...v.standard ? { standard: v.standard } : {},
+    placeholders: [
+      { token: GLOBS_PLACEHOLDER, meaning: "the files to audit \u2014 a glob the shell must not expand, or explicit paths" },
+      { token: REPORT_PLACEHOLDER, meaning: `the Markdown report the \`report\` step writes into ${run2} (<standard>-<date>.md)` }
+    ].filter((p) => p.token === GLOBS_PLACEHOLDER || v.report === REPORT_PLACEHOLDER),
+    phases,
+    steps: [
+      engine(
+        "audit",
+        "Audit \u2014 the deterministic finding set",
+        [GLOBS_PLACEHOLDER],
+        [audit2],
+        { "0": "audit written (no --fail-on, or clean)", "1": "findings at or above --fail-on", "2": EXIT_USAGE },
+        "adjudicate-worklist"
+      ),
+      engine(
+        "adjudicate-worklist",
+        "Adjudication worklist \u2014 the criteria the engine could not decide",
+        [audit2],
+        [adjTodo, join50(run2, "ADJUDICATE.md"), join50(run2, "ADJUDICATE.verdicts.json"), join50(run2, "adjudicate")],
+        { "0": "worklist written (possibly empty: nothing to adjudicate)", "2": EXIT_USAGE },
+        "adjudicate"
+      ),
+      judgment(
+        "adjudicate",
+        adj,
+        "adjudicator",
+        "Adjudicate \u2014 fill every item's verdict (C/NC/NA/manual)",
+        [adjTodo, join50(run2, "adjudicate")],
+        "adjudicate-fold"
+      ),
+      engine(
+        "adjudicate-fold",
+        "Fold \u2014 the fail-closed gate on the adjudication",
+        [adjTodo, audit2],
+        [audit2],
+        {
+          "0": "at least one verdict landed (refusals, if any, named in rejectedCriteria[] / issues[])",
+          "1": "nothing landed, or --strict and a refusal",
+          "2": EXIT_USAGE
+        },
+        "report"
+      ),
+      engine(
+        "report",
+        "Report \u2014 deterministic rendering of the adjudicated audit",
+        [audit2],
+        [REPORT_PLACEHOLDER],
+        { "0": "report written", "2": EXIT_USAGE },
+        "verify-worklist"
+      ),
+      engine(
+        "verify-worklist",
+        "Trial worklist \u2014 the report's non-conformities and the audit's claimed conformities",
+        [v.report, verAudit],
+        [verTodo, join50(run2, "VERIFY.md"), join50(run2, "VERIFY.context.json")],
+        { "0": "worklist written", "2": EXIT_USAGE },
+        "verify"
+      ),
+      judgment("verify", ver, "refuter", "Verify \u2014 rule every claim supported/partial/refuted/unsupported", [verTodo], "verify-fold"),
+      engine(
+        "verify-fold",
+        "Apply the trial \u2014 coverage and grounding gate",
+        [verTodo, v.report, verAudit],
+        [],
+        {
+          "0": "every claim on trial supported or partial, and grounded in source",
+          "1": "a claim refuted, unsupported, unadjudicated, missing or ungrounded",
+          "2": EXIT_USAGE
+        },
+        "gate"
+      ),
+      {
+        ...engine(
+          "gate",
+          "Gate \u2014 structural and semantic check of the report",
+          [v.report, verTodo],
+          [],
+          { "0": "report sound and semantic gate green \u2014 it may be presented", "1": "integrity or semantic failure \u2014 do not present it", "2": EXIT_USAGE },
+          null
+        ),
+        onFailure: "fix"
+      },
+      engine("fix", "Fix & re-audit \u2014 then loop", [GLOBS_PLACEHOLDER], [], { "0": "fixes applied (or nothing to fix)", "2": EXIT_USAGE }, "audit")
+    ]
+  };
 }
 function unrenderedInRun(run2) {
   try {
@@ -73650,7 +73804,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
     }
   }
   const rb = join50(orchDir, "RUNBOOK.md");
-  writeFileSync20(rb, runbookMd(phases, run2, engineAbs, unrenderedInRun(run2), verifyRunContext(run2)));
+  writeFileSync20(rb, runbookMd(buildManifest(run2, engineAbs), unrenderedInRun(run2)));
   written.push(rb);
   return { exitCode: 0, written, notices, errors: [], phases };
 }
@@ -76118,6 +76272,7 @@ Usage:
   ultra11y verify   --apply <VERIFY.todo.json> --report <md> --in <audit.json> --out <dir> --prune   (APPLY the trial: delete refuted non-conformities, send refuted conformities back to \xAB \xE0 \xE9valuer \xBB)
   ultra11y verify   --summary --verdicts <VERIFY.todo.json> --report <md> --in <audit.json> [--pruned <audit.json>] [--out <dir>] [--json]   (read-only bilan of the trial \u2192 TRIAL.md: confirmed, withdrawn/applied, contested engine decisions, coverage, gate)
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
+  ultra11y orchestrate --run <dir> --manifest [--json]   (the loop as data: each step's command/argv, inputs, outputs, exit contract, next step \u2014 for any orchestrator)
   ultra11y fix      <globs\u2026 | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
   ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate manual criteria \u2014 api needs ANTHROPIC_API_KEY; claude/codex reuse their CLI login; cli aliases claude)
@@ -76725,6 +76880,8 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "clean",
   "sample",
   "eco",
+  // `orchestrate --manifest`: print the loop's step graph as JSON (src/orchestrate.ts buildManifest).
+  "manifest",
   "help",
   "version",
   "allow-remote",
@@ -79779,6 +79936,14 @@ function cmdOrchestrate(p) {
       return 2;
     }
     console.log(JSON.stringify({ phases: listPhases(runFlag, engineAbs) }, null, 2));
+    return 0;
+  }
+  if (p.flags.manifest === true) {
+    if (!existsSync40(runFlag)) {
+      console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
+      return 2;
+    }
+    console.log(JSON.stringify(buildManifest(runFlag, engineAbs), null, 2));
     return 0;
   }
   const res = orchestrateRun(runFlag, engineAbs, {
