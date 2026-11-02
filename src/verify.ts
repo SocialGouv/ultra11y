@@ -528,6 +528,9 @@ const citationKey = (cite: CriterionCitation): string => {
 };
 const citationSetKey = (it: VerifyItem): string => (it.kind === "c" ? (it.citations ?? []).map(citationKey).sort().join("||") : "");
 const itemKey = (it: VerifyItem): string => `${it.kind ?? "nc"}|${it.criteriaId}|${it.file}|${it.line}|${it.selector}|${citationSetKey(it)}`;
+/** The coverage identity of a claim — what `applyVerdicts` matches a verdict to its expected
+ *  claim by. Exported for the trial summary (src/trial-summary.ts), which must match the same way. */
+export const claimKey = itemKey;
 
 /** Exact claim identity used only to resume an interrupted/re-generated trial. Unlike the
  * coverage key above, this includes the claim text: a changed assertion must be reviewed

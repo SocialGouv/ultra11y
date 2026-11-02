@@ -131,6 +131,7 @@ import { auditDocumentFor, packAuditDocument, unwrapAudit } from "./standards/do
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
 import { runPackCheck, packScaffold } from "./pack.js";
 import { listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
+import { buildTrialSummary, formatTrialSummary } from "./trial-summary.js";
 import { readStdin, readText } from "./util.js";
 import { runStdioServer } from "./mcp/stdio.js";
 import { startHttpServer } from "./mcp/http.js";
@@ -168,6 +169,7 @@ Usage:
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
   ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (fold the adjudication into the audit)
   ultra11y verify   --apply <VERIFY.todo.json> --report <md> --in <audit.json> --out <dir> --prune   (APPLY the trial: delete refuted non-conformities, send refuted conformities back to « à évaluer »)
+  ultra11y verify   --summary --verdicts <VERIFY.todo.json> --report <md> --in <audit.json> [--pruned <audit.json>] [--out <dir>] [--json]   (read-only bilan of the trial → TRIAL.md: confirmed, withdrawn/applied, contested engine decisions, coverage, gate)
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y fix      <globs… | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
@@ -646,6 +648,8 @@ const VALUE_FLAGS = new Set([
   "theme",
   "apply",
   "verdicts",
+  // `verify --summary`: the audit `verify --apply … --prune` wrote, to show which withdrawals landed.
+  "pruned",
   // `check --require-decided`: the criteria a project declares it cannot decide.
   "allow-undecided",
   "max-verify",
@@ -730,6 +734,8 @@ const BOOLEAN_FLAGS = new Set([
   // `verify --apply … --prune`: apply what the refutation trial decided to the audit, instead
   // of only reporting it (src/refute.ts).
   "prune",
+  // `verify --summary`: the read-only bilan of a counter-review (src/trial-summary.ts).
+  "summary",
   "changed",
   "staged",
   "jsx",
@@ -2931,6 +2937,7 @@ function cmdCheck(p: ParsedArgs): number {
 }
 
 function cmdVerify(p: ParsedArgs): number {
+  if (p.flags.summary === true) return cmdVerifySummary(p);
   // --apply has no --standard/audit in hand — resolved below (post-standard) for the --report path.
   const lang = resolveLang(p.flags, {});
   const apply = p.flags.apply;
@@ -3119,6 +3126,90 @@ function cmdVerify(p: ParsedArgs): number {
   }
 
   return cmdVerifyWorklist(p, lang);
+}
+
+/** `verify --summary` — the read-only bilan of a counter-review (src/trial-summary.ts, #60).
+ *
+ *  Every input is required and named: the verdicts, the report they were drawn from, and the
+ *  audit under `--in`. No ledger, no `VERIFY.todo.json` next to the report, no default — a
+ *  bilan silently associated with the wrong trial is worse than none. `--pruned` is the one
+ *  optional input, and without it no withdrawal is reported as applied. Exit 0 once the bilan is
+ *  written: it is a report, not a gate — `check --semantic` stays the gate, and the bilan says
+ *  what it answered. */
+function cmdVerifySummary(p: ParsedArgs): number {
+  const standard = stdOf(p, "verify");
+  if (standard === null) return 2;
+  const lang = resolveLang(p.flags, { standard });
+  const need = (flag: string): string | null => {
+    const v = p.flags[flag];
+    if (typeof v === "string" && v && v !== "-") return v;
+    console.error(
+      lang === "fr"
+        ? `ultra11y verify : --summary exige --verdicts <VERIFY.json>, --report <md> et --in <audit.json> (--${flag} manquant) — le bilan ne devine aucune de ses sources.`
+        : `ultra11y verify: --summary requires --verdicts <VERIFY.json>, --report <md> and --in <audit.json> (--${flag} missing) — the summary guesses none of its sources.`,
+    );
+    return null;
+  };
+  const verdictsPath = need("verdicts");
+  const reportPath = verdictsPath === null ? null : need("report");
+  const auditPath = reportPath === null ? null : need("in");
+  if (verdictsPath === null || reportPath === null || auditPath === null) return 2;
+  const readJson = (path: string, flag: string): unknown => {
+    try {
+      return JSON.parse(readText(path));
+    } catch {
+      console.error(`ultra11y verify: --${flag} file not found or not valid JSON: ${path}.`);
+      return undefined;
+    }
+  };
+  const verdicts = readJson(verdictsPath, "verdicts");
+  if (!Array.isArray(verdicts)) {
+    if (verdicts !== undefined) console.error("ultra11y verify: --verdicts must be a JSON array of verdicts (a filled VERIFY.todo.json).");
+    return 2;
+  }
+  const rawAudit = readJson(auditPath, "in");
+  if (rawAudit === undefined) return 2;
+  const audit = unwrapAudit(rawAudit) as AuditResult;
+  let pruned: { audit: AuditResult; path: string } | undefined;
+  const prunedFlag = p.flags.pruned;
+  if (typeof prunedFlag === "string" && prunedFlag) {
+    const raw = readJson(prunedFlag, "pruned");
+    if (raw === undefined) return 2;
+    pruned = { audit: unwrapAudit(raw) as AuditResult, path: resolve(prunedFlag) };
+  }
+  const reportMd = readReportInput(reportPath, "verify");
+  if (reportMd === null) return 2;
+  const gate = checkSemantic(reportMd, { reportPath, verdictsPath, standard, lang });
+  const summary = buildTrialSummary({
+    standard,
+    lang,
+    audit,
+    auditPath: resolve(auditPath),
+    verdicts: verdicts as VerifyItem[],
+    verdictsPath: resolve(verdictsPath),
+    reportMd,
+    reportPath: resolve(reportPath),
+    ...(pruned ? { pruned } : {}),
+    gate,
+  });
+  if (p.flags.json) {
+    console.log(JSON.stringify(summary, null, 2));
+    return 0;
+  }
+  const out = typeof p.flags.out === "string" && p.flags.out ? (p.flags.out as string) : ".";
+  mkdirSync(out, { recursive: true });
+  const mdPath = join(out, "TRIAL.md");
+  writeFileSync(mdPath, formatTrialSummary(summary, lang));
+  console.log(
+    summary.validated
+      ? lang === "fr"
+        ? `✓ Bilan de contre-expertise → ${mdPath} — gate sémantique vert.`
+        : `✓ Counter-review summary → ${mdPath} — semantic gate green.`
+      : lang === "fr"
+        ? `Bilan de contre-expertise → ${mdPath} — audit NON validé (gate ${summary.gate.ok ? "vert" : "en échec"}, ${summary.contestedEngine.length} décision(s) moteur contestée(s), ${summary.untried.length} jamais mise(s) à l'épreuve, ${summary.foreign.length} étrangère(s)).`
+        : `Counter-review summary → ${mdPath} — audit NOT validated (gate ${summary.gate.ok ? "green" : "failing"}, ${summary.contestedEngine.length} contested engine decision(s), ${summary.untried.length} never tried, ${summary.foreign.length} foreign).`,
+  );
+  return 0;
 }
 
 /** `verify --apply … --prune`: write back the audit the trial repaired.

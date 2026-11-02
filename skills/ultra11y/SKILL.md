@@ -409,6 +409,9 @@ drive the judgment and content stages:
    conformity's criterion back to « à évaluer » — never to NC, because refuting a conformity
    proves nothing against the criterion; with `--prune` it writes that outcome back to the
    audit, and a conformity the verdicts file never ruled on goes back to « à évaluer » too.
+   `verify --summary --verdicts <file> --report <md> --in <audit> [--pruned <audit>]` writes the
+   read-only bilan (`TRIAL.md`): confirmed, withdrawn and applied, contested engine decisions
+   (unresolved), never tried, foreign, and the semantic gate apart from the application.
    The conformity half is **never capped by default** (`--max-verify` bounds the
    non-conformities only, default 40); pass `--max-verify 0` to put every claim on trial in
    one worklist, and treat any « left out of the trial » warning as an incomplete run.

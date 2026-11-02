@@ -77,6 +77,9 @@ export interface PruneResult {
    *  than silently dropped: a refuted engine finding is a real signal about a RULE, and the
    *  caller should be able to say how many it is sitting on. */
   skippedEngine: number;
+  /** The claims behind `skippedEngine`, so a caller can name each contested engine decision
+   *  rather than only count them (`verify --summary`, src/trial-summary.ts). */
+  skippedEngineClaims: VerifyItem[];
 }
 
 /** Is this record still a clearing claim (C, or an NA folded to C)? An untried conformity on a
@@ -207,7 +210,8 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
 
   // Everything the trial withdrew that this pass did not act on — counted here rather than
   // inside the loops, so the case where there is no record to iterate at all is counted too.
-  const skippedEngine = withdrawn.filter((it) => !acted.has(it.criteriaId)).length;
+  const skippedEngineClaims = withdrawn.filter((it) => !acted.has(it.criteriaId));
+  const skippedEngine = skippedEngineClaims.length;
 
   // The flat list mirrors the criteria, and only them: an anchor the criteria refused to drop
   // stays here too, or `check`'s grounding would resolve a finding no criterion carries.
@@ -216,5 +220,5 @@ export function pruneRefuted(audit: AuditResult, standard: StandardId, items: Ve
   // recomputing is only needed — and only correct — when the core itself changed.
   if (isCore(standard)) recomputeTallies(next);
 
-  return { audit: next, removedFindings, reopenedCriteria, clearedConformities, untriedConformities, skippedEngine };
+  return { audit: next, removedFindings, reopenedCriteria, clearedConformities, untriedConformities, skippedEngine, skippedEngineClaims };
 }
