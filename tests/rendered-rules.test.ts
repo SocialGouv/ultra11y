@@ -369,6 +369,23 @@ describe("a control whose boundary cannot be seen (WCAG 1.4.11 → RGAA 3.3)", (
     expect(ids(btn, { styles: s })).toContain("rendered-nontext-contrast");
   });
 
+  // #118 — a visually hidden control has nothing visible to delimit, and an icon-only button is
+  // identified by its glyph (painted in currentColor), which needs 3:1 — not a boundary.
+  it("says nothing about a visually hidden input (fr-sr-only)", () => {
+    const dom = PAGE('<form><label for="f">Fichier</label><input id="f" type="file" class="fr-sr-only"></form>');
+    expect(ids(dom, { styles: styles([...base, ["input", INVISIBLE]]) })).not.toContain("rendered-nontext-contrast");
+  });
+  it("says nothing about an icon-only button whose glyph contrasts 3:1 with its surroundings", () => {
+    const btn = PAGE('<footer><button type="button" aria-label="Fermer" class="fr-btn fr-icon-close-line"></button></footer>');
+    const s = styles([...HEAD, ["footer", {}], ["button", { ...INVISIBLE, color: "rgb(0, 0, 145)" }]]);
+    expect(ids(btn, { styles: s })).not.toContain("rendered-nontext-contrast");
+  });
+  it("still reports an icon-only button whose glyph is too faint", () => {
+    const btn = PAGE('<footer><button type="button" aria-label="Fermer" class="fr-btn fr-icon-close-line"></button></footer>');
+    const s = styles([...HEAD, ["footer", {}], ["button", { ...INVISIBLE, color: "rgb(230, 230, 230)" }]]);
+    expect(ids(btn, { styles: s })).toContain("rendered-nontext-contrast");
+  });
+
   it("ignores a hidden input — it has no boundary to perceive", () => {
     const hidden = PAGE('<form><input type="hidden" name="csrf"></form>');
     const s = styles([...HEAD, ["form", {}], ["input", INVISIBLE]]);

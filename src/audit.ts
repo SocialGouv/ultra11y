@@ -28,7 +28,7 @@ import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir,
 import { isFullDocument } from "./rules/rule.js";
 import { renderedRulesFor, renderedRulesRan, renderedTestedScs } from "./rules/rendered.js";
 import { renderedProvesOn } from "./coverage.js";
-import { AXE_DECIDES, PROBE_SEVERITY, PROBE_WCAG, isAxeAdvisory, scForAxe, severityFromImpact } from "./axe-map.js";
+import { AXE_DECIDES, PROBE_SEVERITY, PROBE_WCAG, axeNodeTreatment, scForAxe } from "./axe-map.js";
 import { subjectsAbsent, subjectsForSc, subjectsPresentIn } from "./adjudicate-subjects.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
@@ -917,10 +917,9 @@ function axeFindings(violations: NonNullable<NonNullable<RenderSignals["axe"]>["
   for (const v of violations) {
     if (!v?.id) continue;
     const criteriaId = scForAxe(v.id, v.tags);
-    const severity = severityFromImpact(v.impact);
-    const advisory = isAxeAdvisory(v.id, v.tags);
     const nodes = v.nodes?.length ? v.nodes : [{ target: [] as string[], html: "" }];
     for (const n of nodes) {
+      const { severity, advisory } = axeNodeTreatment(v.id, v.tags, v.impact, n.html);
       out.push({
         ruleId: `axe:${v.id}`,
         criteriaId,

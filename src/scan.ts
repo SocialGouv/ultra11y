@@ -14,7 +14,7 @@ import type { AuditResult, DynamicEngine, DynamicFinding, DynamicResult, Finding
 import { isAdjudicated } from "./types.js";
 import { lineStartsOf, lineColAt } from "./parse/html.js";
 import { allGuidelines } from "./wcag.js";
-import { PROBE_SEVERITY, PROBE_WCAG, scForAxe, severityFromImpact, isAxeAdvisory } from "./axe-map.js";
+import { PROBE_SEVERITY, PROBE_WCAG, axeNodeTreatment, scForAxe } from "./axe-map.js";
 import { parseSitemapUrls, crawlUrls, crawlBound, nameFromUrl } from "./crawl.js";
 import { sampleScope } from "./sample.js";
 import {
@@ -462,11 +462,11 @@ export function toDynamicResult(out: RunnerOutput, target: string, lang: Lang = 
   const findings: DynamicFinding[] = [];
   for (const v of out.violations) {
     const criteriaId = scForAxe(v.id, v.tags);
-    const severity: Severity = severityFromImpact(v.impact);
-    // A best-practice-only axe violation (no `wcag<digits>` tag) evidences no testable SC
-    // → fold as an advisory recommendation, never a criterion NC (e.g. empty-table-header).
-    const advisory = isAxeAdvisory(v.id, v.tags);
     for (const n of v.nodes.length ? v.nodes : [{ target: [], html: "" }]) {
+      // A best-practice-only axe violation (no `wcag<digits>` tag) evidences no testable SC
+      // → fold as an advisory recommendation, never a criterion NC (e.g. empty-table-header).
+      // Decided per NODE: some rules need the element to tell a weak name from no name (#117).
+      const { severity, advisory } = axeNodeTreatment(v.id, v.tags, v.impact, n.html);
       findings.push({
         criteriaId,
         axeRule: v.id,
