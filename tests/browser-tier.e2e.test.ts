@@ -1011,3 +1011,49 @@ describe("an authenticated scan downloads the documents behind the same login", 
     expect(stderr).toMatch(/not a PDF/);
   }, 360_000);
 });
+
+// #127 — Next.js's dev overlay puts a focusable <button id="next-logo"> inside the shadow root of
+// <nextjs-portal>. Tab reached it on every egapro page captured under `next dev`, the walk counted
+// it as an untagged stop and refused 2.4.7 / 2.4.11 everywhere. Dev tooling is not the product.
+describe("the focus walk ignores a framework's dev-tools overlay", () => {
+  const PAGE = (extra: string) => `<!doctype html><html lang="fr"><head><title>t</title></head><body><main><h1>T</h1>
+    <a href="/a">Lien A</a><button type="button">Action</button>${extra}</main>
+    <script>
+      const host = document.createElement('nextjs-portal');
+      document.body.appendChild(host);
+      host.attachShadow({ mode: 'open' }).innerHTML = '<button id="next-logo" aria-label="Open Next.js Dev Tools">N</button>';
+    </script></body></html>`;
+
+  it("clears the ring when the only untagged stop is the dev-tools button", async () => {
+    if (!browserAvailable) return;
+    const { probeFocusRing } = await import("../src/probes.js");
+    const page = await browser!.newPage();
+    try {
+      await page.setContent(PAGE(""), { waitUntil: "load" });
+      const r = await probeFocusRing(page);
+      expect(r.why, r.why).toBeUndefined();
+      expect(r.complete).toBe(true);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it("still refuses the ring when a PRODUCT control was never tagged", async () => {
+    if (!browserAvailable) return;
+    const { probeFocusRing } = await import("../src/probes.js");
+    const page = await browser!.newPage();
+    try {
+      // a custom element of the product, focusable inside its own shadow root
+      await page.setContent(
+        PAGE(
+          `<acme-widget></acme-widget><script>document.querySelector('acme-widget').attachShadow({ mode: 'open' }).innerHTML = '<button>Widget</button>';</script>`,
+        ),
+        { waitUntil: "load" },
+      );
+      const r = await probeFocusRing(page);
+      expect(r.complete).toBe(false);
+    } finally {
+      await page.close();
+    }
+  });
+});
