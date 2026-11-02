@@ -292,7 +292,11 @@ if (!existsSync(ocPath)) bad(`missing ${OC_REL} — OpenCode would have no plugi
 else {
   const src = readFileSync(ocPath, "utf8");
   src.includes("ULTRA11Y_OPENCODE_PLUGIN") ? ok("plugin carries the ownership marker") : bad(`${OC_REL} has no ULTRA11Y_OPENCODE_PLUGIN marker — the installer would refuse to manage it`);
-  src.includes('"tool.execute.before"') ? ok("plugin declares tool.execute.before") : bad(`${OC_REL} declares no "tool.execute.before" — nothing would gate a commit`);
+  src.includes('"tool.execute.before"') ? ok("plugin declares tool.execute.before (OpenCode 1)") : bad(`${OC_REL} declares no "tool.execute.before" — nothing would gate a commit on OpenCode 1`);
+  src.includes('ctx.tool.hook("execute.before"') ? ok("plugin registers execute.before (OpenCode 2)") : bad(`${OC_REL} never calls ctx.tool.hook("execute.before") — nothing would gate a commit on OpenCode 2`);
+  /^export default \{ id: PLUGIN_ID, setup, server: Ultra11yPlugin \};$/m.test(src)
+    ? ok("plugin default-exports { id, setup, server } — read by both majors")
+    : bad(`${OC_REL} must default-export { id: PLUGIN_ID, setup, server: Ultra11yPlugin }: OpenCode 2 reads setup(), OpenCode 1 ≥ 1.18.28 reads server()`);
 
   const foreign = [...src.matchAll(/^import .*? from ["']([^"']+)["']/gm)].map((m) => m[1]).filter((s) => !s.startsWith("node:"));
   foreign.length === 0 ? ok("plugin imports only node: builtins") : bad(`${OC_REL} imports ${foreign.join(", ")} — it must stay zero-dependency, it is loaded from outside any node_modules`);
@@ -307,6 +311,12 @@ else {
   // is not in files[] publishes a package whose pin route is broken.
   pkg.main === OC_REL ? ok(`package.json main points at ${OC_REL}`) : bad(`package.json "main" is "${pkg.main ?? "unset"}" — it must be "${OC_REL}" or the opencode.json npm pin cannot resolve the plugin`);
   existsSync(join(root, pkg.main ?? "")) ? ok("package.json main resolves on disk") : bad(`package.json "main" points at a file that does not exist`);
+  // OpenCode 2 resolves a `"plugins": ["ultra11y@latest"]` pin through `exports` (`.` or
+  // `./server`); OpenCode 1 reads `./server`, then `main`. All of them must be the plugin.
+  for (const sub of [".", "./server"]) {
+    const target = pkg.exports?.[sub];
+    target === `./${OC_REL}` ? ok(`package.json exports["${sub}"] is the plugin`) : bad(`package.json exports["${sub}"] is ${JSON.stringify(target)} — it must be "./${OC_REL}" for an OpenCode npm pin to load the plugin`);
+  }
   (pkg.files ?? []).includes(pkg.main?.split("/")[0]) ? ok("package.json files[] carries main's directory") : bad(`package.json "files" is missing "${pkg.main?.split("/")[0]}" — main would not be published`);
 
   // Two prefilters that disagree mean one harness silently reviews less than the other.

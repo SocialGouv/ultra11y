@@ -72291,61 +72291,129 @@ function codexHooksEnabled(codexDir) {
 }
 
 // src/install/opencode.ts
+import { spawnSync as spawnSync2 } from "child_process";
 import { existsSync as existsSync36, readFileSync as readFileSync30, rmSync as rmSync8 } from "fs";
 import { join as join46 } from "path";
 var OPENCODE_MARKER = "ULTRA11Y_OPENCODE_PLUGIN";
-function pluginTarget(configDir) {
-  return join46(configDir, "plugin", "ultra11y.js");
+var PLUGIN_DIRS = ["plugin", "plugins"];
+function dirFor(major) {
+  return major === 2 ? "plugins" : "plugin";
 }
-function installOpencode({ configDir, pluginSource, skillsSource, enginePath }) {
-  const target = pluginTarget(configDir);
-  if (existsSync36(target) && !readFileSync30(target, "utf8").includes(OPENCODE_MARKER)) {
+function opencodePinKey(major) {
+  return major === 2 ? "plugins" : "plugin";
+}
+var pluginFile = (configDir, dir) => join46(configDir, dir, "ultra11y.js");
+var ours = (path) => existsSync36(path) && readFileSync30(path, "utf8").includes(OPENCODE_MARKER);
+function parseOpencodeVersion(text) {
+  const m = /\bv?(\d+)\.\d+\.\d+/.exec(text);
+  if (!m) return null;
+  const major = Number(m[1]);
+  if (major === 1) return 1;
+  return major >= 2 ? 2 : null;
+}
+var runOpencodeVersion = () => {
+  const r = spawnSync2("opencode", ["--version"], {
+    encoding: "utf8",
+    timeout: 1e4,
+    stdio: ["ignore", "pipe", "pipe"],
+    // npm's global shim on Windows is opencode.cmd, which only a shell resolves.
+    shell: process.platform === "win32"
+  });
+  return { status: r.status, stdout: r.stdout ?? "", error: r.error };
+};
+function detectOpencodeMajor(run2 = runOpencodeVersion) {
+  try {
+    const r = run2();
+    if (r.error || r.status !== 0) return null;
+    return parseOpencodeVersion(r.stdout);
+  } catch {
+    return null;
+  }
+}
+function parseOpencodeMajorFlag(value) {
+  if (value === void 0) return {};
+  const v = typeof value === "string" ? value.trim().replace(/^v/i, "") : "";
+  if (v === "1" || v === "2") return { major: Number(v) };
+  return { error: `--opencode-version takes 1 or 2 (got ${typeof value === "string" ? JSON.stringify(value) : "no value"}).` };
+}
+function isUltra11yPin(entry2) {
+  const spec = typeof entry2 === "string" ? entry2 : Array.isArray(entry2) ? entry2[0] : entry2?.package;
+  return typeof spec === "string" && /^ultra11y(@|$)/.test(spec);
+}
+function pinnedKeys(configDir) {
+  try {
+    const cfg = JSON.parse(readFileSync30(join46(configDir, "opencode.json"), "utf8"));
+    return ["plugin", "plugins"].filter((k) => Array.isArray(cfg?.[k]) && cfg[k].some(isUltra11yPin));
+  } catch {
+    return [];
+  }
+}
+function installOpencode({ configDir, pluginSource, skillsSource, enginePath, major = null }) {
+  const dir = dirFor(major);
+  const target = pluginFile(configDir, dir);
+  if (existsSync36(target) && !ours(target)) {
     throw new Error(`refusing to overwrite ${target}: it is not a file ultra11y wrote. Remove it manually if you want the plugin here.`);
   }
   const reports = [writeTextWithBackup(target, readFileSync30(pluginSource, "utf8"))];
+  const guidance = [];
   if (enginePath && existsSync36(enginePath)) {
-    reports.push(writeTextWithBackup(join46(configDir, "plugin", "ultra11y.mjs"), readFileSync30(enginePath, "utf8")));
+    reports.push(writeTextWithBackup(join46(configDir, dir, "ultra11y.mjs"), readFileSync30(enginePath, "utf8")));
   }
   if (skillsSource) reports.push(...copySkillsInto(skillsSource, join46(configDir, "skills")));
-  return {
-    reports,
-    guidance: [
-      "opencode: restart the session \u2014 plugins load at startup.",
-      'opencode: the alternative is an npm pin \u2014 add "plugin": ["ultra11y@latest"] to ~/.config/opencode/opencode.json and drop this file.',
-      "opencode: the gate surfaces as a blocked tool call whose error message carries the findings (OpenCode has no permission-decision channel)."
-    ]
-  };
+  for (const other of PLUGIN_DIRS) {
+    if (other === dir) continue;
+    const stale = pluginFile(configDir, other);
+    if (!ours(stale)) continue;
+    rmSync8(stale, { force: true });
+    rmSync8(join46(configDir, other, "ultra11y.mjs"), { force: true });
+    guidance.push(`opencode: moved the plugin from ${other}/ to ${dir}/ \u2014 it is loaded from one place only.`);
+  }
+  const key2 = opencodePinKey(major);
+  guidance.push(
+    major === null ? "opencode: no `opencode` on PATH to ask its version \u2014 wired plugin/, which OpenCode 1 and 2 both read (pass --opencode-version 1|2 to choose)." : `opencode: wired for OpenCode ${major}.`,
+    "opencode: restart the session \u2014 plugins load at startup.",
+    `opencode: the alternative is an npm pin \u2014 add "${key2}": ["ultra11y@latest"] to ${join46(configDir, "opencode.json")} and drop this file.`,
+    "opencode: the gate surfaces as a blocked tool call whose error message carries the findings (OpenCode has no permission-decision channel)."
+  );
+  const pins = pinnedKeys(configDir);
+  if (pins.length > 0) {
+    guidance.push(`opencode: opencode.json also pins ultra11y under "${pins.join('", "')}" \u2014 remove the pin or this file, or the gate runs twice.`);
+  }
+  return { reports, guidance };
 }
 function uninstallOpencode({ configDir }) {
   const reports = [];
-  const target = pluginTarget(configDir);
-  if (existsSync36(target) && readFileSync30(target, "utf8").includes(OPENCODE_MARKER)) {
+  for (const dir of PLUGIN_DIRS) {
+    const target = pluginFile(configDir, dir);
+    if (!ours(target)) continue;
     rmSync8(target, { force: true });
-    rmSync8(join46(configDir, "plugin", "ultra11y.mjs"), { force: true });
+    rmSync8(join46(configDir, dir, "ultra11y.mjs"), { force: true });
     reports.push({ path: target, changed: true });
   }
   const configPath = join46(configDir, "opencode.json");
   if (existsSync36(configPath)) {
     reports.push(
       editJsonFile(configPath, (root) => {
-        if (!Array.isArray(root.plugin)) return;
-        const kept = root.plugin.filter((p) => !/^ultra11y(@|$)/.test(String(p)));
-        if (kept.length > 0) root.plugin = kept;
-        else delete root.plugin;
+        for (const key2 of ["plugin", "plugins"]) {
+          if (!Array.isArray(root[key2])) continue;
+          const kept = root[key2].filter((p) => !isUltra11yPin(p));
+          if (kept.length > 0) root[key2] = kept;
+          else delete root[key2];
+        }
       })
     );
   }
   return { reports, guidance: [] };
 }
+function opencodePluginPath(configDir) {
+  for (const dir of PLUGIN_DIRS) if (ours(pluginFile(configDir, dir))) return pluginFile(configDir, dir);
+  return null;
+}
+function opencodePluginTarget(configDir, major) {
+  return pluginFile(configDir, dirFor(major));
+}
 function opencodeWired(configDir) {
-  const target = pluginTarget(configDir);
-  if (existsSync36(target) && readFileSync30(target, "utf8").includes(OPENCODE_MARKER)) return true;
-  try {
-    const cfg = JSON.parse(readFileSync30(join46(configDir, "opencode.json"), "utf8"));
-    return Array.isArray(cfg.plugin) && cfg.plugin.some((p) => /^ultra11y(@|$)/.test(String(p)));
-  } catch {
-    return false;
-  }
+  return opencodePluginPath(configDir) !== null || pinnedKeys(configDir).length > 0;
 }
 
 // src/install/index.ts
@@ -72399,17 +72467,19 @@ function installForTargets(opts) {
             break;
           }
           const configDir = opts.project === true ? join47(cwd, ".opencode") : opencodeConfigDir();
+          const major = opts.opencodeVersion ?? detectOpencodeMajor();
           if (!opts.dryRun) {
             const engine = existsSync37(pinnedEnginePath()) ? pinnedEnginePath() : join47(packageRoot() ?? "", "scripts", "ultra11y.mjs");
             const out3 = installOpencode({
               configDir,
               pluginSource: source,
               skillsSource: opts.skills === false ? null : bundledSkillsDir(),
-              enginePath: existsSync37(engine) ? engine : null
+              enginePath: existsSync37(engine) ? engine : null,
+              major
             });
             r.reports.push(...out3.reports);
             r.guidance.push(...out3.guidance);
-          } else r.reports.push({ path: join47(configDir, "plugin", "ultra11y.js"), changed: false });
+          } else r.reports.push({ path: opencodePluginTarget(configDir, major), changed: false });
           break;
         }
         case "agents-md": {
@@ -72479,7 +72549,7 @@ function statusReport(opts = {}) {
       // A wired hook behind a disabled feature flag never fires and looks fine. Say so.
       note: codexOn && !codexHooksEnabled(codexDir) ? "WIRED BUT INERT: `[features] hooks = true` is not set in config.toml" : void 0
     },
-    { target: "opencode", wired: opencodeWired(ocDir), path: join47(ocDir, "plugin", "ultra11y.js") },
+    { target: "opencode", wired: opencodeWired(ocDir), path: opencodePluginPath(ocDir) ?? opencodePluginTarget(ocDir, null) },
     { target: "agents-md", wired: agentsMdWired(root), path: agentsMdPath(root) }
   ];
 }
@@ -78484,7 +78554,7 @@ Usage:
   ultra11y import   --from file <report.json> | --from ara <id> [--source <adapter>] [--out <dir>] [--json]
   ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
-  ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills]
+  ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
   ultra11y status   [--json] [--project] [--browser [--cwd <dir>]]   (doctor: which agents run the review; --browser asks whether the scan tier resolves here)
   ultra11y dev      [--port <n>] [--root <dir>] [--standard <pack>] [--lang auto|en|fr]   (dev side-car: live overlay + per-page dashboard)
@@ -78930,6 +79000,9 @@ function isCommand(s) {
   return !!s && COMMANDS.includes(s);
 }
 var VALUE_FLAGS2 = /* @__PURE__ */ new Set([
+  // `install --opencode --opencode-version 1|2`: the OpenCode major to wire for, instead of
+  // asking the `opencode` on PATH.
+  "opencode-version",
   // `judge --refute <VERIFY.todo.json>`: put already-written claims on trial, through the same
   // transport the adjudication pass uses.
   "refute",
@@ -79944,7 +80017,18 @@ function cmdInstall(p) {
     console.log(agentsMdBlock(repoRoot() ?? process.cwd()));
     if (targets.length === 1) return 0;
   }
-  const results = installForTargets({ targets, project: p.flags.project === true, dryRun, skills: p.flags["no-skills"] !== true });
+  const oc = parseOpencodeMajorFlag(p.flags["opencode-version"]);
+  if (oc.error) {
+    console.error(`ultra11y install: ${oc.error}`);
+    return 2;
+  }
+  const results = installForTargets({
+    targets,
+    project: p.flags.project === true,
+    dryRun,
+    skills: p.flags["no-skills"] !== true,
+    opencodeVersion: oc.major
+  });
   return reportInstall(results, dryRun ? "would wire" : "wired");
 }
 function cmdUninstall(p) {
@@ -81941,13 +82025,13 @@ function diffAgainstExternal(p, result, scope, standard, lang, file) {
     console.error(`ultra11y pages --diff: the imported audit is keyed by "${ext2.standard}" but --standard is "${standard}".`);
     return 2;
   }
-  const ours = /* @__PURE__ */ new Map();
+  const ours2 = /* @__PURE__ */ new Map();
   for (const page of derivePages(result, scope)) {
     const m = /* @__PURE__ */ new Map();
     for (const c2 of pageCriterionRows(result, page, standard, lang)) m.set(c2.id, c2.status);
-    ours.set(page.id, m);
+    ours2.set(page.id, m);
   }
-  const d = diffSides({ byPage: ours }, sideOfExternal(ext2));
+  const d = diffSides({ byPage: ours2 }, sideOfExternal(ext2));
   if (p.flags.json) {
     console.log(JSON.stringify({ standard, external: ext2.source, ...d }, null, 2));
     return 0;

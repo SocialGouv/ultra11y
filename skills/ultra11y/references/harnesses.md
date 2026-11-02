@@ -75,20 +75,36 @@ That command uses `codex exec` with an ephemeral, read-only, offline session and
 config, repository rules and hooks. No API key is required; Codex reuses its ChatGPT login.
 For Claude CLI use `--runner claude` (`--runner cli` is the legacy alias).
 
-## OpenCode
+## OpenCode (1.x and 2.x)
 
 ```
-ultra11y install --opencode
+ultra11y install --opencode                      # the major is asked of `opencode --version`
+ultra11y install --opencode --opencode-version 2 # …or stated
 ```
 
-…or pin it in `~/.config/opencode/opencode.json`: `"plugin": ["ultra11y@latest"]`.
+OpenCode 2 replaced the plugin API, and V1 plugins do not run on it. ultra11y ships **one
+plugin file that both majors load**: OpenCode 2 reads its default export's `{ id, setup }`,
+OpenCode 1 (≥ 1.18.28) calls the `server()` on that same object, and older V1 releases call
+the named `Ultra11yPlugin`. The gate runs once per shell call on every one of them.
+
+| | OpenCode 1 | OpenCode 2 |
+|---|---|---|
+| `install --opencode` writes | `~/.config/opencode/plugin/ultra11y.js` | `~/.config/opencode/plugins/ultra11y.js` |
+| …or pin it in `opencode.json` | `"plugin": ["ultra11y@latest"]` | `"plugins": ["ultra11y@latest"]` |
+| the gate hooks | `tool.execute.before` on `bash` | `ctx.tool.hook("execute.before")` on `shell` |
+| the two skills are registered by | `config.skills.paths` | `ctx.skill.transform` |
+
+When no `opencode` is on PATH, the installer writes `plugin/`, which both majors read; an
+earlier copy of ours in the other directory is removed so the gate never loads twice. A pin
+in `opencode.json` and the file together would load it twice — the installer says so.
 
 The delta: OpenCode has **no permission-decision channel**. Its plugin blocks a tool call by
-throwing, so the review arrives as a **failed bash call whose error message carries the
+throwing, so the review arrives as a **failed shell call whose error message carries the
 findings**. Same content, different envelope — read the error, do not retry blindly.
 
-Skills live under `~/.config/opencode/skills/`; the plugin also registers the bundled
-`skills/` directory via `config.skills.paths`.
+The engine runs on the `node` from PATH (OpenCode itself is a Bun binary); with no Node
+there the gate is silent rather than broken. Skills also live under
+`~/.config/opencode/skills/` once `install --opencode` has copied them there.
 
 ## Everything else (Cursor, Amp, Zed, Gemini CLI, Windsurf, aider…)
 
@@ -129,7 +145,7 @@ tool is the blessed path**, not a workaround. Discover what exists by listing
 |---|---|---|---|---|---|
 | Claude Code | plugin / `skills add` | yes | `permissionDecision: "deny"` | yes | yes |
 | Codex CLI | plugin / `skills add` | yes | `permissionDecision: "deny"` | yes | yes |
-| OpenCode | plugin / `skills add` | yes | thrown tool error | yes | yes |
+| OpenCode 1.x · 2.x | plugin / `skills add` | yes | thrown tool error | yes | yes |
 | Cursor, Amp, Zed, Gemini… | AGENTS.md | **no** | — | yes | yes |
 
 `ultra11y status` reports which of these are actually wired on this machine — including the

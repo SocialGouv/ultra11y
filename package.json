@@ -10,6 +10,7 @@
   },
   "exports": {
     ".": "./.opencode/plugins/ultra11y.js",
+    "./server": "./.opencode/plugins/ultra11y.js",
     "./playwright": {
       "types": "./dist/playwright.d.ts",
       "import": "./dist/playwright.mjs",
@@ -50,6 +51,7 @@
     "test:coverage": "vitest run --coverage",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:opencode": "vitest run --config vitest.opencode.config.ts",
     "bench": "node scripts/bench.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome ci .",

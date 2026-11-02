@@ -7,7 +7,15 @@
 import { claudeCodeWired, installClaudeCode, uninstallClaudeCode } from "./claude-code.js";
 import { agentsMdPath, agentsMdWired, installAgentsMd, uninstallAgentsMd } from "./agents-md.js";
 import { codexHooksEnabled, codexWired, installCodex, uninstallCodex } from "./codex.js";
-import { installOpencode, opencodeWired, uninstallOpencode } from "./opencode.js";
+import {
+  detectOpencodeMajor,
+  installOpencode,
+  type OpencodeMajor,
+  opencodePluginPath,
+  opencodePluginTarget,
+  opencodeWired,
+  uninstallOpencode,
+} from "./opencode.js";
 import {
   bundledOpencodePlugin,
   bundledSkillsDir,
@@ -51,6 +59,8 @@ export interface InstallOptions {
   dryRun?: boolean;
   /** Copy the bundled skills into the harness's skills directory too (default: yes). */
   skills?: boolean;
+  /** `--opencode-version 1|2`. Unset: ask the `opencode` on PATH. */
+  opencodeVersion?: OpencodeMajor;
 }
 
 /** Parse `--claude-code --codex --opencode --agents-md --all` into a target list.
@@ -108,6 +118,7 @@ export function installForTargets(opts: InstallOptions): TargetResult[] {
             break;
           }
           const configDir = opts.project === true ? join(cwd, ".opencode") : opencodeConfigDir();
+          const major = opts.opencodeVersion ?? detectOpencodeMajor();
           if (!opts.dryRun) {
             const engine = existsSync(pinnedEnginePath()) ? pinnedEnginePath() : join(packageRoot() ?? "", "scripts", "ultra11y.mjs");
             const out = installOpencode({
@@ -115,10 +126,11 @@ export function installForTargets(opts: InstallOptions): TargetResult[] {
               pluginSource: source,
               skillsSource: opts.skills === false ? null : bundledSkillsDir(),
               enginePath: existsSync(engine) ? engine : null,
+              major,
             });
             r.reports.push(...out.reports);
             r.guidance.push(...out.guidance);
-          } else r.reports.push({ path: join(configDir, "plugin", "ultra11y.js"), changed: false });
+          } else r.reports.push({ path: opencodePluginTarget(configDir, major), changed: false });
           break;
         }
         case "agents-md": {
@@ -198,7 +210,7 @@ export function statusReport(opts: { project?: boolean; cwd?: string } = {}): St
       // A wired hook behind a disabled feature flag never fires and looks fine. Say so.
       note: codexOn && !codexHooksEnabled(codexDir) ? "WIRED BUT INERT: `[features] hooks = true` is not set in config.toml" : undefined,
     },
-    { target: "opencode", wired: opencodeWired(ocDir), path: join(ocDir, "plugin", "ultra11y.js") },
+    { target: "opencode", wired: opencodeWired(ocDir), path: opencodePluginPath(ocDir) ?? opencodePluginTarget(ocDir, null) },
     { target: "agents-md", wired: agentsMdWired(root), path: agentsMdPath(root) },
   ];
 }

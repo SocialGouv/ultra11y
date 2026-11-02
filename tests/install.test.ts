@@ -5,9 +5,11 @@
 // content survives, a malformed file is refused rather than clobbered, and uninstall puts
 // things back.
 //
-// Every installer takes explicit paths, so none of this spawns a process or touches $HOME.
+// Every installer takes explicit paths, so none of this touches $HOME; the one CLI block at
+// the end spawns the engine under a temporary HOME/XDG_CONFIG_HOME.
 import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { editJsonFile, SettingsParseError, writeTextWithBackup } from "../src/install/json-edit.js";
@@ -16,7 +18,14 @@ import { agentsMdBlock, agentsMdPath, agentsMdWired, installAgentsMd, uninstallA
 import { ALL_TARGETS, parseTargets } from "../src/install/index.js";
 import { BLOCK_BEGIN, BLOCK_END } from "../src/install/text-edit.js";
 import { CODEX_MARKER, codexHooksEnabled, codexWired, enableHooksFeature, installCodex, uninstallCodex } from "../src/install/codex.js";
-import { installOpencode, opencodeWired, uninstallOpencode } from "../src/install/opencode.js";
+import {
+  detectOpencodeMajor,
+  installOpencode,
+  opencodeWired,
+  parseOpencodeMajorFlag,
+  parseOpencodeVersion,
+  uninstallOpencode,
+} from "../src/install/opencode.js";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -389,6 +398,177 @@ describe("installOpencode", () => {
     expect(opencodeWired(d)).toBe(true);
     uninstallOpencode({ configDir: d });
     expect(JSON.parse(readFileSync(join(d, "opencode.json"), "utf8")).plugin).toEqual(["other@1"]);
+  });
+
+  describe("per OpenCode major", () => {
+    it("OpenCode 1: plugin/ — the directory every V1 release scans", () => {
+      const d = tmp();
+      installOpencode({ configDir: d, pluginSource, major: 1 });
+      expect(existsSync(join(d, "plugin", "ultra11y.js"))).toBe(true);
+      expect(existsSync(join(d, "plugins", "ultra11y.js"))).toBe(false);
+    });
+
+    it("OpenCode 2: plugins/ — the directory V2 documents", () => {
+      const d = tmp();
+      const out = installOpencode({ configDir: d, pluginSource, major: 2 });
+      expect(existsSync(join(d, "plugins", "ultra11y.js"))).toBe(true);
+      expect(existsSync(join(d, "plugin", "ultra11y.js"))).toBe(false);
+      expect(opencodeWired(d)).toBe(true);
+      // The npm-pin alternative it points at uses V2's key, not V1's.
+      expect(out.guidance.join("\n")).toContain('"plugins": ["ultra11y@latest"]');
+      expect(out.guidance.join("\n")).not.toContain('"plugin": [');
+    });
+
+    it("an unknown major falls back to plugin/, which both majors read", () => {
+      const d = tmp();
+      installOpencode({ configDir: d, pluginSource, major: null });
+      expect(existsSync(join(d, "plugin", "ultra11y.js"))).toBe(true);
+    });
+
+    it("moving from V1 to V2 removes OUR copy in plugin/, so the gate never loads twice", () => {
+      const d = tmp();
+      const engine = join(d, "engine.mjs");
+      writeFileSync(engine, "// engine\n");
+      installOpencode({ configDir: d, pluginSource, major: 1, enginePath: engine });
+      expect(existsSync(join(d, "plugin", "ultra11y.mjs"))).toBe(true);
+      const out = installOpencode({ configDir: d, pluginSource, major: 2, enginePath: engine });
+      expect(existsSync(join(d, "plugin", "ultra11y.js"))).toBe(false);
+      expect(existsSync(join(d, "plugin", "ultra11y.mjs"))).toBe(false);
+      expect(existsSync(join(d, "plugins", "ultra11y.js"))).toBe(true);
+      expect(existsSync(join(d, "plugins", "ultra11y.mjs"))).toBe(true);
+      expect(out.guidance.join("\n")).toMatch(/moved/);
+    });
+
+    it("never removes a foreign ultra11y.js from the other directory", () => {
+      const d = tmp();
+      mkdirSync(join(d, "plugin"), { recursive: true });
+      writeFileSync(join(d, "plugin", "ultra11y.js"), "// mine\n");
+      installOpencode({ configDir: d, pluginSource, major: 2 });
+      expect(readFileSync(join(d, "plugin", "ultra11y.js"), "utf8")).toBe("// mine\n");
+    });
+
+    it("refuses to overwrite a foreign plugins/ultra11y.js on V2", () => {
+      const d = tmp();
+      mkdirSync(join(d, "plugins"), { recursive: true });
+      writeFileSync(join(d, "plugins", "ultra11y.js"), "// mine\n");
+      expect(() => installOpencode({ configDir: d, pluginSource, major: 2 })).toThrow(/refusing to overwrite/);
+      expect(readFileSync(join(d, "plugins", "ultra11y.js"), "utf8")).toBe("// mine\n");
+    });
+
+    it("warns when an npm pin would load the gate a second time", () => {
+      const d = tmp();
+      writeFileSync(join(d, "opencode.json"), `${JSON.stringify({ plugins: [{ package: "ultra11y@latest" }] }, null, 2)}\n`);
+      const out = installOpencode({ configDir: d, pluginSource, major: 2 });
+      expect(out.guidance.join("\n")).toMatch(/twice/);
+    });
+
+    it("recognises V2's `plugins` key, in string and object form, and uninstall drops both", () => {
+      const d = tmp();
+      writeFileSync(
+        join(d, "opencode.json"),
+        `${JSON.stringify({ plugins: ["ultra11y@latest", { package: "ultra11y", options: {} }, "other@1"] }, null, 2)}\n`,
+      );
+      expect(opencodeWired(d)).toBe(true);
+      uninstallOpencode({ configDir: d });
+      expect(JSON.parse(readFileSync(join(d, "opencode.json"), "utf8")).plugins).toEqual(["other@1"]);
+      expect(opencodeWired(d)).toBe(false);
+    });
+
+    it("uninstall removes our copy from both directories", () => {
+      const d = tmp();
+      installOpencode({ configDir: d, pluginSource, major: 2 });
+      mkdirSync(join(d, "plugin"), { recursive: true });
+      writeFileSync(join(d, "plugin", "ultra11y.js"), readFileSync(pluginSource, "utf8"));
+      uninstallOpencode({ configDir: d });
+      expect(existsSync(join(d, "plugins", "ultra11y.js"))).toBe(false);
+      expect(existsSync(join(d, "plugin", "ultra11y.js"))).toBe(false);
+      expect(opencodeWired(d)).toBe(false);
+    });
+  });
+});
+
+describe("OpenCode major detection", () => {
+  it("reads both majors' --version formats", () => {
+    expect(parseOpencodeVersion("1.19.5\n")).toBe(1);
+    expect(parseOpencodeVersion("opencode v2.2.5\n")).toBe(2);
+    expect(parseOpencodeVersion("3.0.0")).toBe(2); // a later major speaks V2's API until told otherwise
+    expect(parseOpencodeVersion("")).toBeNull();
+    expect(parseOpencodeVersion("command not found")).toBeNull();
+  });
+
+  it("asks the opencode binary, and answers null when there is none", () => {
+    expect(detectOpencodeMajor(() => ({ status: 0, stdout: "opencode v2.2.5\n" }))).toBe(2);
+    expect(detectOpencodeMajor(() => ({ status: 0, stdout: "1.19.5\n" }))).toBe(1);
+    expect(detectOpencodeMajor(() => ({ status: null, stdout: "", error: new Error("ENOENT") }))).toBeNull();
+    expect(
+      detectOpencodeMajor(() => {
+        throw new Error("boom");
+      }),
+    ).toBeNull();
+  });
+
+  it("parses --opencode-version strictly", () => {
+    expect(parseOpencodeMajorFlag(undefined)).toEqual({ major: undefined });
+    expect(parseOpencodeMajorFlag("1")).toEqual({ major: 1 });
+    expect(parseOpencodeMajorFlag("2")).toEqual({ major: 2 });
+    expect(parseOpencodeMajorFlag("v2")).toEqual({ major: 2 });
+    expect(parseOpencodeMajorFlag("3").error).toMatch(/1 or 2/);
+    expect(parseOpencodeMajorFlag(true).error).toMatch(/1 or 2/);
+  });
+});
+
+// Through the real CLI, against an isolated HOME/XDG_CONFIG_HOME: the flag parsing, the
+// detection (a fake `opencode` first on PATH) and the per-major directory, end to end.
+describe("ultra11y install --opencode (CLI)", () => {
+  const cli = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "ultra11y.mjs");
+  function run(args: string[], fakeVersion?: string) {
+    const home = tmp();
+    const bin = join(home, "bin");
+    mkdirSync(bin, { recursive: true });
+    if (fakeVersion !== undefined) {
+      writeFileSync(join(bin, "opencode"), `#!/bin/sh\necho "${fakeVersion}"\n`, { mode: 0o755 });
+    }
+    const r = spawnSync(process.execPath, [cli, "install", "--opencode", "--no-skills", ...args], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), PATH: `${bin}:/usr/bin:/bin` },
+    });
+    return { ...r, configDir: join(home, ".config", "opencode") };
+  }
+
+  it("--opencode-version 2 writes plugins/", () => {
+    const r = run(["--opencode-version", "2"]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(existsSync(join(r.configDir, "plugins", "ultra11y.js"))).toBe(true);
+    expect(r.stdout).toMatch(/OpenCode 2/);
+  });
+
+  it("--opencode-version 1 writes plugin/", () => {
+    const r = run(["--opencode-version", "1"]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(existsSync(join(r.configDir, "plugin", "ultra11y.js"))).toBe(true);
+  });
+
+  it.skipIf(process.platform === "win32")("detects the installed major from `opencode --version`", () => {
+    const v2 = run([], "opencode v2.2.5");
+    expect(v2.status, v2.stderr).toBe(0);
+    expect(existsSync(join(v2.configDir, "plugins", "ultra11y.js"))).toBe(true);
+    const v1 = run([], "1.19.5");
+    expect(v1.status, v1.stderr).toBe(0);
+    expect(existsSync(join(v1.configDir, "plugin", "ultra11y.js"))).toBe(true);
+  });
+
+  it("with no opencode on PATH, writes plugin/ — the directory both majors read", () => {
+    const r = run([]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(existsSync(join(r.configDir, "plugin", "ultra11y.js"))).toBe(true);
+    expect(r.stdout).toMatch(/both/);
+  });
+
+  it("rejects a bad --opencode-version without writing anything", () => {
+    const r = run(["--opencode-version", "7"]);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/1 or 2/);
+    expect(existsSync(r.configDir)).toBe(false);
   });
 });
 
