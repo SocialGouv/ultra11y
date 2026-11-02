@@ -716,6 +716,15 @@ describe("the collector's ordinals line up with a reparse of its own serialisati
     expect(r.boxes, "box digest refused").not.toBeNull();
   });
 
+  // #112 — with scripting on, a <noscript>'s content is raw TEXT to the browser, yet the reparse
+  // (htmlparser2) reads it as elements: every GTM/Matomo pixel shifted the ordinals.
+  it("accepts the digests of a page whose <noscript> holds markup (analytics pixels)", async () => {
+    if (!browserAvailable) return;
+    const r = await collect(DOC(`<noscript><iframe src="about:blank"></iframe><img src="p.gif" alt=""><p>Activez JavaScript</p></noscript><p>Après</p>`));
+    expect(r.styles, "style digest refused").not.toBeNull();
+    expect(r.boxes, "box digest refused").not.toBeNull();
+  });
+
   it("accepts the digests of a page holding a <template> with elements", async () => {
     if (!browserAvailable) return;
     const r = await collect(DOC(`<template id="tpl"><div class="row"><span>a</span></div></template><p>Après</p>`));

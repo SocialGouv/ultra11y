@@ -59,6 +59,16 @@ var COLLECT_SNAPSHOT = `(() => {
       els.push(child);
       const name = child.localName;
       if (RAW_TEXT.has(name)) continue;
+      // With scripting on, a <noscript>'s content is raw TEXT to the browser, while the reparse
+      // reads it as elements (#112). Parse that text with the page's own parser and count what
+      // it yields, in place, so every later ordinal still lines up. The inert parsed nodes have
+      // no computed style and an empty box, which the rules read as \xAB nothing measured \xBB.
+      if (name === 'noscript' && child.children.length === 0 && (child.textContent || '').includes('<')) {
+        const parsed = document.createElement('template');
+        parsed.innerHTML = child.textContent || '';
+        walkElements(parsed.content);
+        continue;
+      }
       walkElements(name === 'template' && child.content ? child.content : child);
     }
   };
