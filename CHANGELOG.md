@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.57.2](https://github.com/SocialGouv/ultra11y/compare/v5.57.1...v5.57.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **adjudicate:** briefs name only the capture files that exist, the 9.1 example follows the RGAA glossary, the contract documents the recommendation shape, and veraPDF's PDF/UA result rides along when installed ([#141](https://github.com/SocialGouv/ultra11y/issues/141)) ([c062557](https://github.com/SocialGouv/ultra11y/commit/c062557b315ae1a4e0d0dbb3b1c5aa37623854a9))
+* **probes:** zoom and text-spacing report only what the stress changes, catch controls slid under another element, wait for relayout; reflow names the widening box ([#134](https://github.com/SocialGouv/ultra11y/issues/134)) ([#142](https://github.com/SocialGouv/ultra11y/issues/142)) ([f2240cd](https://github.com/SocialGouv/ultra11y/commit/f2240cd02d467529a84ff4053264f30790cee555))
+
 ## [5.57.1](https://github.com/SocialGouv/ultra11y/compare/v5.57.0...v5.57.1) (2026-11-02)
 
 

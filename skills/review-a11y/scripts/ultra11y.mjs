@@ -6,7 +6,7 @@ import { join as join56, relative as relative7, resolve as resolve19, sep as sep
 import { fileURLToPath as fileURLToPath6, pathToFileURL as pathToFileURL3 } from "url";
 
 // src/types.ts
-var VERSION = "5.57.1";
+var VERSION = "5.57.2";
 var SCHEMA_VERSION = 2;
 function isAdjudicated(by) {
   return by === "agent" || by === "human";
