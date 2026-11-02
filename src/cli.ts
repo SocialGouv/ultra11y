@@ -3091,7 +3091,10 @@ function applyPrune(p: ParsedArgs, standard: StandardId, items: VerifyItem[], la
       );
       return undefined;
     }
-    ledgerRepair = pruneLedger(ledger, items, pruned.reopenedCriteria, pruned.clearedConformities);
+    // Keyed on the audited root on both sides: the todo was harvested here, the ledger may
+    // have been recorded anywhere.
+    const root = typeof p.flags.cwd === "string" ? (p.flags.cwd as string) : ".";
+    ledgerRepair = pruneLedger(ledger, items, pruned.reopenedCriteria, pruned.clearedConformities, root);
   }
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
   mkdirSync(out, { recursive: true });
@@ -3544,7 +3547,9 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
       );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
-    const fresh = entriesFrom(adj, accepted, r.audit.date);
+    // Paths written relative to the audited root, so the committed ledger names files a
+    // reviewer can open and another checkout can replay.
+    const fresh = entriesFrom(adj, accepted, r.audit.date, cwd ?? ".");
     writeLedger(ledgerOut, mergeLedger(readLedger(ledgerOut), adj.standard, fresh));
     if (!p.flags.json)
       console.log(
@@ -4021,7 +4026,9 @@ async function cmdJudge(p: ParsedArgs): Promise<number> {
       );
     const refused = new Set(r.rejectedCriteria);
     const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
-    const fresh = entriesFrom(adj, accepted, r.audit.date);
+    // Paths written relative to the audited root, so the committed ledger names files a
+    // reviewer can open and another checkout can replay.
+    const fresh = entriesFrom(adj, accepted, r.audit.date, cwd ?? ".");
     writeLedger(ledgerOut, mergeLedger(readLedger(ledgerOut), adj.standard, fresh));
     console.log(
       lang === "fr"

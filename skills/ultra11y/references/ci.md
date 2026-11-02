@@ -116,7 +116,7 @@ through the same `applyAdjudication` — same coverage checks in both directions
 matching against the criterion's own anchors, same content-level re-grounding. A verdict nobody
 can prove is refused in CI exactly as it would be in a session.
 
-Three properties are worth knowing:
+Four properties are worth knowing:
 
 - **A stale verdict is dropped, never carried.** When the code under a criterion changes, the
   evidence changes with it, the fingerprint stops matching, and the criterion returns to « à
@@ -127,6 +127,12 @@ Three properties are worth knowing:
 - **A reformatting is not a change.** The fingerprint ignores line numbers and the replay
   re-anchors stored citations onto today's lines, so adding a comment at the top of a file does
   not invalidate every verdict in it.
+- **Its paths are the repository's, not the runner's.** Page captures are recorded by their
+  published `.ultra11y/pages/<id>/…` path and source files relative to the audited root
+  (`--cwd`, else the working directory), whatever absolute path the harvest used. Every reader
+  — staleness, re-anchoring, `verify --prune` — keys on that same identity, so a ledger
+  recorded on a laptop replays on a CI checkout. A ledger recorded before (absolute source
+  paths) still replays: its fingerprints are accepted in either spelling.
 - **A missing or refused ledger never fails the job.** The criteria stay « à évaluer », which is
   where they would have been without one.
 

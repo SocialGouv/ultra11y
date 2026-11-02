@@ -28,13 +28,14 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { type AdjudicationFile, type AdjudicationItem, type AgentFinding, buildAdjudicationWorklist, type Evidence, readCitation } from "./adjudicate.js";
 import { PAGES_DIR } from "./snapshot.js";
 import { CORE, type StandardId } from "./standards/index.js";
 import type { AuditResult } from "./types.js";
 import { SCHEMA_VERSION } from "./types.js";
+import { repoRelative } from "./util.js";
 import type { VerifyItem } from "./verify.js";
 
 /** Where a ledger lives by default, relative to the audited repository root. Committed on
@@ -119,25 +120,39 @@ const canonicalFile = (file: string): string => {
   return at >= 0 ? posix.slice(at) : posix;
 };
 
-/** The path a COMMITTED ledger carries for a page capture: its published
- *  `.ultra11y/pages/<id>/…` identity, whatever absolute `--cwd` the browser wrote it through.
+/** THE LEDGER'S FILE IDENTITY, root-aware: a capture by its published `.ultra11y/pages/…`
+ *  identity, a file under `root` relative to it, anything else as given.
+ *
+ *  The SAME function on both sides — the store and every reader (`anchorKey`,
+ *  `evidenceFilesOf`, `reanchor`, `pruneLedger`'s finding key, the replay's current-file map).
+ *  Applied to one side only, a root-relative store met an absolute harvest of the same file and
+ *  the lexical comparisons all missed: a valid verdict was staled by its silent-file guard, a
+ *  stored line never moved onto today's, and a withdrawn finding was never pruned.
+ *
+ *  No `root`, no relativising: the as-harvested spelling every ledger was fingerprinted under
+ *  before this existed, which a replay still accepts (see `verdictStillHolds`). A RELATIVE path
+ *  is left alone — the harvest and the fold already resolve it against the root. */
+export function identityFile(file: string, root?: string): string {
+  const canonical = canonicalFile(file);
+  if (root === undefined || canonical.startsWith(`${PAGES_DIR}/`) || !isAbsolute(canonical)) return canonical;
+  return repoRelative(canonical, resolve(root));
+}
+
+/** The path a COMMITTED ledger carries: `identityFile` against the audited root.
  *
  *  A ledger travels — reviewed in a pull request, replayed on another machine — and the
  *  harvester hands out the paths it was given. Recorded as such, one ledger carried 196
  *  `/home/runner/work/<repo>/<repo>/.ultra11y/pages/…/dom.html` citations: readable by
- *  nobody, and all of them captures. `canonicalFile` is already the identity every reader
- *  keys on (`anchorKey`, `evidenceFilesOf`, `reanchor`, `pruneLedger`), so writing it is a
- *  change of spelling, not of identity. Ordinary source files are left exactly as harvested:
- *  the readers compare them lexically, and a spelling that differs from the harvest's (a
- *  root-relative store against an absolute harvest) would stale, un-anchor and un-prune
- *  valid verdicts — a root-aware identity on both sides is its own change. */
-export function portableFile(file: string): string {
-  return canonicalFile(file.replace(/\\/g, "/"));
+ *  nobody. Captures take their published identity, and ordinary source files under the root
+ *  are written relative to it; the readers key on the same identity, so this is a change of
+ *  spelling, not of identity. */
+export function portableFile(file: string, root?: string): string {
+  return identityFile(file, root);
 }
 
 /** The line-independent identity of one piece of evidence: what the agent actually read. */
-const anchorKey = (e: { file: string; selector?: string; snippet?: string }) => {
-  const file = canonicalFile(e.file);
+const anchorKey = (e: { file: string; selector?: string; snippet?: string }, root?: string) => {
+  const file = identityFile(e.file, root);
   let snippet = norm(e.snippet ?? "");
   // The capture header records transport provenance, not page evidence. A local port or CI
   // hostname changing must not stale a verdict about the same DOM/doctype.
@@ -147,8 +162,8 @@ const anchorKey = (e: { file: string; selector?: string; snippet?: string }) => 
 
 /** Fingerprint the evidence a criterion was ruled against. Order-independent (the harvester's
  *  traversal order is not a property of the code) and line-independent (see module header). */
-export function evidenceFingerprint(evidence: Evidence[]): string {
-  const keys = evidence.map(anchorKey).sort();
+export function evidenceFingerprint(evidence: Evidence[], root?: string): string {
+  const keys = evidence.map((e) => anchorKey(e, root)).sort();
   return `sha256:${createHash("sha256")
     .update(`${keys.length}\n${keys.join("\n")}`)
     .digest("hex")
@@ -159,17 +174,18 @@ export function evidenceFingerprint(evidence: Evidence[]): string {
  *  so a replay can ask which pieces are new rather than only whether anything moved. Sorted and
  *  de-duplicated so the committed file has a stable diff. */
 /** The canonical files one criterion's evidence was read from, deduplicated and sorted. */
-export function evidenceFilesOf(evidence: Evidence[]): string[] {
-  return [...new Set(evidence.map((e) => canonicalFile(e.file)))].sort();
+export function evidenceFilesOf(evidence: Evidence[], root?: string): string[] {
+  return [...new Set(evidence.map((e) => identityFile(e.file, root)))].sort();
 }
 
-export function evidenceAnchorsOf(evidence: Evidence[]): string {
+export function evidenceAnchorsOf(evidence: Evidence[], root?: string): string {
   const out = new Set<string>();
-  for (const e of evidence) out.add(anchorHash(e));
+  for (const e of evidence) out.add(anchorHash(e, root));
   return [...out].sort().join(",");
 }
 
-const anchorHash = (e: { file: string; selector?: string; snippet?: string }): string => createHash("sha256").update(anchorKey(e)).digest("hex").slice(0, 16);
+const anchorHash = (e: { file: string; selector?: string; snippet?: string }, root?: string): string =>
+  createHash("sha256").update(anchorKey(e, root)).digest("hex").slice(0, 16);
 
 /** Does a stored verdict still cover today's harvest?
  *
@@ -200,7 +216,7 @@ const anchorHash = (e: { file: string; selector?: string; snippet?: string }): s
 export function verdictStillHolds(
   entry: LedgerEntry,
   today: Evidence[],
-  opts: { harvestComplete: boolean; fileExists?: (file: string) => boolean },
+  opts: { harvestComplete: boolean; fileExists?: (file: string) => boolean; root?: string },
 ): { holds: true } | { holds: false; why: string } {
   const stale = (why: string) => ({ holds: false as const, why });
   const was = entry.evidenceCount;
@@ -215,8 +231,15 @@ export function verdictStillHolds(
       `Ledger verdict is STALE — this run's harvest is INCOMPLETE (page captures the audit says it read are missing from disk), so neither what it found nor what it did not says anything about the code. Re-run with the captures present.`,
     );
   }
+  // BOTH SPELLINGS, because the fingerprint and the anchors hash it. An entry recorded before
+  // the identity was root-aware was hashed over the as-harvested spelling; one recorded since,
+  // over the root-relative one. Either is the same evidence, and a ledger committed under the
+  // first must not expire wholesale the day its readers learn the second.
+  const root = opts.root;
   // The fast path, and the only path a legacy entry has: byte-identical evidence.
-  if (evidenceFingerprint(today) === entry.evidenceFingerprint) return { holds: true };
+  if (evidenceFingerprint(today) === entry.evidenceFingerprint || (root !== undefined && evidenceFingerprint(today, root) === entry.evidenceFingerprint)) {
+    return { holds: true };
+  }
   if (typeof entry.evidenceAnchors !== "string" || !entry.evidenceAnchors) {
     return stale(
       `Ledger verdict is STALE — the evidence changed since it was recorded on ${entry.date} (${was} item(s) then, ${today.length} now), and the entry records no anchor set, so what changed cannot be established. Re-adjudicate this criterion.`,
@@ -231,12 +254,14 @@ export function verdictStillHolds(
     );
   }
   const recorded = new Set(entry.evidenceAnchors.split(","));
-  const added = evidenceAnchorsOf(today)
-    .split(",")
-    .filter((h) => h && !recorded.has(h));
-  if (added.length > 0) {
+  const added = new Set<string>();
+  for (const e of today) {
+    const rooted = anchorHash(e, root);
+    if (!recorded.has(rooted) && !recorded.has(anchorHash(e))) added.add(rooted);
+  }
+  if (added.size > 0) {
     return stale(
-      `Ledger verdict is STALE — ${added.length} piece(s) of evidence are NEW since the verdict was recorded on ${entry.date} (${was} item(s) then, ${today.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`,
+      `Ledger verdict is STALE — ${added.size} piece(s) of evidence are NEW since the verdict was recorded on ${entry.date} (${was} item(s) then, ${today.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`,
     );
   }
   // AND THE OTHER HALF OF THE SUBSET RULE: is the shrinkage EXPLAINED?
@@ -256,8 +281,8 @@ export function verdictStillHolds(
   // skips the check rather than failing it. Skipping is the safe direction: this guard exists
   // to catch a file the run should have read, not to accuse one it never claimed.
   const exists = opts.fileExists ?? ((f: string) => existsSync(f));
-  const contributing = new Set(evidenceFilesOf(today));
-  const silent = (entry.evidenceFiles ?? []).filter((f) => !contributing.has(f) && exists(f));
+  const contributing = new Set([...evidenceFilesOf(today), ...evidenceFilesOf(today, root)]);
+  const silent = (entry.evidenceFiles ?? []).filter((f) => !contributing.has(f) && !contributing.has(identityFile(f, root)) && exists(f));
   if (silent.length > 0) {
     const shown = silent.slice(0, 4);
     return stale(
@@ -283,19 +308,20 @@ function reanchor<T extends { file: string; line: number; selector?: string; sni
   stored: T[] | undefined,
   today: Evidence[],
   currentFiles: ReadonlyMap<string, string>,
+  root?: string,
 ): T[] | undefined {
   if (!stored?.length) return stored;
-  const byKey = new Map(today.map((e) => [anchorKey(e), e]));
+  const byKey = new Map(today.map((e) => [anchorKey(e, root), e]));
   const byLocation = new Map<string, Evidence[]>();
   for (const evidence of today) {
-    const key = `${canonicalFile(evidence.file)}:${evidence.line}`;
+    const key = `${identityFile(evidence.file, root)}:${evidence.line}`;
     const matches = byLocation.get(key);
     if (matches) matches.push(evidence);
     else byLocation.set(key, [evidence]);
   }
   return stored.map((s) => {
-    const exact = byKey.get(anchorKey(s));
-    const atLine = byLocation.get(`${canonicalFile(s.file)}:${s.line}`) ?? [];
+    const exact = byKey.get(anchorKey(s, root));
+    const atLine = byLocation.get(`${identityFile(s.file, root)}:${s.line}`) ?? [];
     // Models often omit the optional selector, while candidate browser measurements carry a
     // note rather than a DOM snippet. A unique anchor at the same canonical file+line is still
     // enough to move the path; applyAdjudication re-grounds the claim afterwards.
@@ -309,7 +335,7 @@ function reanchor<T extends { file: string; line: number; selector?: string; sni
     // prefix still has to move: a macOS path committed to the ledger does not exist on Linux.
     // `scope.inputs` is the authoritative current checkout mapping. Move the FILE only and
     // keep the claimed line/snippet strict; applyAdjudication will re-ground both afterwards.
-    const currentFile = currentFiles.get(canonicalFile(s.file));
+    const currentFile = currentFiles.get(identityFile(s.file, root));
     return currentFile && currentFile !== s.file ? { ...s, file: currentFile } : s;
   });
 }
@@ -364,14 +390,15 @@ export function writeLedger(path: string, ledger: VerdictLedger): void {
  *
  *  `applied` names the criteria whose verdict the fold ACCEPTED — a refused one must never
  *  reach the ledger, or the next replay would launder it back in. */
-export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>, date: string): LedgerEntry[] {
+export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>, date: string, root?: string): LedgerEntry[] {
   const out: LedgerEntry[] = [];
-  // Every path the entry persists goes through `portableFile`: the ledger is a committed,
-  // reviewed artefact, and the machine that recorded it is not the one that replays it.
+  // Every path the entry persists goes through `portableFile` against the audited `root`: the
+  // ledger is a committed, reviewed artefact, and the machine that recorded it is not the one
+  // that replays it. The fingerprint, anchors and files are hashed in that same spelling.
   // Only a string file is respelled. The fold validates a finding's `file` for an NC alone;
   // findings an LLM attached to a C/NA/manual item reach here unvalidated, and the ledger
   // recorded them as they came — a write must not crash on what it never checked.
-  const portable = <T extends { file?: unknown }>(xs: T[]): T[] => xs.map((x) => (typeof x.file === "string" ? { ...x, file: portableFile(x.file) } : x));
+  const portable = <T extends { file?: unknown }>(xs: T[]): T[] => xs.map((x) => (typeof x.file === "string" ? { ...x, file: portableFile(x.file, root) } : x));
   for (const it of adj.items) {
     if (!accepted.has(it.criteriaId) || it.verdict === null) continue;
     const citations = (it.citations ?? []).map(readCitation).filter((c): c is Evidence => c !== null);
@@ -385,9 +412,9 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
       ...(citations.length ? { citations: portable(citations) } : {}),
       ...(it.findings?.length ? { findings: portable(it.findings) } : {}),
       ...(it.recommendations?.length ? { recommendations: portable(it.recommendations) } : {}),
-      evidenceFingerprint: evidenceFingerprint(it.evidence),
-      evidenceAnchors: evidenceAnchorsOf(it.evidence),
-      evidenceFiles: evidenceFilesOf(it.evidence),
+      evidenceFingerprint: evidenceFingerprint(it.evidence, root),
+      evidenceAnchors: evidenceAnchorsOf(it.evidence, root),
+      evidenceFiles: evidenceFilesOf(it.evidence, root),
       evidenceCount: it.evidence.length,
       date,
       decidedBy: "agent",
@@ -414,16 +441,19 @@ export interface PrunedLedgerResult {
 /** Remove claims withdrawn by `verify --prune` from the reusable verdict ledger too.
  * Otherwise the repaired audit is honest for one run, then the next replay resurrects the
  * exact claim the independent reviewer rejected. Reopened criteria are deleted wholesale;
- * a criterion that remains NC keeps only its still-supported findings. */
+ * a criterion that remains NC keeps only its still-supported findings. Both sides are keyed on
+ * `identityFile` against the audited `root`: the todo comes from a fresh harvest, the ledger
+ * from whatever machine recorded it. */
 export function pruneLedger(
   ledger: VerdictLedger,
   items: VerifyItem[],
   reopenedCriteria: readonly string[],
   clearedConformities: readonly string[],
+  root?: string,
 ): PrunedLedgerResult {
   const dropCriteria = new Set([...reopenedCriteria, ...clearedConformities]);
   const withdrawn = new Map<string, Set<string>>();
-  const findingKey = (f: { file: string; line: number; selector?: string }) => `${canonicalFile(f.file)}|${f.line}|${(f.selector ?? "").trim()}`;
+  const findingKey = (f: { file: string; line: number; selector?: string }) => `${identityFile(f.file, root)}|${f.line}|${(f.selector ?? "").trim()}`;
   for (const item of items) {
     if ((item.verdict ?? "").trim().toLowerCase() !== "refuted" && (item.verdict ?? "").trim().toLowerCase() !== "unsupported") continue;
     if (item.kind === "c") continue;
@@ -498,11 +528,11 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
   const residualReasons: Record<string, string> = {};
   // Whether this run read everything it says it read. The subset rule below is only sound over
   // a complete harvest — see `verdictStillHolds`.
+  // Today's spelling of every audited input, keyed on its ledger identity: a capture by its
+  // published path, a source file by its path under the root.
+  const root = opts.cwd ?? ".";
   const currentFiles = new Map<string, string>();
-  for (const input of audit.scope.inputs) {
-    const canonical = canonicalFile(input);
-    if (canonical.startsWith(`${PAGES_DIR}/`)) currentFiles.set(canonical, input);
-  }
+  for (const input of audit.scope.inputs) currentFiles.set(identityFile(input, root), input);
   // DID THIS RUN READ EVERY PAGE IT SAYS IT READ?
   //
   // `unreadableCaptures` answers that against ONE root, and a replay does not always run from
@@ -510,7 +540,6 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
   // that way it reported every capture missing and staled the whole ledger on a run where
   // nothing was wrong. So a capture counts as read when it is where the AUDIT'S OWN INPUTS say
   // it is, or where this checkout would put it; only a page neither answer can find is a hole.
-  const root = opts.cwd ?? ".";
   const unreadable = (audit.scope.pagesAudited ?? []).filter((id) => {
     const canonical = `${PAGES_DIR}/${id}/dom.html`;
     const fromInputs = currentFiles.get(canonical);
@@ -529,7 +558,8 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
     }
     const held = verdictStillHolds(e, it.evidence, {
       harvestComplete,
-      fileExists: (f) => existsSync(join(opts.cwd ?? ".", f)),
+      fileExists: (f) => existsSync(join(root, f)),
+      root,
     });
     if (!held.holds) {
       stale.push(it.criteriaId);
@@ -545,9 +575,9 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
       verdict: e.verdict,
       justification: e.justification ?? "",
       reason: e.reason ?? null,
-      findings: reanchor(e.findings, it.evidence, currentFiles) ?? [],
-      ...(e.citations ? { citations: reanchor(e.citations, it.evidence, currentFiles) ?? [] } : {}),
-      ...(e.recommendations ? { recommendations: reanchor(e.recommendations, it.evidence, currentFiles) ?? [] } : {}),
+      findings: reanchor(e.findings, it.evidence, currentFiles, root) ?? [],
+      ...(e.citations ? { citations: reanchor(e.citations, it.evidence, currentFiles, root) ?? [] } : {}),
+      ...(e.recommendations ? { recommendations: reanchor(e.recommendations, it.evidence, currentFiles, root) ?? [] } : {}),
       decidedBy: "agent",
     });
   }
