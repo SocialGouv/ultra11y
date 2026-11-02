@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.57.3](https://github.com/SocialGouv/ultra11y/compare/v5.57.2...v5.57.3) (2026-11-02)
+
+
+### Bug Fixes
+
+* **verify:** a partial worklist reports its coverage gaps as notInWorklist, not as rejections ([#136](https://github.com/SocialGouv/ultra11y/issues/136)) ([ce2bea5](https://github.com/SocialGouv/ultra11y/commit/ce2bea53775a1928de69e1b56ab7cdab87f8c866))
+
 ## [5.57.2](https://github.com/SocialGouv/ultra11y/compare/v5.57.1...v5.57.2) (2026-11-02)
 
 
