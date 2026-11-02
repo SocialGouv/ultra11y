@@ -558,7 +558,8 @@ Five surfaces come out of it:
   the `page-<id>.html` mirrors are really in the artifact.
 - **`audits/pages.json`**, the same projection for a machine — `{ pages: [{ id, name, url,
   basis, criteria: [{ id, status, decidedBy }], conformancePct, decided, total }],
-  unattributed }`.
+  unattributed, averageRate }` — `averageRate` being, under a pack, the RGAA « taux moyen de
+  conformité » and the per-page rates it averages (see `pages.md`).
 
 The action publishes the page dimension as **outputs** too, so a later job needs neither the
 artifact nor a re-derivation: `pages-json-path`, `pages-report-path`, `pages-summary-path`, `pages-count` and

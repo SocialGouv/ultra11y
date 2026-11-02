@@ -182,7 +182,17 @@ dossiers and the HTML are documents for a person; this is the one file a later j
 a dashboard can read without re-deriving anything, and stdout alone cannot serve them — in CI
 the caller is a composite action step, and a criterion × page matrix does not fit in an action
 output. Its shape is `{ pages: [{ id, name, url, basis, criteria: [{ id, status, decidedBy }],
-conformancePct, decided, total }], unattributed }`.
+conformancePct, decided, total }], unattributed, averageRate }`.
+
+`averageRate` (under a pack only) is the RGAA **« taux moyen de conformité »** — the second
+figure the method asks of a sample, beside the global rate: `{ pct, pages: [{ id, name, url,
+pct, validated, applicable, open }], excluded, open }`. Each page is rated with the global
+formula over that page alone (validated ÷ applicable), `pct` is the mean of those exact
+ratios rounded once, a page with no applicable criterion is listed in `excluded` and left out
+of the mean (never counted as 100 %), and `open > 0` means every rate — and so the mean — is a
+floor. The grid prints the same line under its table, followed by each page's
+`NN % (validated ÷ applicable)`; `report` prints it under its headline rate, in its summary and
+as the last column of « Taux par page ».
 
 One row per criterion (the pack's own under `--standard`), one column per page:
 `C` conforming · `NC` non-conforming · `—` not applicable · `?` to assess. The same grid is

@@ -23,7 +23,7 @@ import {
   renderRedirected,
 } from "./pages.js";
 import { PAGES_DIR } from "./snapshot.js";
-import { pageCoverage, pageCriterionRows, pageRatePct } from "./pages-report.js";
+import { pageCoverage, pageCriterionRows, pageRatePct, pageTally } from "./pages-report.js";
 import { mdLink, mdText } from "./md.js";
 import { isLinkableUrl } from "./util.js";
 import {
@@ -55,6 +55,17 @@ const SEV_ORDER: Severity[] = ["bloquant", "majeur", "mineur"];
  *  announced. */
 const PER_PAGE_MAX = 30;
 
+// « Taux moyen de conformité » — what the mean is a mean OF, said once per language so the header
+// line and the summary fact cannot word it differently.
+const averageOfFr = (n: number) =>
+  n > 1
+    ? `moyenne des taux de conformité (validés ÷ applicables) des ${n} pages de l'échantillon`
+    : "taux de conformité (validés ÷ applicables) de l'unique page de l'échantillon";
+const averageOfEn = (n: number) =>
+  n > 1
+    ? `mean of the per-page conformity rates (validated ÷ applicable) over the ${n} sampled pages`
+    : "conformity rate (validated ÷ applicable) of the single sampled page";
+
 const L = {
   fr: {
     title: (std: string) => `Rapport d'audit d'accessibilité — ${std}`,
@@ -76,6 +87,11 @@ const L = {
     // both operands in the open — a reader who cannot recompute the number cannot defend it.
     conformanceRate: (std: string) => `Taux de conformité ${std}`,
     conformanceProvisional: "provisoire",
+    averageRate: "Taux moyen de conformité",
+    averageRateOf: averageOfFr,
+    averageRateFact: (pct: number, n: number) => `${pct} % — ${averageOfFr(n)}`,
+    averageRateNone: "non calculable — aucune page de l'échantillon n'a de critère applicable",
+    averageRateExcluded: (k: number) => ` ; ${k} page(s) sans critère applicable, hors moyenne`,
     conformanceNone: (na: number) =>
       `non calculable — aucun critère applicable dans ce périmètre (${na} critère(s) conforme(s) faute de sujet, aucun autre décidé ni ouvert). Un dénominateur vide n'est pas un taux de 100 %.`,
     conformanceFormula: (v: number, a: number) => `critères validés ÷ critères applicables (${v} ÷ ${a})`,
@@ -113,6 +129,9 @@ const L = {
     urlCol: "URL",
     basisCol: "Base",
     rateCol: "Taux",
+    conformanceCol: "Taux de conformité (validés ÷ applicables)",
+    conformanceColNote:
+      " La dernière colonne est le taux de conformité de la page — critères validés ÷ critères applicables sur cette page — dont le « taux moyen de conformité » de l'en-tête est la moyenne.",
     naTitle: "4. Critères conformes faute de sujet",
     naNote:
       "Rien de ce type dans le périmètre audité (aucun tableau, média ou champ, selon le critère) : conformes, mais sans rien à vérifier. Chaque ligne dit ce qui a été cherché, pour que l'affirmation reste réfutable.",
@@ -303,6 +322,11 @@ const L = {
     rateNote: "machine-decidable subset: C ÷ (C + NC)",
     conformanceRate: (std: string) => `${std} conformity rate`,
     conformanceProvisional: "provisional",
+    averageRate: "Average conformity rate",
+    averageRateOf: averageOfEn,
+    averageRateFact: (pct: number, n: number) => `${pct}% — ${averageOfEn(n)}`,
+    averageRateNone: "not computable — no page of the sample has an applicable criterion",
+    averageRateExcluded: (k: number) => `; ${k} page(s) with no applicable criterion, left out of the mean`,
     conformanceNone: (na: number) =>
       `not computable — no applicable criterion in this scope (${na} conforming for want of a subject, none other decided or open). An empty denominator is not a rate of 100%.`,
     conformanceFormula: (v: number, a: number) => `validated criteria ÷ applicable criteria (${v} ÷ ${a})`,
@@ -340,6 +364,9 @@ const L = {
     urlCol: "URL",
     basisCol: "Basis",
     rateCol: "Rate",
+    conformanceCol: "Conformity rate (validated ÷ applicable)",
+    conformanceColNote:
+      " The last column is the page's conformity rate — validated criteria ÷ applicable criteria on that page — whose mean is the header’s “average conformity rate”.",
     naTitle: "4. Conforming for want of a subject",
     naNote:
       "Nothing of that kind in the audited scope (no table, media or form control, depending on the criterion): conforming, with nothing to verify. Each line says what was looked for, so the claim stays falsifiable.",
@@ -705,6 +732,66 @@ export function conformanceRate(t: ReportTally): ConformanceRate {
   };
 }
 
+/** One page of the sample, rated with the global formula over that page alone. */
+export interface PageConformance {
+  id: string;
+  name: string;
+  url: string;
+  pct: number;
+  validated: number;
+  applicable: number;
+  open: number;
+}
+
+/** THE RGAA « TAUX MOYEN DE CONFORMITÉ » — the second figure the method asks of a sample.
+ *
+ *  `conformanceRate` decides each criterion over the WHOLE sample. The method
+ *  (accessibilite.numerique.gouv.fr/methode) also asks for the MEAN of the per-page rates, each
+ *  page rated with the same formula — validated ÷ applicable — over that page alone, and the
+ *  declaration of accessibility reproduces both. Each page's rate is `conformanceRate` over the
+ *  page's own rows (`pageCriterionRows`, the dossier's projection), so it can never disagree
+ *  with the page's sheet.
+ *
+ *  A page with NO applicable criterion has no rate: it is listed in `excluded` and left out of
+ *  the mean, rather than counted as the 100 % an empty denominator is not. The mean is taken
+ *  over the exact ratios and rounded once, so it is not a mean of rounded percentages. `open`
+ *  sums the criteria still to assess on the averaged pages: while it is above zero every page
+ *  rate is a floor, and so is their mean. */
+export interface AverageRate {
+  pct: number | null;
+  pages: PageConformance[];
+  excluded: string[];
+  open: number;
+}
+
+export function averageConformanceRate(r: AuditResult, pages: PageResult[], standard: StandardId, lang: Lang): AverageRate {
+  const rated = pages.map((p) => {
+    const rate = conformanceRate(pageTally(pageCriterionRows(r, p, standard, lang)));
+    return { id: p.id, name: p.name, url: p.url, pct: rate.pct, validated: rate.validated, applicable: rate.applicable, open: rate.open };
+  });
+  const counted = rated.filter((p) => p.applicable > 0);
+  const mean = counted.reduce((n, p) => n + p.validated / p.applicable, 0) / counted.length;
+  return {
+    pct: counted.length ? Math.round(mean * 100) : null,
+    pages: counted,
+    excluded: rated.filter((p) => p.applicable === 0).map((p) => p.id),
+    open: counted.reduce((n, p) => n + p.open, 0),
+  };
+}
+
+/** The average as the one line the header and the `pages` grid print. */
+export function averageRateLine(avg: AverageRate, lang: Lang): string {
+  const s = L[lang];
+  const title = `${s.averageRate}${avg.open > 0 ? ` (${s.conformanceProvisional})` : ""}`;
+  const excluded = avg.excluded.length ? s.averageRateExcluded(avg.excluded.length) : "";
+  return avg.pct === null ? `**${title}** : ${s.averageRateNone}${excluded}` : `**${title}** : ${avg.pct}% — ${s.averageRateOf(avg.pages.length)}${excluded}`;
+}
+
+/** One page's conformity rate as a table cell: the rate and the two operands it follows from. */
+export function pageConformanceCell(p: Pick<PageConformance, "pct" | "validated" | "applicable"> | undefined): string {
+  return p && p.applicable > 0 ? `${p.pct} % (${p.validated} ÷ ${p.applicable})` : "—";
+}
+
 /** Who settled each criterion — the engine's own tests, a browser measurement, or an
  *  adjudication. Published beside the rate because « 80 % » means something different when
  *  half of it was ruled by a model than when the engine proved it. */
@@ -926,6 +1013,7 @@ export function summaryModel(
   ncUnits: PrdUnit[],
   advisories: number,
   resolver?: PageResolver,
+  average?: AverageRate,
 ): SummaryModel {
   const s = L[lang];
   const scale = conformityScale(standard, lang);
@@ -947,6 +1035,13 @@ export function summaryModel(
   if (!isCore(standard) && rate.applicable > 0) {
     const range = rate.open > 0 ? ` ; ${s.rangeValue(sum.ceilingPct, leveled ? sum.best?.label : undefined)}` : "";
     facts.push({ label: s.rateLabel, value: `${s.rateValue(rate.pct, rate.validated, rate.applicable)}${range}` });
+  }
+  // The second rate of the RGAA method, beside the first — see `averageConformanceRate`.
+  if (!isCore(standard) && average?.pct != null) {
+    facts.push({
+      label: s.averageRate,
+      value: `${s.averageRateFact(average.pct, average.pages.length)}${average.excluded.length ? s.averageRateExcluded(average.excluded.length) : ""}`,
+    });
   }
   facts.push({ label: s.tallyLabel(rate.total), value: s.tallyValue(rate.validated, tot.nc, rate.na, rate.open) });
   if (leveled) facts.push({ label: s.scaleLabel, value: scaleText(scale, lang) });
@@ -1357,6 +1452,9 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   const { nc: ncUnits, advisory: advisoryUnits } = partitionUnits(prdUnits(r, opts.standard, lang));
   // WHAT THIS RUN DID, read off the run rather than off the engine's capabilities.
   const pagesRead = r.scope.pagesAudited?.length ?? 0;
+  const derivedPages = pageScope.length ? derivePages(r, pageScope) : [];
+  // The RGAA « taux moyen » — published wherever the global conformity rate is, and only there.
+  const average = opts.conformance && derivedPages.length ? averageConformanceRate(r, derivedPages, opts.standard, lang) : undefined;
 
   // ================================ THE REPORT ================================
   const out: string[] = [];
@@ -1387,6 +1485,10 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
         ? `- **${title}** : ${s.conformanceNone(rate.na)}`
         : `- **${title}** : ${rate.pct}% — ${s.conformanceShort(rate.validated, rate.applicable)}`,
     );
+    // No operands on this line, on purpose: it is a mean of per-page ratios, not one ratio, and
+    // `check` reads `(a ÷ b)` in a header bullet as a pair the synthesis table must license. The
+    // per-page operands are in the « Taux par page » table.
+    if (average) out.push(`- ${averageRateLine(average, lang)}`);
   } else {
     out.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
   }
@@ -1399,9 +1501,8 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   // The report opens on the summary — the level and what to fix — so the index comes right
   // after it, never before. Optional sections are left out when this run has none, so every
   // entry is a link that resolves.
-  out.push(...renderSummary(summaryModel(lang, opts.std, opts.standard, tot, ncUnits, advisoryUnits.length, resolver), lang));
+  out.push(...renderSummary(summaryModel(lang, opts.std, opts.standard, tot, ncUnits, advisoryUnits.length, resolver, average), lang));
 
-  const derivedPages = pageScope.length ? derivePages(r, pageScope) : [];
   const contents: [string, string][] = [
     ["synthesis", s.synthTitle(opts.groupHead)],
     ["non-conformities", s.ncTitle],
@@ -1453,12 +1554,16 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   // « Taux par page » — each audited page, its URL and its rate with the denominator. Drawn from
   // `pageCriterionRows`/`pageRatePct`, the per-page dossier's own helpers.
   if (derivedPages.length) {
-    out.push('<a id="page-rates"></a>', `## 📋 ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}`, "");
-    out.push(`| ${s.pageCol} | ${s.urlCol} | ${s.rateCol} |`, "| --- | --- | --- |");
+    out.push('<a id="page-rates"></a>', `## 📋 ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}${average ? s.conformanceColNote : ""}`, "");
+    // Under a pack, each page's own conformity rate beside it: the figures the « taux moyen » in
+    // the header is the mean of, so a reader can recompute it.
+    const conf = average ? new Map(average.pages.map((p) => [p.id, p])) : undefined;
+    out.push(`| ${s.pageCol} | ${s.urlCol} | ${s.rateCol} |${conf ? ` ${s.conformanceCol} |` : ""}`, `| --- | --- | --- |${conf ? " --- |" : ""}`);
     for (const p of derivedPages) {
       const criteria = pageCriterionRows(r, p, opts.standard, lang);
       const cov = pageCoverage(criteria);
-      out.push(`| ${mdText(p.name)}${p.auth ? " 🔒" : ""} | ${urlText(p.url)} | ${formatRate(pageRatePct(criteria), cov.decided, cov.total)} |`);
+      const cell = conf ? ` ${pageConformanceCell(conf.get(p.id))} |` : "";
+      out.push(`| ${mdText(p.name)}${p.auth ? " 🔒" : ""} | ${urlText(p.url)} | ${formatRate(pageRatePct(criteria), cov.decided, cov.total)} |${cell}`);
     }
     out.push("");
   }

@@ -30,6 +30,7 @@ import { pageCoverage, pageCriterionRows, pageRatePct, pageTally } from "./pages
 import { partitionUnits, prdUnits, type PrdUnit } from "./prd.js";
 import {
   automationOverview,
+  averageConformanceRate,
   conformanceRate,
   packReportGroups,
   reportCoverage,
@@ -259,7 +260,9 @@ function summaryBlocks(result: AuditResult, standard: StandardId, lang: Lang): B
   const groups = core ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
   const resolver = pageResolver(result);
   const { nc, advisory } = partitionUnits(prdUnits(result, standard, lang));
-  const m = summaryModel(lang, standardLabel(standard), standard, reportTotals(groups), nc, advisory.length, resolver);
+  // The RGAA « taux moyen », computed exactly as the Markdown report computes it.
+  const average = !core && resolver.pages.length ? averageConformanceRate(result, derivePages(result, resolver.pages), standard, lang) : undefined;
+  const m = summaryModel(lang, standardLabel(standard), standard, reportTotals(groups), nc, advisory.length, resolver, average);
   const out: Block[] = [
     { kind: "heading", level: 2, text: m.title, id: "summary" },
     { kind: "para", runs: [{ text: m.headline[0], strong: true }, ...ticks(` ${m.headline[1]}`)] },

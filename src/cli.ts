@@ -17,7 +17,15 @@ import {
 } from "./types.js";
 import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
-import { writeReportFiles, untestedNeedsRendering, partialAuditBanner, withReportAnnexes } from "./report.js";
+import {
+  averageConformanceRate,
+  averageRateLine,
+  pageConformanceCell,
+  writeReportFiles,
+  untestedNeedsRendering,
+  partialAuditBanner,
+  withReportAnnexes,
+} from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
 import { commentKindFrom, pushPrComment } from "./pr-comment.js";
 import { buildTickets } from "./tickets/grain.js";
@@ -1596,7 +1604,14 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
 
   if (p.flags.json) {
     // Projected onto the ACTIVE standard, like every rendered surface — see pagesForStandard.
-    const doc = { pages: pagesForStandard(result, derivePages(result, scope), standard, lang), unattributed: unattributedFindings(result).length };
+    const derived = derivePages(result, scope);
+    // Under a pack, the RGAA « taux moyen » and the per-page rates it averages (src/report.ts
+    // `averageConformanceRate`) — the same figures the report prints beside its global rate.
+    const doc = {
+      pages: pagesForStandard(result, derived, standard, lang),
+      unattributed: unattributedFindings(result).length,
+      ...(isCore(standard) ? {} : { averageRate: averageConformanceRate(result, derived, standard, lang) }),
+    };
     const json = JSON.stringify(doc, null, 2);
     console.log(json);
     // AND ON DISK, WHEN THERE IS A DIRECTORY TO PUT IT IN.
@@ -1621,6 +1636,14 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   }
   if (format === "grid") {
     console.log(renderPageGrid(result, scope, standard, lang));
+    // Under a pack, the « taux moyen » under the grid, with the per-page rate each page
+    // contributes to it — validated ÷ applicable, not the grid's decided-only rate row.
+    if (!isCore(standard)) {
+      const avg = averageConformanceRate(result, derivePages(result, scope), standard, lang);
+      const rated = new Map(avg.pages.map((pg) => [pg.id, pg]));
+      const cells = derivePages(result, scope).map((pg) => `${pg.name} ${pageConformanceCell(rated.get(pg.id))}`);
+      console.log(`${averageRateLine(avg, lang)}\n\n> ${cells.join(" · ")}\n`);
+    }
     return 0;
   }
 

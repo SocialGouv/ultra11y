@@ -61219,6 +61219,8 @@ function renderPageDocument(result, page, opts = {}) {
 var ICON3 = { bloquant: "\u{1F534}", majeur: "\u{1F7E0}", mineur: "\u{1F7E1}" };
 var SEV_ORDER3 = ["bloquant", "majeur", "mineur"];
 var PER_PAGE_MAX = 30;
+var averageOfFr = (n) => n > 1 ? `moyenne des taux de conformit\xE9 (valid\xE9s \xF7 applicables) des ${n} pages de l'\xE9chantillon` : "taux de conformit\xE9 (valid\xE9s \xF7 applicables) de l'unique page de l'\xE9chantillon";
+var averageOfEn = (n) => n > 1 ? `mean of the per-page conformity rates (validated \xF7 applicable) over the ${n} sampled pages` : "conformity rate (validated \xF7 applicable) of the single sampled page";
 var L5 = {
   fr: {
     title: (std) => `Rapport d'audit d'accessibilit\xE9 \u2014 ${std}`,
@@ -61239,6 +61241,11 @@ var L5 = {
     // both operands in the open — a reader who cannot recompute the number cannot defend it.
     conformanceRate: (std) => `Taux de conformit\xE9 ${std}`,
     conformanceProvisional: "provisoire",
+    averageRate: "Taux moyen de conformit\xE9",
+    averageRateOf: averageOfFr,
+    averageRateFact: (pct2, n) => `${pct2} % \u2014 ${averageOfFr(n)}`,
+    averageRateNone: "non calculable \u2014 aucune page de l'\xE9chantillon n'a de crit\xE8re applicable",
+    averageRateExcluded: (k) => ` ; ${k} page(s) sans crit\xE8re applicable, hors moyenne`,
     conformanceNone: (na) => `non calculable \u2014 aucun crit\xE8re applicable dans ce p\xE9rim\xE8tre (${na} crit\xE8re(s) conforme(s) faute de sujet, aucun autre d\xE9cid\xE9 ni ouvert). Un d\xE9nominateur vide n'est pas un taux de 100 %.`,
     conformanceFormula: (v, a) => `crit\xE8res valid\xE9s \xF7 crit\xE8res applicables (${v} \xF7 ${a})`,
     conformanceNa: (na) => `${na} crit\xE8re(s) non applicable(s) exclu(s) du d\xE9nominateur`,
@@ -61271,6 +61278,8 @@ var L5 = {
     urlCol: "URL",
     basisCol: "Base",
     rateCol: "Taux",
+    conformanceCol: "Taux de conformit\xE9 (valid\xE9s \xF7 applicables)",
+    conformanceColNote: " La derni\xE8re colonne est le taux de conformit\xE9 de la page \u2014 crit\xE8res valid\xE9s \xF7 crit\xE8res applicables sur cette page \u2014 dont le \xAB taux moyen de conformit\xE9 \xBB de l'en-t\xEAte est la moyenne.",
     naTitle: "4. Crit\xE8res conformes faute de sujet",
     naNote: "Rien de ce type dans le p\xE9rim\xE8tre audit\xE9 (aucun tableau, m\xE9dia ou champ, selon le crit\xE8re) : conformes, mais sans rien \xE0 v\xE9rifier. Chaque ligne dit ce qui a \xE9t\xE9 cherch\xE9, pour que l'affirmation reste r\xE9futable.",
     manualTitle: "5. Crit\xE8res \xE0 \xE9valuer (jugement / rendu)",
@@ -61436,6 +61445,11 @@ var L5 = {
     rateNote: "machine-decidable subset: C \xF7 (C + NC)",
     conformanceRate: (std) => `${std} conformity rate`,
     conformanceProvisional: "provisional",
+    averageRate: "Average conformity rate",
+    averageRateOf: averageOfEn,
+    averageRateFact: (pct2, n) => `${pct2}% \u2014 ${averageOfEn(n)}`,
+    averageRateNone: "not computable \u2014 no page of the sample has an applicable criterion",
+    averageRateExcluded: (k) => `; ${k} page(s) with no applicable criterion, left out of the mean`,
     conformanceNone: (na) => `not computable \u2014 no applicable criterion in this scope (${na} conforming for want of a subject, none other decided or open). An empty denominator is not a rate of 100%.`,
     conformanceFormula: (v, a) => `validated criteria \xF7 applicable criteria (${v} \xF7 ${a})`,
     conformanceNa: (na) => `${na} criterion/criteria not applicable, excluded from the denominator`,
@@ -61468,6 +61482,8 @@ var L5 = {
     urlCol: "URL",
     basisCol: "Basis",
     rateCol: "Rate",
+    conformanceCol: "Conformity rate (validated \xF7 applicable)",
+    conformanceColNote: " The last column is the page's conformity rate \u2014 validated criteria \xF7 applicable criteria on that page \u2014 whose mean is the header\u2019s \u201Caverage conformity rate\u201D.",
     naTitle: "4. Conforming for want of a subject",
     naNote: "Nothing of that kind in the audited scope (no table, media or form control, depending on the criterion): conforming, with nothing to verify. Each line says what was looked for, so the claim stays falsifiable.",
     manualTitle: "5. Criteria to assess (judgment / rendering)",
@@ -61683,6 +61699,29 @@ function conformanceRate(t3) {
     total: t3.c + t3.nc + t3.manual
   };
 }
+function averageConformanceRate(r, pages, standard, lang) {
+  const rated = pages.map((p) => {
+    const rate = conformanceRate(pageTally(pageCriterionRows(r, p, standard, lang)));
+    return { id: p.id, name: p.name, url: p.url, pct: rate.pct, validated: rate.validated, applicable: rate.applicable, open: rate.open };
+  });
+  const counted = rated.filter((p) => p.applicable > 0);
+  const mean = counted.reduce((n, p) => n + p.validated / p.applicable, 0) / counted.length;
+  return {
+    pct: counted.length ? Math.round(mean * 100) : null,
+    pages: counted,
+    excluded: rated.filter((p) => p.applicable === 0).map((p) => p.id),
+    open: counted.reduce((n, p) => n + p.open, 0)
+  };
+}
+function averageRateLine(avg, lang) {
+  const s = L5[lang];
+  const title = `${s.averageRate}${avg.open > 0 ? ` (${s.conformanceProvisional})` : ""}`;
+  const excluded = avg.excluded.length ? s.averageRateExcluded(avg.excluded.length) : "";
+  return avg.pct === null ? `**${title}** : ${s.averageRateNone}${excluded}` : `**${title}** : ${avg.pct}% \u2014 ${s.averageRateOf(avg.pages.length)}${excluded}`;
+}
+function pageConformanceCell(p) {
+  return p && p.applicable > 0 ? `${p.pct} % (${p.validated} \xF7 ${p.applicable})` : "\u2014";
+}
 function decisionProvenance(rows) {
   const decided = rows.filter((r) => r.status !== "manual");
   return {
@@ -61784,7 +61823,7 @@ function scaleText(scale, lang) {
   }).join(" \xB7 ");
 }
 var SUMMARY_PAGES_MAX = 3;
-function summaryModel(lang, std, standard, tot, ncUnits, advisories, resolver) {
+function summaryModel(lang, std, standard, tot, ncUnits, advisories, resolver, average) {
   const s = L5[lang];
   const scale = conformityScale(standard, lang);
   const sum = reportSummary(tot, scale);
@@ -61803,6 +61842,12 @@ function summaryModel(lang, std, standard, tot, ncUnits, advisories, resolver) {
   if (!isCore(standard) && rate.applicable > 0) {
     const range = rate.open > 0 ? ` ; ${s.rangeValue(sum.ceilingPct, leveled ? sum.best?.label : void 0)}` : "";
     facts.push({ label: s.rateLabel, value: `${s.rateValue(rate.pct, rate.validated, rate.applicable)}${range}` });
+  }
+  if (!isCore(standard) && average?.pct != null) {
+    facts.push({
+      label: s.averageRate,
+      value: `${s.averageRateFact(average.pct, average.pages.length)}${average.excluded.length ? s.averageRateExcluded(average.excluded.length) : ""}`
+    });
   }
   facts.push({ label: s.tallyLabel(rate.total), value: s.tallyValue(rate.validated, tot.nc, rate.na, rate.open) });
   if (leveled) facts.push({ label: s.scaleLabel, value: scaleText(scale, lang) });
@@ -62027,6 +62072,8 @@ function render(r, lang, opts) {
   const pageScope = resolver.pages;
   const { nc: ncUnits, advisory: advisoryUnits } = partitionUnits(prdUnits(r, opts.standard, lang));
   const pagesRead = r.scope.pagesAudited?.length ?? 0;
+  const derivedPages = pageScope.length ? derivePages(r, pageScope) : [];
+  const average = opts.conformance && derivedPages.length ? averageConformanceRate(r, derivedPages, opts.standard, lang) : void 0;
   const out2 = [];
   out2.push(`# ${s.title(opts.std)}`, "");
   out2.push(`- **${s.date}** : ${r.date}`);
@@ -62044,6 +62091,7 @@ function render(r, lang, opts) {
     out2.push(
       rate.applicable === 0 ? `- **${title}** : ${s.conformanceNone(rate.na)}` : `- **${title}** : ${rate.pct}% \u2014 ${s.conformanceShort(rate.validated, rate.applicable)}`
     );
+    if (average) out2.push(`- ${averageRateLine(average, lang)}`);
   } else {
     out2.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% (${s.rateNote})`);
   }
@@ -62051,8 +62099,7 @@ function render(r, lang, opts) {
   if (opts.partialAudit?.length) out2.push(`> \u{1F6A8} ${partialAuditBusiness(lang, opts.partialAudit)}`, "");
   if (r.scope.truncated || r.scope.captureCoverage?.blindSpots.length) out2.push(`> \u26A0\uFE0F ${s.scopeCaveat}`, "");
   out2.push(`> ${s.annexPointer(annexFile)}`, "");
-  out2.push(...renderSummary(summaryModel(lang, opts.std, opts.standard, tot, ncUnits, advisoryUnits.length, resolver), lang));
-  const derivedPages = pageScope.length ? derivePages(r, pageScope) : [];
+  out2.push(...renderSummary(summaryModel(lang, opts.std, opts.standard, tot, ncUnits, advisoryUnits.length, resolver, average), lang));
   const contents = [
     ["synthesis", s.synthTitle(opts.groupHead)],
     ["non-conformities", s.ncTitle],
@@ -62092,12 +62139,14 @@ function render(r, lang, opts) {
     out2.push("");
   }
   if (derivedPages.length) {
-    out2.push('<a id="page-rates"></a>', `## \u{1F4CB} ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}`, "");
-    out2.push(`| ${s.pageCol} | ${s.urlCol} | ${s.rateCol} |`, "| --- | --- | --- |");
+    out2.push('<a id="page-rates"></a>', `## \u{1F4CB} ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}${average ? s.conformanceColNote : ""}`, "");
+    const conf = average ? new Map(average.pages.map((p) => [p.id, p])) : void 0;
+    out2.push(`| ${s.pageCol} | ${s.urlCol} | ${s.rateCol} |${conf ? ` ${s.conformanceCol} |` : ""}`, `| --- | --- | --- |${conf ? " --- |" : ""}`);
     for (const p of derivedPages) {
       const criteria = pageCriterionRows(r, p, opts.standard, lang);
       const cov = pageCoverage(criteria);
-      out2.push(`| ${mdText(p.name)}${p.auth ? " \u{1F512}" : ""} | ${urlText(p.url)} | ${formatRate(pageRatePct(criteria), cov.decided, cov.total)} |`);
+      const cell3 = conf ? ` ${pageConformanceCell(conf.get(p.id))} |` : "";
+      out2.push(`| ${mdText(p.name)}${p.auth ? " \u{1F512}" : ""} | ${urlText(p.url)} | ${formatRate(pageRatePct(criteria), cov.decided, cov.total)} |${cell3}`);
     }
     out2.push("");
   }
@@ -71746,7 +71795,8 @@ function summaryBlocks(result, standard, lang) {
   const groups = core ? reportGroups(result, lang) : packReportGroups(result, loadPack(standard), lang);
   const resolver = pageResolver(result);
   const { nc, advisory } = partitionUnits(prdUnits(result, standard, lang));
-  const m = summaryModel(lang, standardLabel(standard), standard, reportTotals(groups), nc, advisory.length, resolver);
+  const average = !core && resolver.pages.length ? averageConformanceRate(result, derivePages(result, resolver.pages), standard, lang) : void 0;
+  const m = summaryModel(lang, standardLabel(standard), standard, reportTotals(groups), nc, advisory.length, resolver, average);
   const out2 = [
     { kind: "heading", level: 2, text: m.title, id: "summary" },
     { kind: "para", runs: [{ text: m.headline[0], strong: true }, ...ticks(` ${m.headline[1]}`)] },
@@ -76759,7 +76809,12 @@ async function cmdPages(p) {
     return diffAgainstExternal(p, result, scope, standard, lang, p.flags.diff);
   }
   if (p.flags.json) {
-    const doc = { pages: pagesForStandard(result, derivePages(result, scope), standard, lang), unattributed: unattributedFindings(result).length };
+    const derived2 = derivePages(result, scope);
+    const doc = {
+      pages: pagesForStandard(result, derived2, standard, lang),
+      unattributed: unattributedFindings(result).length,
+      ...isCore(standard) ? {} : { averageRate: averageConformanceRate(result, derived2, standard, lang) }
+    };
     const json = JSON.stringify(doc, null, 2);
     console.log(json);
     const outDir2 = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "";
@@ -76777,6 +76832,15 @@ async function cmdPages(p) {
   }
   if (format === "grid") {
     console.log(renderPageGrid(result, scope, standard, lang));
+    if (!isCore(standard)) {
+      const avg = averageConformanceRate(result, derivePages(result, scope), standard, lang);
+      const rated = new Map(avg.pages.map((pg) => [pg.id, pg]));
+      const cells = derivePages(result, scope).map((pg) => `${pg.name} ${pageConformanceCell(rated.get(pg.id))}`);
+      console.log(`${averageRateLine(avg, lang)}
+
+> ${cells.join(" \xB7 ")}
+`);
+    }
     return 0;
   }
   const derived = derivePages(result, scope);
