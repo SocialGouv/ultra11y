@@ -279,8 +279,10 @@ describe("browser collector", () => {
     expect(() => new Function(`return ${COLLECT_SNAPSHOT}`)).not.toThrow();
   });
 
-  it("walks elements in document order so the ordinal index is the join key", () => {
-    expect(COLLECT_SNAPSHOT).toContain("querySelectorAll");
+  it("walks elements in the order a reparse of its serialisation yields, so the ordinal is the join key (#101)", () => {
+    expect(COLLECT_SNAPSHOT).toContain("walkElements(document)");
+    expect(COLLECT_SNAPSHOT).toContain("template' && child.content");
+    for (const raw of ["script", "style", "title", "textarea", "xmp", "iframe", "noembed", "noframes"]) expect(COLLECT_SNAPSHOT).toContain(`'${raw}'`);
     expect(COLLECT_SNAPSHOT).toContain("documentElement");
   });
 });

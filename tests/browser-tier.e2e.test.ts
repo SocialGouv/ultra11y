@@ -681,3 +681,43 @@ describe("focus visibility on a pseudo-element ring", () => {
     expect(hit?.changed).toBe(false);
   }, 60_000);
 });
+
+// #101 — every egapro capture had its style and box digests refused wholesale: Next's dev
+// overlay inserts <nextjs-portal> as an ELEMENT child of a <script>, which outerHTML serialises
+// as the script's raw text, so `querySelectorAll('*')` counted one element the reparse never
+// sees. The opposite drift exists too: <template> contents are serialised (and reparsed as
+// elements) but are not traversed by querySelectorAll. Either one voids 1.4.3/1.4.1/1.4.11.
+describe("the collector's ordinals line up with a reparse of its own serialisation", () => {
+  async function collect(html: string, mutate?: string) {
+    const { COLLECT_SNAPSHOT, alignedStyles, alignedBoxes } = await import("../src/snapshot.js");
+    const page = await browser!.newPage();
+    try {
+      await page.setContent(html, { waitUntil: "load" });
+      if (mutate) await page.evaluate(mutate);
+      const snap = (await page.evaluate(COLLECT_SNAPSHOT)) as {
+        dom: string;
+        styles: Parameters<typeof alignedStyles>[1];
+        boxes: Parameters<typeof alignedBoxes>[1];
+      };
+      return { styles: alignedStyles(snap.dom, snap.styles), boxes: alignedBoxes(snap.dom, snap.boxes) };
+    } finally {
+      await page.close();
+    }
+  }
+  const DOC = (body: string) =>
+    `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>t</title></head><body><main><h1>Titre</h1><p>Texte</p>${body}</main><script id="s">window.x = 1;</script></body></html>`;
+
+  it("accepts the digests of a page whose <script> holds an element child (Next's dev overlay)", async () => {
+    if (!browserAvailable) return;
+    const r = await collect(DOC(""), `document.getElementById("s").appendChild(document.createElement("nextjs-portal"))`);
+    expect(r.styles, "style digest refused").not.toBeNull();
+    expect(r.boxes, "box digest refused").not.toBeNull();
+  });
+
+  it("accepts the digests of a page holding a <template> with elements", async () => {
+    if (!browserAvailable) return;
+    const r = await collect(DOC(`<template id="tpl"><div class="row"><span>a</span></div></template><p>Après</p>`));
+    expect(r.styles, "style digest refused").not.toBeNull();
+    expect(r.boxes, "box digest refused").not.toBeNull();
+  });
+});

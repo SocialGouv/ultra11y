@@ -114,6 +114,39 @@ describe("computed contrast (WCAG 1.4.3 → RGAA 3.2 / 10.5)", () => {
   });
 });
 
+// #104 — WCAG 1.4.3 and 1.4.11 exempt inactive user interface components.
+describe("an inactive control is exempt from the contrast criteria", () => {
+  const LOW = { color: "rgb(150, 150, 150)", fontSize: "16px", backgroundColor: "rgb(255, 255, 255)" };
+  it("does not report the low-contrast text of a disabled button, nor of an aria-disabled link", () => {
+    const dom = PAGE('<p><button type="button" disabled>Première page</button></p><p><a href="/x" aria-disabled="true">Page précédente</a></p>');
+    const s = styles([
+      ...HEAD,
+      ["p", { backgroundColor: "rgb(255, 255, 255)" }],
+      ["button", LOW],
+      ["p", { backgroundColor: "rgb(255, 255, 255)" }],
+      ["a", LOW],
+    ]);
+    expect(ids(dom, { styles: s })).not.toContain("rendered-contrast");
+  });
+  it("still reports the same text once the control is active", () => {
+    const dom = PAGE('<p><button type="button">Première page</button></p>');
+    const s = styles([...HEAD, ["p", { backgroundColor: "rgb(255, 255, 255)" }], ["button", LOW]]);
+    expect(ids(dom, { styles: s })).toContain("rendered-contrast");
+  });
+  it("does not ask a disabled field for a visible boundary", () => {
+    const dom = PAGE('<form><fieldset disabled><label for="q">Q</label><input id="q" type="text"></fieldset></form>');
+    const field = {
+      backgroundColor: "rgb(255, 255, 255)",
+      borderTopStyle: "none",
+      borderRightStyle: "none",
+      borderBottomStyle: "none",
+      borderLeftStyle: "none",
+    };
+    const s = styles([...HEAD, ["form", {}], ["fieldset", {}], ["label", {}], ["input", field]]);
+    expect(ids(dom, { styles: s })).not.toContain("rendered-nontext-contrast");
+  });
+});
+
 describe("a link identified by colour alone (WCAG 1.4.1 → RGAA 10.6)", () => {
   const linkPage = PAGE('<p>see <a href="/x">the page</a> for more</p>');
   const base: [string, Record<string, string>][] = [...HEAD, ["p", { color: "rgb(0, 0, 0)", fontSize: "16px" }]];
@@ -154,6 +187,30 @@ describe("a link identified by colour alone (WCAG 1.4.1 → RGAA 10.6)", () => {
 
   it("says nothing when the link is the SAME colour as its text — that is a different defect", () => {
     const s = styles([...base, ["a", { color: "rgb(0, 0, 0)", textDecorationLine: "none", fontWeight: "400" }]]);
+    expect(ids(linkPage, { styles: s })).not.toContain("rendered-link-colour-only");
+  });
+
+  // #103 — DSFR markup, which the rule never saw on egapro until #101 fixed the digests.
+  const COLOURED = { color: "rgb(0, 0, 145)", textDecorationLine: "none", fontWeight: "400" };
+  it("says nothing about a link that is its list item's only content (skip links, menus)", () => {
+    const skip = PAGE('<ul><li><a class="fr-link" href="#content">Contenu</a></li></ul>');
+    const s = styles([...HEAD, ["ul", { color: "rgb(22, 22, 22)" }], ["li", { color: "rgb(22, 22, 22)" }], ["a", COLOURED]]);
+    expect(ids(skip, { styles: s })).not.toContain("rendered-link-colour-only");
+  });
+  it("still reports a coloured link among the text of a list item", () => {
+    const item = PAGE('<ul><li>Consultez <a href="/x">la page</a> pour plus de détails</li></ul>');
+    const s = styles([...HEAD, ["ul", { color: "rgb(22, 22, 22)" }], ["li", { color: "rgb(22, 22, 22)" }], ["a", COLOURED]]);
+    expect(ids(item, { styles: s })).toContain("rendered-link-colour-only");
+  });
+  it("accepts the DSFR underline painted with background-image", () => {
+    const s = styles([
+      ...base,
+      ["a", { ...COLOURED, backgroundImage: "linear-gradient(0deg, rgb(0, 0, 145), rgb(0, 0, 145)), linear-gradient(0deg, rgb(0, 0, 145), rgb(0, 0, 145))" }],
+    ]);
+    expect(ids(linkPage, { styles: s })).not.toContain("rendered-link-colour-only");
+  });
+  it("accepts a box-shadow drawn around the link (DSFR tertiary buttons)", () => {
+    const s = styles([...base, ["a", { ...COLOURED, boxShadow: "rgb(221, 221, 221) 0px 0px 0px 1px inset" }]]);
     expect(ids(linkPage, { styles: s })).not.toContain("rendered-link-colour-only");
   });
 });
@@ -298,6 +355,18 @@ describe("a control whose boundary cannot be seen (WCAG 1.4.11 → RGAA 3.3)", (
   it("declines when a visible outline may be drawing the boundary", () => {
     const outlined = { ...INVISIBLE, outlineStyle: "solid", outlineWidth: "2px" };
     expect(ids(form, { styles: input(outlined) })).not.toContain("rendered-nontext-contrast");
+  });
+
+  // #103 — Understanding 1.4.11: a button identified by its visible text needs no boundary.
+  it("says nothing about a text button with no drawn boundary (the DSFR footer « Paramètres d'affichage »)", () => {
+    const btn = PAGE('<footer><button type="button">Paramètres d\'affichage</button></footer>');
+    const s = styles([...HEAD, ["footer", {}], ["button", INVISIBLE]]);
+    expect(ids(btn, { styles: s })).not.toContain("rendered-nontext-contrast");
+  });
+  it("still reports an icon-only button whose boundary cannot be seen", () => {
+    const btn = PAGE('<footer><button type="button" aria-label="Fermer"><span class="fr-icon-close-line" aria-hidden="true"></span></button></footer>');
+    const s = styles([...HEAD, ["footer", {}], ["button", INVISIBLE], ["span", {}]]);
+    expect(ids(btn, { styles: s })).toContain("rendered-nontext-contrast");
   });
 
   it("ignores a hidden input — it has no boundary to perceive", () => {

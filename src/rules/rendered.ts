@@ -13,7 +13,7 @@
 // trustworthy: it can say "non-conforming" because it can also say "I don't know".
 import { readFileSync } from "node:fs";
 import { contrastRatio, parseColor, type RGBA } from "../color.js";
-import { attr, type Doc, type El } from "../parse/html.js";
+import { attr, visibleText, type Doc, type El } from "../parse/html.js";
 import { decodePng, dominantBackground, type Image } from "../pixel.js";
 import type { RenderSignals, StyleEntry } from "../types.js";
 import type { Rule, RuleFinding } from "./rule.js";
@@ -27,6 +27,18 @@ function styleAt(doc: Doc, i: number): StyleEntry | undefined {
 
 function hasDirectText(el: El): boolean {
   return el.children.some((c) => c.type === "text" && c.data.trim() !== "");
+}
+
+// WCAG 1.4.3 and 1.4.11 exempt « inactive user interface components » (#104): a disabled
+// control, or anything inside a disabled fieldset, or marked aria-disabled, by itself or an
+// ancestor.
+const DISABLEABLE = new Set(["button", "input", "select", "textarea", "option", "optgroup", "fieldset"]);
+function inactive(el: El): boolean {
+  for (let n: El | null = el; n; n = n.parent) {
+    if (attr(n, "aria-disabled") === "true") return true;
+    if (DISABLEABLE.has(n.tag) && attr(n, "disabled") !== undefined) return true;
+  }
+  return false;
 }
 
 /** Is this element painted at all? An invisible element cannot fail a contrast criterion. */
@@ -105,7 +117,7 @@ const renderedContrast: Rule = {
     const index = elementIndex(doc);
     const out: RuleFinding[] = [];
     for (const [el, i] of index) {
-      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el) || inactive(el)) continue;
       const css = styleAt(doc, i)?.css;
       if (!css || invisible(css)) continue;
       const fg = parseColor(css.color ?? "");
@@ -153,7 +165,7 @@ const renderedContrastPixel: Rule = {
     const index = elementIndex(doc);
     const out: RuleFinding[] = [];
     for (const [el, i] of index) {
-      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el)) continue;
+      if (SKIP_TAGS.has(el.tag) || !hasDirectText(el) || inactive(el)) continue;
       const css = styleAt(doc, i)?.css;
       if (!css || invisible(css)) continue;
       // Only where the CSSOM could NOT answer — otherwise renderedContrast already decided,
@@ -190,6 +202,11 @@ function hasNonColourAffordance(css: Record<string, string>, parentCss: Record<s
   if ((css.borderBottomStyle ?? "none") !== "none" && Number.parseFloat(css.borderBottomWidth ?? "0") > 0) return true;
   const bg = parseColor(css.backgroundColor ?? "");
   if (bg && bg.a > 0) return true;
+  // The DSFR paints its link underline with a `background-image` gradient (and
+  // `text-decoration: none`), and outlines its tertiary buttons with an inset `box-shadow`:
+  // both are visible, non-colour affordances (#103).
+  if ((css.backgroundImage ?? "none") !== "none") return true;
+  if ((css.boxShadow ?? "none") !== "none") return true;
   const w = Number.parseInt(css.fontWeight ?? "400", 10);
   const pw = Number.parseInt(parentCss?.fontWeight ?? "400", 10);
   if (Number.isFinite(w) && Number.isFinite(pw) && w >= pw + 200) return true;
@@ -203,6 +220,18 @@ function hasNonColourAffordance(css: Record<string, string>, parentCss: Record<s
 // is where the criterion applies; a nav or button-styled link is out of scope by construction.
 const TEXT_BLOCK = new Set(["p", "li", "dd", "dt", "td", "th", "blockquote", "figcaption", "caption"]);
 
+const WORD = /[\p{L}\p{N}]/u;
+/** Does `block` carry visible words OUTSIDE `link`? */
+function hasSurroundingText(block: El, link: El): boolean {
+  for (const c of block.children) {
+    if (c === link) continue;
+    if (c.type === "text") {
+      if (WORD.test(c.data)) return true;
+    } else if (WORD.test(visibleText(c))) return true;
+  }
+  return false;
+}
+
 const renderedLinkColourOnly: Rule = {
   id: "rendered-link-colour-only",
   criteria: ["1.4.1"],
@@ -215,6 +244,10 @@ const renderedLinkColourOnly: Rule = {
       if (el.tag !== "a" || !hasDirectText(el)) continue;
       const parent = el.parent;
       if (!parent || !TEXT_BLOCK.has(parent.tag)) continue; // only links in running text
+      // …and only AMONG text. A link that is its block's whole content — a menu entry, a skip
+      // link, a button-styled call to action in a <li> — is not distinguished from any
+      // surrounding text, because there is none (#103).
+      if (!hasSurroundingText(parent, el)) continue;
       const css = styleAt(doc, i)?.css;
       const pi = index.get(parent);
       const parentCss = pi === undefined ? undefined : styleAt(doc, pi)?.css;
@@ -272,9 +305,14 @@ const renderedNonTextContrast: Rule = {
     const index = elementIndex(doc);
     const out: RuleFinding[] = [];
     for (const [el, i] of index) {
-      if (!BOUNDED_CONTROLS.has(el.tag)) continue;
+      if (!BOUNDED_CONTROLS.has(el.tag) || inactive(el)) continue;
       const type = (el.attribs.type ?? "").toLowerCase();
       if (el.tag === "input" && (type === "hidden" || type === "image")) continue;
+      // Understanding 1.4.11: a button identified by its VISIBLE TEXT needs no visible
+      // boundary — the text is the identifier, and its contrast is 1.4.3's question. Fields
+      // and text-less (icon-only) controls still need one (#103).
+      if (el.tag === "button" && WORD.test(visibleText(el))) continue;
+      if (el.tag === "input" && ["button", "submit", "reset"].includes(type) && WORD.test(el.attribs.value ?? "")) continue;
       const css = styleAt(doc, i)?.css;
       if (!css || invisible(css)) continue;
       // A shadow or an outline can BE the boundary, and neither is a colour we can compare
