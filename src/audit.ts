@@ -71,6 +71,10 @@ export interface AuditInput {
   // input instead — see cmdAudit's `useCaptures`).
   captureDiff?: boolean;
   noDefaultExcludes?: boolean; // also audit test/spec/story/__tests__ markup
+  // `false` leaves a snapshot's screenshot out of the signals, so the pixel tier (contrast
+  // sampled on the screenshot, src/rules/rendered.ts) never decodes a PNG. The lite gate's
+  // choice: it buys speed, and the CSSOM contrast rule still runs. Default: on.
+  pixel?: boolean;
   onWarn?: (msg: string) => void;
 }
 
@@ -1289,6 +1293,7 @@ export function runAudit(opts: AuditInput): AuditResult {
     // already lives — is what lets the rendered rules decide criteria the source cannot,
     // OFFLINE and with no browser. A no-op for every other file.
     attachSignals(doc);
+    if (opts.pixel === false && doc.signals?.screenshot) doc.signals = { ...doc.signals, screenshot: undefined };
     foldDoc(acc, doc, graph);
   }
 

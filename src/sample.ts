@@ -95,6 +95,16 @@ export function validateSample(raw: unknown): SampleValidation {
     }
   }
 
+  if (s.global !== undefined) {
+    if (!Array.isArray(s.global)) {
+      err("sample.global", "global must be an array of globs");
+    } else {
+      (s.global as unknown[]).forEach((g, i) => {
+        if (typeof g !== "string" || g.trim() === "") err(`sample.global[${i}]`, "global entries must be non-empty glob strings");
+      });
+    }
+  }
+
   const ok = issues.length === 0;
   return { ok, issues, warnings, sample: ok ? normalizeSample(s) : undefined };
 }
@@ -110,7 +120,8 @@ function normalizeSample(s: Record<string, unknown>): SampleConfig {
     ...(Array.isArray(p.sources) ? { sources: p.sources as string[] } : {}),
   }));
   const transverse = Array.isArray(s.transverse) ? (s.transverse as string[]).map(String) : undefined;
-  return { pages, ...(transverse?.length ? { transverse } : {}) };
+  const global = Array.isArray(s.global) ? (s.global as string[]).map(String) : undefined;
+  return { pages, ...(transverse?.length ? { transverse } : {}), ...(global?.length ? { global } : {}) };
 }
 
 /** Project a validated sample to the storageState-free shape recorded on an AuditResult /
@@ -224,7 +235,11 @@ export function mergeSample(existing: SampleConfig | undefined, proposed: Sample
     added.push(page);
   }
   return {
-    sample: { pages, ...(existing?.transverse?.length ? { transverse: existing.transverse } : {}) },
+    sample: {
+      pages,
+      ...(existing?.transverse?.length ? { transverse: existing.transverse } : {}),
+      ...(existing?.global?.length ? { global: existing.global } : {}),
+    },
     added,
     kept: pages.length - added.length,
   };
@@ -270,7 +285,11 @@ export function unionSample(declared: SampleConfig | undefined, snapshotted: Sam
   const undeclared = snapshotted.filter((p) => !declaredIds.has(p.id));
   const uncaptured = pages.filter((p) => !snapIds.has(p.id));
   return {
-    sample: { pages: [...pages, ...undeclared], ...(declared?.transverse?.length ? { transverse: declared.transverse } : {}) },
+    sample: {
+      pages: [...pages, ...undeclared],
+      ...(declared?.transverse?.length ? { transverse: declared.transverse } : {}),
+      ...(declared?.global?.length ? { global: declared.global } : {}),
+    },
     undeclared,
     uncaptured,
   };
