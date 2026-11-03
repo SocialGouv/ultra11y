@@ -87,6 +87,11 @@ export interface SampleConfig {
   pages: SamplePage[];
   // Element descriptions audited on EVERY page (header, nav, footer, modals…).
   transverse?: string[];
+  // Globs (relative to the project root) whose change reaches EVERY page: the root layout,
+  // global styles, the design-system setup, the config. `affected` selects the whole sample
+  // when one of them is touched, because no import edge says so — a Next.js root layout wraps
+  // every page without any page importing it.
+  global?: string[];
 }
 // The sample as recorded in an AuditResult / DynamicResult. The `storageState` PATH is
 // deliberately dropped (never persisted): the report needs name/url/auth/notes only.

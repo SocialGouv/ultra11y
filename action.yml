@@ -231,6 +231,18 @@ inputs:
     description: 'Directory to run in.'
     required: false
     default: '.'
+  mode:
+    description: "`full` (default) runs everything above. `lite` is the per-pull-request RENDERED regression gate, and runs nothing else: the page snapshots alone, the engine alone (no source audit, no adjudication, no per-page report, no PDF, no pixel tier, no HTML), failing only on findings that are NEW against a baseline kept in the Actions cache. It is called twice in one job, around the capture the workflow runs itself — see `step`, and the README for a complete workflow."
+    required: false
+    default: 'full'
+  step:
+    description: "Which half of `mode: lite` this invocation is. `affected` publishes the outputs `affected-pages` (comma-separated ids), `affected-all` and `affected-none` — the sample pages the diff can change (`ultra11y affected`: the merge-base, each page's `sources` and what they import, `sample.global`), so the workflow captures only those, or skips the capture altogether. On a push to the default branch it selects every page. `audit` audits the snapshots the capture wrote: on a pull request it restores the baseline from `actions/cache` (exact key of the merge-base, else the closest by prefix) and gates on new findings at `fail-on`; on a push to the default branch it audits every page and saves the baseline under a key carrying the SHA. Ignored in `full` mode."
+    required: false
+    default: 'audit'
+  pages:
+    description: "`mode: lite`, `step: audit`: comma-separated page ids to audit — typically `steps.<affected>.outputs.affected-pages`. Empty (default) audits every snapshot present under `.ultra11y/pages/`."
+    required: false
+    default: ''
 
 outputs:
   findings:
@@ -282,6 +294,20 @@ outputs:
   artifact-url:
     description: 'Download URL of the uploaded artifact. Empty when nothing was uploaded.'
     value: ${{ steps.upload.outputs.artifact-url }}
+  # THE LITE MODE's outputs. `affected-*` drive the capture the workflow runs between the two
+  # invocations; `lite-new` is what the gate counted.
+  affected-pages:
+    description: '`mode: lite`, `step: affected`: comma-separated ids of the pages to capture. Empty when none is.'
+    value: ${{ steps.lite-affected.outputs.pages }}
+  affected-all:
+    description: "`mode: lite`, `step: affected`: `true` when every page is selected — a `sample.global` file changed, or a push to the default branch."
+    value: ${{ steps.lite-affected.outputs.all }}
+  affected-none:
+    description: "`mode: lite`, `step: affected`: `true` when the diff reaches no page — skip the capture and the audit step."
+    value: ${{ steps.lite-affected.outputs.none }}
+  lite-new:
+    description: '`mode: lite`, `step: audit`: number of NEW findings against the baseline (whatever their severity).'
+    value: ${{ steps.lite-audit.outputs.new }}
 
 runs:
   using: composite
@@ -302,6 +328,8 @@ runs:
         REQUIRE_RENDERED: ${{ inputs.require-rendered }}
         COMMENT_KIND: ${{ inputs.comment-kind }}
         PAGES_REPORT: ${{ inputs.pages-report }}
+        MODE: ${{ inputs.mode }}
+        LITE_STEP: ${{ inputs.step }}
       run: |
         echo "path=$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" >> "$GITHUB_OUTPUT"
         node "$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" --version
@@ -386,9 +414,27 @@ runs:
             exit 1
             ;;
         esac
+        # `mode` and `step` are compared literally by every step's `if:`: a typo would run NOTHING
+        # in lite mode, and a green job that audited nothing is the failure this refuses.
+        case "${MODE:-}" in
+          full|lite|'') ;;
+          *)
+            echo "::error::ultra11y: mode='${MODE}' is not a mode — expected 'full' or 'lite'."
+            exit 1
+            ;;
+        esac
+        if [ "${MODE:-}" = 'lite' ]; then
+          case "${LITE_STEP:-}" in
+            affected|audit) ;;
+            *)
+              echo "::error::ultra11y: step='${LITE_STEP}' is not a lite step — expected 'affected' (which pages to capture) or 'audit' (gate the captured pages)."
+              exit 1
+              ;;
+          esac
+        fi
 
     - name: Start the application
-      if: inputs.start != '' && (inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != '')
+      if: inputs.mode != 'lite' && (inputs.start != '' && (inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != ''))
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
@@ -396,7 +442,7 @@ runs:
         echo "ultra11y: started the app (logs: /tmp/ultra11y-app.log)"
 
     - name: Wait for the application
-      if: inputs.wait-on != '' && (inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != '')
+      if: inputs.mode != 'lite' && (inputs.wait-on != '' && (inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != ''))
       shell: bash
       run: |
         deadline=$(( SECONDS + ${{ inputs.wait-timeout }} ))
@@ -412,6 +458,7 @@ runs:
 
     # The STATIC audit — the code-level half. Always runs.
     - name: Audit the code
+      if: inputs.mode != 'lite'
       id: audit
       shell: bash
       working-directory: ${{ inputs.working-directory }}
@@ -470,7 +517,7 @@ runs:
     # second answer, and it would eventually disagree with the command it exists to serve.
     - name: Provide the browser tier
       id: browsertier
-      if: (inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != '') && inputs.browser != 'off' && inputs.runtime != 'docker'
+      if: inputs.mode != 'lite' && ((inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != '') && inputs.browser != 'off' && inputs.runtime != 'docker')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -518,7 +565,7 @@ runs:
         echo "ultra11y: browser tier ready in $prefix (@playwright/test@$pw)."
 
     - name: Scan the pages
-      if: inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != ''
+      if: inputs.mode != 'lite' && (inputs.urls != '' || inputs.sample == 'true' || inputs.sitemap != '' || inputs.crawl != '')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -570,7 +617,7 @@ runs:
     # tier below costs nothing at all.
     - name: Replay the verdict ledger
       id: ledger
-      if: inputs.ledger != '' && inputs.ledger != 'false'
+      if: inputs.mode != 'lite' && (inputs.ledger != '' && inputs.ledger != 'false')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -624,7 +671,7 @@ runs:
     # request, where secrets are not exposed.
     - name: Resolve the adjudication tier
       id: adjudication
-      if: inputs.adjudicate != 'none'
+      if: inputs.mode != 'lite' && (inputs.adjudicate != 'none')
       shell: bash
       # Through `env:`, not interpolated into the script. An input reaches a reusable action
       # from a caller's workflow, and a caller is free to wire an event payload into it —
@@ -702,7 +749,7 @@ runs:
     # renders it through the very formatter the agent reads, and folds the verdicts through
     # `applyAdjudication` unchanged: a model cannot assert a conformance the gate refuses.
     - name: Adjudicate with the API
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'api'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'api')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -762,7 +809,7 @@ runs:
     # the action path has never been able to serve.
     - name: Adjudicate through the engine-driven CLI
       id: clirunner
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner == 'cli'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner == 'cli')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -863,7 +910,7 @@ runs:
 
     - name: Adjudicate with an agent — worklist and runbook
       id: worklist
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -973,7 +1020,7 @@ runs:
     # step has nobody watching it.
     - name: Adjudicate with an agent — Claude Code
       id: agentpass1
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli')
       uses: anthropics/claude-code-action@v1
       # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
       # always honoured, and the one tier that could not. A `uses:` step has no `if node …
@@ -1093,7 +1140,7 @@ runs:
           not comment on the PR.
 
     - name: Adjudicate with an agent — fold the verdicts
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1139,7 +1186,7 @@ runs:
     # is the criterion's own `manual` reason.
     - name: Adjudicate with an agent — pass 2, worklist
       id: worklist2
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && (inputs.adjudicate-passes == '2' || inputs.adjudicate-passes == '3') && steps.worklist.outputs.remaining != '0'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && (inputs.adjudicate-passes == '2' || inputs.adjudicate-passes == '3') && steps.worklist.outputs.remaining != '0')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1207,7 +1254,7 @@ runs:
 
     - name: Adjudicate with an agent — pass 2, Claude Code
       id: agentpass2
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0')
       uses: anthropics/claude-code-action@v1
       # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
       # always honoured, and the one tier that could not. A `uses:` step has no `if node …
@@ -1270,7 +1317,7 @@ runs:
           not comment on the PR.
 
     - name: Adjudicate with an agent — pass 2, fold
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1297,7 +1344,7 @@ runs:
 
     - name: Adjudicate with an agent — pass 3, worklist
       id: worklist3
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0' && inputs.adjudicate-passes == '3'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist2.outputs.remaining != '' && steps.worklist2.outputs.remaining != '0' && inputs.adjudicate-passes == '3')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1365,7 +1412,7 @@ runs:
 
     - name: Adjudicate with an agent — pass 3, Claude Code
       id: agentpass3
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0')
       uses: anthropics/claude-code-action@v1
       # AN ADJUDICATION THAT FAILS IS NOT AN AUDIT THAT FAILS — the policy the API tier has
       # always honoured, and the one tier that could not. A `uses:` step has no `if node …
@@ -1413,7 +1460,7 @@ runs:
           not comment on the PR.
 
     - name: Adjudicate with an agent — pass 3, fold
-      if: steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist3.outputs.remaining != '' && steps.worklist3.outputs.remaining != '0')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1445,7 +1492,7 @@ runs:
     # says success while the final Claude result says `is_error: true`.
     - name: Require at least one operational agent pass
       id: agentoperational
-      if: always() && steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist.outputs.remaining != '0'
+      if: inputs.mode != 'lite' && (always() && steps.adjudication.outputs.on == 'true' && inputs.adjudicate == 'agent' && inputs.adjudicate-runner != 'cli' && steps.worklist.outputs.remaining != '0')
       shell: bash
       env:
         PASS1: ${{ steps.agentpass1.outputs.conclusion }}
@@ -1523,7 +1570,7 @@ runs:
     # they were handed.
     - name: What the adjudication left to assess
       id: residue
-      if: steps.adjudication.outputs.on == 'true'
+      if: inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1559,7 +1606,7 @@ runs:
     # anyone does with an incomplete sweep is go and read which pages are missing.
     - name: Sample coverage gate
       id: covered
-      if: inputs.require-sample == 'true'
+      if: inputs.mode != 'lite' && (inputs.require-sample == 'true')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1579,7 +1626,7 @@ runs:
     # with an incomplete grid is go and read which criteria are missing.
     - name: Completeness gate
       id: decided
-      if: inputs.require-decided == 'true' || inputs.require-decided == 'pages'
+      if: inputs.mode != 'lite' && (inputs.require-decided == 'true' || inputs.require-decided == 'pages')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1612,7 +1659,7 @@ runs:
     # by a workflow that audited sources only and had snapshotted nothing.
     - name: Render gate
       id: renderedgate
-      if: inputs.require-rendered == 'true'
+      if: inputs.mode != 'lite' && (inputs.require-rendered == 'true')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1631,7 +1678,7 @@ runs:
     # standard, each non-conformity), plus an index. Uploaded with the rest of audits/.
     - name: Per-page report
       id: pages
-      if: inputs.pages-report != 'false'
+      if: inputs.mode != 'lite' && (inputs.pages-report != 'false')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1745,7 +1792,7 @@ runs:
         '
 
     - name: SARIF → code scanning
-      if: inputs.sarif == 'true'
+      if: inputs.mode != 'lite' && (inputs.sarif == 'true')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1753,7 +1800,7 @@ runs:
       run: node "$ENGINE" report --in audits/audit-latest.json --standard '${{ inputs.standard }}' --format sarif > audits/ultra11y.sarif
 
     - name: Upload SARIF
-      if: inputs.sarif == 'true'
+      if: inputs.mode != 'lite' && (inputs.sarif == 'true')
       continue-on-error: true # no Advanced Security / no security-events: write → annotations still cover it
       uses: github/codeql-action/upload-sarif@v3
       with:
@@ -1762,7 +1809,7 @@ runs:
 
     # Annotations + the job summary (+ the sticky PR comment when asked). Works on every plan.
     - name: Annotations, job summary and PR comment
-      if: inputs.annotations == 'true' || inputs.comment == 'true'
+      if: inputs.mode != 'lite' && (inputs.annotations == 'true' || inputs.comment == 'true')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1785,7 +1832,7 @@ runs:
     # Tickets. REST is why this works in a container job or on a self-hosted runner, where
     # `gh` is absent: the engine falls back to GITHUB_TOKEN + GITHUB_REPOSITORY on its own.
     - name: File tracker tickets
-      if: inputs.tickets != ''
+      if: inputs.mode != 'lite' && (inputs.tickets != '')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1802,7 +1849,7 @@ runs:
 
     - name: Markdown report
       id: report
-      if: inputs.report == 'true'
+      if: inputs.mode != 'lite' && (inputs.report == 'true')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1833,7 +1880,7 @@ runs:
     # output are NOT optional.
     - name: HTML report
       id: html
-      if: inputs.html == 'true'
+      if: inputs.mode != 'lite' && (inputs.html == 'true')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1863,7 +1910,7 @@ runs:
     # one: all 258 RGAA tests, their owner, and the exact decisive/candidate rules travel with
     # the report instead of living only in the action's source repository.
     - name: Carry the RGAA automation matrix into the artifact
-      if: (inputs.report == 'true' || inputs.html == 'true') && inputs.standard == 'rgaa'
+      if: inputs.mode != 'lite' && ((inputs.report == 'true' || inputs.html == 'true') && inputs.standard == 'rgaa')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1890,7 +1937,7 @@ runs:
     # nothing saying so. Copied beside the report so the artifact carries what the run decided,
     # ready to be read and committed.
     - name: Carry the verdict ledger into the artifact
-      if: (inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false') && inputs.ledger != '' && inputs.ledger != 'false'
+      if: inputs.mode != 'lite' && ((inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false') && inputs.ledger != '' && inputs.ledger != 'false')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1911,7 +1958,7 @@ runs:
     # download stays as small and readable as the job summary.
     - name: Prepare report artifact
       id: artifact-files
-      if: inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false'
+      if: inputs.mode != 'lite' && (inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -1929,7 +1976,7 @@ runs:
 
     - name: Upload the report
       id: upload
-      if: inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false'
+      if: inputs.mode != 'lite' && (inputs.report == 'true' || inputs.html == 'true' || inputs.pages-report != 'false')
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('ultra11y-{0}', inputs.standard) }}
@@ -1951,7 +1998,7 @@ runs:
     # rather than failing a run over a number nobody has asked for yet.
     - name: Recompute the published totals
       id: totals
-      if: always()
+      if: inputs.mode != 'lite' && (always())
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
@@ -1970,7 +2017,7 @@ runs:
 
     # The gate runs LAST, so a failing audit has already produced every surface above.
     - name: Gate
-      if: inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-decided == 'pages' || inputs.require-sample == 'true' || inputs.require-rendered == 'true' || steps.agentoperational.outputs.ok == 'false' || steps.clirunner.outputs.operational == 'false'
+      if: inputs.mode != 'lite' && (inputs.fail-on != '' || inputs.require-decided == 'true' || inputs.require-decided == 'pages' || inputs.require-sample == 'true' || inputs.require-rendered == 'true' || steps.agentoperational.outputs.ok == 'false' || steps.clirunner.outputs.operational == 'false')
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -2059,3 +2106,186 @@ runs:
         # The gate counts THIS standard's non-conformities — which under a pack also carries
         # its declarative-rule findings, part of its verdict and previously invisible here.
         node "$ENGINE" audit "${args[@]}" --fail-on '${{ inputs.fail-on }}' --standard '${{ inputs.standard }}'
+
+    # ---- MODE: LITE ------------------------------------------------------------------------
+    #
+    # The per-pull-request RENDERED regression gate (src/lite.ts, src/affected.ts). Every step
+    # above is `mode != 'lite'`; every step below is `mode == 'lite'`, so the two never mix.
+    #
+    # Two invocations in one job, because the capture between them belongs to the consumer — its
+    # app, its seed, its sign-in — and a composite action cannot run it:
+    #
+    #   step: affected  → which pages can this diff change? (outputs affected-*)
+    #   …the workflow captures those pages into .ultra11y/pages/ (its own Playwright suite)…
+    #   step: audit     → engine only over those snapshots, gate on findings NEW to the baseline.
+    #
+    # The baseline lives in the Actions cache, never in the repository: it is written by the push
+    # to the default branch (every page, key carrying the SHA) and restored by a pull request
+    # (exact key of its merge-base, else the closest entry by prefix). A cache created on the
+    # default branch is readable from every pull request against it.
+    - name: Lite — select the pages the diff reaches
+      id: lite-affected
+      if: inputs.mode == 'lite' && inputs.step == 'affected'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        SINCE: ${{ inputs.since }}
+        EVENT: ${{ github.event_name }}
+        REF: ${{ github.ref }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        mkdir -p audits/lite
+        since="$SINCE"
+        if [ "$since" = "auto" ]; then
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then since="origin/$GITHUB_BASE_REF"; else since=""; fi
+        fi
+        # The push that WRITES the baseline measures every page, whatever it changed: a page left
+        # out of it has no baseline, and every pull request touching it would only warn.
+        if [ "$EVENT" = "push" ] && [ -n "$DEFAULT_BRANCH" ] && [ "$REF" = "refs/heads/$DEFAULT_BRANCH" ]; then since=""; fi
+        if [ -n "$since" ]; then
+          node "$ENGINE" affected --since "$since" --json > audits/lite/affected.json
+        else
+          node "$ENGINE" affected --all --json > audits/lite/affected.json
+        fi
+        node -e '
+          const fs = require("fs");
+          const r = JSON.parse(fs.readFileSync("audits/lite/affected.json", "utf8"));
+          const out = (k, v) => fs.appendFileSync(process.env.GITHUB_OUTPUT, k + "=" + v + "\n");
+          out("pages", r.pages.join(","));
+          out("all", String(r.all));
+          out("none", String(r.none));
+          for (const f of r.unmapped) console.log("::warning file=" + f + ",title=ultra11y lite::changed markup that no sample page reaches — declare its page, or add it to its page sources.");
+          if (r.unsourced.length) console.log("::warning title=ultra11y lite::page(s) declaring no sources, selected only by a global file: " + r.unsourced.join(", "));
+          const label = r.all ? "every page" : r.none ? "no page" : r.pages.length + " page(s): " + r.pages.join(", ");
+          console.log("ultra11y lite: " + label + (r.changed ? " (" + r.changed + " changed file(s))" : ""));
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, "ultra11y lite — pages to capture: " + label + "\n\n");
+        '
+
+    - name: Lite — resolve the baseline key
+      id: lite-key
+      if: inputs.mode == 'lite' && inputs.step == 'audit'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        SINCE: ${{ inputs.since }}
+        EVENT: ${{ github.event_name }}
+        REF: ${{ github.ref }}
+        SHA: ${{ github.sha }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        STANDARD: ${{ inputs.standard }}
+        WORKDIR: ${{ inputs.working-directory }}
+      run: |
+        # One cache line per standard and per project directory: a monorepo running the gate on
+        # two apps must not read one app's baseline for the other.
+        scope=$(node -e 'process.stdout.write(require("crypto").createHash("sha256").update(process.argv[1]).digest("hex").slice(0, 8))' "$WORKDIR")
+        prefix="ultra11y-lite-${STANDARD}-${scope}-"
+        save=false
+        key="${prefix}${SHA}"
+        if [ "$EVENT" = "push" ] && [ -n "$DEFAULT_BRANCH" ] && [ "$REF" = "refs/heads/$DEFAULT_BRANCH" ]; then
+          save=true
+        else
+          since="$SINCE"
+          if [ "$since" = "auto" ]; then
+            if [ -n "${GITHUB_BASE_REF:-}" ]; then since="origin/$GITHUB_BASE_REF"; else since=""; fi
+          fi
+          base=""
+          if [ -n "$since" ]; then base=$(git merge-base "$since" HEAD 2>/dev/null || true); fi
+          if [ -n "$base" ]; then key="${prefix}${base}"; fi
+        fi
+        {
+          echo "prefix=$prefix"
+          echo "key=$key"
+          echo "save=$save"
+          # The cache path is workspace-relative; the engine runs inside working-directory.
+          echo "path=${WORKDIR%/}/.ultra11y/lite/baseline.json"
+        } >> "$GITHUB_OUTPUT"
+        echo "ultra11y lite: baseline key $key (save=$save)"
+
+    - name: Lite — restore the baseline
+      id: lite-restore
+      if: inputs.mode == 'lite' && inputs.step == 'audit' && steps.lite-key.outputs.save != 'true'
+      continue-on-error: true # no cache service → no baseline → the gate warns instead of failing
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.lite-key.outputs.path }}
+        key: ${{ steps.lite-key.outputs.key }}
+        restore-keys: ${{ steps.lite-key.outputs.prefix }}
+
+    - name: Lite — audit the pages
+      id: lite-audit
+      if: inputs.mode == 'lite' && inputs.step == 'audit'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ENGINE: ${{ steps.engine.outputs.path }}
+        PAGES: ${{ inputs.pages }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        STANDARD: ${{ inputs.standard }}
+        LANG_IN: ${{ inputs.lang }}
+        SAVE: ${{ steps.lite-key.outputs.save }}
+        RESTORED: ${{ steps.lite-restore.outputs.cache-matched-key }}
+      run: |
+        args=(audit --lite --standard "$STANDARD" --lang "$LANG_IN" --out audits/lite --format github)
+        if [ -n "$PAGES" ]; then args+=(--pages "$PAGES"); fi
+        if [ "$SAVE" = 'true' ]; then
+          args+=(--write-baseline .ultra11y/lite/baseline.json)
+        else
+          if [ -n "$RESTORED" ]; then echo "ultra11y lite: baseline restored from $RESTORED"; fi
+          args+=(--baseline .ultra11y/lite/baseline.json)
+          if [ -n "$FAIL_ON" ]; then args+=(--fail-on "$FAIL_ON"); fi
+        fi
+        # The verdict waits for the uploads below: record the exit code instead of dying on it.
+        set +e
+        node "$ENGINE" "${args[@]}"
+        code=$?
+        set -e
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+        node -e '
+          const fs = require("fs");
+          let j = null;
+          try { j = JSON.parse(fs.readFileSync("audits/lite/lite.json", "utf8")); } catch {}
+          const out = (k, v) => fs.appendFileSync(process.env.GITHUB_OUTPUT, k + "=" + v + "\n");
+          // Written only by a run that got as far as the verdict: its absence is a crash, which
+          // must not read as "new findings".
+          out("ran", String(j !== null));
+          j = j || {};
+          out("new", String((j.newFindings || []).length));
+          out("pages", String((j.pages || []).length));
+          out("sarif", String(fs.existsSync("audits/lite/lite.sarif")));
+        '
+
+    - name: Lite — SARIF → code scanning
+      if: inputs.mode == 'lite' && inputs.step == 'audit' && inputs.sarif == 'true' && steps.lite-key.outputs.save != 'true' && steps.lite-audit.outputs.sarif == 'true'
+      continue-on-error: true # no Advanced Security / no security-events: write → annotations still cover it
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.working-directory }}/audits/lite/lite.sarif
+        category: ultra11y-lite-${{ inputs.standard }}
+
+    - name: Lite — save the baseline
+      if: inputs.mode == 'lite' && inputs.step == 'audit' && steps.lite-key.outputs.save == 'true' && steps.lite-audit.outputs.code == '0' && steps.lite-audit.outputs.pages != '0'
+      continue-on-error: true # the same SHA re-run finds its key taken; the first save stands
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ steps.lite-key.outputs.path }}
+        key: ${{ steps.lite-key.outputs.key }}
+
+    - name: Lite — gate
+      if: inputs.mode == 'lite' && inputs.step == 'audit'
+      shell: bash
+      env:
+        CODE: ${{ steps.lite-audit.outputs.code }}
+        RAN: ${{ steps.lite-audit.outputs.ran }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        NEW: ${{ steps.lite-audit.outputs.new }}
+      run: |
+        if [ "$CODE" = '2' ] || [ -z "$CODE" ] || [ "$RAN" != 'true' ]; then
+          echo "::error::ultra11y lite: the audit did not run (see the step above)."
+          exit 1
+        fi
+        if [ "$CODE" = '1' ] && [ -n "$FAIL_ON" ]; then
+          echo "::error::ultra11y lite: this change introduces rendered non-conformities ≥ ${FAIL_ON} (${NEW} new finding(s) in all). See the job summary."
+          exit 1
+        fi
+        echo "ultra11y lite: no new rendered non-conformity ≥ ${FAIL_ON:-any} — ${NEW:-0} new finding(s) in all."

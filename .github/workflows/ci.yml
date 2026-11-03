@@ -396,6 +396,91 @@ jobs:
           node scripts/ultra11y.mjs check --in audits/audit-latest.json \
             --standard rgaa --require-rendered
 
+  action-lite:
+    # `mode: lite` EXECUTED, not parsed. It needs no install, no browser and no app — the engine
+    # ships in the checkout and the snapshot is written by `snapshot write` — so it costs seconds
+    # and runs on every push and pull request, unlike `action` below. On a push to main the audit
+    # half takes its save branch (every page, baseline into the cache); on a pull request, the
+    # gate branch with no baseline yet, which must warn and pass.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: A project with a sample, and one commit that reaches one page
+        id: project
+        run: |
+          p="$RUNNER_TEMP/lite"
+          mkdir -p "$p/src"
+          cat > "$p/.ultra11yrc.json" <<'JSON'
+          {"sample":{"pages":[{"id":"home","name":"Home","url":"http://localhost/","sources":["src/home.tsx"]},{"id":"about","name":"About","url":"http://localhost/about","sources":["src/about.tsx"]}]}}
+          JSON
+          printf 'import { Button } from "./button";\nexport default function Home() { return <Button />; }\n' > "$p/src/home.tsx"
+          printf 'export default function About() { return <p>about</p>; }\n' > "$p/src/about.tsx"
+          printf 'export function Button() { return <button>ok</button>; }\n' > "$p/src/button.tsx"
+          cd "$p"
+          git init -q -b main .
+          git config user.email ci@example.org
+          git config user.name ci
+          git add .
+          git commit -q -m base
+          printf 'export function Button() { return <button>changed</button>; }\n' > src/button.tsx
+          git commit -q -am change
+          echo "dir=$p" >> "$GITHUB_OUTPUT"
+
+      - name: Lite — which pages
+        id: affected
+        uses: ./
+        with:
+          mode: lite
+          step: affected
+          working-directory: ${{ steps.project.outputs.dir }}
+          since: HEAD~1
+          adjudicate: none
+
+      - name: It selects the page the diff reaches — every page on a push to main
+        env:
+          PAGES: ${{ steps.affected.outputs.affected-pages }}
+          ALL: ${{ steps.affected.outputs.affected-all }}
+          NONE: ${{ steps.affected.outputs.affected-none }}
+          SAVE_RUN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          echo "pages=$PAGES all=$ALL none=$NONE"
+          if [ "$SAVE_RUN" = 'true' ]; then
+            if [ "$ALL" != 'true' ] || [ "$PAGES" != 'home,about' ]; then echo "::error::the default-branch run must select every page"; exit 1; fi
+          else
+            if [ "$PAGES" != 'home' ] || [ "$ALL" != 'false' ] || [ "$NONE" != 'false' ]; then echo "::error::expected exactly the page whose import changed"; exit 1; fi
+          fi
+
+      - name: Capture it (a snapshot with a blocking defect)
+        env:
+          DIR: ${{ steps.project.outputs.dir }}
+        run: |
+          printf '%s' '{"meta":{"v":1,"id":"home","name":"Home","url":"http://localhost/"},"dom":"<!doctype html><html lang=\"en\"><head><title>Home</title></head><body><main><img src=\"a.png\"></main></body></html>"}' \
+            | node "$GITHUB_WORKSPACE/scripts/ultra11y.mjs" snapshot write --root "$DIR" > /dev/null
+
+      - name: Lite — audit
+        id: audit
+        uses: ./
+        with:
+          mode: lite
+          step: audit
+          working-directory: ${{ steps.project.outputs.dir }}
+          pages: ${{ steps.affected.outputs.affected-pages }}
+          fail-on: blocking
+          sarif: "false"
+          adjudicate: none
+
+      - name: No baseline yet is a warning, never a failure — and the run measured the page
+        env:
+          DIR: ${{ steps.project.outputs.dir }}
+          NEW: ${{ steps.audit.outputs.lite-new }}
+        run: |
+          echo "new=$NEW"
+          test -f "$DIR/audits/lite/lite.json" || { echo "::error::the lite audit wrote no result"; exit 1; }
+          node -e 'const j = require(process.argv[1]); if (!j.pages.includes("home")) { console.log("::error::home was not audited"); process.exit(1); }' "$DIR/audits/lite/lite.json"
+          if [ "$NEW" != '0' ]; then echo "::error::with no baseline, no finding can be new"; exit 1; fi
+
   action:
     # HAND-DISPATCHED ONLY. This is the heaviest job in the file — it installs the browser
     # tier, serves a site, crawls it and drives four full invocations of the shipped action —

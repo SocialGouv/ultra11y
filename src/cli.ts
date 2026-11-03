@@ -1,4 +1,4 @@
-import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
+import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, readdirSync, appendFileSync, copyFileSync } from "node:fs";
 import { join, relative, resolve, sep, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -105,6 +105,17 @@ import { diffSides, sideOfExternal, type DiffBucket } from "./external/diff.js";
 import type { ExternalAdapter, ExternalAudit } from "./external/types.js";
 import { runFix, fixSummary } from "./fix.js";
 import { diffAgainstBaseline, baselineSummary, findingId, parseFailOn, findingsAtOrAbove } from "./baseline.js";
+import {
+  buildRenderBaseline,
+  diffRenderBaseline,
+  gatedFindings,
+  parseRenderBaseline,
+  regressionKey,
+  renderDiffMarkdown,
+  renderDiffWarnings,
+  type RenderBaseline,
+} from "./lite.js";
+import { changedSince, selectAffected } from "./affected.js";
 import { repoRoot, resolveEnginePath, writeHook, writeCi } from "./init.js";
 import { installForTargets, parseTargets, statusReport, uninstallForTargets } from "./install/index.js";
 import { agentsMdBlock } from "./install/agents-md.js";
@@ -156,6 +167,8 @@ Usage:
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures + .ultra11y/pages snapshots: audit real HTML)
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor] [--format sarif|github]   (re-gate an audit already computed — e.g. one carrying adjudicated verdicts — without a second detection pass)
+  ultra11y audit    --lite [--pages <ids>] [--root <dir>] [--baseline <file>] [--write-baseline <file>] [--fail-on blocking|major|minor] [--format sarif|github] [--out <dir>] [--json]   (rendered regression gate: the page snapshots alone, engine only, fails on NEW findings only)
+  ultra11y affected --since <ref> | --all [--root <dir>] [--json]   (the sample pages a diff can change: sources + their imports, sample.global, the merge-base)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (the Markdown report, illustrated with annotated crops)
   ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
@@ -427,8 +440,9 @@ Options:
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
   --e2e              render: write the Playwright/Cypress fixtures into .ultra11y/e2e/
   --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
-  --root <dir>       snapshot, scan: project root holding .ultra11y/pages (default: . —
-                     scan writes the snapshots it collects under it)
+  --root <dir>       snapshot, scan, affected, audit --lite: project root holding
+                     .ultra11y/pages and .ultra11yrc.json (default: . — scan writes the
+                     snapshots it collects under it)
   --port <n>         dev: port for the side-car (default: 4111); mcp: HTTP transport port
   --transport <k>    mcp: stdio (default) or http
   --bind <addr>      mcp --transport http: address to bind (default 127.0.0.1)
@@ -445,6 +459,16 @@ Options:
   --safe             fix: apply only genuinely-automatic codemods (skip TODO placeholders / judgment proposals)
   --only <ids>       fix: limit auto-fixes to these rule ids (comma-separated)
   --baseline <file>  audit/init: regression-gate vs / write this baseline AuditResult
+                     · audit --lite: a render baseline (or an audit JSON), compared on the
+                     stable key page|rule|criterion|selector, so a finding that only MOVED
+                     is not new. A missing file means no baseline: warnings, never a failure
+  --lite             audit: the rendered regression gate — audit only the page snapshots
+                     (.ultra11y/pages), engine only: no source, no PDF, no pixel tier, no
+                     report. With --baseline it fails only on NEW findings at --fail-on; a
+                     page the baseline never measured, or a baseline from another ultra11y
+                     version, warns instead of failing
+  --pages <ids>      audit --lite: comma-separated page ids to audit (default: every snapshot)
+  --write-baseline <file>  audit --lite: write the render baseline of this run
   --fail-on <sev>    audit/init: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
   --hook             init: write a git pre-commit accessibility gate (staged snapshot + auto-fix by default)
   --ci               init: write a GitHub Actions accessibility gate
@@ -615,6 +639,7 @@ Data: WCAG 2.2 © W3C (W3C Document License). RGAA 4.1.2 pack © DINUM, Licence 
 
 export const COMMANDS = [
   "audit",
+  "affected",
   "report",
   "prd",
   "tickets",
@@ -702,6 +727,10 @@ const VALUE_FLAGS = new Set([
   // the conformity half of the gate runs without anyone asking for it.
   "conformities",
   "baseline",
+  // `audit --lite --write-baseline <file>`: where to write the render baseline of this run.
+  "write-baseline",
+  // `audit --lite --pages a,b`: the snapshots to audit.
+  "pages",
   "fail-on",
   "split",
   "api-key",
@@ -755,6 +784,8 @@ function valueFlagsFor(command: string): ReadonlySet<string> {
 // Paired with VALUE_FLAGS this is the full set of recognised long flags, used to
 // warn on unknown/misspelled ones instead of silently accepting them as no-ops.
 const BOOLEAN_FLAGS = new Set([
+  // `audit --lite`: the rendered regression gate (src/lite.ts).
+  "lite",
   // `verify --apply … --prune`: apply what the refutation trial decided to the audit, instead
   // of only reporting it (src/refute.ts).
   "prune",
@@ -1180,6 +1211,7 @@ async function cmdAuditFromFile(p: ParsedArgs, inPath: string): Promise<number> 
 async function cmdAudit(p: ParsedArgs): Promise<number> {
   const inFlag = p.flags.in;
   if (typeof inFlag === "string" && inFlag) return cmdAuditFromFile(p, inFlag);
+  if (p.flags.lite === true) return cmdAuditLite(p);
 
   const inputs = p.positionals.length ? p.positionals : ["."];
   if (inputs.length === 0) {
@@ -1385,6 +1417,231 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   }
   if (!failOnSet && !requireCaptures) return 0;
   return failing.length || blindSpots.length ? 1 : 0;
+}
+
+// `audit --lite` — the rendered regression gate (src/lite.ts). Everything the full pipeline adds
+// on top of the engine is left out on purpose — no source files, no captures, no PDF, no pixel
+// tier, no page report, no adjudication — because this runs on every pull request and its one
+// question is "did this change break a page?". The snapshots are the pages a workflow captured,
+// usually the ones `affected` selected.
+async function cmdAuditLite(p: ParsedArgs): Promise<number> {
+  const standard = stdOf(p, "audit");
+  if (standard === null) return 2;
+  let lang = resolveLang(p.flags, { standard });
+  const refused = ["since", "changed", "staged", "graph", "cross-file", "captures", "require-captures", "in", "max-files"].filter(
+    (f) => p.flags[f] !== undefined,
+  );
+  if (p.positionals.length) refused.unshift("<paths>");
+  if (refused.length) {
+    console.error(`ultra11y audit --lite: audits the page snapshots alone, so these do not apply: ${refused.join(", ")}.`);
+    return 2;
+  }
+  const failOnRaw = p.flags["fail-on"];
+  const failOn = parseFailOn(failOnRaw);
+  if (failOn === null) {
+    console.error(`ultra11y audit: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
+    return 2;
+  }
+  const ciFormat = parseCiFormat(p.flags.format);
+  if (ciFormat === null) {
+    console.error(`ultra11y audit: --format must be sarif|github (got "${String(p.flags.format)}").`);
+    return 2;
+  }
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  const pagesDir = join(root, PAGES_DIR);
+  let available: string[] = [];
+  try {
+    available = readdirSync(pagesDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && existsSync(join(pagesDir, d.name, "dom.html")))
+      .map((d) => d.name)
+      .sort();
+  } catch {
+    /* no snapshot directory: reported below like an empty one */
+  }
+  const warnings: string[] = [];
+  let selected = available;
+  if (typeof p.flags.pages === "string") {
+    const wanted = [
+      ...new Set(
+        p.flags.pages
+          .split(/[\s,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    ];
+    const have = new Set(available);
+    const missing = wanted.filter((id) => !have.has(id));
+    if (missing.length)
+      warnings.push(
+        lang === "fr"
+          ? `page(s) demandée(s) sans instantané dans ${pagesDir} : ${missing.join(", ")} — non auditée(s).`
+          : `page(s) asked for with no snapshot in ${pagesDir}: ${missing.join(", ")} — not audited.`,
+      );
+    selected = wanted.filter((id) => have.has(id));
+  }
+
+  const result = runAudit({
+    inputs: selected.map((id) => join(pagesDir, id, "dom.html")),
+    // Two pages may serialize to the same DOM; each must still be measured under its own id,
+    // or the second one reads as a clean page in the baseline.
+    dedup: "off",
+    noDefaultExcludes: true,
+    pixel: false,
+    onWarn: (m) => console.error(m),
+  });
+  lang = resolveLang(p.flags, { audit: result, standard });
+  const findings = findingsForStandard(result, standard);
+
+  const writeTo = typeof p.flags["write-baseline"] === "string" && p.flags["write-baseline"] ? p.flags["write-baseline"] : undefined;
+  if (writeTo) {
+    const baseline = buildRenderBaseline(findings, selected, standard);
+    mkdirSync(dirname(writeTo), { recursive: true });
+    writeFileSync(writeTo, `${JSON.stringify(baseline, null, 2)}\n`);
+    console.error(
+      lang === "fr"
+        ? `→ baseline de rendu écrite dans ${writeTo} (${selected.length} page(s)).`
+        : `→ render baseline written to ${writeTo} (${selected.length} page(s)).`,
+    );
+  }
+
+  // Gate only when a baseline was asked for. Without one the run is a measurement (the push to
+  // the default branch that writes the next baseline), and every finding is the backlog.
+  const baselineFlag = typeof p.flags.baseline === "string" ? p.flags.baseline : undefined;
+  let baseline: RenderBaseline | null = null;
+  if (baselineFlag && existsSync(baselineFlag)) {
+    try {
+      baseline = parseRenderBaseline(JSON.parse(readText(baselineFlag)), standard);
+      if (!baseline) warnings.push(`--baseline ${baselineFlag} is neither a render baseline nor an ultra11y audit — treated as absent.`);
+    } catch {
+      warnings.push(`--baseline ${baselineFlag} is not valid JSON — treated as absent.`);
+    }
+  }
+  const gating = baselineFlag !== undefined;
+  const diff = diffRenderBaseline(findings, selected, baseline, failOn);
+  warnings.push(...(gating ? renderDiffWarnings(diff, lang) : []));
+  if (!selected.length) warnings.push(lang === "fr" ? `aucun instantané de page à auditer sous ${pagesDir}.` : `no page snapshot to audit under ${pagesDir}.`);
+  // What this run REPORTS: the regression when gating, the whole backlog when measuring.
+  const reported = gating ? diff.newFindings : gatedFindings(findings);
+  const reportedResult: AuditResult = { ...result, findings: reported, packFindings: [] };
+
+  if (typeof p.flags.out === "string" && p.flags.out) {
+    const out = p.flags.out;
+    try {
+      mkdirSync(out, { recursive: true });
+      writeFileSync(join(out, "lite.json"), `${JSON.stringify({ ...diff, gating, warnings, findings: reported.length }, null, 2)}\n`);
+      writeFileSync(
+        join(out, "lite.sarif"),
+        `${JSON.stringify(toSarif(reportedResult, { standard, lang, fingerprint: regressionKey, automationId: `ultra11y-lite/${standard}/` }), null, 2)}\n`,
+      );
+    } catch {
+      /* non-fatal: the gate below still decides */
+    }
+  }
+
+  if (ciFormat === "sarif") {
+    console.log(JSON.stringify(toSarif(reportedResult, { standard, lang, fingerprint: regressionKey, automationId: `ultra11y-lite/${standard}/` }), null, 2));
+  } else if (ciFormat === "github") {
+    for (const w of warnings) console.log(`::warning title=ultra11y lite::${w.replace(/%/g, "%25").replace(/\r?\n/g, "%0A")}`);
+    if (gating) for (const line of annotations(reportedResult, { standard, lang })) console.log(line);
+    const md = gating
+      ? renderDiffMarkdown(diff, lang)
+      : lang === "fr"
+        ? `## ultra11y lite — mesure\n\n${selected.length} page(s) auditée(s) · ${reported.length} constat(s)${writeTo ? " · baseline écrite" : ""}.\n`
+        : `## ultra11y lite — measurement\n\n${selected.length} page(s) audited · ${reported.length} finding(s)${writeTo ? " · baseline written" : ""}.\n`;
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      try {
+        appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${md}\n`);
+      } catch {
+        /* a summary that cannot be written never fails a gate */
+      }
+    } else console.error(md);
+  } else if (p.flags.json) {
+    console.log(JSON.stringify({ ...diff, gating, warnings }, null, 2));
+  } else {
+    for (const w of warnings) console.error(`⚠ ${w}`);
+    console.log(
+      gating
+        ? renderDiffMarkdown(diff, lang)
+        : lang === "fr"
+          ? `${selected.length} page(s) auditée(s) · ${reported.length} constat(s).`
+          : `${selected.length} page(s) audited · ${reported.length} finding(s).`,
+    );
+  }
+  return gating && !diff.ok ? 1 : 0;
+}
+
+// `affected` — the sample pages a diff can change (src/affected.ts). No browser and no parse:
+// the merge-base, the import graph reached from each page's sources, and `sample.global`.
+function cmdAffected(p: ParsedArgs): number {
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  const since = typeof p.flags.since === "string" ? p.flags.since.trim() : "";
+  const lang = resolveLang(p.flags, {});
+  const every = p.flags.all === true;
+  if (!since && !every) {
+    console.error("ultra11y affected: --since <ref> is required (e.g. --since origin/main), or --all for every page.");
+    return 2;
+  }
+  let cfg: ReturnType<typeof loadConfig>;
+  try {
+    cfg = loadConfig(root);
+  } catch (e) {
+    console.error(`ultra11y affected: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  const v = cfg?.sample ? validateSample(cfg.sample) : undefined;
+  if (!v?.ok || !v.sample) {
+    console.error(
+      v
+        ? `ultra11y affected: invalid \`sample\` in ${join(root, ".ultra11yrc.json")}: ${v.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`
+        : `ultra11y affected: no \`sample.pages\` in ${join(root, ".ultra11yrc.json")} — there is no page to select.`,
+    );
+    return 2;
+  }
+  // `--all`: the run that writes the baseline measures every page, whatever changed.
+  if (every) {
+    const pages = v.sample.pages.map((pg) => pg.id);
+    const r = { pages, all: true, none: pages.length === 0, unmapped: [], global: [], reasons: {}, unsourced: [], changed: 0 };
+    if (p.flags.json) console.log(JSON.stringify(r, null, 2));
+    else console.log(lang === "fr" ? `Toutes les pages (${pages.length}).` : `Every page (${pages.length}).`);
+    return 0;
+  }
+  let changed: ReturnType<typeof changedSince>;
+  try {
+    changed = changedSince(since, root);
+  } catch (e) {
+    console.error(`ultra11y affected: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  const r = selectAffected({ root, pages: v.sample.pages, global: v.sample.global, changed: changed.files });
+  if (p.flags.json) {
+    console.log(JSON.stringify({ since, mergeBase: changed.mergeBase, ...r }, null, 2));
+    return 0;
+  }
+  const fr = lang === "fr";
+  if (r.all)
+    console.log(
+      fr
+        ? `Toutes les pages (${r.pages.length}) : fichier(s) global(aux) touché(s) — ${r.global.join(", ")}.`
+        : `Every page (${r.pages.length}): global file(s) touched — ${r.global.join(", ")}.`,
+    );
+  else if (r.none) console.log(fr ? `Aucune page touchée (${r.changed} fichier(s) modifié(s)).` : `No page affected (${r.changed} changed file(s)).`);
+  else {
+    console.log(fr ? `${r.pages.length} page(s) touchée(s) sur ${v.sample.pages.length} :` : `${r.pages.length} of ${v.sample.pages.length} page(s) affected:`);
+    for (const id of r.pages) console.log(`  ${id}  ← ${(r.reasons[id] ?? []).join(", ")}`);
+  }
+  if (r.unmapped.length)
+    console.error(
+      fr
+        ? `⚠ balisage modifié qu'aucune page de l'échantillon n'atteint : ${r.unmapped.join(", ")}`
+        : `⚠ changed markup no sample page reaches: ${r.unmapped.join(", ")}`,
+    );
+  if (r.unsourced.length)
+    console.error(
+      fr
+        ? `⚠ page(s) sans \`sources\`, sélectionnée(s) seulement par un fichier global : ${r.unsourced.join(", ")}`
+        : `⚠ page(s) declaring no \`sources\`, selected only by a global file: ${r.unsourced.join(", ")}`,
+    );
+  return 0;
 }
 
 // `dev` — the development side-car. Long-running by design: it holds the port until you stop
@@ -5432,6 +5689,8 @@ export async function main(argv: string[]): Promise<number> {
   switch (p.command as Command) {
     case "audit":
       return cmdAudit(p);
+    case "affected":
+      return cmdAffected(p);
     case "report":
       return cmdReport(p);
     case "tickets":

@@ -36,6 +36,11 @@ const ACTION = parse(RAW) as {
  *  describes reason about ORDER, and a per-describe copy is a copy that drifts. */
 const idx = (needle: string): number => ACTION.runs.steps.findIndex((s) => s.name?.includes(needle));
 
+/** The `mode: lite` steps (#144) — appended after the full pipeline, which they never mix with. */
+const isLite = (s: { if?: string }): boolean => (s.if ?? "").startsWith("inputs.mode == 'lite'");
+const FULL_STEPS = ACTION.runs.steps.filter((s) => !isLite(s));
+const LITE_STEPS = ACTION.runs.steps.filter(isLite);
+
 describe("the action is well-formed", () => {
   it("is a composite action with a name and a description", () => {
     expect(ACTION.runs.using).toBe("composite");
@@ -620,7 +625,7 @@ describe("the adjudication tier", () => {
     expect(residue, "the action must always measure its own residue").toBeTruthy();
     // Gated on the TIER having run, and on nothing else — not on require-decided, not on a
     // pass count, not on fail-on.
-    expect(residue?.if).toBe("steps.adjudication.outputs.on == 'true'");
+    expect(residue?.if).toBe("inputs.mode != 'lite' && (steps.adjudication.outputs.on == 'true')");
     expect(residue?.run).toContain("verify --manual");
     expect(residue?.run).toContain("::warning::");
     // It names the criteria, not just a count: "12 left to assess" is not actionable.
@@ -1028,8 +1033,9 @@ describe("the authenticated scan", () => {
 });
 
 describe("the gate", () => {
+  // LAST of the full pipeline. The `mode: lite` steps come after it and never run beside it.
   it("runs LAST, so a failing audit has still produced every surface above it", () => {
-    const names = ACTION.runs.steps.map((s) => s.name);
+    const names = FULL_STEPS.map((s) => s.name);
     expect(names[names.length - 1]).toBe("Gate");
   });
 
@@ -1037,12 +1043,12 @@ describe("the gate", () => {
   // non-conformity can fail the job, and the caller has accepted a verdict that no longer
   // reproduces run to run. Both live in the SAME step, because the gate must stay last.
   it("re-audits the source by default, so two runs on one commit cannot disagree", () => {
-    const gate = ACTION.runs.steps[ACTION.runs.steps.length - 1];
+    const gate = FULL_STEPS[FULL_STEPS.length - 1];
     expect(gate?.run).toMatch(/node "\$ENGINE" audit "\$\{args\[@\]\}" --fail-on/);
   });
 
   it("gates the adjudicated audit only when asked, and says so in the log", () => {
-    const gate = ACTION.runs.steps[ACTION.runs.steps.length - 1];
+    const gate = FULL_STEPS[FULL_STEPS.length - 1];
     expect(gate?.run).toContain("inputs.gate-adjudicated");
     expect(gate?.run).toContain("audit --in audits/audit-latest.json");
     expect(gate?.run).toMatch(/not reproducible/i);
@@ -1053,7 +1059,7 @@ describe("the gate", () => {
   });
 
   it("can be turned off entirely (report-only mode)", () => {
-    const gate = ACTION.runs.steps[ACTION.runs.steps.length - 1];
+    const gate = FULL_STEPS[FULL_STEPS.length - 1];
     expect(gate?.if).toContain("inputs.fail-on != ''");
   });
 
@@ -1609,5 +1615,76 @@ describe("the published scalars are read off the audit as it finally stands", ()
     const gate = RAW.slice(RAW.indexOf("- name: Gate"));
     expect(gate).toMatch(/NOT counted by this gate/);
     expect(gate).toMatch(/gate-adjudicated/);
+  });
+});
+
+// #144 — `mode: lite`, the per-pull-request rendered regression gate. Two invocations around the
+// consumer's own capture: `step: affected` says which pages, `step: audit` gates them.
+describe("mode: lite", () => {
+  const lite = (id: string) => ACTION.runs.steps.find((s) => s.id === id);
+
+  it("takes mode, step and pages, defaulting to the full pipeline", () => {
+    expect(ACTION.inputs.mode?.default).toBe("full");
+    expect(ACTION.inputs.step?.default).toBe("audit");
+    expect(ACTION.inputs.pages?.default).toBe("");
+  });
+
+  it("gates every step on the mode, so the two pipelines never mix", () => {
+    for (const step of ACTION.runs.steps) {
+      if (step.id === "engine") continue;
+      expect(step.if ?? "", `step "${step.name}" runs in both modes`).toMatch(/^inputs\.mode (!=|==) 'lite'/);
+    }
+    expect(ACTION.runs.steps.findIndex(isLite)).toBe(FULL_STEPS.length);
+    expect(LITE_STEPS[LITE_STEPS.length - 1]?.name).toBe("Lite — gate");
+  });
+
+  it("refuses a mode or a step its own conditions cannot match", () => {
+    const engine = ACTION.runs.steps.find((s) => s.id === "engine");
+    expect(engine?.run).toContain("mode='${MODE}' is not a mode");
+    expect(engine?.run).toContain("step='${LITE_STEP}' is not a lite step");
+  });
+
+  it("selects the pages from the merge-base on a pull request, and every page on the default branch", () => {
+    const run = lite("lite-affected")?.run ?? "";
+    expect(run).toContain('affected --since "$since" --json');
+    expect(run).toContain("affected --all --json");
+    expect(run).toContain('"refs/heads/$DEFAULT_BRANCH"');
+    expect(ACTION.outputs["affected-pages"]?.value).toContain("steps.lite-affected.outputs.pages");
+    expect(ACTION.outputs["affected-all"]?.value).toContain("steps.lite-affected.outputs.all");
+    expect(ACTION.outputs["affected-none"]?.value).toContain("steps.lite-affected.outputs.none");
+  });
+
+  it("restores the baseline by the merge-base, else the closest by prefix, and saves it only on the default branch", () => {
+    const key = lite("lite-key")?.run ?? "";
+    expect(key).toContain('git merge-base "$since" HEAD');
+    expect(key).toContain('key="${prefix}${SHA}"');
+    const restore = lite("lite-restore");
+    expect(restore?.uses).toMatch(/^actions\/cache\/restore@/);
+    expect(restore?.with?.key).toContain("steps.lite-key.outputs.key");
+    expect(restore?.with?.["restore-keys"]).toContain("steps.lite-key.outputs.prefix");
+    expect(restore?.if).toContain("steps.lite-key.outputs.save != 'true'");
+    const save = ACTION.runs.steps.find((s) => s.name === "Lite — save the baseline");
+    expect(save?.uses).toMatch(/^actions\/cache\/save@/);
+    expect(save?.if).toContain("steps.lite-key.outputs.save == 'true'");
+    expect(save?.with?.path).toBe(restore?.with?.path);
+  });
+
+  it("runs the engine alone over the snapshots — no adjudication, no report, no comment", () => {
+    const run = lite("lite-audit")?.run ?? "";
+    expect(run).toContain("audit --lite");
+    expect(run).toContain("--write-baseline");
+    expect(run).toContain("--baseline");
+    for (const step of LITE_STEPS) {
+      const text = JSON.stringify(step);
+      expect(text, step.name).not.toMatch(/adjudicat|claude|verify |pages --in|report --in|ULTRA11Y_PR_COMMENT|upload-artifact/);
+    }
+  });
+
+  it("produces every surface before it decides, and fails only on a new finding, or on a run that did not happen", () => {
+    expect(lite("lite-audit")?.run).toContain("set +e");
+    expect(idx("Lite — SARIF")).toBeLessThan(idx("Lite — gate"));
+    const gate = ACTION.runs.steps.find((s) => s.name === "Lite — gate");
+    expect(gate?.run).toContain(`"$CODE" = '1' ] && [ -n "$FAIL_ON" ]`);
+    expect(gate?.run).toContain(`"$RAN" != 'true'`);
   });
 });

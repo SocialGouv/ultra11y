@@ -145,6 +145,8 @@ ultra11y audit    <globs… | ->  [--standard <pack>] [--out <dir>] [--include <
 ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
 ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]              # audit rendered-DOM captures alongside source
 ultra11y audit    [--format sarif|github]                                               # CI: code-scanning SARIF, or inline annotations + job summary
+ultra11y audit    --lite [--pages <ids>] [--baseline <file>] [--write-baseline <file>] [--fail-on …]   # rendered regression gate: snapshots only, new findings only
+ultra11y affected --since <ref> | --all [--root <dir>] [--json]                         # the sample pages a diff can change
 ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
 ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--standard <pack>] [--lang auto|en|fr]
 ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest] [--max-tickets <n>] [--dry-run] [--json]
@@ -464,7 +466,8 @@ or malformed file is reported unreadable. See `skills/ultra11y/references/audit.
   end. `adjudicate: api|agent` optionally
   rules on the judgment criteria that would otherwise stay « à évaluer » in CI, reading its key
   from the job environment and skipping itself without one. `ultra11y init --ci` writes a
-  workflow using it. See `references/ci.md`.
+  workflow using it. `mode: lite` is the per-pull-request **rendered** gate: only the pages the
+  diff reaches, the engine alone, failing only on new findings (see below). See `references/ci.md`.
 - **Two PR comments, not one** — `comment-kind: digest` (the default) posts the distinct
   defects a reviewer can act on; `comment-kind: pages` posts the **page-by-page grid**: one row
   per page with its basis, its rate *and its denominator*, then the non-conforming criteria of
@@ -484,6 +487,97 @@ or malformed file is reported unreadable. See `skills/ultra11y/references/audit.
   re-stages them, and blocks only on judgment issues. `init --baseline`/`--ci` is the opt-in
   regression variant (hook + committed baseline / GitHub Actions job) that fails only on **new**
   non-conformities, not the existing backlog. See `references/automation.md`.
+
+### Rendered regressions on every pull request (`mode: lite`)
+
+The full page-by-page run captures every page and adjudicates with a model, which is minutes of
+browser and tens of minutes of model: it belongs on a schedule. The static gate runs on every pull
+request but cannot see the rendered page. `mode: lite` is the gate in between, priced for every
+pull request:
+
+- **only the pages the diff can change** — `ultra11y affected --since origin/main` diffs from the
+  merge-base and follows each sample page's `sources` through their imports (relative paths,
+  tsconfig aliases, `import()`, stylesheets and Sass `@use`/`@import`; type-only imports are
+  erased, so they select nothing). A Next.js App Router page is wrapped by every `layout`/`template`
+  above it. What no import says goes in `sample.global` — a touched global file selects every
+  page — and changed markup no page reaches is listed as `unmapped`, in a warning. No browser, no
+  parse: it reads only the files the pages reach, in well under a second;
+- **the engine alone** — `ultra11y audit --lite --pages <ids>` audits those snapshots and nothing
+  else: no source audit, no adjudication, no per-page report, no PDF, no pixel tier, no HTML;
+- **only NEW findings fail** — the baseline keys a rendered finding on
+  `page|rule|criterion|normalized selector` (generated ids, hashes and digits folded), not on its
+  position in the serialized DOM, which moves whenever anything above it changes. A finding that
+  only moved is not new; a third `img` without `alt` on a page that had two is. A page the
+  baseline never measured, or a baseline written by another ultra11y version, warns instead of
+  failing. The baseline lives in the Actions cache: the push to the default branch audits every
+  page and saves it under a key carrying the SHA, and a pull request restores the one of its
+  merge-base (else the closest by prefix).
+
+```jsonc
+// .ultra11yrc.json
+{
+  "sample": {
+    // What no import says: the root layout, global styles, and what changes the rendered output
+    // from outside the source tree — dependencies (lockfile, patches), relative to this file.
+    "global": ["src/app/layout.tsx", "src/styles/**", "package.json", "../../pnpm-lock.yaml", "../../patches/**"],
+    "pages": [{ "id": "accueil", "name": "Accueil", "url": "http://localhost:3000/", "sources": ["src/app/page.tsx"] }]
+  }
+}
+```
+
+```yaml
+name: Accessibility (rendered, per PR)
+on:
+  pull_request:
+  push:
+    branches: [main] # writes the baseline the pull requests compare against
+permissions:
+  contents: read
+  security-events: write # SARIF → code scanning (optional: annotations cover it without)
+jobs:
+  a11y-lite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the merge-base
+      - id: affected
+        uses: SocialGouv/ultra11y@v5
+        with:
+          mode: lite
+          step: affected
+      # Your own capture, of those pages only. Here a Playwright suite whose tests call
+      # `checkA11y` and filter their routes on ULTRA11Y_PAGES (empty = every page).
+      - if: steps.affected.outputs.affected-none != 'true'
+        run: npx playwright test e2e/a11y
+        env:
+          ULTRA11Y_PAGES: ${{ steps.affected.outputs.affected-pages }}
+      - if: steps.affected.outputs.affected-none != 'true'
+        uses: SocialGouv/ultra11y@v5
+        with:
+          mode: lite
+          step: audit
+          pages: ${{ steps.affected.outputs.affected-pages }}
+          standard: rgaa
+          fail-on: blocking
+```
+
+```ts
+// e2e/a11y/sweep.a11y.ts — capture only what `affected` selected
+const only = process.env.ULTRA11Y_PAGES?.split(",").filter(Boolean);
+for (const route of ROUTES.filter((r) => !only?.length || only.includes(r.id))) {
+  test(route.id, async ({ page }) => {
+    await page.goto(route.path);
+    await checkA11y(page, { as: route.id, name: route.name, sources: route.sources, failOn: false });
+  });
+}
+```
+
+The job summary lists each new finding (page, criterion, rule, element); annotations and a SARIF
+upload (category `ultra11y-lite-<standard>`) carry them too. No sticky comment. The same gate
+outside GitHub: `ultra11y affected --since origin/main --json`, your capture, then
+`ultra11y audit --lite --pages <ids> --baseline <file> --fail-on blocking` (and
+`--write-baseline <file>` on the default branch).
 
 ### Optional model tier (`judge`) — for the runs with no agent in the loop
 

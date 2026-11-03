@@ -627,6 +627,32 @@ Two things worth knowing about an authenticated scan:
   the job before scanning — otherwise the page redirects and you are back to auditing the wrong
   screen under the right name.
 
+## Rendered regressions on every pull request (`mode: lite`)
+
+The page sweep above is the weekly deliverable. `mode: lite` is the per-pull-request gate on the
+**rendered** page, and costs the engine alone: two invocations of the action around your own
+capture.
+
+1. `step: affected` runs `ultra11y affected --since origin/<base>`: the merge-base, each sample
+   page's `sources` and their transitive imports (relative, tsconfig aliases, `import()`,
+   stylesheets, Sass `@use`), the App Router `layout`/`template` above a `page`, and
+   `sample.global` (a touched global file selects every page). Outputs `affected-pages`
+   (comma-separated ids), `affected-all`, `affected-none`. On a push to the default branch it
+   selects every page. Changed markup no page reaches is warned as `unmapped`.
+2. Your workflow captures those pages only (`ULTRA11Y_PAGES` filtered in your suite), or skips.
+3. `step: audit` runs `ultra11y audit --lite --pages <ids>` over `.ultra11y/pages/`: no source,
+   no adjudication, no page report, no PDF, no pixel tier, no HTML. On a pull request it restores
+   the baseline from `actions/cache` (key of the merge-base, else the closest by prefix) and fails
+   only on findings NEW at `fail-on`. On the default branch it saves the baseline under a key
+   carrying the SHA.
+
+The baseline keys a finding on `page|rule|criterion|normalized selector`, a multiset: a finding
+that only moved is not new, a third occurrence of a key that had two is. It is separate from
+`findingId`, which the ledger and the full run's SARIF keep using. A page the baseline never
+measured, or a baseline written by another ultra11y version, warns and never fails. Surfaces: the
+job summary, annotations, SARIF under category `ultra11y-lite-<standard>`; no sticky comment.
+A complete workflow is in the README.
+
 ## What the artifact looks like when you open it
 
 `audits/` used to hold JSON, SARIF and Markdown: everything a machine needs and nothing that

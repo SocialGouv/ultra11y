@@ -75,6 +75,13 @@ export interface SarifOptions {
   lang?: Lang;
   /** Root the artifact URIs are made relative to. Defaults to the process CWD. */
   baseDir?: string;
+  /** The identity GitHub de-duplicates alerts on. Defaults to `findingId`; the lite gate passes
+   *  its stable rendered key (src/lite.ts `regressionKey`), so a defect whose snapshot bytes
+   *  moved stays the same alert. Repeats of one key are numbered, as fingerprints must be unique. */
+  fingerprint?: (f: Finding) => string;
+  /** `automationDetails.id` — a run category of its own, so two kinds of upload never close each
+   *  other's alerts. Defaults to `ultra11y/<standard>/`. */
+  automationId?: string;
 }
 
 // Advisory findings are non-normative recommendations: whatever their severity rank, they
@@ -160,6 +167,13 @@ function packHelpUri(pack: StandardPack, ids: string[]): { helpUri?: string } {
   return url ? { helpUri: url } : {};
 }
 
+/** `key`, or `key#n` for its n-th repeat — a coarse key repeats, and GitHub de-duplicates on it. */
+function uniqueFingerprint(key: string, seen: Map<string, number>): string {
+  const n = seen.get(key) ?? 0;
+  seen.set(key, n + 1);
+  return n === 0 ? key : `${key}#${n + 1}`;
+}
+
 /** Project an AuditResult onto a SARIF 2.1.0 log. Pure — writes nothing. */
 export function toSarif(result: AuditResult, opts: SarifOptions = {}): SarifLog {
   const standard = opts.standard ?? CORE;
@@ -169,6 +183,8 @@ export function toSarif(result: AuditResult, opts: SarifOptions = {}): SarifLog 
   const rules: SarifRule[] = [];
   const indexOf = new Map<string, number>();
   const results: SarifResult[] = [];
+  const fingerprintOf = opts.fingerprint ?? findingId; // the default path stays byte-identical
+  const fingerprintSeen = new Map<string, number>();
 
   for (const f of findingsForStandard(result, standard)) {
     const criterion = criterionLabel(f, standard);
@@ -193,7 +209,7 @@ export function toSarif(result: AuditResult, opts: SarifOptions = {}): SarifLog 
       message: { text: `[${criterion}] ${resolveMessage(f, lang)} — ${resolveRemediation(f, lang)}` },
       locations: physicalLocation(f, baseDir),
       ...(related ? { relatedLocations: related } : {}),
-      partialFingerprints: { [FINGERPRINT_KEY]: findingId(f) },
+      partialFingerprints: { [FINGERPRINT_KEY]: opts.fingerprint ? uniqueFingerprint(fingerprintOf(f), fingerprintSeen) : findingId(f) },
       properties,
     });
   }
@@ -206,7 +222,7 @@ export function toSarif(result: AuditResult, opts: SarifOptions = {}): SarifLog 
         tool: { driver: { name: "ultra11y", version: VERSION, informationUri: INFO_URI, rules } },
         // Distinguishes concurrent uploads in one PR (source audit vs page scan) so
         // GitHub keeps them as separate analyses instead of overwriting one another.
-        automationDetails: { id: `ultra11y/${standard}/` },
+        automationDetails: { id: opts.automationId ?? `ultra11y/${standard}/` },
         results,
       },
     ],
