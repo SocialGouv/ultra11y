@@ -167,8 +167,8 @@ Usage:
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures + .ultra11y/pages snapshots: audit real HTML)
   ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
   ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor] [--format sarif|github]   (re-gate an audit already computed — e.g. one carrying adjudicated verdicts — without a second detection pass)
-  ultra11y audit    --lite [--pages <ids>] [--root <dir>] [--baseline <file>] [--write-baseline <file>] [--fail-on blocking|major|minor] [--format sarif|github] [--out <dir>] [--json]   (rendered regression gate: the page snapshots alone, engine only, fails on NEW findings only)
-  ultra11y affected --since <ref> | --all [--root <dir>] [--json]   (the sample pages a diff can change: sources + their imports, sample.global, the merge-base)
+  ultra11y audit    --lite [--pages <ids>] [--root <dir>] [--baseline <file> [--baseline-approximate]] [--write-baseline <file>] [--fail-on blocking|major|minor] [--format sarif|github] [--out <dir>] [--json]   (rendered regression gate: the page snapshots alone, engine only, fails on NEW findings only)
+  ultra11y affected --since <ref> | --all [--root <dir>] [--require-sampled] [--json]   (the sample pages a diff can change: sources + their imports, sample.global, the merge-base)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
   ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (the Markdown report, illustrated with annotated crops)
   ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
@@ -467,7 +467,14 @@ Options:
                      report. With --baseline it fails only on NEW findings at --fail-on; a
                      page the baseline never measured, or a baseline from another ultra11y
                      version, warns instead of failing
-  --pages <ids>      audit --lite: comma-separated page ids to audit (default: every snapshot)
+  --pages <ids>      audit --lite: comma-separated page ids to audit (default: every snapshot).
+                     A page absent from a same-version baseline is NEW: every finding on it
+                     counts as new and gates
+  --baseline-approximate  audit --lite: the baseline is not the merge-base's own, so a page it
+                     lacks only warns
+  --require-sampled  affected: fail when the diff adds or changes a route file (App Router
+                     page.*, pages/…, +page.svelte) no sample page declares in its sources and
+                     sample.exempt does not exempt
   --write-baseline <file>  audit --lite: write the render baseline of this run
   --fail-on <sev>    audit/init: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
   --hook             init: write a git pre-commit accessibility gate (staged snapshot + auto-fix by default)
@@ -786,6 +793,11 @@ function valueFlagsFor(command: string): ReadonlySet<string> {
 const BOOLEAN_FLAGS = new Set([
   // `audit --lite`: the rendered regression gate (src/lite.ts).
   "lite",
+  // `audit --lite --baseline-approximate`: the baseline is not the merge-base's own (a closest
+  // cache entry), so a page it lacks may not be this change's — warn instead of gating it.
+  "baseline-approximate",
+  // `affected --require-sampled`: fail on a changed route no sample page declares.
+  "require-sampled",
   // `verify --apply … --prune`: apply what the refutation trial decided to the audit, instead
   // of only reporting it (src/refute.ts).
   "prune",
@@ -1517,7 +1529,7 @@ async function cmdAuditLite(p: ParsedArgs): Promise<number> {
     }
   }
   const gating = baselineFlag !== undefined;
-  const diff = diffRenderBaseline(findings, selected, baseline, failOn);
+  const diff = diffRenderBaseline(findings, selected, baseline, failOn, undefined, { approximate: p.flags["baseline-approximate"] === true });
   warnings.push(...(gating ? renderDiffWarnings(diff, lang) : []));
   if (!selected.length) warnings.push(lang === "fr" ? `aucun instantané de page à auditer sous ${pagesDir}.` : `no page snapshot to audit under ${pagesDir}.`);
   // What this run REPORTS: the regression when gating, the whole backlog when measuring.
@@ -1600,7 +1612,7 @@ function cmdAffected(p: ParsedArgs): number {
   // `--all`: the run that writes the baseline measures every page, whatever changed.
   if (every) {
     const pages = v.sample.pages.map((pg) => pg.id);
-    const r = { pages, all: true, none: pages.length === 0, unmapped: [], global: [], reasons: {}, unsourced: [], changed: 0 };
+    const r = { pages, all: true, none: pages.length === 0, unmapped: [], global: [], reasons: {}, unsourced: [], unsampled: [], changed: 0 };
     if (p.flags.json) console.log(JSON.stringify(r, null, 2));
     else console.log(lang === "fr" ? `Toutes les pages (${pages.length}).` : `Every page (${pages.length}).`);
     return 0;
@@ -1612,12 +1624,25 @@ function cmdAffected(p: ParsedArgs): number {
     console.error(`ultra11y affected: ${e instanceof Error ? e.message : String(e)}`);
     return 2;
   }
-  const r = selectAffected({ root, pages: v.sample.pages, global: v.sample.global, changed: changed.files });
+  const r = selectAffected({ root, pages: v.sample.pages, global: v.sample.global, exempt: v.sample.exempt?.map((e) => e.path), changed: changed.files });
+  const fr = lang === "fr";
+  // A route nobody captures ships unaudited: the gate's one blind spot it can name. Report-only
+  // unless asked, so turning the feature on never breaks a workflow that did not.
+  const requireSampled = p.flags["require-sampled"] === true;
+  const unsampledMessage = r.unsampled.length
+    ? fr
+      ? `route(s) ajoutée(s) ou modifiée(s) qu'aucune page de l'échantillon ne déclare : ${r.unsampled.join(", ")} — déclarez la page dans \`sample.pages\` (avec ses \`sources\`), ou exemptez-la dans \`sample.exempt\` avec sa raison.`
+      : `route(s) added or changed that no sample page declares: ${r.unsampled.join(", ")} — declare the page in \`sample.pages\` (with its \`sources\`), or exempt it in \`sample.exempt\` with a reason.`
+    : "";
+  const sampledVerdict = (): number => {
+    if (!unsampledMessage) return 0;
+    console.error(`${requireSampled ? "✗" : "⚠"} ${unsampledMessage}`);
+    return requireSampled ? 1 : 0;
+  };
   if (p.flags.json) {
     console.log(JSON.stringify({ since, mergeBase: changed.mergeBase, ...r }, null, 2));
-    return 0;
+    return sampledVerdict();
   }
-  const fr = lang === "fr";
   if (r.all)
     console.log(
       fr
@@ -1641,7 +1666,7 @@ function cmdAffected(p: ParsedArgs): number {
         ? `⚠ page(s) sans \`sources\`, sélectionnée(s) seulement par un fichier global : ${r.unsourced.join(", ")}`
         : `⚠ page(s) declaring no \`sources\`, selected only by a global file: ${r.unsourced.join(", ")}`,
     );
-  return 0;
+  return sampledVerdict();
 }
 
 // `dev` — the development side-car. Long-running by design: it holds the port until you stop

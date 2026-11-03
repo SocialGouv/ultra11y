@@ -507,11 +507,21 @@ pull request:
 - **only NEW findings fail** — the baseline keys a rendered finding on
   `page|rule|criterion|normalized selector` (generated ids, hashes and digits folded), not on its
   position in the serialized DOM, which moves whenever anything above it changes. A finding that
-  only moved is not new; a third `img` without `alt` on a page that had two is. A page the
-  baseline never measured, or a baseline written by another ultra11y version, warns instead of
-  failing. The baseline lives in the Actions cache: the push to the default branch audits every
-  page and saves it under a key carrying the SHA, and a pull request restores the one of its
-  merge-base (else the closest by prefix).
+  only moved is not new; a third `img` without `alt` on a page that had two is. The baseline lives
+  in the Actions cache: the push to the default branch audits every page and saves it under a key
+  carrying the SHA, and a pull request restores the one of its merge-base (else the closest by
+  prefix);
+- **a new page is judged with no reference** — that push records every sample page, clean ones
+  included, so a page the merge-base's own baseline does not know was added by the pull request:
+  every finding on it at `fail-on` is new and fails, and the summary says the page is new. Only a
+  baseline that cannot speak for it only warns: none at all, one written by another ultra11y
+  version, or the closest entry by prefix (`--baseline-approximate`, set by the action);
+- **a route nobody declared is named** — `affected` lists the route files the diff adds or changes
+  (Next.js App Router `page.*`, a `pages/` router — Next, Nuxt, Astro —, SvelteKit
+  `+page.svelte`) that no sample page declares in its `sources`, as `unsampled` and the action
+  output `affected-unsampled`. `--require-sampled` / `require-sampled: true` fails on them: declare
+  the page in `sample.pages`, or exempt it in `sample.exempt` with a reason. A router configured in
+  code (React Router, Vue Router) has no route files to recognise: declare those pages.
 
 ```jsonc
 // .ultra11yrc.json
@@ -520,6 +530,8 @@ pull request:
     // What no import says: the root layout, global styles, and what changes the rendered output
     // from outside the source tree — dependencies (lockfile, patches), relative to this file.
     "global": ["src/app/layout.tsx", "src/styles/**", "package.json", "../../pnpm-lock.yaml", "../../patches/**"],
+    // Routes deliberately outside the sample — a reason is required.
+    "exempt": [{ "path": "src/app/(mfa)/**", "reason": "behind MFA, unreachable from the capture" }],
     "pages": [{ "id": "accueil", "name": "Accueil", "url": "http://localhost:3000/", "sources": ["src/app/page.tsx"] }]
   }
 }
@@ -546,6 +558,7 @@ jobs:
         with:
           mode: lite
           step: affected
+          require-sampled: true # a new route no sample page declares fails here
       # Your own capture, of those pages only. Here a Playwright suite whose tests call
       # `checkA11y` and filter their routes on ULTRA11Y_PAGES (empty = every page).
       - if: steps.affected.outputs.affected-none != 'true'

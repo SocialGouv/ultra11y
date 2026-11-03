@@ -105,6 +105,23 @@ export function validateSample(raw: unknown): SampleValidation {
     }
   }
 
+  if (s.exempt !== undefined) {
+    if (!Array.isArray(s.exempt)) {
+      err("sample.exempt", "exempt must be an array of { path, reason }");
+    } else {
+      (s.exempt as unknown[]).forEach((e, i) => {
+        const x = e as Record<string, unknown> | null;
+        if (typeof x !== "object" || x === null || Array.isArray(x)) {
+          err(`sample.exempt[${i}]`, "each exemption must be an object { path, reason }");
+          return;
+        }
+        if (typeof x.path !== "string" || x.path.trim() === "") err(`sample.exempt[${i}].path`, "path must be a non-empty glob");
+        if (typeof x.reason !== "string" || x.reason.trim() === "")
+          err(`sample.exempt[${i}].reason`, "reason is required — say why this route is left out of the sample");
+      });
+    }
+  }
+
   const ok = issues.length === 0;
   return { ok, issues, warnings, sample: ok ? normalizeSample(s) : undefined };
 }
@@ -121,7 +138,10 @@ function normalizeSample(s: Record<string, unknown>): SampleConfig {
   }));
   const transverse = Array.isArray(s.transverse) ? (s.transverse as string[]).map(String) : undefined;
   const global = Array.isArray(s.global) ? (s.global as string[]).map(String) : undefined;
-  return { pages, ...(transverse?.length ? { transverse } : {}), ...(global?.length ? { global } : {}) };
+  const exempt = Array.isArray(s.exempt)
+    ? (s.exempt as { path: string; reason: string }[]).map((e) => ({ path: String(e.path), reason: String(e.reason) }))
+    : undefined;
+  return { pages, ...(transverse?.length ? { transverse } : {}), ...(global?.length ? { global } : {}), ...(exempt?.length ? { exempt } : {}) };
 }
 
 /** Project a validated sample to the storageState-free shape recorded on an AuditResult /
@@ -239,6 +259,7 @@ export function mergeSample(existing: SampleConfig | undefined, proposed: Sample
       pages,
       ...(existing?.transverse?.length ? { transverse: existing.transverse } : {}),
       ...(existing?.global?.length ? { global: existing.global } : {}),
+      ...(existing?.exempt?.length ? { exempt: existing.exempt } : {}),
     },
     added,
     kept: pages.length - added.length,
@@ -289,6 +310,7 @@ export function unionSample(declared: SampleConfig | undefined, snapshotted: Sam
       pages: [...pages, ...undeclared],
       ...(declared?.transverse?.length ? { transverse: declared.transverse } : {}),
       ...(declared?.global?.length ? { global: declared.global } : {}),
+      ...(declared?.exempt?.length ? { exempt: declared.exempt } : {}),
     },
     undeclared,
     uncaptured,

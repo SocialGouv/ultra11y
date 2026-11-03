@@ -236,9 +236,13 @@ inputs:
     required: false
     default: 'full'
   step:
-    description: "Which half of `mode: lite` this invocation is. `affected` publishes the outputs `affected-pages` (comma-separated ids), `affected-all` and `affected-none` — the sample pages the diff can change (`ultra11y affected`: the merge-base, each page's `sources` and what they import, `sample.global`), so the workflow captures only those, or skips the capture altogether. On a push to the default branch it selects every page. `audit` audits the snapshots the capture wrote: on a pull request it restores the baseline from `actions/cache` (exact key of the merge-base, else the closest by prefix) and gates on new findings at `fail-on`; on a push to the default branch it audits every page and saves the baseline under a key carrying the SHA. Ignored in `full` mode."
+    description: "Which half of `mode: lite` this invocation is. `affected` publishes the outputs `affected-pages` (comma-separated ids), `affected-all` and `affected-none` — the sample pages the diff can change (`ultra11y affected`: the merge-base, each page's `sources` and what they import, `sample.global`), so the workflow captures only those, or skips the capture altogether. On a push to the default branch it selects every page. `audit` audits the snapshots the capture wrote: on a pull request it restores the baseline from `actions/cache` (exact key of the merge-base, else the closest by prefix) and gates on new findings at `fail-on` — a page absent from the merge-base's own baseline is a page the pull request added, judged with no reference, so every finding on it is new; on a push to the default branch it audits every page and saves the baseline under a key carrying the SHA. Ignored in `full` mode."
     required: false
     default: 'audit'
+  require-sampled:
+    description: "`mode: lite`, `step: affected`: fail the job when the diff adds or changes a ROUTE file (Next.js App Router `page.*`, a `pages/` router, SvelteKit `+page.svelte`) that no page of `sample.pages` declares in its `sources` and no `sample.exempt` glob covers — a page nobody captures ships unaudited. The routes are always listed in `affected-unsampled` and warned about; `false` (default) never fails, so turning this on is a choice and never a surprise."
+    required: false
+    default: 'false'
   pages:
     description: "`mode: lite`, `step: audit`: comma-separated page ids to audit — typically `steps.<affected>.outputs.affected-pages`. Empty (default) audits every snapshot present under `.ultra11y/pages/`."
     required: false
@@ -305,6 +309,9 @@ outputs:
   affected-none:
     description: "`mode: lite`, `step: affected`: `true` when the diff reaches no page — skip the capture and the audit step."
     value: ${{ steps.lite-affected.outputs.none }}
+  affected-unsampled:
+    description: '`mode: lite`, `step: affected`: comma-separated route files the diff adds or changes that no sample page declares and nothing exempts. Empty when none.'
+    value: ${{ steps.lite-affected.outputs.unsampled }}
   lite-new:
     description: '`mode: lite`, `step: audit`: number of NEW findings against the baseline (whatever their severity).'
     value: ${{ steps.lite-audit.outputs.new }}
@@ -330,6 +337,7 @@ runs:
         PAGES_REPORT: ${{ inputs.pages-report }}
         MODE: ${{ inputs.mode }}
         LITE_STEP: ${{ inputs.step }}
+        REQUIRE_SAMPLED: ${{ inputs.require-sampled }}
       run: |
         echo "path=$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" >> "$GITHUB_OUTPUT"
         node "$GITHUB_ACTION_PATH/scripts/ultra11y.mjs" --version
@@ -420,6 +428,13 @@ runs:
           full|lite|'') ;;
           *)
             echo "::error::ultra11y: mode='${MODE}' is not a mode — expected 'full' or 'lite'."
+            exit 1
+            ;;
+        esac
+        case "${REQUIRE_SAMPLED:-}" in
+          true|false|'') ;;
+          *)
+            echo "::error::ultra11y: require-sampled='${REQUIRE_SAMPLED}' is not a value — expected 'true' or 'false'."
             exit 1
             ;;
         esac
@@ -2134,6 +2149,7 @@ runs:
         EVENT: ${{ github.event_name }}
         REF: ${{ github.ref }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        REQUIRE_SAMPLED: ${{ inputs.require-sampled }}
       run: |
         mkdir -p audits/lite
         since="$SINCE"
@@ -2155,11 +2171,22 @@ runs:
           out("pages", r.pages.join(","));
           out("all", String(r.all));
           out("none", String(r.none));
+          out("unsampled", (r.unsampled || []).join(","));
           for (const f of r.unmapped) console.log("::warning file=" + f + ",title=ultra11y lite::changed markup that no sample page reaches — declare its page, or add it to its page sources.");
           if (r.unsourced.length) console.log("::warning title=ultra11y lite::page(s) declaring no sources, selected only by a global file: " + r.unsourced.join(", "));
           const label = r.all ? "every page" : r.none ? "no page" : r.pages.length + " page(s): " + r.pages.join(", ");
           console.log("ultra11y lite: " + label + (r.changed ? " (" + r.changed + " changed file(s))" : ""));
           if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, "ultra11y lite — pages to capture: " + label + "\n\n");
+          // A route no page declares is captured by nobody. Written before the verdict, so the
+          // outputs are there for the workflow even when the step goes on to fail.
+          const unsampled = r.unsampled || [];
+          if (unsampled.length) {
+            const level = process.env.REQUIRE_SAMPLED === "true" ? "error" : "warning";
+            const what = "route added or changed that no sample page declares — declare the page in sample.pages (with its sources), or exempt it in sample.exempt with a reason.";
+            for (const f of unsampled) console.log("::" + level + " file=" + f + ",title=ultra11y lite — unsampled route::" + what);
+            if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, "ultra11y lite — route(s) no sample page declares: " + unsampled.join(", ") + "\n\n");
+            if (level === "error") process.exitCode = 1;
+          }
         '
 
     - name: Lite — resolve the baseline key
@@ -2225,6 +2252,7 @@ runs:
         LANG_IN: ${{ inputs.lang }}
         SAVE: ${{ steps.lite-key.outputs.save }}
         RESTORED: ${{ steps.lite-restore.outputs.cache-matched-key }}
+        PRIMARY: ${{ steps.lite-key.outputs.key }}
       run: |
         args=(audit --lite --standard "$STANDARD" --lang "$LANG_IN" --out audits/lite --format github)
         if [ -n "$PAGES" ]; then args+=(--pages "$PAGES"); fi
@@ -2233,6 +2261,9 @@ runs:
         else
           if [ -n "$RESTORED" ]; then echo "ultra11y lite: baseline restored from $RESTORED"; fi
           args+=(--baseline .ultra11y/lite/baseline.json)
+          # Only the merge-base's OWN baseline can say a page it lacks is new. The closest entry by
+          # prefix may predate pages this change did not add: those pages warn instead of gating.
+          if [ -n "$RESTORED" ] && [ "$RESTORED" != "$PRIMARY" ]; then args+=(--baseline-approximate); fi
           if [ -n "$FAIL_ON" ]; then args+=(--fail-on "$FAIL_ON"); fi
         fi
         # The verdict waits for the uploads below: record the exit code instead of dying on it.

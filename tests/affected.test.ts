@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { buildAffectedGraph, extractSpecifiers, nextWrappers, parseModule, selectAffected } from "../src/affected.js";
+import { buildAffectedGraph, extractSpecifiers, isRouteFile, nextWrappers, parseModule, selectAffected } from "../src/affected.js";
 import { main } from "../src/cli.js";
 import { validateSample } from "../src/sample.js";
 
@@ -38,6 +38,8 @@ const FILES: Record<string, string> = {
   "src/modules/shared/Button.tsx": `export function Button() { return <button>ok</button>; }\n`,
   "src/modules/shared/Card.tsx": `export default function Card() { return <article />; }\n`,
   "src/modules/shared/Orphan.tsx": `export function Orphan() { return <aside />; }\n`,
+  "src/app/nouvelle/page.tsx": `export default function Nouvelle() { return <main />; }\n`,
+  "src/app/mfa/page.tsx": `export default function Mfa() { return <main />; }\n`,
   "src/types.ts": `export interface Props { a: string }\nexport type Shape = "a" | "b";\nexport const LIMIT = 3;\n`,
   "src/modules/shared/index.ts": `export { Button } from "./Button";\nexport { default as Card } from "./Card";\nexport { Orphan } from "./Orphan";\nexport * from "./more";\nexport type { Props } from "../../types";\n`,
   "src/modules/shared/more.ts": `export const helper = 1;\n`,
@@ -144,6 +146,59 @@ describe("affected — global files, nothing touched, and what it warns about", 
   });
 });
 
+// #146 — a route the sample does not declare is never captured, so a change that ADDS a page
+// would ship it unaudited. `affected` names it; `--require-sampled` fails on it.
+describe("affected — routes no sample page declares", () => {
+  it("reports an added route outside the sample", () => {
+    expect(select(["src/app/nouvelle/page.tsx"]).unsampled).toEqual(["src/app/nouvelle/page.tsx"]);
+  });
+
+  it("does not report a route a page declares in its sources", () => {
+    expect(select(["src/app/page.tsx", "src/app/about/page.tsx"]).unsampled).toEqual([]);
+  });
+
+  it("does not report a route `sample.exempt` covers", () => {
+    const r = selectAffected({ root, pages: PAGES, exempt: ["src/app/mfa/**"], changed: ["src/app/mfa/page.tsx", "src/app/nouvelle/page.tsx"] });
+    expect(r.unsampled).toEqual(["src/app/nouvelle/page.tsx"]);
+  });
+
+  it("still reports it when a global change selects every declared page, and never a deleted route", () => {
+    expect(select(["src/styles/global.scss", "src/app/nouvelle/page.tsx"]).unsampled).toEqual(["src/app/nouvelle/page.tsx"]);
+    expect(select(["src/app/supprimee/page.tsx"]).unsampled).toEqual([]);
+  });
+
+  it("knows the file-system routers by path, and nothing else", () => {
+    for (const route of [
+      "app/page.tsx",
+      "src/app/(group)/a/[id]/page.tsx",
+      "pages/index.tsx",
+      "src/pages/blog/[slug].astro",
+      "pages/about.vue",
+      "src/routes/a/+page.svelte",
+    ])
+      expect(isRouteFile(route), route).toBe(true);
+    for (const other of [
+      "src/app/a/layout.tsx",
+      "src/modules/x/page.tsx",
+      "pages/_app.tsx",
+      "pages/api/users.ts",
+      "src/app/a/__tests__/page.tsx",
+      "src/app/a/page.test.tsx",
+    ])
+      expect(isRouteFile(other), other).toBe(false);
+  });
+
+  it("validates `sample.exempt`: a glob and a reason, both required", () => {
+    const pg = { id: "a", name: "A", url: "http://x/" };
+    expect(validateSample({ pages: [pg], exempt: [{ path: "src/app/mfa/**", reason: "behind MFA" }] }).sample?.exempt).toEqual([
+      { path: "src/app/mfa/**", reason: "behind MFA" },
+    ]);
+    expect(validateSample({ pages: [pg], exempt: [{ path: "src/app/mfa/**" }] }).issues[0]?.message).toMatch(/reason is required/);
+    expect(validateSample({ pages: [pg], exempt: [{ path: "", reason: "x" }] }).ok).toBe(false);
+    expect(validateSample({ pages: [pg], exempt: "src/app/mfa/**" }).ok).toBe(false);
+  });
+});
+
 describe("affected — the pieces", () => {
   it("reads what a module imports by name, and what it exports", () => {
     const m = parseModule(
@@ -203,6 +258,60 @@ describe("affected — the pieces", () => {
     expect(validateSample({ pages: [page], global: ["src/app/layout.tsx"] }).sample?.global).toEqual(["src/app/layout.tsx"]);
     expect(validateSample({ pages: [page], global: "src/app/layout.tsx" }).ok).toBe(false);
     expect(validateSample({ pages: [page], global: [""] }).ok).toBe(false);
+  });
+});
+
+describe("affected --require-sampled, against a real merge-base", () => {
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: join(tmpdir(), "u11y-affected-none.gitconfig"), GIT_CONFIG_NOSYSTEM: "1" };
+  const id = ["-c", "user.email=t@example.org", "-c", "user.name=t"];
+  const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, env, stdio: "ignore" });
+  const quiet = async (argv: string[]) => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const lo = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => void out.push(a.join(" ")));
+    const le = vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => void err.push(a.join(" ")));
+    const code = await main(argv);
+    lo.mockRestore();
+    le.mockRestore();
+    return { code, out: out.join("\n"), err: err.join("\n") };
+  };
+
+  it("fails on an added route outside the sample, and passes once it is exempted or declared", async () => {
+    writeFileSync(env.GIT_CONFIG_GLOBAL, "");
+    const repo = mkdtempSync(join(tmpdir(), "u11y-sampled-git-"));
+    try {
+      const cfg = (sample: Record<string, unknown>) => writeFileSync(join(repo, ".ultra11yrc.json"), JSON.stringify({ sample }));
+      const base = { pages: [{ id: "home", name: "Home", url: "http://localhost/", sources: ["src/app/page.tsx"] }] };
+      mkdirSync(join(repo, "src/app/nouvelle"), { recursive: true });
+      writeFileSync(join(repo, "src/app/page.tsx"), "export default function Home() { return <main />; }\n");
+      cfg(base);
+      git(repo, "init", "-q", "-b", "main");
+      git(repo, ...id, "add", ".");
+      git(repo, ...id, "commit", "-q", "-m", "base");
+      git(repo, "checkout", "-q", "-b", "feature");
+      writeFileSync(join(repo, "src/app/nouvelle/page.tsx"), "export default function Nouvelle() { return <main />; }\n");
+      git(repo, ...id, "add", ".");
+      git(repo, ...id, "commit", "-q", "-m", "a new route");
+
+      const reported = await quiet(["affected", "--since", "main", "--root", repo, "--json", "--lang", "en"]);
+      expect(reported.code, "report-only by default").toBe(0);
+      expect(JSON.parse(reported.out).unsampled).toEqual(["src/app/nouvelle/page.tsx"]);
+
+      const required = await quiet(["affected", "--since", "main", "--root", repo, "--require-sampled", "--lang", "en"]);
+      expect(required.code).toBe(1);
+      expect(required.err).toContain("src/app/nouvelle/page.tsx");
+      expect(required.err).toMatch(/declare the page in `sample.pages`.*or exempt it in `sample.exempt`/);
+
+      cfg({ ...base, exempt: [{ path: "src/app/nouvelle/**", reason: "expected 404 until launch" }] });
+      expect((await quiet(["affected", "--since", "main", "--root", repo, "--require-sampled"])).code, "exempted").toBe(0);
+
+      cfg({ pages: [...base.pages, { id: "nouvelle", name: "Nouvelle", url: "http://localhost/nouvelle", sources: ["src/app/nouvelle/page.tsx"] }] });
+      const covered = await quiet(["affected", "--since", "main", "--root", repo, "--require-sampled", "--json"]);
+      expect(covered.code, "declared").toBe(0);
+      expect(JSON.parse(covered.out).unsampled).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
 
