@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.58.1](https://github.com/SocialGouv/ultra11y/compare/v5.58.0...v5.58.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **lite:** a page new to the baseline gates, and a route outside the sample is named ([#147](https://github.com/SocialGouv/ultra11y/issues/147)) ([d29cc62](https://github.com/SocialGouv/ultra11y/commit/d29cc62712b5378ec7d6150cd6132832662a19c6))
+
 # [5.58.0](https://github.com/SocialGouv/ultra11y/compare/v5.57.5...v5.58.0) (2026-11-03)
 
 
