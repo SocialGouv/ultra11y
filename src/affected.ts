@@ -71,6 +71,8 @@ export interface AffectedInput {
   root: string;
   pages: AffectedPageInput[];
   global?: string[];
+  /** Route globs deliberately left out of the sample (`sample.exempt[].path`). */
+  exempt?: string[];
   /** Changed files, relative to `root` (a file outside it starts with `../`). */
   changed: string[];
 }
@@ -90,7 +92,32 @@ export interface AffectedResult {
   reasons: Record<string, string[]>;
   /** Pages that declare no `sources`: only a global change can select them. */
   unsourced: string[];
+  /** Route files the diff adds or changes that no sample page declares in its `sources` and no
+   *  `sample.exempt` glob covers: a page nobody will capture. */
+  unsampled: string[];
   changed: number;
+}
+
+// ---- route files -------------------------------------------------------------------------------
+//
+// A route the sample does not declare is never captured, so a pull request that ADDS a page ships
+// it unaudited. These are the file-system routing conventions whose route files can be told from
+// any other file by path alone; a router configured in code (React Router, Vue Router, Remix's
+// flat routes mixed with colocated modules) cannot, and is out of reach — declare those pages.
+const ROUTE_FILES: RegExp[] = [
+  // Next.js App Router: app/**/page.* — at any depth, so a config at a workspace root still sees
+  // `apps/web/src/app/**`. A `page.*` file under an `app/` directory is a route almost everywhere;
+  // where it is not, `sample.exempt` says so.
+  /(?:^|\/)app\/(?:.+\/)?page\.(?:tsx|jsx|ts|js|mdx)$/,
+  // Next.js Pages Router, Nuxt, Astro: pages/** (minus `_app`/`_document`/… and API routes)
+  /^(?:src\/)?pages\/(?!(?:.+\/)?_)(?!api\/)(?:.+\/)?[^/]+\.(?:tsx|jsx|ts|js|mdx|md|vue|astro|svelte)$/,
+  // SvelteKit: routes/**/+page.svelte — unambiguous, so at any depth too
+  /(?:^|\/)routes\/(?:.+\/)?\+page\.svelte$/,
+];
+
+/** Is this root-relative path a route file of a file-system router? */
+export function isRouteFile(rel: string): boolean {
+  return !isTestArtifact(rel) && ROUTE_FILES.some((re) => re.test(rel));
 }
 
 // ---- module extraction ------------------------------------------------------------------------
@@ -381,9 +408,25 @@ export function nextWrappers(page: string, known: ReadonlySet<string>): string[]
 
 export function selectAffected(input: AffectedInput, graph: AffectedGraph = buildAffectedGraph(input.root)): AffectedResult {
   const changed = [...new Set(input.changed.map(norm))].sort();
-  const empty: AffectedResult = { pages: [], all: false, none: true, unmapped: [], global: [], reasons: {}, unsourced: [], changed: changed.length };
+  const empty: AffectedResult = {
+    pages: [],
+    all: false,
+    none: true,
+    unmapped: [],
+    global: [],
+    reasons: {},
+    unsourced: [],
+    unsampled: [],
+    changed: changed.length,
+  };
   const unsourced = input.pages.filter((p) => !p.sources?.length).map((p) => p.id);
   if (!changed.length) return { ...empty, unsourced };
+
+  // Computed before anything can return early: a global change selecting every DECLARED page
+  // still captures none of the undeclared ones.
+  const declared = new Set(input.pages.flatMap((p) => (p.sources ?? []).map(norm)));
+  const isExempt = input.exempt?.length ? (engineCompileGlobs(input.exempt.map(norm)) ?? (() => false)) : () => false;
+  const unsampled = changed.filter((f) => isRouteFile(f) && !declared.has(f) && !isExempt(f) && existsSync(join(input.root, f)));
 
   const isGlobal = engineCompileGlobs([...IMPLICIT_GLOBAL, ...(input.global ?? []).map(norm)]) ?? (() => false);
   const globalHits = changed.filter((f) => isGlobal(f));
@@ -395,6 +438,7 @@ export function selectAffected(input: AffectedInput, graph: AffectedGraph = buil
       none: false,
       global: globalHits,
       unsourced,
+      unsampled,
     };
 
   const changedSet = new Set(changed);
@@ -416,7 +460,7 @@ export function selectAffected(input: AffectedInput, graph: AffectedGraph = buil
   const unmapped = changed.filter(
     (f) => !reached.has(f) && !f.startsWith("../") && MARKUP_EXT.has(extOf(f)) && !isTestArtifact(f) && existsSync(join(input.root, f)),
   );
-  return { pages, all: false, none: pages.length === 0, unmapped, global: [], reasons, unsourced, changed: changed.length };
+  return { pages, all: false, none: pages.length === 0, unmapped, global: [], reasons, unsourced, unsampled, changed: changed.length };
 }
 
 // ---- git ---------------------------------------------------------------------------------------

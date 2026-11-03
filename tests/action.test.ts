@@ -1669,6 +1669,23 @@ describe("mode: lite", () => {
     expect(save?.with?.path).toBe(restore?.with?.path);
   });
 
+  it("names the routes no sample page declares, and fails on them only when asked", () => {
+    expect(ACTION.inputs["require-sampled"]?.default).toBe("false");
+    expect(ACTION.outputs["affected-unsampled"]?.value).toContain("steps.lite-affected.outputs.unsampled");
+    const run = lite("lite-affected")?.run ?? "";
+    expect(run).toContain('out("unsampled"');
+    expect(run).toContain('process.env.REQUIRE_SAMPLED === "true"');
+    expect(run).toMatch(/declare the page in sample\.pages.*or exempt it in sample\.exempt/);
+    // The outputs are written before the verdict, so a failing step still hands them on.
+    expect(run.indexOf('out("unsampled"')).toBeLessThan(run.indexOf("process.exitCode = 1"));
+    expect(ACTION.runs.steps.find((s) => s.id === "engine")?.run).toContain("require-sampled='${REQUIRE_SAMPLED}' is not a value");
+  });
+
+  it("lets only the merge-base's own baseline call a page new", () => {
+    const run = lite("lite-audit")?.run ?? "";
+    expect(run).toContain('[ "$RESTORED" != "$PRIMARY" ]; then args+=(--baseline-approximate)');
+  });
+
   it("runs the engine alone over the snapshots — no adjudication, no report, no comment", () => {
     const run = lite("lite-audit")?.run ?? "";
     expect(run).toContain("audit --lite");

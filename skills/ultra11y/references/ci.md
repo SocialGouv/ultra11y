@@ -638,7 +638,11 @@ capture.
    stylesheets, Sass `@use`), the App Router `layout`/`template` above a `page`, and
    `sample.global` (a touched global file selects every page). Outputs `affected-pages`
    (comma-separated ids), `affected-all`, `affected-none`. On a push to the default branch it
-   selects every page. Changed markup no page reaches is warned as `unmapped`.
+   selects every page. Changed markup no page reaches is warned as `unmapped`. Route files the
+   diff adds or changes (App Router `page.*`, a `pages/` router, SvelteKit `+page.svelte`) that no
+   page declares in its `sources` are listed in `affected-unsampled`; `require-sampled: true`
+   fails on them — declare the page in `sample.pages`, or exempt it in
+   `sample.exempt: [{ "path": "<glob>", "reason": "…" }]` (the reason is required).
 2. Your workflow captures those pages only (`ULTRA11Y_PAGES` filtered in your suite), or skips.
 3. `step: audit` runs `ultra11y audit --lite --pages <ids>` over `.ultra11y/pages/`: no source,
    no adjudication, no page report, no PDF, no pixel tier, no HTML. On a pull request it restores
@@ -649,7 +653,11 @@ capture.
 The baseline keys a finding on `page|rule|criterion|normalized selector`, a multiset: a finding
 that only moved is not new, a third occurrence of a key that had two is. It is separate from
 `findingId`, which the ledger and the full run's SARIF keep using. A page the baseline never
-measured, or a baseline written by another ultra11y version, warns and never fails. Surfaces: the
+measured is NEW when the baseline is the merge-base's own and of the same version — the push that
+writes it records every sample page, clean ones included — so every finding on it gates, and the
+summary says the page is new. It only warns when the baseline is missing, from another ultra11y
+version, or the closest cache entry rather than the merge-base's (`--baseline-approximate`), and
+for a page the baseline records as `skipped` (declared or asked for, but no snapshot on that push). Surfaces: the
 job summary, annotations, SARIF under category `ultra11y-lite-<standard>`; no sticky comment.
 A complete workflow is in the README.
 

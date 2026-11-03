@@ -97,15 +97,50 @@ describe("the render baseline diff", () => {
     expect(d.fixed).toBeGreaterThan(0);
   });
 
-  it("warns, never fails, on a page the baseline never measured", () => {
+  // #146 — the push that writes a baseline audits EVERY sample page, clean ones included, so a page
+  // a same-version baseline does not know was added by the change under review.
+  it("gates a page new to a valid baseline: every finding on it is new", () => {
     snap("accueil", ONE_IMG);
     snap("contact", TWO_IMG);
     const baseline = buildRenderBaseline(auditPages("accueil"), ["accueil"], "wcag");
     const d = diffRenderBaseline(auditPages("accueil", "contact"), ["accueil", "contact"], baseline);
-    expect(d.pagesWithoutBaseline).toEqual(["contact"]);
-    expect(d.unbaselined.length).toBeGreaterThan(0);
+    expect(d.newPages).toEqual(["contact"]);
+    expect(d.pagesWithoutBaseline).toEqual([]);
+    expect(d.unbaselined).toEqual([]);
+    expect(d.blocking.length).toBeGreaterThan(0);
+    expect(d.blocking.every((f) => regressionKey(f).startsWith("contact|"))).toBe(true);
+    expect(d.ok).toBe(false);
+    expect(renderDiffMarkdown(d, "en")).toMatch(/New page\(s\), absent from the baseline: judged with no reference.*contact/);
+    expect(renderDiffMarkdown(d, "fr")).toMatch(/Nouvelle\(s\) page\(s\).*jugée\(s\) sans référence.*contact/);
+  });
+
+  it("passes a page new to the baseline that is clean, and still names it as new", () => {
+    snap("accueil", ONE_IMG);
+    snap("propre", page("<h1>Rien à signaler</h1>"));
+    const baseline = buildRenderBaseline(auditPages("accueil"), ["accueil"], "wcag");
+    const d = diffRenderBaseline(auditPages("accueil", "propre"), ["accueil", "propre"], baseline);
+    expect(d.newPages).toEqual(["propre"]);
     expect(d.newFindings).toEqual([]);
     expect(d.ok).toBe(true);
+    expect(renderDiffMarkdown(d, "en")).toContain("propre");
+  });
+
+  it("only warns about a page it lacks when the baseline cannot be a reference", () => {
+    snap("accueil", ONE_IMG);
+    snap("contact", TWO_IMG);
+    const findings = auditPages("accueil", "contact");
+    const valid = buildRenderBaseline(auditPages("accueil"), ["accueil"], "wcag");
+    for (const [why, d] of [
+      ["no baseline", diffRenderBaseline(findings, ["accueil", "contact"], null)],
+      ["another version", diffRenderBaseline(findings, ["accueil", "contact"], { ...valid, version: "0.0.1" })],
+      ["an approximate baseline", diffRenderBaseline(findings, ["accueil", "contact"], valid, "bloquant", undefined, { approximate: true })],
+      ["an empty baseline", diffRenderBaseline(findings, ["accueil", "contact"], { ...valid, pages: {} })],
+    ] as const) {
+      expect(d.newPages, why).toEqual([]);
+      expect(d.pagesWithoutBaseline, why).toContain("contact");
+      expect(d.unbaselined.length, why).toBeGreaterThan(0);
+      expect(d.ok, why).toBe(true);
+    }
   });
 
   it("measures a clean page as measured, so a later finding on it is new", () => {
@@ -164,12 +199,45 @@ describe("audit --lite, the command", () => {
     const added = await run(["audit", "--lite", "--root", root, "--pages", "accueil,contact,absente", "--baseline", baseline, "--out", out, "--json"]);
     expect(added.code).toBe(1);
     const diff = JSON.parse(added.out);
-    expect(diff.pagesWithoutBaseline).toEqual(["contact"]);
+    expect(diff.newPages).toEqual(["contact"]);
+    expect(diff.pagesWithoutBaseline).toEqual([]);
     expect(diff.warnings.join("\n")).toContain("absente");
     expect(existsSync(join(out, "lite.sarif"))).toBe(true);
     const sarif = JSON.parse(readFileSync(join(out, "lite.sarif"), "utf8"));
     expect(sarif.runs[0].automationDetails.id).toBe("ultra11y-lite/wcag/");
     expect(sarif.runs[0].results.length).toBe(diff.newFindings.length);
+  });
+
+  it("fails on a new page with a blocking finding, passes a clean one, and only warns with --baseline-approximate", async () => {
+    snap("accueil", page("<h1>Accueil</h1>"));
+    const baseline = join(root, "baseline.json");
+    await run(["audit", "--lite", "--root", root, "--write-baseline", baseline]);
+    snap("propre", page("<h1>Propre</h1>"));
+    expect((await run(["audit", "--lite", "--root", root, "--baseline", baseline, "--json"])).code).toBe(0);
+    snap("cassee", ONE_IMG);
+    const broken = await run(["audit", "--lite", "--root", root, "--baseline", baseline, "--json"]);
+    expect(broken.code).toBe(1);
+    expect(JSON.parse(broken.out).newPages).toEqual(["cassee", "propre"]);
+    const approx = await run(["audit", "--lite", "--root", root, "--baseline", baseline, "--baseline-approximate", "--json", "--lang", "en"]);
+    expect(approx.code).toBe(0);
+    expect(JSON.parse(approx.out).warnings.join("\n")).toContain("approximate");
+  });
+
+  it("never judges new a declared page the baseline push failed to capture", async () => {
+    writeFileSync(
+      join(root, ".ultra11yrc.json"),
+      JSON.stringify({ sample: { pages: ["accueil", "flaky"].map((id) => ({ id, name: id, url: `http://localhost/${id}` })) } }),
+    );
+    snap("accueil", page("<h1>Accueil</h1>"));
+    const baseline = join(root, "baseline.json");
+    await run(["audit", "--lite", "--root", root, "--pages", "accueil,flaky", "--write-baseline", baseline]);
+    expect(JSON.parse(readFileSync(baseline, "utf8")).skipped).toEqual(["flaky"]);
+    snap("flaky", ONE_IMG);
+    const r = await run(["audit", "--lite", "--root", root, "--baseline", baseline, "--json"]);
+    expect(r.code, "its old findings are not this change's").toBe(0);
+    const d = JSON.parse(r.out);
+    expect(d.newPages).toEqual([]);
+    expect(d.pagesWithoutBaseline).toEqual(["flaky"]);
   });
 
   it("treats a missing baseline file as no baseline: a warning, never a failure", async () => {

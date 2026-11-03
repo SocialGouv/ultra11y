@@ -92,6 +92,14 @@ export interface SampleConfig {
   // when one of them is touched, because no import edge says so — a Next.js root layout wraps
   // every page without any page importing it.
   global?: string[];
+  // Routes deliberately LEFT OUT of the sample (a page expected to answer 404, a step behind MFA),
+  // each with the reason. `affected` reports a changed route that no page declares and nothing
+  // exempts — a reason is required, so an exemption says why it was granted.
+  exempt?: SampleExempt[];
+}
+export interface SampleExempt {
+  path: string; // glob, relative to the project root
+  reason: string;
 }
 // The sample as recorded in an AuditResult / DynamicResult. The `storageState` PATH is
 // deliberately dropped (never persisted): the report needs name/url/auth/notes only.

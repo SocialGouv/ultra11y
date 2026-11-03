@@ -38,6 +38,10 @@ export interface RenderBaseline {
   /** Every page this baseline AUDITED, clean ones included (`{}`): a page absent from this map was
    *  never measured, which is a different statement from a page with nothing wrong on it. */
   pages: Record<string, PageCounts>;
+  /** Pages the run was expected to measure (asked for, or declared in the sample) and did not —
+   *  no snapshot. Absent from `pages`, and NOT new: a pull request touching one must not have the
+   *  page's old findings judged as its own. */
+  skipped?: string[];
 }
 
 // Generated identifiers a framework puts in ids and class names. They differ between two renders
@@ -84,14 +88,30 @@ function countByKey(findings: Finding[]): Map<string, Finding[]> {
   return out;
 }
 
-export function buildRenderBaseline(findings: Finding[], pages: string[], standard: string, date = new Date().toISOString().slice(0, 10)): RenderBaseline {
+export function buildRenderBaseline(
+  findings: Finding[],
+  pages: string[],
+  standard: string,
+  date = new Date().toISOString().slice(0, 10),
+  skipped: string[] = [],
+): RenderBaseline {
   const out: Record<string, PageCounts> = {};
   for (const id of [...pages].sort()) out[id] = {};
   for (const [key, list] of [...countByKey(gatedFindings(findings))].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     const page = key.slice(0, key.indexOf("|"));
     (out[page] ??= {})[key] = list.length;
   }
-  return { tool: "ultra11y", kind: RENDER_BASELINE_KIND, schemaVersion: 1, version: VERSION, date, standard, pages: out };
+  const missed = [...new Set(skipped)].filter((id) => !(id in out)).sort();
+  return {
+    tool: "ultra11y",
+    kind: RENDER_BASELINE_KIND,
+    schemaVersion: 1,
+    version: VERSION,
+    date,
+    standard,
+    pages: out,
+    ...(missed.length ? { skipped: missed } : {}),
+  };
 }
 
 /** Read a render baseline. An AUDIT document is accepted too — its findings are folded onto the
@@ -115,6 +135,7 @@ export function parseRenderBaseline(raw: unknown, standard = "wcag"): RenderBase
       date: typeof r.date === "string" ? r.date : "",
       standard: typeof r.standard === "string" ? r.standard : standard,
       pages,
+      ...(Array.isArray(r.skipped) ? { skipped: (r.skipped as unknown[]).filter((x): x is string => typeof x === "string") } : {}),
     };
   }
   const doc = unwrapAudit(raw) as unknown as Record<string, unknown>;
@@ -139,10 +160,17 @@ export interface RenderDiff {
   blocking: Finding[];
   /** Occurrences the baseline had and this run no longer finds, on the pages it audited. */
   fixed: number;
-  /** Audited pages the baseline never measured: their findings cannot be told new from old. */
+  /** Audited pages absent from a baseline that is a valid REFERENCE (same engine, the merge-base's
+   *  own, at least one page): the baseline measured every sample page, so these were introduced by
+   *  the change. Their findings are all new and gate — the page is judged with no reference. */
+  newPages: string[];
+  /** Audited pages the baseline cannot speak for (no baseline, another engine, an approximate
+   *  baseline): their findings cannot be told new from old. */
   pagesWithoutBaseline: string[];
   /** Findings on those pages, reported as warnings and never failing. */
   unbaselined: Finding[];
+  /** Set when the baseline is not the merge-base's own (the closest cache entry by prefix). */
+  approximate: boolean;
   /** Set when the baseline was written by another engine version. */
   versionMismatch?: { baseline: string; current: string };
   /** No baseline at all — first run, or a cache miss. */
@@ -156,20 +184,34 @@ export function diffRenderBaseline(
   baseline: RenderBaseline | null,
   failOn: Severity = "bloquant",
   version: string = VERSION,
+  opts: { approximate?: boolean } = {},
 ): RenderDiff {
   const current = countByKey(gatedFindings(findings));
   const newFindings: Finding[] = [];
   const unbaselined: Finding[] = [];
   const without = new Set<string>();
+  const fresh = new Set<string>();
   let fixed = 0;
   const audited = new Set(pages);
-  for (const id of pages) if (!baseline?.pages[id]) without.add(id);
+  const versionMismatch = baseline && baseline.version !== version ? { baseline: baseline.version, current: version } : undefined;
+  // The push that writes a baseline audits EVERY sample page and records the clean ones too, so a
+  // page a same-engine baseline does not know was not there: the change under review added it.
+  // Only an exact baseline can say so — the closest entry by prefix may predate pages that are
+  // not this change's, and another engine's or an empty one speaks for nothing.
+  const reference = baseline !== null && !versionMismatch && !opts.approximate && Object.keys(baseline.pages).length > 0;
+  // A page the writing run was expected to measure and did not is not new either: it was there,
+  // nobody captured it.
+  const skipped = new Set(baseline?.skipped ?? []);
+  const isNew = (page: string): boolean => reference && !skipped.has(page);
+  const absent = (page: string): void => void (isNew(page) ? fresh : without).add(page);
+  for (const id of pages) if (!baseline?.pages[id]) absent(id);
   for (const [key, list] of current) {
     const page = key.slice(0, key.indexOf("|"));
     const base = baseline?.pages[page];
     if (!base) {
-      without.add(page);
-      unbaselined.push(...list);
+      absent(page);
+      if (isNew(page)) newFindings.push(...list);
+      else unbaselined.push(...list);
       continue;
     }
     const had = base[key] ?? 0;
@@ -183,15 +225,16 @@ export function diffRenderBaseline(
     for (const [key, had] of Object.entries(base)) fixed += Math.max(0, had - (current.get(key)?.length ?? 0));
   }
   const blocking = newFindings.filter((f) => RANK[f.severity] <= RANK[failOn]);
-  const versionMismatch = baseline && baseline.version !== version ? { baseline: baseline.version, current: version } : undefined;
   return {
     pages: [...pages].sort(),
     failOn,
     newFindings,
     blocking,
     fixed,
+    newPages: [...fresh].sort(),
     pagesWithoutBaseline: [...without].sort(),
     unbaselined,
+    approximate: opts.approximate === true,
     ...(versionMismatch ? { versionMismatch } : {}),
     noBaseline: baseline === null,
     ok: blocking.length === 0 || versionMismatch !== undefined,
@@ -210,9 +253,13 @@ export function renderDiffWarnings(diff: RenderDiff, lang: Lang = "en"): string[
     );
   else if (diff.pagesWithoutBaseline.length)
     out.push(
-      fr
-        ? `page(s) absente(s) de la baseline, ses constats ne bloquent pas : ${diff.pagesWithoutBaseline.join(", ")}.`
-        : `page(s) the baseline never measured, their findings do not gate: ${diff.pagesWithoutBaseline.join(", ")}.`,
+      diff.approximate
+        ? fr
+          ? `baseline approchée (pas celle du merge-base) : les pages qu'elle ne connaît pas sont signalées sans bloquer : ${diff.pagesWithoutBaseline.join(", ")}.`
+          : `approximate baseline (not the merge-base's own): pages it does not know are reported without gating: ${diff.pagesWithoutBaseline.join(", ")}.`
+        : fr
+          ? `page(s) absente(s) de la baseline, ses constats ne bloquent pas : ${diff.pagesWithoutBaseline.join(", ")}.`
+          : `page(s) the baseline never measured, their findings do not gate: ${diff.pagesWithoutBaseline.join(", ")}.`,
     );
   if (diff.versionMismatch)
     out.push(
@@ -257,6 +304,13 @@ export function renderDiffMarkdown(diff: RenderDiff, lang: Lang = "en", max = 50
     "",
   );
   for (const w of renderDiffWarnings(diff, lang)) out.push(`> ⚠️ ${w}`, "");
+  if (diff.newPages.length)
+    out.push(
+      fr
+        ? `🆕 Nouvelle(s) page(s), absente(s) de la baseline : jugée(s) sans référence, chacun de ses constats ≥ ${sev} bloque — ${diff.newPages.join(", ")}.`
+        : `🆕 New page(s), absent from the baseline: judged with no reference, every finding ≥ ${sev} on it gates — ${diff.newPages.join(", ")}.`,
+      "",
+    );
   if (diff.newFindings.length) {
     out.push(fr ? "| Page | Critère | Règle | Sévérité | Élément |" : "| Page | Criterion | Rule | Severity | Element |", "|---|---|---|---|---|");
     for (const f of diff.newFindings.slice(0, max))
