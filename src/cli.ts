@@ -1506,7 +1506,24 @@ async function cmdAuditLite(p: ParsedArgs): Promise<number> {
 
   const writeTo = typeof p.flags["write-baseline"] === "string" && p.flags["write-baseline"] ? p.flags["write-baseline"] : undefined;
   if (writeTo) {
-    const baseline = buildRenderBaseline(findings, selected, standard);
+    // The new-page judgment rests on the baseline knowing every page that EXISTED when it was
+    // written. A page asked for or declared in the sample that left no snapshot (a skipped or
+    // flaky capture) is recorded as skipped, so a later pull request never inherits its backlog
+    // as new.
+    let declared: string[] = [];
+    try {
+      declared = (loadConfig(root)?.sample?.pages ?? []).map((pg) => pg.id).filter((id): id is string => typeof id === "string");
+    } catch {
+      /* an unreadable config is reported by every other command; here it only narrows `skipped` */
+    }
+    const asked = typeof p.flags.pages === "string" ? p.flags.pages.split(/[\s,]+/).filter(Boolean) : [];
+    const baseline = buildRenderBaseline(findings, selected, standard, undefined, [...asked, ...declared]);
+    if (baseline.skipped?.length)
+      warnings.push(
+        lang === "fr"
+          ? `baseline écrite sans ${baseline.skipped.length} page(s) déclarée(s) faute d'instantané (${baseline.skipped.join(", ")}) : elles ne seront pas jugées nouvelles.`
+          : `baseline written without ${baseline.skipped.length} declared page(s) that left no snapshot (${baseline.skipped.join(", ")}): they will not be judged new.`,
+      );
     mkdirSync(dirname(writeTo), { recursive: true });
     writeFileSync(writeTo, `${JSON.stringify(baseline, null, 2)}\n`);
     console.error(

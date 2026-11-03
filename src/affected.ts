@@ -105,12 +105,14 @@ export interface AffectedResult {
 // any other file by path alone; a router configured in code (React Router, Vue Router, Remix's
 // flat routes mixed with colocated modules) cannot, and is out of reach — declare those pages.
 const ROUTE_FILES: RegExp[] = [
-  // Next.js App Router: app/**/page.*
-  /^(?:src\/)?app\/(?:.+\/)?page\.(?:tsx|jsx|ts|js|mdx)$/,
+  // Next.js App Router: app/**/page.* — at any depth, so a config at a workspace root still sees
+  // `apps/web/src/app/**`. A `page.*` file under an `app/` directory is a route almost everywhere;
+  // where it is not, `sample.exempt` says so.
+  /(?:^|\/)app\/(?:.+\/)?page\.(?:tsx|jsx|ts|js|mdx)$/,
   // Next.js Pages Router, Nuxt, Astro: pages/** (minus `_app`/`_document`/… and API routes)
   /^(?:src\/)?pages\/(?!(?:.+\/)?_)(?!api\/)(?:.+\/)?[^/]+\.(?:tsx|jsx|ts|js|mdx|md|vue|astro|svelte)$/,
-  // SvelteKit: routes/**/+page.svelte
-  /^(?:src\/)?routes\/(?:.+\/)?\+page\.svelte$/,
+  // SvelteKit: routes/**/+page.svelte — unambiguous, so at any depth too
+  /(?:^|\/)routes\/(?:.+\/)?\+page\.svelte$/,
 ];
 
 /** Is this root-relative path a route file of a file-system router? */

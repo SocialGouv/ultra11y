@@ -656,7 +656,8 @@ that only moved is not new, a third occurrence of a key that had two is. It is s
 measured is NEW when the baseline is the merge-base's own and of the same version — the push that
 writes it records every sample page, clean ones included — so every finding on it gates, and the
 summary says the page is new. It only warns when the baseline is missing, from another ultra11y
-version, or the closest cache entry rather than the merge-base's (`--baseline-approximate`). Surfaces: the
+version, or the closest cache entry rather than the merge-base's (`--baseline-approximate`), and
+for a page the baseline records as `skipped` (declared or asked for, but no snapshot on that push). Surfaces: the
 job summary, annotations, SARIF under category `ultra11y-lite-<standard>`; no sticky comment.
 A complete workflow is in the README.
 

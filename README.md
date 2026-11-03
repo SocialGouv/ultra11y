@@ -515,7 +515,9 @@ pull request:
   included, so a page the merge-base's own baseline does not know was added by the pull request:
   every finding on it at `fail-on` is new and fails, and the summary says the page is new. Only a
   baseline that cannot speak for it only warns: none at all, one written by another ultra11y
-  version, or the closest entry by prefix (`--baseline-approximate`, set by the action);
+  version, or the closest entry by prefix (`--baseline-approximate`, set by the action). A page
+  the push was asked for, or that the sample declares, but that left no snapshot is recorded as
+  `skipped` in the baseline and never judged new;
 - **a route nobody declared is named** — `affected` lists the route files the diff adds or changes
   (Next.js App Router `page.*`, a `pages/` router — Next, Nuxt, Astro —, SvelteKit
   `+page.svelte`) that no sample page declares in its `sources`, as `unsampled` and the action

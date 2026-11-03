@@ -38,6 +38,10 @@ export interface RenderBaseline {
   /** Every page this baseline AUDITED, clean ones included (`{}`): a page absent from this map was
    *  never measured, which is a different statement from a page with nothing wrong on it. */
   pages: Record<string, PageCounts>;
+  /** Pages the run was expected to measure (asked for, or declared in the sample) and did not —
+   *  no snapshot. Absent from `pages`, and NOT new: a pull request touching one must not have the
+   *  page's old findings judged as its own. */
+  skipped?: string[];
 }
 
 // Generated identifiers a framework puts in ids and class names. They differ between two renders
@@ -84,14 +88,30 @@ function countByKey(findings: Finding[]): Map<string, Finding[]> {
   return out;
 }
 
-export function buildRenderBaseline(findings: Finding[], pages: string[], standard: string, date = new Date().toISOString().slice(0, 10)): RenderBaseline {
+export function buildRenderBaseline(
+  findings: Finding[],
+  pages: string[],
+  standard: string,
+  date = new Date().toISOString().slice(0, 10),
+  skipped: string[] = [],
+): RenderBaseline {
   const out: Record<string, PageCounts> = {};
   for (const id of [...pages].sort()) out[id] = {};
   for (const [key, list] of [...countByKey(gatedFindings(findings))].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     const page = key.slice(0, key.indexOf("|"));
     (out[page] ??= {})[key] = list.length;
   }
-  return { tool: "ultra11y", kind: RENDER_BASELINE_KIND, schemaVersion: 1, version: VERSION, date, standard, pages: out };
+  const missed = [...new Set(skipped)].filter((id) => !(id in out)).sort();
+  return {
+    tool: "ultra11y",
+    kind: RENDER_BASELINE_KIND,
+    schemaVersion: 1,
+    version: VERSION,
+    date,
+    standard,
+    pages: out,
+    ...(missed.length ? { skipped: missed } : {}),
+  };
 }
 
 /** Read a render baseline. An AUDIT document is accepted too — its findings are folded onto the
@@ -115,6 +135,7 @@ export function parseRenderBaseline(raw: unknown, standard = "wcag"): RenderBase
       date: typeof r.date === "string" ? r.date : "",
       standard: typeof r.standard === "string" ? r.standard : standard,
       pages,
+      ...(Array.isArray(r.skipped) ? { skipped: (r.skipped as unknown[]).filter((x): x is string => typeof x === "string") } : {}),
     };
   }
   const doc = unwrapAudit(raw) as unknown as Record<string, unknown>;
@@ -178,14 +199,18 @@ export function diffRenderBaseline(
   // Only an exact baseline can say so — the closest entry by prefix may predate pages that are
   // not this change's, and another engine's or an empty one speaks for nothing.
   const reference = baseline !== null && !versionMismatch && !opts.approximate && Object.keys(baseline.pages).length > 0;
-  const absent = (page: string): void => void (reference ? fresh : without).add(page);
+  // A page the writing run was expected to measure and did not is not new either: it was there,
+  // nobody captured it.
+  const skipped = new Set(baseline?.skipped ?? []);
+  const isNew = (page: string): boolean => reference && !skipped.has(page);
+  const absent = (page: string): void => void (isNew(page) ? fresh : without).add(page);
   for (const id of pages) if (!baseline?.pages[id]) absent(id);
   for (const [key, list] of current) {
     const page = key.slice(0, key.indexOf("|"));
     const base = baseline?.pages[page];
     if (!base) {
       absent(page);
-      if (reference) newFindings.push(...list);
+      if (isNew(page)) newFindings.push(...list);
       else unbaselined.push(...list);
       continue;
     }

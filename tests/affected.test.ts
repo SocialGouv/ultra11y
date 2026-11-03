@@ -175,6 +175,8 @@ describe("affected — routes no sample page declares", () => {
       "src/pages/blog/[slug].astro",
       "pages/about.vue",
       "src/routes/a/+page.svelte",
+      "apps/web/src/app/a/page.tsx",
+      "apps/kit/src/routes/+page.svelte",
     ])
       expect(isRouteFile(route), route).toBe(true);
     for (const other of [

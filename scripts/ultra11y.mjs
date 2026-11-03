@@ -72972,14 +72972,24 @@ function countByKey(findings) {
   }
   return out2;
 }
-function buildRenderBaseline(findings, pages, standard, date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)) {
+function buildRenderBaseline(findings, pages, standard, date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), skipped = []) {
   const out2 = {};
   for (const id of [...pages].sort()) out2[id] = {};
   for (const [key2, list] of [...countByKey(gatedFindings(findings))].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
     const page = key2.slice(0, key2.indexOf("|"));
     (out2[page] ??= {})[key2] = list.length;
   }
-  return { tool: "ultra11y", kind: RENDER_BASELINE_KIND, schemaVersion: 1, version: VERSION, date, standard, pages: out2 };
+  const missed = [...new Set(skipped)].filter((id) => !(id in out2)).sort();
+  return {
+    tool: "ultra11y",
+    kind: RENDER_BASELINE_KIND,
+    schemaVersion: 1,
+    version: VERSION,
+    date,
+    standard,
+    pages: out2,
+    ...missed.length ? { skipped: missed } : {}
+  };
 }
 function parseRenderBaseline(raw, standard = "wcag") {
   if (typeof raw !== "object" || raw === null) return null;
@@ -72999,7 +73009,8 @@ function parseRenderBaseline(raw, standard = "wcag") {
       version: typeof r.version === "string" ? r.version : "unknown",
       date: typeof r.date === "string" ? r.date : "",
       standard: typeof r.standard === "string" ? r.standard : standard,
-      pages
+      pages,
+      ...Array.isArray(r.skipped) ? { skipped: r.skipped.filter((x) => typeof x === "string") } : {}
     };
   }
   const doc = unwrapAudit(raw);
@@ -73023,14 +73034,16 @@ function diffRenderBaseline(findings, pages, baseline, failOn = "bloquant", vers
   const audited = new Set(pages);
   const versionMismatch = baseline && baseline.version !== version ? { baseline: baseline.version, current: version } : void 0;
   const reference = baseline !== null && !versionMismatch && !opts.approximate && Object.keys(baseline.pages).length > 0;
-  const absent = (page) => void (reference ? fresh : without).add(page);
+  const skipped = new Set(baseline?.skipped ?? []);
+  const isNew = (page) => reference && !skipped.has(page);
+  const absent = (page) => void (isNew(page) ? fresh : without).add(page);
   for (const id of pages) if (!baseline?.pages[id]) absent(id);
   for (const [key2, list] of current) {
     const page = key2.slice(0, key2.indexOf("|"));
     const base = baseline?.pages[page];
     if (!base) {
       absent(page);
-      if (reference) newFindings.push(...list);
+      if (isNew(page)) newFindings.push(...list);
       else unbaselined.push(...list);
       continue;
     }
@@ -73144,12 +73157,14 @@ var extOf = (f) => {
 };
 var norm5 = (p) => posix3.normalize(toPosix(p)).replace(/^\.\//, "");
 var ROUTE_FILES = [
-  // Next.js App Router: app/**/page.*
-  /^(?:src\/)?app\/(?:.+\/)?page\.(?:tsx|jsx|ts|js|mdx)$/,
+  // Next.js App Router: app/**/page.* — at any depth, so a config at a workspace root still sees
+  // `apps/web/src/app/**`. A `page.*` file under an `app/` directory is a route almost everywhere;
+  // where it is not, `sample.exempt` says so.
+  /(?:^|\/)app\/(?:.+\/)?page\.(?:tsx|jsx|ts|js|mdx)$/,
   // Next.js Pages Router, Nuxt, Astro: pages/** (minus `_app`/`_document`/… and API routes)
   /^(?:src\/)?pages\/(?!(?:.+\/)?_)(?!api\/)(?:.+\/)?[^/]+\.(?:tsx|jsx|ts|js|mdx|md|vue|astro|svelte)$/,
-  // SvelteKit: routes/**/+page.svelte
-  /^(?:src\/)?routes\/(?:.+\/)?\+page\.svelte$/
+  // SvelteKit: routes/**/+page.svelte — unambiguous, so at any depth too
+  /(?:^|\/)routes\/(?:.+\/)?\+page\.svelte$/
 ];
 function isRouteFile(rel2) {
   return !isTestArtifact(rel2) && ROUTE_FILES.some((re) => re.test(rel2));
@@ -81192,7 +81207,17 @@ async function cmdAuditLite(p) {
   const findings = findingsForStandard(result, standard);
   const writeTo = typeof p.flags["write-baseline"] === "string" && p.flags["write-baseline"] ? p.flags["write-baseline"] : void 0;
   if (writeTo) {
-    const baseline2 = buildRenderBaseline(findings, selected, standard);
+    let declared = [];
+    try {
+      declared = (loadConfig(root)?.sample?.pages ?? []).map((pg) => pg.id).filter((id) => typeof id === "string");
+    } catch {
+    }
+    const asked = typeof p.flags.pages === "string" ? p.flags.pages.split(/[\s,]+/).filter(Boolean) : [];
+    const baseline2 = buildRenderBaseline(findings, selected, standard, void 0, [...asked, ...declared]);
+    if (baseline2.skipped?.length)
+      warnings.push(
+        lang === "fr" ? `baseline \xE9crite sans ${baseline2.skipped.length} page(s) d\xE9clar\xE9e(s) faute d'instantan\xE9 (${baseline2.skipped.join(", ")}) : elles ne seront pas jug\xE9es nouvelles.` : `baseline written without ${baseline2.skipped.length} declared page(s) that left no snapshot (${baseline2.skipped.join(", ")}): they will not be judged new.`
+      );
     mkdirSync20(dirname22(writeTo), { recursive: true });
     writeFileSync23(writeTo, `${JSON.stringify(baseline2, null, 2)}
 `);

@@ -223,6 +223,23 @@ describe("audit --lite, the command", () => {
     expect(JSON.parse(approx.out).warnings.join("\n")).toContain("approximate");
   });
 
+  it("never judges new a declared page the baseline push failed to capture", async () => {
+    writeFileSync(
+      join(root, ".ultra11yrc.json"),
+      JSON.stringify({ sample: { pages: ["accueil", "flaky"].map((id) => ({ id, name: id, url: `http://localhost/${id}` })) } }),
+    );
+    snap("accueil", page("<h1>Accueil</h1>"));
+    const baseline = join(root, "baseline.json");
+    await run(["audit", "--lite", "--root", root, "--pages", "accueil,flaky", "--write-baseline", baseline]);
+    expect(JSON.parse(readFileSync(baseline, "utf8")).skipped).toEqual(["flaky"]);
+    snap("flaky", ONE_IMG);
+    const r = await run(["audit", "--lite", "--root", root, "--baseline", baseline, "--json"]);
+    expect(r.code, "its old findings are not this change's").toBe(0);
+    const d = JSON.parse(r.out);
+    expect(d.newPages).toEqual([]);
+    expect(d.pagesWithoutBaseline).toEqual(["flaky"]);
+  });
+
   it("treats a missing baseline file as no baseline: a warning, never a failure", async () => {
     snap("accueil", TWO_IMG);
     const r = await run(["audit", "--lite", "--root", root, "--baseline", join(root, "absent.json"), "--json"]);
