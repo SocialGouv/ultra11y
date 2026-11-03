@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.58.0](https://github.com/SocialGouv/ultra11y/compare/v5.57.5...v5.58.0) (2026-11-03)
+
+
+### Features
+
+* **lite:** a per-pull-request rendered regression gate — affected pages only, engine only, new findings only ([#145](https://github.com/SocialGouv/ultra11y/issues/145)) ([b24519c](https://github.com/SocialGouv/ultra11y/commit/b24519c30aacf917bf5d7c56edbec6fc23e6165c))
+
 ## [5.57.5](https://github.com/SocialGouv/ultra11y/compare/v5.57.4...v5.57.5) (2026-11-02)
 
 
