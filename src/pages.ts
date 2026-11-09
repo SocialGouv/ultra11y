@@ -290,7 +290,12 @@ function pageStatus(c: CriterionResult, pageFindings: Finding[], basis: PageScop
   // nothing to do with. That is what makes a complete page grid reachable at all, and it is
   // labelled as a scope-wide decision where it is rendered.
   // A named human auditor's ruling is the same kind of recorded verdict.
-  if (c.decidedBy === "agent" || c.decidedBy === "human" || c.decidedBy === "scan") return c.status;
+  //
+  // EXCEPT AN NC. A clearing verdict says something about the whole scope; an NC rests on
+  // findings with a location, and this page has none of them (they would have returned above).
+  // It falls through to rule 3 like any other NC that fired somewhere else — carried here, it
+  // gave every page of a run the same list of non-conformities.
+  if (c.status !== "NC" && (c.decidedBy === "agent" || c.decidedBy === "human" || c.decidedBy === "scan")) return c.status;
 
   // 3. SILENCE ONLY DECIDES WHAT THE ENGINE CAN DECIDE.
   //
@@ -355,8 +360,11 @@ export function derivePages(result: AuditResult, pages: PageScope[]): PageResult
       // justification is re-derived too: the scope-wide one says why the criterion stayed OPEN
       // ("probed on 19 of the 20 pages"), which is the opposite of what happened here.
       const measured = status === "C" && c.status !== "C" && c.decidedBy === undefined;
-      const decidedBy = c.decidedBy ?? (measured ? "scan" : undefined);
-      const justification = measured ? measuredHereReason(c.id, p.coverage) : c.justification;
+      // An NC ruled elsewhere is nobody's verdict on THIS page: neither the provenance nor the
+      // reasons given for the other pages belong on its row.
+      const ruledElsewhere = c.status === "NC" && status !== "NC" && c.decidedBy !== undefined;
+      const decidedBy = ruledElsewhere ? undefined : (c.decidedBy ?? (measured ? "scan" : undefined));
+      const justification = measured ? measuredHereReason(c.id, p.coverage) : ruledElsewhere ? undefined : c.justification;
       return {
         id: c.id,
         guideline: c.guideline,
@@ -563,6 +571,37 @@ export interface PageGridModel {
   human: Set<string>;
 }
 
+/** The run's recorded verdicts as they apply to ONE page.
+ *
+ *  `derivePackResults` prefers a recorded verdict over its own derivation, and a verdict is
+ *  scope-wide. For a clearing verdict that is the documented claim (see `pageStatus`). For an NC
+ *  it is not: the verdict rests on findings with a location, so one defect on one route made the
+ *  criterion NC on all of them. Measured on a 38-page sweep: seven NC verdicts located on zero to
+ *  four pages each, and 38 identical sheets.
+ *
+ *  An NC therefore reaches this page only with the findings that are on it. Without any, the
+ *  entry leaves the view and the page falls back on its own derivation, which is what honesty
+ *  rule 3 asks of any NC that fired elsewhere.
+ *
+ *  A source a page declares counts on that page even when `attributePages` stamped the finding
+ *  on another one: first-match is there to keep occurrence counts from inflating, and here the
+ *  question is whether this page ships the defect. */
+function adjudicationOnPage(
+  result: AuditResult,
+  adjudication: NonNullable<AuditResult["packAdjudication"]>,
+  page: PageResult,
+): NonNullable<AuditResult["packAdjudication"]> {
+  const stamped = new Set(page.findings.map(findingId));
+  const sources = result.scope.pages?.find((p) => p.id === page.id)?.sources ?? [];
+  const onPage = (f: Finding): boolean => stamped.has(findingId(f)) || sources.some((s) => pathMatch(f.origin?.sourceFile ?? f.file, s));
+  const criteria = adjudication.criteria.flatMap((c) => {
+    if (c.status !== "NC") return [c];
+    const findings = c.findings.filter(onPage);
+    return findings.some((f) => !f.advisory) ? [{ ...c, findings }] : [];
+  });
+  return { ...adjudication, criteria };
+}
+
 /** A view of the audit restricted to ONE page: the same shape, with this page's criterion
  *  statuses and findings. Feeding it to `derivePackResults` is what makes the grid agree with
  *  the report BY CONSTRUCTION — out-of-scope criteria (RGAA 8.1), scoped-out siblings, pack
@@ -585,9 +624,11 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
   //
   // Absent map ⇒ unchanged behaviour, so an audit written before the fold reads as it always did.
   const own = result.scope.pageSubjects?.[page.id];
+  const packAdjudication = result.packAdjudication ? adjudicationOnPage(result, result.packAdjudication, page) : undefined;
   return {
     ...result,
     ...(own ? { scope: { ...result.scope, subjectsSeen: own } } : {}),
+    ...(packAdjudication ? { packAdjudication } : {}),
     criteria: page.criteria,
     findings: page.findings,
     ...(result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}),

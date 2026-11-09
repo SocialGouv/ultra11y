@@ -62754,7 +62754,7 @@ function pageStatus(c2, pageFindings, basis, coverage) {
   if (c2.status === "manual") return "manual";
   if (c2.status === "NA") return "NA";
   if (c2.inapplicable) return c2.status;
-  if (c2.decidedBy === "agent" || c2.decidedBy === "human" || c2.decidedBy === "scan") return c2.status;
+  if (c2.status !== "NC" && (c2.decidedBy === "agent" || c2.decidedBy === "human" || c2.decidedBy === "scan")) return c2.status;
   if (automatability(c2.id) !== "static") return "manual";
   return basis === "snapshot" ? "C" : "manual";
 }
@@ -62783,8 +62783,9 @@ function derivePages(result, pages) {
       const pf = own.filter((f) => f.criteriaId === c2.id);
       const status = pageStatus(c2, pf, p.basis, p.coverage);
       const measured2 = status === "C" && c2.status !== "C" && c2.decidedBy === void 0;
-      const decidedBy = c2.decidedBy ?? (measured2 ? "scan" : void 0);
-      const justification = measured2 ? measuredHereReason(c2.id, p.coverage) : c2.justification;
+      const ruledElsewhere = c2.status === "NC" && status !== "NC" && c2.decidedBy !== void 0;
+      const decidedBy = ruledElsewhere ? void 0 : c2.decidedBy ?? (measured2 ? "scan" : void 0);
+      const justification = measured2 ? measuredHereReason(c2.id, p.coverage) : ruledElsewhere ? void 0 : c2.justification;
       return {
         id: c2.id,
         guideline: c2.guideline,
@@ -62904,11 +62905,24 @@ function commonOrigin(pages) {
 function pageOriginNote(origin, lang) {
   return origin ? L[lang].originNote(origin) : void 0;
 }
+function adjudicationOnPage(result, adjudication, page) {
+  const stamped = new Set(page.findings.map(findingId));
+  const sources = result.scope.pages?.find((p) => p.id === page.id)?.sources ?? [];
+  const onPage = (f) => stamped.has(findingId(f)) || sources.some((s) => pathMatch2(f.origin?.sourceFile ?? f.file, s));
+  const criteria = adjudication.criteria.flatMap((c2) => {
+    if (c2.status !== "NC") return [c2];
+    const findings = c2.findings.filter(onPage);
+    return findings.some((f) => !f.advisory) ? [{ ...c2, findings }] : [];
+  });
+  return { ...adjudication, criteria };
+}
 function pageView(result, page) {
   const own = result.scope.pageSubjects?.[page.id];
+  const packAdjudication = result.packAdjudication ? adjudicationOnPage(result, result.packAdjudication, page) : void 0;
   return {
     ...result,
     ...own ? { scope: { ...result.scope, subjectsSeen: own } } : {},
+    ...packAdjudication ? { packAdjudication } : {},
     criteria: page.criteria,
     findings: page.findings,
     ...result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {},

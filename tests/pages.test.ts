@@ -177,6 +177,17 @@ describe("per-page criterion status", () => {
     expect(pages.find((p) => p.id === "contact")?.criteria.find((c) => c.id === "1.1.1")?.status).toBe("manual");
   });
 
+  it("does not spread a non-conformity the agent ruled onto a page it was not found on", () => {
+    const nc = F({ page: "accueil", criteriaId: "1.1.1" });
+    const ruled: CriterionResult = { ...C("1.1.1", "NC", [nc]), decidedBy: "agent" };
+    const pages = derivePages(audit({ findings: [nc], criteria: [ruled] }), PAGES);
+    const cell = (id: string) => pages.find((p) => p.id === id)?.criteria.find((c) => c.id === "1.1.1");
+    expect(cell("accueil")?.status).toBe("NC");
+    expect(cell("accueil")?.decidedBy).toBe("agent");
+    expect(cell("contact")?.status).toBe("manual");
+    expect(cell("contact")?.decidedBy).toBeUndefined();
+  });
+
   it("keeps a globally undecidable criterion `manual` on every page", () => {
     const r = audit({ criteria: [C("1.4.3", "manual")] });
     for (const p of derivePages(r, PAGES)) expect(p.criteria.find((c) => c.id === "1.4.3")?.status).toBe("manual");
