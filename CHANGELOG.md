@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.58.3](https://github.com/SocialGouv/ultra11y/compare/v5.58.2...v5.58.3) (2026-11-09)
+
+
+### Bug Fixes
+
+* **pages:** each page gets its own rate, and PDFKit is recommended for untagged PDFs ([a9fc2ad](https://github.com/SocialGouv/ultra11y/commit/a9fc2adc678a6ea59d47d6cfd09ab10897783669)), closes [#148](https://github.com/SocialGouv/ultra11y/issues/148)
+
 ## [5.58.2](https://github.com/SocialGouv/ultra11y/compare/v5.58.1...v5.58.2) (2026-11-09)
 
 
