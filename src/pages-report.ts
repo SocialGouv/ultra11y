@@ -74,14 +74,19 @@ const L = {
     producer: "Producteur",
     auth: "Authentification requise",
     rate: "Taux de réussite automatique (vérifications statiques)",
+    packRate: "Taux de conformité de la page",
     // The index has its own, shorter header — the sheet's label is a full sentence and would
     // wreck an eight-column table. Kept as a SEPARATE key: editing `rate` in place would
     // silently reword the sheet bullet too.
     rateShort: "Taux (critères décidés)",
+    packRateShort: "Taux (validés ÷ applicables)",
     rateNote: "sous-ensemble décidable : C ÷ (C + NC)",
+    packRateNote: "critères validés ÷ critères applicables, ceux à évaluer comptant au dénominateur",
     tally: (c: number, nc: number, na: number, m: number) => `${c} conforme(s) · ${nc} non conforme(s) · ${na} non applicable(s) · ${m} à évaluer`,
     coverage: (decided: number, total: number) =>
       `Couverture : ${decided}/${total} critère(s) évalué(s) — le taux ci-dessus ne porte que sur eux, et ne dit rien des ${total - decided} autres.`,
+    packCoverage: (decided: number, total: number) =>
+      `Couverture : ${decided}/${total} critère(s) évalué(s). Tant qu'il en reste ${total - decided} à évaluer, le taux ci-dessus est un plancher.`,
     tests: "Tests",
     screenshotAlt: (n: string) => `Capture d'écran de la page ${n}`,
     noScreenshot: "Aucune capture d'écran pour cette page (le producteur n'en a pas fourni) — le tier pixel est donc inactif ici.",
@@ -105,6 +110,8 @@ const L = {
     minor: "Mineur",
     indexNote:
       "Une fiche par page. `X % (d/t)` : le taux ne porte que sur les `d` critères décidés sur `t` — il ne dit rien des autres. `—` signifie qu'aucun critère n'a été décidé sur cette page, et ne vaut donc NI conformité NI non-conformité.",
+    packIndexNote:
+      "Une fiche par page. `X % (v/a)` : critères validés ÷ critères applicables, la formule du taux global. Un critère sans sujet sur la page sort du calcul ; un critère à évaluer reste au dénominateur, le taux est donc un plancher. `—` signifie qu'aucun critère n'a été décidé sur cette page, et ne vaut donc NI conformité NI non-conformité.",
   },
   en: {
     docTitle: "Page-by-page accessibility report",
@@ -122,11 +129,16 @@ const L = {
     producer: "Producer",
     auth: "Authentication required",
     rate: "Automatic static-check pass rate",
+    packRate: "Page conformance rate",
     rateShort: "Rate (decided criteria)",
+    packRateShort: "Rate (validated ÷ applicable)",
     rateNote: "decidable subset: C ÷ (C + NC)",
+    packRateNote: "validated criteria ÷ applicable criteria, those still to assess counting in the denominator",
     tally: (c: number, nc: number, na: number, m: number) => `${c} conforming · ${nc} non-conforming · ${na} not applicable · ${m} to assess`,
     coverage: (decided: number, total: number) =>
       `Coverage: ${decided}/${total} criteria assessed — the rate above covers only those, and says nothing about the other ${total - decided}.`,
+    packCoverage: (decided: number, total: number) =>
+      `Coverage: ${decided}/${total} criteria assessed. While ${total - decided} remain to assess, the rate above is a floor.`,
     tests: "Tests",
     screenshotAlt: (n: string) => `Screenshot of the ${n} page`,
     noScreenshot: "No screenshot for this page (the producer supplied none) — the pixel tier is therefore inactive here.",
@@ -150,6 +162,8 @@ const L = {
     minor: "Minor",
     indexNote:
       "One sheet per page. `X % (d/t)`: the rate covers only the `d` criteria decided out of `t` — it says nothing about the others. `—` means no criterion was decided on this page, so it is NEITHER conformity NOR non-conformity.",
+    packIndexNote:
+      "One sheet per page. `X % (v/a)`: validated criteria ÷ applicable criteria, the formula of the overall rate. A criterion with no subject on the page leaves the calculation; one still to assess stays in the denominator, so the rate is a floor. `—` means no criterion was decided on this page, so it is NEITHER conformity NOR non-conformity.",
   },
 } as const;
 
@@ -250,7 +264,7 @@ export function pagesForStandard(result: AuditResult, pages: PageResult[], stand
         findings: [],
         ...(r.decidedBy ? { decidedBy: r.decidedBy } : {}),
       })),
-      conformancePct: pageRatePct(rows),
+      conformancePct: pageRatePct(rows, standard),
       decided: cov.decided,
       total: cov.total,
     };
@@ -286,15 +300,59 @@ export function pageCoverage(rows: PageCriterionRow[]): { decided: number; total
   return { decided: t.c + t.nc, total: rows.length };
 }
 
-/** The rate over the criteria of the ACTIVE standard, decided ones only. Under a pack this is
- *  the pack's own arithmetic, not the WCAG one, so the number agrees with the grid above it
- *  rather than with a different denominator.
+export interface ConformanceRate {
+  pct: number;
+  validated: number;
+  applicable: number;
+  na: number;
+  open: number;
+  decided: number;
+  total: number;
+}
+
+export function conformanceRate(t: { c: number; nc: number; na: number; manual: number }): ConformanceRate {
+  const validated = Math.max(0, t.c - t.na);
+  const applicable = validated + t.nc + t.manual;
+  return {
+    // No applicable criterion is not a failure — it is a scope with nothing of any kind in it,
+    // and the repository's convention for an empty denominator is 100 (src/audit.ts
+    // conformancePct). Divergent conventions on the same question is how two numbers describing
+    // one grid start disagreeing.
+    pct: applicable === 0 ? 100 : Math.round((validated / applicable) * 100),
+    validated,
+    applicable,
+    na: t.na,
+    open: t.manual,
+    decided: t.c + t.nc,
+    total: t.c + t.nc + t.manual,
+  };
+}
+
+/** A page's rate, by the arithmetic of the overall rate of the ACTIVE standard. The WCAG core's
+ *  overall rate is C ÷ (C + NC); a pack's follows its own method, here RGAA's.
+ *
+ *  Under a pack it was C ÷ (C + NC), which printed two numbers no reader could reconcile. A criterion with no
+ *  subject counted as validated, and one still to assess did not count at all, so a real 38-page
+ *  run published « 93 % » on every page above an overall 81 %, and a page with no located
+ *  non-conformity read 100 % with fourteen criteria nobody had settled.
  *
  *  NULL when nothing was decided — see `pct` in src/pages.ts. Returning 100 there is what let a
  *  page nobody had assessed be quoted as a page with nothing wrong. */
-export function pageRatePct(rows: PageCriterionRow[]): number | null {
-  const { c, nc } = pageTally(rows);
-  return c + nc === 0 ? null : Math.round((c / (c + nc)) * 100);
+export function pageRatePct(rows: PageCriterionRow[], standard: StandardId): number | null {
+  const t = pageTally(rows);
+  if (isCore(standard)) return t.c + t.nc === 0 ? null : Math.round((t.c / (t.c + t.nc)) * 100);
+  const rate = conformanceRate(t);
+  return rate.validated + t.nc === 0 ? null : rate.pct;
+}
+
+/** A page's rate with the two numbers it is computed from, as every surface prints it. */
+export function formatPageRate(rows: PageCriterionRow[], standard: StandardId): string {
+  if (isCore(standard)) {
+    const cov = pageCoverage(rows);
+    return formatRate(pageRatePct(rows, standard), cov.decided, cov.total);
+  }
+  const rate = conformanceRate(pageTally(rows));
+  return formatRate(pageRatePct(rows, standard), rate.validated, rate.applicable);
 }
 
 /** One page's dossier: identity, screenshot, rate, the full criteria grid, then every
@@ -317,12 +375,17 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
   const rows = pageCriterionRows(result, page, standard, lang);
   const t = pageTally(rows);
   const cov = pageCoverage(rows);
-  const rate = pageRatePct(rows);
-  out.push(`- **${s.rate}** : **${rate === null ? "—" : `${rate} %`}** _(${s.rateNote})_`);
+  const pack = !isCore(standard);
+  const rate = pageRatePct(rows, standard);
+  out.push(
+    pack
+      ? `- **${s.packRate}** : **${formatPageRate(rows, standard)}** _(${s.packRateNote})_`
+      : `- **${s.rate}** : **${rate === null ? "—" : `${rate} %`}** _(${s.rateNote})_`,
+  );
   out.push(`- ${pageTallyNote(t, lang)}`);
   // The rate alone reads as a verdict on the page. Naming the denominator next to it is
   // what stops "100 %" over six decided criteria from being quoted as a conformant page.
-  out.push(`- ${s.coverage(cov.decided, cov.total)}`, "");
+  out.push(`- ${(pack ? s.packCoverage : s.coverage)(cov.decided, cov.total)}`, "");
 
   // A source-only page cannot earn conformity by silence. Say so ON THE PAGE, not only in a
   // legend the reader may never reach — this is the sentence that stops a clean-looking
@@ -403,19 +466,19 @@ export function renderPagesIndex(result: AuditResult, pages: PageResult[], opts:
   const lang = opts.lang ?? "en";
   const s = L[lang];
   const out = header(result, pages, standard, lang, s.indexTitle);
-  out.push(`> ${s.indexNote}`, "");
-  out.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
+  const pack = !isCore(standard);
+  out.push(`> ${pack ? s.packIndexNote : s.indexNote}`, "");
+  out.push(`| ${s.page} | ${s.url} | ${s.basis} | ${pack ? s.packRateShort : s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
   out.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const p of pages) {
     const rows = pageCriterionRows(result, p, standard, lang);
-    const cov = pageCoverage(rows);
     // Severity counts must see the SAME findings the rate did. Under a pack the rate comes from
     // `derivePackResults`, which reads packFindings; counting only `p.findings` printed
     // "0 · 0 · 0" beside a rate that had already counted those non-conformities.
     const nc = [...p.findings, ...(result.packFindings ?? []).filter((f) => f.page === p.id)].filter((f) => !f.advisory);
     const href = opts.hrefs?.get(p.id);
     out.push(
-      `| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} | ${
+      `| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatPageRate(rows, standard)} | ${
         nc.filter((f) => f.severity === "bloquant").length
       } | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`,
     );

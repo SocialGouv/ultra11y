@@ -315,13 +315,14 @@ smaller one. The evidence is `scope.pagesAudited`, written beside `scope.pages` 
 switches itself off exactly when it matters). An audit written before that field existed leaves
 it undefined, is read as "unknown", and keeps its recorded basis.
 
-**A rate over nothing is not a rate.** The per-page rate is `C ÷ (C + NC)` over the criteria
-that page actually decided, and it is **null** when that denominator is empty — rendered `—`,
-never a number, and always beside its denominator: `50 % (2/106)`, `— (0/106)`. Returning 100
+**A rate over nothing is not a rate.** Under the WCAG core the per-page rate is `C ÷ (C + NC)`
+over the criteria that page decided. Under a country standard it is the overall rate's formula,
+validated ÷ applicable: a criterion with no subject on the page leaves it, and one still to
+assess stays in the denominator, so the rate is a floor. It is **null** when nothing was
+decided — rendered `—`, never a number, and always beside its denominator: `79 % (53/67)`, `— (0/106)`. Returning 100
 there is how thirty-eight sheets reported a perfect page for an app a human auditor had just
 found sixteen non-conformities in: the criteria were all « à évaluer », so nothing was decided,
-so the rate was 100. The index cell carries the same `(decided/total)` bracket as the sheet's
-« Couverture » line, from one shared computation, so the artefact people paste into a pull
+so the rate was 100. The index cell carries the same bracket as the sheet's rate line, from one shared computation, so the artefact people paste into a pull
 request can no longer say something its own sheet contradicts.
 
 **3. Silence only decides what the engine CAN decide.** A scope-wide `NC` on a judgment

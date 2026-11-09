@@ -12,19 +12,11 @@ import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits, type PrdUnit } from "./prd.js";
 import { auditorUnitModel, renderAuditorUnit, type AuditorCropLookup } from "./auditor.js";
 import { resolveMessage, resolveRemediation } from "./messages.js";
-import {
-  basisLabel,
-  derivePages,
-  formatRate,
-  occurrencesByPage,
-  type PageResolver,
-  pageResolver,
-  pageView,
-  renderPageGrid,
-  renderRedirected,
-} from "./pages.js";
+import { basisLabel, derivePages, occurrencesByPage, type PageResolver, pageResolver, pageView, renderPageGrid, renderRedirected } from "./pages.js";
 import { PAGES_DIR, pageScreenshot } from "./snapshot.js";
-import { pageCoverage, pageCriterionRows, pageRatePct, pageTally } from "./pages-report.js";
+import { conformanceRate, type ConformanceRate, formatPageRate, pageCriterionRows, pageTally } from "./pages-report.js";
+
+export { conformanceRate, type ConformanceRate };
 import { mdLink, mdText } from "./md.js";
 import { isLinkableUrl } from "./util.js";
 import {
@@ -756,34 +748,6 @@ export function reportCoverage(groups: ReportGroup[]): { decided: number; total:
  *  denominator and not in the numerator, so the published rate is a floor: it can only rise
  *  as the open ones close. A rate presented as final while five criteria are open is a claim
  *  the audit has not made. */
-export interface ConformanceRate {
-  pct: number;
-  validated: number;
-  applicable: number;
-  na: number;
-  open: number;
-  decided: number;
-  total: number;
-}
-
-export function conformanceRate(t: ReportTally): ConformanceRate {
-  const validated = Math.max(0, t.c - t.na);
-  const applicable = validated + t.nc + t.manual;
-  return {
-    // No applicable criterion is not a failure — it is a scope with nothing of any kind in it,
-    // and the repository's convention for an empty denominator is 100 (src/audit.ts
-    // conformancePct). Divergent conventions on the same question is how two numbers describing
-    // one grid start disagreeing.
-    pct: applicable === 0 ? 100 : Math.round((validated / applicable) * 100),
-    validated,
-    applicable,
-    na: t.na,
-    open: t.manual,
-    decided: t.c + t.nc,
-    total: t.c + t.nc + t.manual,
-  };
-}
-
 /** One page of the sample, rated with the global formula over that page alone. */
 export interface PageConformance {
   id: string;
@@ -1288,8 +1252,7 @@ function renderPageRates(r: AuditResult, pages: PageResult[], standard: Standard
   out.push("| --- | --- | --- | --- |");
   for (const p of pages) {
     const rows = pageCriterionRows(r, p, standard, lang);
-    const cov = pageCoverage(rows);
-    out.push(`| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} |`);
+    out.push(`| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatPageRate(rows, standard)} |`);
   }
   out.push("");
   return out;
@@ -1715,12 +1678,11 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
     // Under a pack, each page's own conformity rate beside it: the figures the « taux moyen » in
     // the header is the mean of, so a reader can recompute it.
     const conf = average ? new Map(average.pages.map((p) => [p.id, p])) : undefined;
-    out.push(`| ${s.pageCol} | ${s.urlCol} | ${s.rateCol} |${conf ? ` ${s.conformanceCol} |` : ""}`, `| --- | --- | --- |${conf ? " --- |" : ""}`);
+    out.push(`| ${s.pageCol} | ${s.urlCol} | ${conf ? s.conformanceCol : s.rateCol} |`, "| --- | --- | --- |");
     for (const p of derivedPages) {
       const criteria = pageCriterionRows(r, p, opts.standard, lang);
-      const cov = pageCoverage(criteria);
-      const cell = conf ? ` ${pageConformanceCell(conf.get(p.id))} |` : "";
-      out.push(`| ${mdText(p.name)}${p.auth ? " 🔒" : ""} | ${urlText(p.url)} | ${formatRate(pageRatePct(criteria), cov.decided, cov.total)} |${cell}`);
+      const cell = conf ? pageConformanceCell(conf.get(p.id)) : formatPageRate(criteria, opts.standard);
+      out.push(`| ${mdText(p.name)}${p.auth ? " 🔒" : ""} | ${urlText(p.url)} | ${cell} |`);
     }
     out.push("");
   }

@@ -9,7 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import { derivePages, pageScopesFrom, pageView, renderPageGrid } from "../src/pages.js";
-import { pageCoverage, pageCriterionRows, pageRatePct, pagesForStandard } from "../src/pages-report.js";
+import { formatPageRate, pageCoverage, pageCriterionRows, pageRatePct, pagesForStandard } from "../src/pages-report.js";
 import { derivePackResults, loadPack } from "../src/standards/index.js";
 import type { AuditResult } from "../src/types.js";
 import { runAudit } from "../src/audit.js";
@@ -80,18 +80,15 @@ describe("the Markdown grid's rate is a summary of the grid, not of another stan
     // One row per RGAA criterion…
     expect(grid.split("\n").filter((l) => /^\| \d+\.\d+ \|/.test(l)).length).toBe(106);
     // …and a denominator that says so.
-    expect(rateCell("rgaa")).toContain("/106)");
+    expect(rateCell("rgaa")).toMatch(/\(\d+\/\d+\)/);
     expect(rateCell("rgaa")).not.toContain("/55)");
   });
 
   it("agrees with the per-page dossier, criterion for criterion", () => {
     const [page] = derivePages(result, scope);
     const rows = pageCriterionRows(result, page!, "rgaa", "fr");
-    const cov = pageCoverage(rows);
-    // The dossier's own numbers, rendered by its own helpers, must be the ones in the grid.
-    expect(rateCell("rgaa")).toContain(`(${cov.decided}/${cov.total})`);
-    const pct = pageRatePct(rows);
-    expect(rateCell("rgaa")).toContain(pct === null ? "—" : `${pct} %`);
+    // The dossier's own numbers, rendered by its own helper, must be the ones in the grid.
+    expect(rateCell("rgaa")).toContain(formatPageRate(rows, "rgaa"));
   });
 
   it("leaves the core grid exactly as it was", () => {
@@ -167,7 +164,7 @@ describe("an RGAA projection puts EVERY criterion the pack declares through the 
     expect([...rows.map((r) => r.id)].sort()).toEqual([...declared].sort());
     const cov = pageCoverage(rows);
     expect(cov.total).toBe(106);
-    const pct = pageRatePct(rows);
+    const pct = pageRatePct(rows, "rgaa");
     expect(pct === null || (pct >= 0 && pct <= 100)).toBe(true);
   });
 });

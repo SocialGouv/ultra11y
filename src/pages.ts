@@ -23,7 +23,8 @@
 //      scored 100% on "does each image have a relevant alternative?". See `pageStatus`.
 import { findingId } from "./baseline.js";
 import { snapshotPageId } from "./snapshot.js";
-import { CORE, type StandardId, derivePackResults, isCore, isProvisionalJudgmentInapplicable, loadPack, themeName } from "./standards/index.js";
+import { subjectsAbsent, subjectsForPackCriterion } from "./adjudicate-subjects.js";
+import { CORE, type StandardId, derivePackResults, getCriterion, isCore, isProvisionalJudgmentInapplicable, loadPack, themeName } from "./standards/index.js";
 import type { AuditResult, CriterionResult, Finding, Lang, PageCoverage, PageResult, PageScope, Status, ScanRedirect } from "./types.js";
 import { renderedProvesOn } from "./coverage.js";
 import { renderedRulesFor } from "./rules/rendered.js";
@@ -569,7 +570,11 @@ export interface PageGridModel {
   /** The `rowId|pageId` cells a named human auditor ruled (`decidedBy: "human"`), so the grid
    *  can mark them apart from the engine's and the agent's. */
   human: Set<string>;
+  /** The `rowId|pageId` cells conforming for want of a subject: they leave the page's rate. */
+  inapplicable: Set<string>;
 }
+
+const NOTHING_ON_THIS_PAGE = "Nothing of this criterion's kind is present on this page.";
 
 /** The run's recorded verdicts as they apply to ONE page.
  *
@@ -583,6 +588,10 @@ export interface PageGridModel {
  *  entry leaves the view and the page falls back on its own derivation, which is what honesty
  *  rule 3 asks of any NC that fired elsewhere.
  *
+ *  A clearing verdict keeps its run-wide scope, with one exception a reader can check: a page
+ *  with none of the criterion's subject has nothing to validate. It is not applicable THERE,
+ *  and leaves that page's rate — otherwise every page repeats the same numerator.
+ *
  *  A source a page declares counts on that page even when `attributePages` stamped the finding
  *  on another one: first-match is there to keep occurrence counts from inflating, and here the
  *  question is whether this page ships the defect. */
@@ -594,7 +603,14 @@ function adjudicationOnPage(
   const stamped = new Set(page.findings.map(findingId));
   const sources = result.scope.pages?.find((p) => p.id === page.id)?.sources ?? [];
   const onPage = (f: Finding): boolean => stamped.has(findingId(f)) || sources.some((s) => pathMatch(f.origin?.sourceFile ?? f.file, s));
+  const seen = result.scope.pageSubjects?.[page.id];
+  const absentHere = (id: string): boolean => {
+    if (!seen) return false;
+    const wcag = getCriterion(loadPack(adjudication.standard), id)?.wcag ?? [];
+    return subjectsAbsent(subjectsForPackCriterion(adjudication.standard, id, wcag), new Set(seen));
+  };
   const criteria = adjudication.criteria.flatMap((c) => {
+    if (c.status === "C" && absentHere(c.id)) return [{ ...c, status: "NA" as const, justification: NOTHING_ON_THIS_PAGE }];
     if (c.status !== "NC") return [c];
     const findings = c.findings.filter(onPage);
     return findings.some((f) => !f.advisory) ? [{ ...c, findings }] : [];
@@ -646,6 +662,7 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
 export function pageGridModel(result: AuditResult, derived: PageResult[], standard: StandardId, lang: Lang): PageGridModel {
   const status = new Map<string, Map<string, Status>>(); // rowId → pageId → status
   const human = new Set<string>();
+  const inapplicable = new Set<string>();
   const put = (rowId: string, pageId: string, s: Status): void => {
     const m = status.get(rowId) ?? new Map<string, Status>();
     m.set(pageId, s);
@@ -661,7 +678,7 @@ export function pageGridModel(result: AuditResult, derived: PageResult[], standa
         put(c.id, p.id, c.status);
         if (c.decidedBy === "human") human.add(`${c.id}|${p.id}`);
       }
-    return { rows, status, human };
+    return { rows, status, human, inapplicable };
   }
 
   const pack = loadPack(standard);
@@ -669,11 +686,13 @@ export function pageGridModel(result: AuditResult, derived: PageResult[], standa
   for (const p of derived) {
     for (const pc of derivePackResults(pageView(result, p), standard, p.id)) {
       const criterion = pack.criteria.find((row) => row.id === pc.id);
-      put(pc.id, p.id, isProvisionalJudgmentInapplicable(pc, criterion) ? "manual" : pc.status);
+      const provisional = isProvisionalJudgmentInapplicable(pc, criterion);
+      put(pc.id, p.id, provisional ? "manual" : pc.status);
       if (pc.decidedBy === "human") human.add(`${pc.id}|${p.id}`);
+      if (pc.inapplicable && !provisional) inapplicable.add(`${pc.id}|${p.id}`);
     }
   }
-  return { rows, status, human };
+  return { rows, status, human, inapplicable };
 }
 
 /** The pages a scan REFUSED to record, named in the deliverable.
@@ -723,16 +742,30 @@ export function renderRedirected(redirected: ScanRedirect[], lang: Lang = "en"):
  *
  *  Returned as the argument tuple `formatRate` takes, so no caller can pair a rate with
  *  somebody else's denominator. */
-export function gridRate(rows: { id: string }[], status: Map<string, Map<string, Status>>, pageId: string): [number | null, number, number] {
+export function gridRate(
+  rows: { id: string }[],
+  status: Map<string, Map<string, Status>>,
+  pageId: string,
+  /** Under a pack, the cells that leave the rate: its presence selects the pack's arithmetic. */
+  inapplicable?: ReadonlySet<string>,
+): [number | null, number, number] {
   let c = 0;
   let nc = 0;
+  let open = 0;
+  let absent = 0;
   for (const row of rows) {
     const st = status.get(row.id)?.get(pageId);
-    if (st === "C") c++;
-    else if (st === "NC") nc++;
+    if (st === "C") {
+      c++;
+      if (inapplicable?.has(`${row.id}|${pageId}`)) absent++;
+    } else if (st === "NC") nc++;
+    else if (st === "manual") open++;
   }
   const decided = c + nc;
-  return [decided === 0 ? null : Math.round((c / decided) * 100), decided, rows.length];
+  if (!inapplicable) return [decided === 0 ? null : Math.round((c / decided) * 100), decided, rows.length];
+  const validated = c - absent;
+  const applicable = validated + nc + open;
+  return [validated + nc === 0 ? null : Math.round((validated / applicable) * 100), validated, applicable];
 }
 
 /** The Markdown grid: one row per criterion, one column per page. */
@@ -761,8 +794,10 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
   // announced « 89 % (9/55) », while the same page's own dossier said 47/106. Same command,
   // same page, two denominators; and this grid is what `comment-kind: pages` pastes onto a
   // pull request, so the wrong one was the one people read.
-  const { rows, status, human } = pageGridModel(result, derived, standard, lang);
-  out.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id))}**`).join(" | ")} |`);
+  const { rows, status, human, inapplicable } = pageGridModel(result, derived, standard, lang);
+  out.push(
+    `| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id, isCore(standard) ? undefined : inapplicable))}**`).join(" | ")} |`,
+  );
   out.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
 
   let group = "";

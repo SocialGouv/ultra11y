@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { readPdf, contentOperators } from "../src/parse/pdf.js";
+import { resolveRemediation } from "../src/messages.js";
 import { runAudit } from "../src/audit.js";
 import { derivePackResults } from "../src/standards/index.js";
 import { buildAdjudicationWorklist } from "../src/adjudicate.js";
@@ -82,6 +83,18 @@ describe("the reader establishes the document-level facts", () => {
     expect(contentOperators(Buffer.from("q (not a Tj) pop Q")).text).toBe(0);
     expect(contentOperators(Buffer.from("BI /W 2 /H 1 /CS /G /BPC 8 ID \x00Tj\x00 EI Q")).text).toBe(0);
     expect(contentOperators(Buffer.from("BT /F1 12 Tf (a) Tj [(b) 3 (c)] TJ ET")).text).toBe(2);
+  });
+});
+
+describe("the remediation of an untagged PDF", () => {
+  it("recommends PDFKit with the options PDF/UA needs, and says what it cannot tag", () => {
+    for (const lang of ["fr", "en"] as const) {
+      const text = resolveRemediation({ remediation: "", msg: { id: "pdf-untagged" } }, lang);
+      expect(text).toContain("https://github.com/foliojs/pdfkit");
+      expect(text).toContain("subset: 'PDF/UA'");
+      expect(text).toContain("tagged: true");
+      expect(text).toMatch(/annotations/);
+    }
   });
 });
 

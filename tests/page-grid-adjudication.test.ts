@@ -19,7 +19,9 @@ import { describe, expect, it } from "vitest";
 
 import { runAudit } from "../src/audit.js";
 import { applyAdjudication, buildAdjudicationWorklist, type AdjudicationFile, type AdjudicationItem } from "../src/adjudicate.js";
-import { pageCriterionRows, pageTally } from "../src/pages-report.js";
+import { formatPageRate, type PageCriterionRow, pageCriterionRows, pageRatePct, pageTally } from "../src/pages-report.js";
+import { subjectsAbsent, subjectsForPackCriterion } from "../src/adjudicate-subjects.js";
+import { loadPack } from "../src/standards/index.js";
 import { derivePages, pagesOf, attributePages, pageGridModel, unattributedFindings } from "../src/pages.js";
 import type { AuditResult, Finding, PageScope } from "../src/types.js";
 
@@ -201,6 +203,62 @@ describe("a non-conformity the agent ruled stays on the pages it was found on", 
     expect(cells?.get("bad")).toBe("manual");
     expect(cells?.get("good")).toBe("manual");
     expect(unattributedFindings(audit).filter((f) => f.file === "src/Nobody.tsx")).toHaveLength(1);
+  });
+});
+
+describe("a page's rate is the overall rate's formula, over that page", () => {
+  const row = (status: "C" | "NC" | "manual", inapplicable = false): PageCriterionRow => ({
+    id: "x",
+    label: "x",
+    group: "g",
+    status,
+    tests: [],
+    ...(inapplicable ? { inapplicable } : {}),
+  });
+  const rows = [...Array.from({ length: 6 }, () => row("C")), row("C", true), row("C", true), row("NC"), row("manual")];
+
+  it("under a pack: a criterion with no subject leaves it, one still to assess stays in it", () => {
+    expect(pageRatePct(rows, "rgaa")).toBe(75);
+    expect(formatPageRate(rows, "rgaa")).toBe("75 % (6/8)");
+  });
+
+  it("does not read 100 % on a page with no non-conformity and criteria still open", () => {
+    expect(pageRatePct([row("C"), row("C"), row("manual"), row("manual")], "rgaa")).toBe(50);
+  });
+
+  it("stays — when nothing was decided, rather than a score", () => {
+    expect(pageRatePct([row("manual"), row("C", true)], "rgaa")).toBeNull();
+  });
+
+  it("keeps the WCAG core on its own overall arithmetic", () => {
+    expect(pageRatePct(rows, "wcag")).toBe(89);
+    expect(formatPageRate(rows, "wcag")).toBe("89 % (9/10)");
+  });
+});
+
+describe("a run-wide conformity on a page that has none of the criterion's subject", () => {
+  const criterion = loadPack("rgaa").criteria.find((pc) => subjectsAbsent(subjectsForPackCriterion("rgaa", pc.id, pc.wcag), new Set()))!;
+  const everything = subjectsForPackCriterion("rgaa", criterion.id, criterion.wcag);
+
+  it("is not applicable there, and stays validated where the subject exists", () => {
+    const bad = join(dir, "subject-a.html");
+    const good = join(dir, "subject-b.html");
+    writeFileSync(bad, "<!doctype html><html lang=fr><title>A</title><main><h1>A</h1></main></html>");
+    writeFileSync(good, "<!doctype html><html lang=fr><title>B</title><main><h1>B</h1></main></html>");
+    const audit = runAudit({ inputs: [bad, good] });
+    audit.scope.pages = [
+      { id: "with", name: "Avec", url: "https://x/with", sources: [bad], basis: "snapshot" },
+      { id: "without", name: "Sans", url: "https://x/without", sources: [good], basis: "snapshot" },
+    ];
+    audit.scope.pagesAudited = ["with", "without"];
+    audit.scope.pageSubjects = { with: everything, without: [] };
+    audit.packAdjudication = { standard: "rgaa", criteria: [{ id: criterion.id, status: "C", justification: "ok", findings: [], decidedBy: "agent" }] };
+    attributePages(audit, audit.scope.pages);
+    const [withPage, withoutPage] = derivePages(audit, audit.scope.pages);
+    const rowOf = (page: typeof withPage) => pageCriterionRows(audit, page!, "rgaa", "fr").find((r) => r.id === criterion.id)!;
+    expect(rowOf(withPage)).toMatchObject({ status: "C", decidedBy: "agent" });
+    expect(rowOf(withPage).inapplicable).toBeUndefined();
+    expect(rowOf(withoutPage)).toMatchObject({ status: "C", inapplicable: true });
   });
 });
 

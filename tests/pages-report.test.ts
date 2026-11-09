@@ -197,7 +197,7 @@ describe("the index", () => {
     // been assessed.
     const rows = md.split("\n").filter((l) => l.startsWith("| Page d'accueil |") || l.startsWith("| Contact |"));
     expect(rows.length).toBe(2);
-    for (const row of rows) expect(row).toMatch(/\| (?:\d+ %|—) \(\d+\/106\) \|/);
+    for (const row of rows) expect(row).toMatch(/\| (?:\d+ %|—) \(\d+\/\d+\) \|/);
   });
 
   it("renders `—`, never a number, for a page on which nothing was decided", () => {
@@ -212,23 +212,23 @@ describe("the index", () => {
   });
 
   it("names the short rate column in both languages", () => {
-    expect(md).toContain("| Taux (critères décidés) |");
+    expect(md).toContain("| Taux (validés ÷ applicables) |");
     const en = renderPagesIndex(result, derived, { standard: "rgaa", lang: "en" });
-    expect(en).toContain("| Rate (decided criteria) |");
+    expect(en).toContain("| Rate (validated ÷ applicable) |");
     // ...and the eight-column shape is unchanged, so the separator row still lines up.
     const header = md.split("\n").find((l) => l.startsWith("| Page |"))!;
     expect(header.split("|").length - 2).toBe(8);
   });
 
-  it("ANTI-DRIFT: the index cell and the sheet's coverage line report the same denominator", () => {
+  it("ANTI-DRIFT: the index cell and the sheet state the same rate over the same denominator", () => {
     // These were computed in two places and disagreed — the sheet said 2/106, the index said
-    // 100 %. One extraction (`coverageOf`) now feeds both; this is what stops them parting again.
+    // 100 %. One helper (`formatPageRate`) now feeds both; this is what stops them parting again.
     for (const p of derived) {
       const sheet = renderPageReport(result, p, { standard: "rgaa", lang: "fr" });
-      const fromSheet = /Couverture : (\d+)\/(\d+) critère/.exec(sheet);
-      expect(fromSheet, `no coverage line on the ${p.id} sheet`).toBeTruthy();
+      const fromSheet = /Taux de conformité de la page\*\* : \*\*([^*]+)\*\*/.exec(sheet);
+      expect(fromSheet, `no rate line on the ${p.id} sheet`).toBeTruthy();
       const row = md.split("\n").find((l) => l.startsWith(`| ${p.name} |`))!;
-      expect(row).toContain(`(${fromSheet![1]}/${fromSheet![2]})`);
+      expect(row).toContain(`| ${fromSheet![1]} |`);
     }
   });
 });

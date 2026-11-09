@@ -39066,8 +39066,8 @@ var MSG_CATALOG = {
       en: (p) => `Untagged PDF document (PDF ${p.version}) \u2014 ${p.marked === "yes" ? "/MarkInfo declares it marked" : "no /MarkInfo << /Marked true >>"}, ${p.structTree === "yes" ? "a structure tree exists" : "no structure tree (/StructTreeRoot)"}: assistive technology reads a flat stream of text with no headings, lists or tables.`
     },
     remediation: {
-      fr: () => `Produisez un PDF balis\xE9 (PDF/UA-1) depuis l'outil source, ou proposez une version alternative accessible (HTML ou document balis\xE9) ; v\xE9rifiez le r\xE9sultat avec veraPDF ou PAC.`,
-      en: () => `Produce a tagged PDF (PDF/UA-1) from the source tool, or offer an accessible alternative version (HTML or a tagged document); check the result with veraPDF or PAC.`
+      fr: () => `Produisez un PDF balis\xE9 (PDF/UA-1) depuis l'outil source, ou proposez une version alternative accessible (HTML ou document balis\xE9) ; v\xE9rifiez le r\xE9sultat avec veraPDF ou PAC. En JavaScript, utilisez PDFKit (https://github.com/foliojs/pdfkit) : options \`subset: 'PDF/UA'\`, \`tagged: true\`, \`displayTitle: true\`, \`lang\`, un titre dans \`info\`, des polices TrueType ou OpenType incorpor\xE9es, et tout le contenu balis\xE9 ou marqu\xE9 comme artefact. PDFKit ne balise ni les annotations (dont les liens) ni les formulaires : pour ces contenus, pr\xE9voyez une version alternative accessible.`,
+      en: () => `Produce a tagged PDF (PDF/UA-1) from the source tool, or offer an accessible alternative version (HTML or a tagged document); check the result with veraPDF or PAC. In JavaScript, use PDFKit (https://github.com/foliojs/pdfkit): options \`subset: 'PDF/UA'\`, \`tagged: true\`, \`displayTitle: true\`, \`lang\`, a title in \`info\`, embedded TrueType or OpenType fonts, and all content tagged or marked as an artifact. PDFKit does not tag annotations (links included) or forms: for those, provide an accessible alternative version.`
     }
   },
   "pdf-lang-missing": {
@@ -62905,11 +62905,19 @@ function commonOrigin(pages) {
 function pageOriginNote(origin, lang) {
   return origin ? L[lang].originNote(origin) : void 0;
 }
+var NOTHING_ON_THIS_PAGE = "Nothing of this criterion's kind is present on this page.";
 function adjudicationOnPage(result, adjudication, page) {
   const stamped = new Set(page.findings.map(findingId));
   const sources = result.scope.pages?.find((p) => p.id === page.id)?.sources ?? [];
   const onPage = (f) => stamped.has(findingId(f)) || sources.some((s) => pathMatch2(f.origin?.sourceFile ?? f.file, s));
+  const seen = result.scope.pageSubjects?.[page.id];
+  const absentHere = (id) => {
+    if (!seen) return false;
+    const wcag = getCriterion(loadPack(adjudication.standard), id)?.wcag ?? [];
+    return subjectsAbsent(subjectsForPackCriterion(adjudication.standard, id, wcag), new Set(seen));
+  };
   const criteria = adjudication.criteria.flatMap((c2) => {
+    if (c2.status === "C" && absentHere(c2.id)) return [{ ...c2, status: "NA", justification: NOTHING_ON_THIS_PAGE }];
     if (c2.status !== "NC") return [c2];
     const findings = c2.findings.filter(onPage);
     return findings.some((f) => !f.advisory) ? [{ ...c2, findings }] : [];
@@ -62933,6 +62941,7 @@ function pageView(result, page) {
 function pageGridModel(result, derived, standard, lang) {
   const status = /* @__PURE__ */ new Map();
   const human = /* @__PURE__ */ new Set();
+  const inapplicable = /* @__PURE__ */ new Set();
   const put = (rowId, pageId, s) => {
     const m = status.get(rowId) ?? /* @__PURE__ */ new Map();
     m.set(pageId, s);
@@ -62945,18 +62954,20 @@ function pageGridModel(result, derived, standard, lang) {
         put(c2.id, p.id, c2.status);
         if (c2.decidedBy === "human") human.add(`${c2.id}|${p.id}`);
       }
-    return { rows: rows2, status, human };
+    return { rows: rows2, status, human, inapplicable };
   }
   const pack = loadPack(standard);
   const rows = pack.criteria.map((pc) => ({ id: pc.id, label: pc.id, group: `${pc.theme}. ${themeName(pack, pc.theme, lang) ?? ""}`.trim() }));
   for (const p of derived) {
     for (const pc of derivePackResults(pageView(result, p), standard, p.id)) {
       const criterion = pack.criteria.find((row) => row.id === pc.id);
-      put(pc.id, p.id, isProvisionalJudgmentInapplicable(pc, criterion) ? "manual" : pc.status);
+      const provisional = isProvisionalJudgmentInapplicable(pc, criterion);
+      put(pc.id, p.id, provisional ? "manual" : pc.status);
       if (pc.decidedBy === "human") human.add(`${pc.id}|${p.id}`);
+      if (pc.inapplicable && !provisional) inapplicable.add(`${pc.id}|${p.id}`);
     }
   }
-  return { rows, status, human };
+  return { rows, status, human, inapplicable };
 }
 function renderRedirected(redirected, lang = "en") {
   const fr = lang === "fr";
@@ -62972,16 +62983,24 @@ function renderRedirected(redirected, lang = "en") {
   }
   return out2;
 }
-function gridRate(rows, status, pageId) {
+function gridRate(rows, status, pageId, inapplicable) {
   let c2 = 0;
   let nc = 0;
+  let open = 0;
+  let absent = 0;
   for (const row of rows) {
     const st = status.get(row.id)?.get(pageId);
-    if (st === "C") c2++;
-    else if (st === "NC") nc++;
+    if (st === "C") {
+      c2++;
+      if (inapplicable?.has(`${row.id}|${pageId}`)) absent++;
+    } else if (st === "NC") nc++;
+    else if (st === "manual") open++;
   }
   const decided = c2 + nc;
-  return [decided === 0 ? null : Math.round(c2 / decided * 100), decided, rows.length];
+  if (!inapplicable) return [decided === 0 ? null : Math.round(c2 / decided * 100), decided, rows.length];
+  const validated = c2 - absent;
+  const applicable = validated + nc + open;
+  return [validated + nc === 0 ? null : Math.round(validated / applicable * 100), validated, applicable];
 }
 function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   const s = L[lang];
@@ -63000,8 +63019,10 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   if (originNote) out2.push(`> ${originNote}`, "");
   const head = [s.criterion, ...derived.map((p) => pageColumnLabel(p, origin))];
   out2.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
-  const { rows, status, human } = pageGridModel(result, derived, standard, lang);
-  out2.push(`| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id))}**`).join(" | ")} |`);
+  const { rows, status, human, inapplicable } = pageGridModel(result, derived, standard, lang);
+  out2.push(
+    `| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id, isCore(standard) ? void 0 : inapplicable))}**`).join(" | ")} |`
+  );
   out2.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
   let group = "";
   let humanRuled = false;
@@ -63764,13 +63785,17 @@ var L4 = {
     producer: "Producteur",
     auth: "Authentification requise",
     rate: "Taux de r\xE9ussite automatique (v\xE9rifications statiques)",
+    packRate: "Taux de conformit\xE9 de la page",
     // The index has its own, shorter header — the sheet's label is a full sentence and would
     // wreck an eight-column table. Kept as a SEPARATE key: editing `rate` in place would
     // silently reword the sheet bullet too.
     rateShort: "Taux (crit\xE8res d\xE9cid\xE9s)",
+    packRateShort: "Taux (valid\xE9s \xF7 applicables)",
     rateNote: "sous-ensemble d\xE9cidable : C \xF7 (C + NC)",
+    packRateNote: "crit\xE8res valid\xE9s \xF7 crit\xE8res applicables, ceux \xE0 \xE9valuer comptant au d\xE9nominateur",
     tally: (c2, nc, na, m) => `${c2} conforme(s) \xB7 ${nc} non conforme(s) \xB7 ${na} non applicable(s) \xB7 ${m} \xE0 \xE9valuer`,
     coverage: (decided, total) => `Couverture : ${decided}/${total} crit\xE8re(s) \xE9valu\xE9(s) \u2014 le taux ci-dessus ne porte que sur eux, et ne dit rien des ${total - decided} autres.`,
+    packCoverage: (decided, total) => `Couverture : ${decided}/${total} crit\xE8re(s) \xE9valu\xE9(s). Tant qu'il en reste ${total - decided} \xE0 \xE9valuer, le taux ci-dessus est un plancher.`,
     tests: "Tests",
     screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`,
     noScreenshot: "Aucune capture d'\xE9cran pour cette page (le producteur n'en a pas fourni) \u2014 le tier pixel est donc inactif ici.",
@@ -63789,7 +63814,8 @@ var L4 = {
     blocking: "Bloquant",
     major: "Majeur",
     minor: "Mineur",
-    indexNote: "Une fiche par page. `X % (d/t)` : le taux ne porte que sur les `d` crit\xE8res d\xE9cid\xE9s sur `t` \u2014 il ne dit rien des autres. `\u2014` signifie qu'aucun crit\xE8re n'a \xE9t\xE9 d\xE9cid\xE9 sur cette page, et ne vaut donc NI conformit\xE9 NI non-conformit\xE9."
+    indexNote: "Une fiche par page. `X % (d/t)` : le taux ne porte que sur les `d` crit\xE8res d\xE9cid\xE9s sur `t` \u2014 il ne dit rien des autres. `\u2014` signifie qu'aucun crit\xE8re n'a \xE9t\xE9 d\xE9cid\xE9 sur cette page, et ne vaut donc NI conformit\xE9 NI non-conformit\xE9.",
+    packIndexNote: "Une fiche par page. `X % (v/a)` : crit\xE8res valid\xE9s \xF7 crit\xE8res applicables, la formule du taux global. Un crit\xE8re sans sujet sur la page sort du calcul ; un crit\xE8re \xE0 \xE9valuer reste au d\xE9nominateur, le taux est donc un plancher. `\u2014` signifie qu'aucun crit\xE8re n'a \xE9t\xE9 d\xE9cid\xE9 sur cette page, et ne vaut donc NI conformit\xE9 NI non-conformit\xE9."
   },
   en: {
     docTitle: "Page-by-page accessibility report",
@@ -63807,10 +63833,14 @@ var L4 = {
     producer: "Producer",
     auth: "Authentication required",
     rate: "Automatic static-check pass rate",
+    packRate: "Page conformance rate",
     rateShort: "Rate (decided criteria)",
+    packRateShort: "Rate (validated \xF7 applicable)",
     rateNote: "decidable subset: C \xF7 (C + NC)",
+    packRateNote: "validated criteria \xF7 applicable criteria, those still to assess counting in the denominator",
     tally: (c2, nc, na, m) => `${c2} conforming \xB7 ${nc} non-conforming \xB7 ${na} not applicable \xB7 ${m} to assess`,
     coverage: (decided, total) => `Coverage: ${decided}/${total} criteria assessed \u2014 the rate above covers only those, and says nothing about the other ${total - decided}.`,
+    packCoverage: (decided, total) => `Coverage: ${decided}/${total} criteria assessed. While ${total - decided} remain to assess, the rate above is a floor.`,
     tests: "Tests",
     screenshotAlt: (n) => `Screenshot of the ${n} page`,
     noScreenshot: "No screenshot for this page (the producer supplied none) \u2014 the pixel tier is therefore inactive here.",
@@ -63829,7 +63859,8 @@ var L4 = {
     blocking: "Blocking",
     major: "Major",
     minor: "Minor",
-    indexNote: "One sheet per page. `X % (d/t)`: the rate covers only the `d` criteria decided out of `t` \u2014 it says nothing about the others. `\u2014` means no criterion was decided on this page, so it is NEITHER conformity NOR non-conformity."
+    indexNote: "One sheet per page. `X % (d/t)`: the rate covers only the `d` criteria decided out of `t` \u2014 it says nothing about the others. `\u2014` means no criterion was decided on this page, so it is NEITHER conformity NOR non-conformity.",
+    packIndexNote: "One sheet per page. `X % (v/a)`: validated criteria \xF7 applicable criteria, the formula of the overall rate. A criterion with no subject on the page leaves the calculation; one still to assess stays in the denominator, so the rate is a floor. `\u2014` means no criterion was decided on this page, so it is NEITHER conformity NOR non-conformity."
   }
 };
 function pageCriterionRows(result, page, standard, lang) {
@@ -63874,7 +63905,7 @@ function pagesForStandard(result, pages, standard, lang) {
         findings: [],
         ...r.decidedBy ? { decidedBy: r.decidedBy } : {}
       })),
-      conformancePct: pageRatePct(rows),
+      conformancePct: pageRatePct(rows, standard),
       decided: cov.decided,
       total: cov.total
     };
@@ -63898,9 +63929,36 @@ function pageCoverage(rows) {
   const t3 = pageTally(rows);
   return { decided: t3.c + t3.nc, total: rows.length };
 }
-function pageRatePct(rows) {
-  const { c: c2, nc } = pageTally(rows);
-  return c2 + nc === 0 ? null : Math.round(c2 / (c2 + nc) * 100);
+function conformanceRate(t3) {
+  const validated = Math.max(0, t3.c - t3.na);
+  const applicable = validated + t3.nc + t3.manual;
+  return {
+    // No applicable criterion is not a failure — it is a scope with nothing of any kind in it,
+    // and the repository's convention for an empty denominator is 100 (src/audit.ts
+    // conformancePct). Divergent conventions on the same question is how two numbers describing
+    // one grid start disagreeing.
+    pct: applicable === 0 ? 100 : Math.round(validated / applicable * 100),
+    validated,
+    applicable,
+    na: t3.na,
+    open: t3.manual,
+    decided: t3.c + t3.nc,
+    total: t3.c + t3.nc + t3.manual
+  };
+}
+function pageRatePct(rows, standard) {
+  const t3 = pageTally(rows);
+  if (isCore(standard)) return t3.c + t3.nc === 0 ? null : Math.round(t3.c / (t3.c + t3.nc) * 100);
+  const rate = conformanceRate(t3);
+  return rate.validated + t3.nc === 0 ? null : rate.pct;
+}
+function formatPageRate(rows, standard) {
+  if (isCore(standard)) {
+    const cov = pageCoverage(rows);
+    return formatRate(pageRatePct(rows, standard), cov.decided, cov.total);
+  }
+  const rate = conformanceRate(pageTally(rows));
+  return formatRate(pageRatePct(rows, standard), rate.validated, rate.applicable);
 }
 function renderPageReport(result, page, opts = {}) {
   const standard = opts.standard ?? CORE2;
@@ -63917,10 +63975,13 @@ function renderPageReport(result, page, opts = {}) {
   const rows = pageCriterionRows(result, page, standard, lang);
   const t3 = pageTally(rows);
   const cov = pageCoverage(rows);
-  const rate = pageRatePct(rows);
-  out2.push(`- **${s.rate}** : **${rate === null ? "\u2014" : `${rate} %`}** _(${s.rateNote})_`);
+  const pack = !isCore(standard);
+  const rate = pageRatePct(rows, standard);
+  out2.push(
+    pack ? `- **${s.packRate}** : **${formatPageRate(rows, standard)}** _(${s.packRateNote})_` : `- **${s.rate}** : **${rate === null ? "\u2014" : `${rate} %`}** _(${s.rateNote})_`
+  );
   out2.push(`- ${pageTallyNote(t3, lang)}`);
-  out2.push(`- ${s.coverage(cov.decided, cov.total)}`, "");
+  out2.push(`- ${(pack ? s.packCoverage : s.coverage)(cov.decided, cov.total)}`, "");
   if (page.basis !== "snapshot") out2.push(`> \u26A0\uFE0F ${page.basis === "loading" ? pageBasisWarning("loading", lang) : s.sourceWarn}`, "");
   const shot = opts.screenshots?.get(page.id);
   if (shot) out2.push(`![${s.screenshotAlt(page.name)}](${shot})`, "");
@@ -63975,16 +64036,16 @@ function renderPagesIndex(result, pages, opts = {}) {
   const lang = opts.lang ?? "en";
   const s = L4[lang];
   const out2 = header2(result, pages, standard, lang, s.indexTitle);
-  out2.push(`> ${s.indexNote}`, "");
-  out2.push(`| ${s.page} | ${s.url} | ${s.basis} | ${s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
+  const pack = !isCore(standard);
+  out2.push(`> ${pack ? s.packIndexNote : s.indexNote}`, "");
+  out2.push(`| ${s.page} | ${s.url} | ${s.basis} | ${pack ? s.packRateShort : s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
   out2.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const p of pages) {
     const rows = pageCriterionRows(result, p, standard, lang);
-    const cov = pageCoverage(rows);
     const nc = [...p.findings, ...(result.packFindings ?? []).filter((f) => f.page === p.id)].filter((f) => !f.advisory);
     const href = opts.hrefs?.get(p.id);
     out2.push(
-      `| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} | ${nc.filter((f) => f.severity === "bloquant").length} | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`
+      `| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatPageRate(rows, standard)} | ${nc.filter((f) => f.severity === "bloquant").length} | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`
     );
   }
   out2.push("");
@@ -64501,23 +64562,6 @@ function reportCoverage(groups) {
   const t3 = reportTotals(groups);
   return { decided: t3.c + t3.nc, total: t3.c + t3.nc + t3.manual };
 }
-function conformanceRate(t3) {
-  const validated = Math.max(0, t3.c - t3.na);
-  const applicable = validated + t3.nc + t3.manual;
-  return {
-    // No applicable criterion is not a failure — it is a scope with nothing of any kind in it,
-    // and the repository's convention for an empty denominator is 100 (src/audit.ts
-    // conformancePct). Divergent conventions on the same question is how two numbers describing
-    // one grid start disagreeing.
-    pct: applicable === 0 ? 100 : Math.round(validated / applicable * 100),
-    validated,
-    applicable,
-    na: t3.na,
-    open: t3.manual,
-    decided: t3.c + t3.nc,
-    total: t3.c + t3.nc + t3.manual
-  };
-}
 function averageConformanceRate(r, pages, standard, lang) {
   const rated = pages.map((p) => {
     const rate = conformanceRate(pageTally(pageCriterionRows(r, p, standard, lang)));
@@ -64779,8 +64823,7 @@ function renderPageRates(r, pages, standard, lang) {
   out2.push("| --- | --- | --- | --- |");
   for (const p of pages) {
     const rows = pageCriterionRows(r, p, standard, lang);
-    const cov = pageCoverage(rows);
-    out2.push(`| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatRate(pageRatePct(rows), cov.decided, cov.total)} |`);
+    out2.push(`| ${p.name}${p.auth ? " \u{1F512}" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatPageRate(rows, standard)} |`);
   }
   out2.push("");
   return out2;
@@ -65038,12 +65081,11 @@ function render(r, lang, opts) {
   if (derivedPages.length) {
     out2.push('<a id="page-rates"></a>', `## \u{1F4CB} ${s.pageRatesTitle}`, "", `> ${s.pageRatesNoteBusiness}${average ? s.conformanceColNote : ""}`, "");
     const conf = average ? new Map(average.pages.map((p) => [p.id, p])) : void 0;
-    out2.push(`| ${s.pageCol} | ${s.urlCol} | ${s.rateCol} |${conf ? ` ${s.conformanceCol} |` : ""}`, `| --- | --- | --- |${conf ? " --- |" : ""}`);
+    out2.push(`| ${s.pageCol} | ${s.urlCol} | ${conf ? s.conformanceCol : s.rateCol} |`, "| --- | --- | --- |");
     for (const p of derivedPages) {
       const criteria = pageCriterionRows(r, p, opts.standard, lang);
-      const cov = pageCoverage(criteria);
-      const cell4 = conf ? ` ${pageConformanceCell(conf.get(p.id))} |` : "";
-      out2.push(`| ${mdText(p.name)}${p.auth ? " \u{1F512}" : ""} | ${urlText(p.url)} | ${formatRate(pageRatePct(criteria), cov.decided, cov.total)} |${cell4}`);
+      const cell4 = conf ? pageConformanceCell(conf.get(p.id)) : formatPageRate(criteria, opts.standard);
+      out2.push(`| ${mdText(p.name)}${p.auth ? " \u{1F512}" : ""} | ${urlText(p.url)} | ${cell4} |`);
     }
     out2.push("");
   }
@@ -75879,12 +75921,11 @@ function scoreboardBlocks(result, standard, lang, sheetHref) {
   const derived = derivePages(result, scope);
   const rows = derived.map((p) => {
     const criteria = pageCriterionRows(result, p, standard, lang);
-    const cov = pageCoverage(criteria);
     return [
       { text: `${p.name}${p.auth ? " \u{1F512}" : ""}`, ...sheetHref ? { href: sheetHref(p.id) } : {} },
       { text: p.url, mono: true },
       { text: basisLabel(p.basis, lang) },
-      { text: formatRate(pageRatePct(criteria), cov.decided, cov.total), align: "end" }
+      { text: formatPageRate(criteria, standard), align: "end" }
     ];
   });
   const out2 = [
@@ -75936,7 +75977,6 @@ function pageGridBlocks(result, page, standard, lang) {
   const t3 = T4[lang];
   const rows = pageCriterionRows(result, page, standard, lang);
   if (!rows.length) return [];
-  const cov = pageCoverage(rows);
   const tally = pageTally(rows);
   const table = { kind: "table", caption: t3.gridCaption(page.name), columns: [{ text: t3.criterion }, { text: t3.status }], rows: [] };
   let group = "";
@@ -75953,7 +75993,7 @@ function pageGridBlocks(result, page, standard, lang) {
       kind: "para",
       runs: [
         { text: `${t3.pageRate} : `, strong: true },
-        { text: formatRate(pageRatePct(rows), cov.decided, cov.total), strong: true }
+        { text: formatPageRate(rows, standard), strong: true }
       ]
     },
     { kind: "para", runs: [{ text: t3.tally(tally.c, tally.nc, tally.na, tally.manual) }] },

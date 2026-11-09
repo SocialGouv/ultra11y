@@ -189,11 +189,11 @@ describe("the per-page grid, rebuilt from the audit JSON alone", () => {
     twoPages(cwd);
     const r = runCli(["pages", "--in", "audit-latest.json", "--standard", "rgaa", "--json"], { cwd });
     expect(r.code, r.stderr).toBe(0);
-    const { pages } = JSON.parse(r.stdout) as { pages: { id: string; conformancePct: number; basis: string }[] };
+    const { pages } = JSON.parse(r.stdout) as { pages: { id: string; basis: string; criteria: { status: string }[] }[] };
     const accueil = pages.find((p) => p.id === "accueil");
     const contact = pages.find((p) => p.id === "contact");
-    expect(accueil?.conformancePct).toBeLessThan(100);
-    expect(contact?.conformancePct).toBe(100);
+    expect(accueil?.criteria.filter((c) => c.status === "NC").length).toBeGreaterThan(0);
+    expect(contact?.criteria.filter((c) => c.status === "NC")).toHaveLength(0);
     expect(accueil?.basis).toBe("snapshot");
   });
 

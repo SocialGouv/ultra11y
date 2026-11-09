@@ -33,9 +33,9 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
     },
     remediation: {
       fr: () =>
-        `Produisez un PDF balisé (PDF/UA-1) depuis l'outil source, ou proposez une version alternative accessible (HTML ou document balisé) ; vérifiez le résultat avec veraPDF ou PAC.`,
+        `Produisez un PDF balisé (PDF/UA-1) depuis l'outil source, ou proposez une version alternative accessible (HTML ou document balisé) ; vérifiez le résultat avec veraPDF ou PAC. En JavaScript, utilisez PDFKit (https://github.com/foliojs/pdfkit) : options \`subset: 'PDF/UA'\`, \`tagged: true\`, \`displayTitle: true\`, \`lang\`, un titre dans \`info\`, des polices TrueType ou OpenType incorporées, et tout le contenu balisé ou marqué comme artefact. PDFKit ne balise ni les annotations (dont les liens) ni les formulaires : pour ces contenus, prévoyez une version alternative accessible.`,
       en: () =>
-        `Produce a tagged PDF (PDF/UA-1) from the source tool, or offer an accessible alternative version (HTML or a tagged document); check the result with veraPDF or PAC.`,
+        `Produce a tagged PDF (PDF/UA-1) from the source tool, or offer an accessible alternative version (HTML or a tagged document); check the result with veraPDF or PAC. In JavaScript, use PDFKit (https://github.com/foliojs/pdfkit): options \`subset: 'PDF/UA'\`, \`tagged: true\`, \`displayTitle: true\`, \`lang\`, a title in \`info\`, embedded TrueType or OpenType fonts, and all content tagged or marked as an artifact. PDFKit does not tag annotations (links included) or forms: for those, provide an accessible alternative version.`,
     },
   },
   "pdf-lang-missing": {

@@ -28,7 +28,7 @@ import {
   type PageResolver,
   pageResolver,
 } from "./pages.js";
-import { pageCoverage, pageCriterionRows, pageRatePct, pageTally } from "./pages-report.js";
+import { formatPageRate, pageCriterionRows, pageTally } from "./pages-report.js";
 import { partitionUnits, prdUnits, type PrdUnit } from "./prd.js";
 import {
   automationOverview,
@@ -499,12 +499,11 @@ export function scoreboardBlocks(result: AuditResult, standard: StandardId, lang
   // quote a rate out of 55 beside a document counting 106.
   const rows = derived.map((p) => {
     const criteria = pageCriterionRows(result, p, standard, lang);
-    const cov = pageCoverage(criteria);
     return [
       { text: `${p.name}${p.auth ? " 🔒" : ""}`, ...(sheetHref ? { href: sheetHref(p.id) } : {}) },
       { text: p.url, mono: true },
       { text: basisLabel(p.basis, lang) },
-      { text: formatRate(pageRatePct(criteria), cov.decided, cov.total), align: "end" as const },
+      { text: formatPageRate(criteria, standard), align: "end" as const },
     ];
   });
   const out: Block[] = [
@@ -562,7 +561,6 @@ function pageGridBlocks(result: AuditResult, page: PageResult, standard: Standar
   const t = T[lang];
   const rows = pageCriterionRows(result, page, standard, lang);
   if (!rows.length) return [];
-  const cov = pageCoverage(rows);
   const tally = pageTally(rows);
   const table: Block = { kind: "table", caption: t.gridCaption(page.name), columns: [{ text: t.criterion }, { text: t.status }], rows: [] };
   let group = "";
@@ -580,7 +578,7 @@ function pageGridBlocks(result: AuditResult, page: PageResult, standard: Standar
       kind: "para",
       runs: [
         { text: `${t.pageRate} : `, strong: true },
-        { text: formatRate(pageRatePct(rows), cov.decided, cov.total), strong: true },
+        { text: formatPageRate(rows, standard), strong: true },
       ],
     },
     { kind: "para", runs: [{ text: t.tally(tally.c, tally.nc, tally.na, tally.manual) }] },
