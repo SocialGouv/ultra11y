@@ -60726,7 +60726,7 @@ var wcag_default2 = {
           lang: "html",
           bad: '<!doctype>\n  <html lang="en">\n  <head>\n    <title>Setting the canvas background</title>\n    <style>\n      body {background-color:white}\n    </style>\n  </head>\n  <body>\n    <p>My background is white.</p>\n  </body>\n</html>',
           note: {
-            en: "Bad: Failure of Success Criterion 1.4.3, 1.4.6 and 1.4.8 due to specifying foreground colors without specifying background colors or vice versa (F24)."
+            en: "Bad: Failure of Success Criteria 1.4.3, 1.4.6, and 1.4.8 due to specifying foreground colors without specifying background colors or vice versa (F24)."
           }
         }
       ],
@@ -60912,7 +60912,7 @@ var wcag_default2 = {
           bad: ":focus {outline: none}",
           good: "*:focus {\n	/* inner indicator */\n	outline: 2px #F9F9F9 solid;\n	outline-offset: 0;\n	/* outer indicator */\n	box-shadow: 0 0 0 4px #193146;\n}",
           note: {
-            en: "Good: Creating a two-color focus indicator to ensure sufficient contrast with all components (C40). Bad: Failure of Success Criterion 1.4.11, 2.4.7 and 2.4.13 due to styling element outlines and borders in a way that removes or renders non-visible the visual focus indicator (F78)."
+            en: "Good: Creating a two-color focus indicator to ensure sufficient contrast with all components (C40). Bad: Failure of Success Criteria 1.4.11, 2.4.7, and 2.4.13 due to styling element outlines and borders in a way that removes or renders non-visible the visual focus indicator (F78)."
           }
         }
       ],

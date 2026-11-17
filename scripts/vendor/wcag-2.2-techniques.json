@@ -2,7 +2,7 @@
   "source": "https://github.com/w3c/wcag",
   "understanding": "https://www.w3.org/WAI/WCAG22/Understanding/",
   "license": "W3C Document License (code samples: W3C Software License)",
-  "fetchedAt": "2026-11-02",
+  "fetchedAt": "2026-11-17",
   "criteria": {
     "1.1.1": {
       "slug": "non-text-content",
@@ -215,10 +215,10 @@
       },
       "bad": {
         "id": "F24",
-        "title": "Failure of Success Criterion 1.4.3, 1.4.6 and 1.4.8 due to specifying foreground colors without specifying background colors or vice versa",
+        "title": "Failure of Success Criteria 1.4.3, 1.4.6, and 1.4.8 due to specifying foreground colors without specifying background colors or vice versa",
         "lang": "html",
         "code": "<!doctype>\n  <html lang=\"en\">\n  <head>\n    <title>Setting the canvas background</title>\n    <style>\n      body {background-color:white}\n    </style>\n  </head>\n  <body>\n    <p>My background is white.</p>\n  </body>\n</html>",
-        "note": "Specifying only background color with CSS In the example below the background color is defined on the CSS stylesheet, however the foreground color is not defined. Therefore, the example fails the Success Criterion."
+        "note": "Specifying only background color with CSS In the example below the background color is defined on the CSS stylesheet, however the foreground color is not defined. Therefore, the example fails the success criterion."
       }
     },
     "1.4.4": {
@@ -289,7 +289,7 @@
       },
       "bad": {
         "id": "F78",
-        "title": "Failure of Success Criterion 1.4.11, 2.4.7 and 2.4.13 due to styling element outlines and borders in a way that removes or renders non-visible the visual focus indicator",
+        "title": "Failure of Success Criteria 1.4.11, 2.4.7, and 2.4.13 due to styling element outlines and borders in a way that removes or renders non-visible the visual focus indicator",
         "lang": "css",
         "code": ":focus {outline: none}",
         "note": "The focus indicator is turned off with CSS The following CSS example will remove the default focus indicator, which fails the requirement to provide a visible focus indicator."
