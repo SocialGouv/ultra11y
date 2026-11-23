@@ -288,6 +288,7 @@ describe("orchestrate — contracts & runbook", () => {
     expect(stable(readWf(run, "adjudicate"), run)).toMatchSnapshot("adjudicate.workflow.mjs");
     expect(stable(readFileSync(join(run, "orchestration", "agents", "refuter.md"), "utf8"), run)).toMatchSnapshot("refuter.md");
     expect(stable(readFileSync(join(run, "orchestration", "RUNBOOK.md"), "utf8"), run)).toMatchSnapshot("RUNBOOK.md");
+    expect(stable(readFileSync(join(run, "orchestration", "verify-report", "verify-report-01.md"), "utf8"), run)).toMatchSnapshot("verify-report-01.md");
   });
 });
 

@@ -33,7 +33,9 @@ Three things are worth knowing before the table:
 The plugin carries both skills *and* the hook. `hooks/hooks.json` → `hooks/pre-tool-use.mjs`
 → `ultra11y hook --claude-code`. The engine resolves from `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
 Claude Code's own fan-out tools are the Agent tool and, where available, the Workflow tool
-that runs the `orchestrate`-emitted `*.workflow.mjs` scripts (Claude Code only).
+that runs the `orchestrate`-emitted `*.workflow.mjs` scripts (Claude Code only). Every harness,
+Claude Code included, can instead hand the per-batch prompt files `orchestrate` writes to its
+own subagents (`references/orchestration.md`).
 
 The review arrives as `permissionDecision: "deny"` on the pending command, with the findings
 in `additionalContext`.

@@ -2471,11 +2471,11 @@ var require_ignore = __commonJS({
         const rules = this._rules;
         const { length } = rules;
         const shortcut = this._basenameCount * 2 >= length;
-        const basename5 = shortcut ? basenameOf(path) : path;
+        const basename6 = shortcut ? basenameOf(path) : path;
         for (let index = length - 1; index >= 0; index--) {
           const rule = rules[index];
           if (rule[mode].test(
-            shortcut && rule._basenameOnly ? basename5 : path
+            shortcut && rule._basenameOnly ? basename6 : path
           )) {
             const { negative } = rule;
             const ret = {
@@ -63875,11 +63875,11 @@ import { existsSync as existsSync31, mkdirSync as mkdirSync14, readFileSync as r
 import { join as join33, resolve as resolve14 } from "path";
 
 // src/orchestrate-templates.ts
-import { join as join32 } from "path";
+import { basename as basename3, join as join32 } from "path";
 var ONE_WRITER_FOOTER = `
 ## Return, don't write
 
-Return ONLY the structured output specified above. Do NOT write, edit, or delete any file; do NOT run any engine command that writes (\`verify --apply\`, \`fix --write\`, \`audit --out\`, \`init\`). The orchestrator is the sole writer \u2014 it folds your verdicts into the worklist itself and runs the apply gate. Exception: if a justification is prose too large to return, write ONLY to \`<RUN>/orchestration/out/<role>-<batch>.md\` (a file namespaced to you alone) and return its path.
+Return ONLY the structured output specified above. Do NOT write, edit, or delete any file; do NOT run any engine command that writes (\`verify --apply\`, \`fix --write\`, \`audit --out\`, \`init\`). The orchestrator is the sole writer \u2014 it folds your verdicts into the worklist itself and runs the apply gate. Exceptions: if your harness gives you no way to return structured output, write that JSON ONLY to the output path your batch prompt names (\`<RUN>/orchestration/out/<phase>/<batch-id>.json\`); if a justification is prose too large to return, write ONLY to \`<RUN>/orchestration/out/<role>-<batch>.md\` (a file namespaced to you alone) and return its path.
 `;
 var ADJUDICATE_SCHEMA = {
   type: "object",
@@ -63979,24 +63979,25 @@ function toBatches(ids2, batchSize) {
   for (let i = 0; i < ids2.length; i += batchSize) out.push(ids2.slice(i, i + batchSize));
   return out;
 }
-function phaseWorkflowScript(ph, runAbs, engineAbs, batchSize) {
-  const spec = phaseSpec(ph.name);
-  const scriptPath = join32(runAbs, "orchestration", `${ph.name}.workflow.mjs`);
-  const meta2 = { name: `ultra11y-${ph.name}`, description: spec.description(ph.items), phases: [{ title: spec.title }] };
+function phaseWorkflowScript(pb) {
+  const spec = phaseSpec(pb.phase);
+  const scriptPath = join32(pb.run, "orchestration", `${pb.phase}.workflow.mjs`);
+  const meta2 = { name: `ultra11y-${pb.phase}`, description: spec.description(pb.items), phases: [{ title: spec.title }] };
   return [
     `export const meta = ${JSON.stringify(meta2)}`,
     ``,
     `// NOT a plain Node script: launch via the Workflow tool \u2014 Workflow({ scriptPath: ${JSON.stringify(scriptPath)} }).`,
     `// Emitted by \`ultra11y orchestrate\` from the CURRENT worklist. The worklist is the source`,
-    `// of truth: if it changes, re-run \`orchestrate --phase ${ph.name}\` before launching.`,
+    `// of truth: if it changes, re-run \`orchestrate --phase ${pb.phase}\` before launching.`,
+    `// One adapter of ${join32(pb.run, "orchestration", `${pb.phase}.batches.json`)} \u2014 the harness-neutral batches.`,
     ``,
     `// Constants for THIS run (injected at emit time; no Date.now/Math.random in this harness).`,
-    `const RUN = ${JSON.stringify(runAbs)}`,
-    `const ENGINE = ${JSON.stringify(engineAbs)}`,
-    `const WORKLIST = ${JSON.stringify(ph.worklist)}`,
+    `const RUN = ${JSON.stringify(pb.run)}`,
+    `const ENGINE = ${JSON.stringify(pb.engine)}`,
+    `const WORKLIST = ${JSON.stringify(pb.worklist)}`,
     `const AGENTS = RUN + '/orchestration/agents'`,
-    `const BATCHES = ${JSON.stringify(toBatches(ph.ids, batchSize))}`,
-    `const SCHEMA = ${JSON.stringify(spec.schema)}`,
+    `const BATCHES = ${JSON.stringify(pb.batches.map((b) => b.ids))}`,
+    `const SCHEMA = ${JSON.stringify(pb.schema)}`,
     ``,
     `function contract(name, extra) {`,
     `  return 'Read and follow the dispatch contract at ' + AGENTS + '/' + name + '.md VERBATIM.\\n'`,
@@ -64005,18 +64006,63 @@ function phaseWorkflowScript(ph, runAbs, engineAbs, batchSize) {
     `    + (extra ? '\\n' + extra : '')`,
     `}`,
     ``,
-    `log('ultra11y ${ph.name}: ' + ${JSON.stringify(String(ph.items))} + ' item(s) across ' + BATCHES.length + ' agent(s)')`,
+    `log('ultra11y ${pb.phase}: ' + ${JSON.stringify(String(pb.items))} + ' item(s) across ' + BATCHES.length + ' agent(s)')`,
     ``,
     `phase(${JSON.stringify(spec.title)})`,
     `const results = await pipeline(BATCHES, (batch, _item, i) =>`,
-    `  agent(contract('${spec.role}', 'ITEMS=' + batch.join(',')), { label: '${ph.name}:' + (i + 1), phase: ${JSON.stringify(spec.title)}, agentType: 'general-purpose', schema: SCHEMA }))`,
+    `  agent(contract('${pb.role}', 'ITEMS=' + batch.join(',')), { label: '${pb.phase}:' + (i + 1), phase: ${JSON.stringify(spec.title)}, agentType: 'general-purpose', schema: SCHEMA }))`,
     ``,
     `// One-writer rule: this workflow only COLLECTS verdict fragments. The main agent folds`,
     `// them into WORKLIST (fill each item's fields from the matching fragment), then runs:`,
-    `//   ${ph.apply}`,
-    `return { phase: ${JSON.stringify(ph.name)}, worklist: WORKLIST, results: results.filter(Boolean) }`,
+    `//   ${pb.fold}`,
+    `return { phase: ${JSON.stringify(pb.phase)}, worklist: WORKLIST, results: results.filter(Boolean) }`,
     ``
   ].join("\n");
+}
+function batchPromptMd(pb, b, contract) {
+  const spec = phaseSpec(pb.phase);
+  const briefs = pb.phase === "adjudicate" ? `
+Each criterion's brief \u2014 its official wording, numbered tests and methodology \u2014 is beside the worklist; read it before ruling:
+
+${b.ids.map((id) => `- \`${join32(pb.run, "adjudicate", `${id}.md`)}\``).join("\n")}
+` : "";
+  return `# ultra11y ${pb.phase} \u2014 batch ${b.id} (${b.role})
+
+You are one subagent of an ultra11y fan-out: batch ${b.index} of ${pb.batches.length} of the \xAB ${spec.title} \xBB phase. This file is your whole brief \u2014 nothing else needs to be passed to you.
+
+ITEMS=${b.ids.join(",")}
+
+Constants: RUN=${pb.run}  ENGINE=${pb.engine}  WORKLIST=${pb.worklist}.
+Invoke the engine only by its ABSOLUTE path: \`node ${pb.engine} <cmd>\` \u2014 read-only commands only.
+
+## Your items
+
+The ${b.ids.length} worklist entr${b.ids.length === 1 ? "y" : "ies"} you rule on, copied from \`${pb.worklist}\`. Handle these and no others.
+${briefs}
+\`\`\`json
+${JSON.stringify(b.items, null, 2)}
+\`\`\`
+
+## What you return
+
+Exactly ONE JSON object that validates against the schema below, covering your ITEMS only \u2014 as your structured output if your harness has one, otherwise as your final message with nothing before or after it.
+
+The orchestrator saves that object at \`${b.output}\` and folds it. If your harness gives you no way to return it, write it to that path yourself: the file is namespaced to this batch, and it is the ONLY file you may write.
+
+\`\`\`json
+${JSON.stringify(b.schema, null, 2)}
+\`\`\`
+
+## Your contract (\`${b.contract}\`, inline)
+
+${contract.trim()}
+
+## After you \u2014 the orchestrator's step, not yours
+
+The main agent is the sole writer. Once every batch of this phase has answered, it fills each worklist item from the matching answer and runs the fail-closed fold:
+
+\`${b.fold}\`
+`;
 }
 function ecoAdjudicatorContract(runAbs) {
   return `# Contract: adjudicator (sequential / --eco)
@@ -64148,8 +64194,18 @@ ${status}
 5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
 6. **Fix & re-audit**: \`${cmd("fix")}\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
-With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join32(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` \u2014 you stay the sole writer either way.
-`;
+## With subagents \u2014 the same phases, fanned out
+
+\`orchestrate --run ${runAbs} --phase <p>\` writes \`${join32(runAbs, "orchestration", "<p>.batches.json")}\` (every batch as data: its items, the schema its answer must match, its output path and the fold) and one self-contained prompt per batch under \`${join32(runAbs, "orchestration", "<p>")}/<batch-id>.md\`. On any harness: hand each prompt file VERBATIM to one subagent, save each returned JSON at that batch's \`output\` (\`${join32(runAbs, "orchestration", "out", "<p>")}/<batch-id>.json\`), fill the worklist from those answers yourself, then run the phase's fold above. On Claude Code, \`Workflow({ scriptPath: "${join32(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` dispatches the same batches in one call. You stay the sole writer either way.
+${batchList(manifest)}`;
+}
+function batchList(manifest) {
+  const lines = manifest.steps.filter((st) => st.kind === "judgment" && st.ready && st.batchFile).map((st) => `- **${basename3(st.batchFile, ".batches.json")}** \u2014 ${st.batchIds?.length ?? 0} batch(es): \`${st.batchFile}\``);
+  return lines.length ? `
+The batches of the current worklists, as \`orchestrate\` without \`--eco\` writes them:
+
+${lines.join("\n")}
+` : "";
 }
 
 // src/orchestrate.ts
@@ -64252,6 +64308,59 @@ function listPhases(runDir, engineAbs) {
     }
   ];
 }
+function batchPaths(runDir, phase) {
+  const orch = join33(resolve14(runDir), "orchestration");
+  return { file: join33(orch, `${phase}.batches.json`), promptDir: join33(orch, phase), outDir: join33(orch, "out", phase) };
+}
+function worklistItems(ph) {
+  if (!ph.ready) return [];
+  try {
+    const raw = JSON.parse(readFileSync23(ph.worklist, "utf8"));
+    const items = ph.name === "adjudicate" ? raw.items : raw;
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
+}
+function phaseBatches(ph, runDir, engineAbs, batchSize = BATCH_SIZE2) {
+  const run = resolve14(runDir);
+  const spec = phaseSpec(ph.name);
+  const role = spec.role;
+  const items = worklistItems(ph);
+  const chunks = toBatches(ph.ids, batchSize);
+  const width = Math.max(2, String(chunks.length).length);
+  const { promptDir, outDir } = batchPaths(run, ph.name);
+  const contract = join33(run, "orchestration", "agents", `${role}.md`);
+  return {
+    kind: "ultra11y-orchestration-batches",
+    schemaVersion: 1,
+    phase: ph.name,
+    role,
+    run,
+    engine: engineAbs,
+    worklist: ph.worklist,
+    items: ph.items,
+    batchSize,
+    schema: spec.schema,
+    fold: ph.apply,
+    batches: chunks.map((ids2, i) => {
+      const id = `${ph.name}-${String(i + 1).padStart(width, "0")}`;
+      return {
+        id,
+        phase: ph.name,
+        role,
+        index: i + 1,
+        ids: ids2,
+        items: items.slice(i * batchSize, i * batchSize + ids2.length),
+        contract,
+        prompt: join33(promptDir, `${id}.md`),
+        output: join33(outDir, `${id}.json`),
+        schema: spec.schema,
+        fold: ph.apply
+      };
+    })
+  };
+}
 var EXIT_USAGE = "usage / bad input (missing or unreadable file, unknown flag value)";
 function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
   const run = resolve14(runDir);
@@ -64275,21 +64384,28 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE2) {
     ready: ready(inputs),
     next
   });
-  const judgment = (id, ph, role, title, inputs, next) => ({
-    id,
-    kind: "judgment",
-    title,
-    role,
-    contract: join33(run, "orchestration", "agents", `${role}.md`),
-    worklist: ph.worklist,
-    items: ph.items,
-    batches: toBatches(ph.ids, batchSize),
-    schema: phaseSpec(ph.name).schema,
-    inputs,
-    outputs: [ph.worklist],
-    ready: ph.ready && ph.items > 0,
-    next
-  });
+  const judgment = (id, ph, role, title, inputs, next) => {
+    const pb = phaseBatches(ph, run, engineAbs, batchSize);
+    return {
+      id,
+      kind: "judgment",
+      title,
+      role,
+      contract: join33(run, "orchestration", "agents", `${role}.md`),
+      worklist: ph.worklist,
+      items: ph.items,
+      batches: pb.batches.map((b) => b.ids),
+      batchFile: batchPaths(run, ph.name).file,
+      batchIds: pb.batches.map((b) => b.id),
+      prompts: pb.batches.map((b) => b.prompt),
+      batchOutputs: pb.batches.map((b) => b.output),
+      schema: pb.schema,
+      inputs,
+      outputs: [ph.worklist],
+      ready: ph.ready && ph.items > 0,
+      next
+    };
+  };
   const [adj, ver] = phases;
   const verAudit = v2.flagArgs[v2.flagArgs.indexOf("--in") + 1];
   return {
@@ -64436,13 +64552,16 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
   const emitted = new Set(opts.eco ? [] : selected.filter((p2) => p2.items > 0).map((p2) => p2.name));
   for (const ph of phases) {
     if (emitted.has(ph.name)) continue;
-    const stale = join33(orchDir, `${ph.name}.workflow.mjs`);
-    if (existsSync31(stale)) {
-      rmSync6(stale, { force: true });
-      notices.push(`phase "${ph.name}": stale workflow removed \u2014 its worklist ${ph.ready ? "is now empty" : "no longer exists"}.`);
+    const { file, promptDir } = batchPaths(run, ph.name);
+    const stale = [join33(orchDir, `${ph.name}.workflow.mjs`), file, promptDir].filter((f2) => existsSync31(f2));
+    if (stale.length) {
+      for (const f2 of stale) rmSync6(f2, { recursive: true, force: true });
+      const why = opts.eco ? "--eco takes the sequential path" : !ph.ready ? "its worklist no longer exists" : ph.items === 0 ? "its worklist is now empty" : `--phase ${opts.phase} emits that phase only`;
+      notices.push(`phase "${ph.name}": stale workflow and batches removed \u2014 ${why}.`);
     }
   }
   if (!opts.eco) {
+    const contracts = agentContracts(run, { verify: verifyRunContext(run) });
     for (const ph of selected) {
       if (ph.items === 0) {
         notices.push(`phase "${ph.name}": worklist is empty \u2014 nothing to orchestrate.`);
@@ -64451,8 +64570,20 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
       if (ph.items <= SMALL_WORKLIST) {
         notices.push(`phase "${ph.name}": only ${ph.items} item(s) \u2014 the sequential --eco path is equivalent and cheaper.`);
       }
+      const pb = phaseBatches(ph, run, engineAbs, BATCH_SIZE2);
+      const paths = batchPaths(run, ph.name);
+      rmSync6(paths.promptDir, { recursive: true, force: true });
+      mkdirSync14(paths.promptDir, { recursive: true });
+      mkdirSync14(paths.outDir, { recursive: true });
+      writeFileSync16(paths.file, `${JSON.stringify(pb, null, 2)}
+`);
+      written.push(paths.file);
+      for (const b of pb.batches) {
+        writeFileSync16(b.prompt, batchPromptMd(pb, b, contracts[pb.role] ?? ""));
+        written.push(b.prompt);
+      }
       const p2 = join33(orchDir, `${ph.name}.workflow.mjs`);
-      writeFileSync16(p2, phaseWorkflowScript(ph, run, engineAbs, BATCH_SIZE2));
+      writeFileSync16(p2, phaseWorkflowScript(pb));
       written.push(p2);
     }
   }
@@ -64717,7 +64848,7 @@ import { createInterface } from "readline";
 
 // src/mcp/handlers.ts
 import { existsSync as existsSync32, lstatSync as lstatSync2, mkdirSync as mkdirSync15, readFileSync as readFileSync25, realpathSync as realpathSync7, statSync as statSync12, writeFileSync as writeFileSync17 } from "fs";
-import { basename as basename3, dirname as dirname16, isAbsolute as isAbsolute5, join as join34, resolve as resolve15, sep as sep5 } from "path";
+import { basename as basename4, dirname as dirname16, isAbsolute as isAbsolute5, join as join34, resolve as resolve15, sep as sep5 } from "path";
 
 // src/criteria-view.ts
 var CriteriaLookupError = class extends Error {
@@ -65603,7 +65734,7 @@ function containedPath(raw, cwd, field) {
     } catch {
       const parent = dirname16(existing);
       if (parent === existing) break;
-      rest.unshift(basename3(existing));
+      rest.unshift(basename4(existing));
       existing = parent;
     }
   }
@@ -66451,7 +66582,7 @@ var DECLARED = new Set([...TOOLS, ...WRITE_TOOLS].map((t3) => t3.name));
 
 // src/mcp/resources.ts
 import { existsSync as existsSync33, readdirSync as readdirSync5, readFileSync as readFileSync26, realpathSync as realpathSync8, statSync as statSync13 } from "fs";
-import { basename as basename4, dirname as dirname17, join as join35, resolve as resolve16, sep as sep6 } from "path";
+import { basename as basename5, dirname as dirname17, join as join35, resolve as resolve16, sep as sep6 } from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
 var SKILL_NAME = "ultra11y";
 var URI_SCHEME = "skill://";
@@ -66468,7 +66599,7 @@ function listResources(moduleDir) {
   if (!existsSync33(refDir)) return out;
   for (const file of readdirSync5(refDir).sort()) {
     if (!file.endsWith(".md")) continue;
-    out.push(describe(root, join35("references", file), `${SKILL_NAME} reference: ${basename4(file, ".md")}`));
+    out.push(describe(root, join35("references", file), `${SKILL_NAME} reference: ${basename5(file, ".md")}`));
   }
   return out;
 }
@@ -67170,11 +67301,13 @@ Commands:
              criterion, or only show its subject exists?). A refuted conformity
              sends its criterion back to \xAB to assess \xBB, never to NC.
   orchestrate  Emit the run's multi-agent orchestration from its CURRENT worklists:
-             one launchable Workflow script per ready phase (adjudicate over
-             ADJUDICATE.todo.json, verify-report over VERIFY.todo.json), the
-             agents/<role>.md dispatch contracts they reference, and a sequential
-             RUNBOOK.md fallback \u2014 absolute paths and the real worklist ids baked
-             in. Subagents only RETURN verdict fragments; you (the caller) stay
+             per ready phase (adjudicate over ADJUDICATE.todo.json, verify-report
+             over VERIFY.todo.json) a harness-neutral <phase>.batches.json, one
+             self-contained prompt per batch under <phase>/ (hand it verbatim to
+             any subagent), and the Claude Code Workflow script rendered from the
+             same batches; the agents/<role>.md dispatch contracts, and a
+             sequential RUNBOOK.md fallback \u2014 absolute paths and the real worklist
+             ids baked in. Subagents only RETURN verdict fragments; you (the caller) stay
              the sole writer and fold them via verify --apply. --eco emits only
              the RUNBOOK + contracts (the explicit low-token path); --list prints
              the phases and their readiness as JSON. Re-run after a worklist
@@ -67432,7 +67565,7 @@ Options:
                      VERIFY.todo.json); artifacts land under <dir>/orchestration/
   --phase <name>     orchestrate: emit one phase only \u2014 adjudicate | verify-report
                      (exit 2 with the producing command if its worklist is missing)
-  --eco              orchestrate: emit only RUNBOOK.md + agents/*.md \u2014 the explicit
+  --eco              orchestrate: emit only RUNBOOK.md + agents/*.md (no batches, no workflow) \u2014 the explicit
                      sequential low-token path (also what a no-subagent harness follows)
   --merge <file>     scan: fold dynamic findings into this AuditResult JSON. With --json the
                      printed document opens with a 'pages' summary of the run \u2014
@@ -71076,11 +71209,16 @@ function cmdOrchestrate(p2) {
   for (const w2 of res.written) console.log(`  ${w2}`);
   for (const n of res.notices) console.error(`ultra11y orchestrate: note \u2014 ${n}`);
   const workflows = res.written.filter((w2) => w2.endsWith(".workflow.mjs"));
+  const batchFiles = res.written.filter((w2) => w2.endsWith(".batches.json"));
   if (workflows.length) {
     console.log("");
+    for (const b of batchFiles)
+      console.log(
+        lang === "fr" ? `Lots : ${b} \u2014 tout harness : confiez chaque prompt de ${b.replace(/\.batches\.json$/, "")}/ tel quel \xE0 un sous-agent, et enregistrez son JSON au chemin \`output\` du lot.` : `Batches: ${b} \u2014 any harness: hand each prompt in ${b.replace(/\.batches\.json$/, "")}/ verbatim to one subagent, and save its JSON at the batch's \`output\` path.`
+      );
     for (const w2 of workflows) console.log(`Launch: Workflow({ scriptPath: ${JSON.stringify(w2)} })`);
     console.log(
-      lang === "fr" ? "Puis fusionnez les fragments retourn\xE9s dans la worklist et lancez le `verify --apply` indiqu\xE9 en fin de workflow (vous restez le seul \xE9crivain)." : "Then fold the returned fragments into the worklist and run the `verify --apply` shown at the end of each workflow (you stay the sole writer)."
+      lang === "fr" ? "Puis fusionnez les fragments retourn\xE9s dans la worklist et lancez le `verify --apply` indiqu\xE9 en fin de prompt ou de workflow (vous restez le seul \xE9crivain)." : "Then fold the returned fragments into the worklist and run the `verify --apply` shown at the end of each prompt or workflow (you stay the sole writer)."
     );
   } else {
     console.log(

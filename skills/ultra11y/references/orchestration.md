@@ -30,13 +30,56 @@ the report's non-conformities and silently skips every conformity the adjudicati
 fold then counts them « missing ». Keep the same context on both sides — `--max-verify 0` cannot
 repair a list generated from another claim source, only regenerating it can.
 
-## Route by harness
+## What `orchestrate` writes
 
-| Your harness | How to run each judgment phase |
-|---|---|
-| Has the Workflow tool (Claude Code only) | `orchestrate --run <RUN> --phase <p>`, then run `<RUN>/orchestration/<p>.workflow.mjs`. Subagents RETURN verdict fragments; you fold them into the worklist, then `verify --apply` as usual. |
-| Subagents but no Workflow tool (Claude Code's Agent tool, Codex subagents, OpenCode's Task tool) | Same `orchestrate`; dispatch one subagent per batch following `<RUN>/orchestration/agents/<role>.md` (the workflow script lists the batches and their prompts). One writer: you fold the results in. |
-| Eco mode, or no subagents | `orchestrate --run <RUN> --eco` → follow `<RUN>/orchestration/RUNBOOK.md` sequentially, playing each role yourself. Correctness-identical; only wall-clock differs. |
+For each ready phase `<p>` (`adjudicate`, `verify-report`), under `<RUN>/orchestration/`:
+
+```
+<p>.batches.json          the batches as data — the canonical, harness-neutral output
+<p>/<batch-id>.md         one self-contained prompt per batch (batch ids: <p>-01, <p>-02, …)
+out/<p>/                  where each batch's answer is saved: out/<p>/<batch-id>.json
+<p>.workflow.mjs          the Claude Code Workflow-tool adapter, rendered from the same batches
+agents/<role>.md          the dispatch contracts (adjudicator, refuter)
+RUNBOOK.md                the sequential path, and where the batch files are
+```
+
+`<p>.batches.json` is `{ kind: "ultra11y-orchestration-batches", schemaVersion: 1, phase, role, run,
+engine, worklist, items, batchSize, schema, fold, batches[] }`. Each batch carries its `id`,
+`role`, `ids` (its `ITEMS=`), `items` (the exact worklist entries it rules on), `contract`,
+`prompt`, `output`, `schema` (what its answer must validate against) and `fold` (the engine
+command the sole writer runs once every answer is in). The prompt file holds all of that in
+prose: the items, the criterion briefs to read, the role contract inline, the schema and the
+output path. Hand it to a subagent **verbatim**; nothing else needs passing.
+
+The workflow script's `BATCHES` and the manifest's `batches` / `batchIds` / `prompts` /
+`batchOutputs` come from the same batch record, so no adapter can dispatch a different partition.
+`--eco` writes neither batches nor workflow, and removes any left over.
+
+## Route by harness — one contract, every harness
+
+Every recipe ends the same way: **each subagent returns one JSON object that validates against
+its batch's `schema`; that JSON is saved at the batch's `output`; you, the main agent and the
+only writer, fill the worklist from those answers and run the batch's `fold`** (`verify --apply`
+for the phase). The gates do not know which harness produced the verdicts.
+
+- **Claude Code.** `orchestrate --run <RUN> --phase <p>`, then either
+  `Workflow({ scriptPath: "<RUN>/orchestration/<p>.workflow.mjs" })`, which dispatches every
+  batch and returns the fragments, or, where the Workflow tool is not available, one Agent-tool
+  subagent per `<RUN>/orchestration/<p>/<batch-id>.md`, each handed that file as its prompt.
+  Save each fragment at its batch's `output`, then fold.
+- **Codex.** Same `orchestrate`. Spawn one subagent per prompt file under
+  `<RUN>/orchestration/<p>/` and hand it the file's contents as its task. Save each returned
+  JSON at the batch's `output` (or let the subagent write it there itself, the one file the
+  prompt allows it), then fold.
+- **OpenCode.** Same `orchestrate`. One Task-tool call per prompt file, the file's contents as
+  the task prompt. Save each returned JSON at the batch's `output`, then fold.
+- **No subagents, or eco.** Either walk the prompt files yourself, one after another, saving
+  each answer at its `output` before folding, or skip the batches altogether:
+  `orchestrate --run <RUN> --eco` and follow `<RUN>/orchestration/RUNBOOK.md`, filling the
+  worklist in place. Both are correctness-identical to the fan-out; only wall-clock differs.
+
+Saved answers under `out/<p>/` are yours to fold; `orchestrate` never deletes them. After the
+fold, clear them before the next fan-out over a regenerated worklist.
 
 ## The other dispatch: the review
 
@@ -56,9 +99,10 @@ report for a human.
 
 ## The rules that do not bend
 
-- **Subagents never write.** Every emitted contract ends with the one-writer rule, and the
-  fail-closed `--apply` fold always stays with you, the orchestrator. Parallel writers to one
-  worklist is how a verdict silently disappears.
+- **Subagents never write the worklist.** Every emitted contract ends with the one-writer rule,
+  and the fail-closed `--apply` fold always stays with you, the orchestrator. The one file a
+  subagent may write is its own batch's `output`, and only when its harness cannot return the
+  JSON. Parallel writers to one worklist is how a verdict silently disappears.
 - **The gates are harness-independent.** `check` and `verify --apply` behave identically
   whether one agent or twelve produced the verdicts, so a fan-out can never buy a greener
   result than the sequential path.

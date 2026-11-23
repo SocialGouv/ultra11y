@@ -2,14 +2,15 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join, resolve } from "node:path";
 import { unrenderedResidual, type AdjudicationFile, type AdjudicationItem } from "./adjudicate.js";
 import type { AuditResult } from "./types.js";
-import { agentContracts, phaseSpec, phaseWorkflowScript, runbookMd, toBatches } from "./orchestrate-templates.js";
+import { agentContracts, batchPromptMd, phaseSpec, phaseWorkflowScript, runbookMd, toBatches } from "./orchestrate-templates.js";
 import { readVerifyContext, type VerifyItem } from "./verify.js";
 
 // ---------------------------------------------------------------------------
 // `ultra11y orchestrate` — emit the run's multi-agent orchestration from its
-// CURRENT worklists (per-phase workflow scripts + dispatch contracts + a
-// sequential RUNBOOK), so a subagent-capable harness fans the judgment work
-// out while the main agent stays the sole writer. Per-phase emission is
+// CURRENT worklists (per-phase harness-neutral batch files + one self-contained
+// prompt per batch, the Claude Code workflow script rendered from them, dispatch
+// contracts and a sequential RUNBOOK), so any subagent-capable harness fans the
+// judgment work out while the main agent stays the sole writer. Per-phase emission is
 // deliberate: each worklist only exists after its engine step (`verify
 // --manual`, `verify --report`), so a whole-pipeline script could only carry
 // placeholders — exactly what the check/verify gates exist to prevent.
@@ -164,6 +165,108 @@ export function listPhases(runDir: string, engineAbs: string): PhaseInfo[] {
   ];
 }
 
+/** ONE BATCH OF A FAN-OUT, AS DATA (#158) — everything a subagent on ANY harness needs, with no
+ *  harness API in it: the exact worklist slice it rules on, the schema its answer must validate
+ *  against, where that answer is saved, and the fold the sole writer runs afterwards. The Claude
+ *  Code workflow script, the prompt files and the manifest all render from this one record. */
+export interface OrchestrationBatch {
+  /** Stable, run-unique id (`<phase>-<NN>`): the prompt file and the output file are named after it. */
+  id: string;
+  phase: PhaseName;
+  role: "adjudicator" | "refuter";
+  /** 1-based position in the phase. */
+  index: number;
+  /** The worklist ids this batch handles (criteriaId for adjudicate, `n` for verify-report) — its `ITEMS=`. */
+  ids: string[];
+  /** The exact worklist entries those ids name, copied from the CURRENT worklist. */
+  items: unknown[];
+  /** The role's dispatch contract (`orchestration/agents/<role>.md`). */
+  contract: string;
+  /** The self-contained prompt any subagent can be handed verbatim. */
+  prompt: string;
+  /** Where the batch's schema-valid JSON answer is saved — the file the sole writer folds from. */
+  output: string;
+  /** The JSON schema the answer must validate against. */
+  schema: unknown;
+  /** The engine command the sole writer runs once every batch's answer is folded into the worklist. */
+  fold: string;
+}
+
+export interface PhaseBatches {
+  kind: "ultra11y-orchestration-batches";
+  schemaVersion: 1;
+  phase: PhaseName;
+  role: "adjudicator" | "refuter";
+  run: string;
+  engine: string;
+  worklist: string;
+  items: number;
+  batchSize: number;
+  schema: unknown;
+  fold: string;
+  batches: OrchestrationBatch[];
+}
+
+/** Where a phase's harness-neutral artifacts live. */
+export function batchPaths(runDir: string, phase: string): { file: string; promptDir: string; outDir: string } {
+  const orch = join(resolve(runDir), "orchestration");
+  return { file: join(orch, `${phase}.batches.json`), promptDir: join(orch, phase), outDir: join(orch, "out", phase) };
+}
+
+/** The worklist entries in order, best effort (an unreadable worklist has no items to slice). */
+function worklistItems(ph: PhaseInfo): unknown[] {
+  if (!ph.ready) return [];
+  try {
+    const raw = JSON.parse(readFileSync(ph.worklist, "utf8")) as unknown;
+    const items = ph.name === "adjudicate" ? (raw as { items?: unknown }).items : raw;
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
+}
+
+/** THE PHASE'S BATCHES, BUILT ONCE (#158). Chunking is order-preserving and deterministic, so the
+ *  batch ids, the workflow's BATCHES and the manifest's `batches` are one and the same partition. */
+export function phaseBatches(ph: PhaseInfo, runDir: string, engineAbs: string, batchSize = BATCH_SIZE): PhaseBatches {
+  const run = resolve(runDir);
+  const spec = phaseSpec(ph.name);
+  const role = spec.role as "adjudicator" | "refuter";
+  const items = worklistItems(ph);
+  const chunks = toBatches(ph.ids, batchSize);
+  const width = Math.max(2, String(chunks.length).length);
+  const { promptDir, outDir } = batchPaths(run, ph.name);
+  const contract = join(run, "orchestration", "agents", `${role}.md`);
+  return {
+    kind: "ultra11y-orchestration-batches",
+    schemaVersion: 1,
+    phase: ph.name,
+    role,
+    run,
+    engine: engineAbs,
+    worklist: ph.worklist,
+    items: ph.items,
+    batchSize,
+    schema: spec.schema,
+    fold: ph.apply,
+    batches: chunks.map((ids, i) => {
+      const id = `${ph.name}-${String(i + 1).padStart(width, "0")}`;
+      return {
+        id,
+        phase: ph.name,
+        role,
+        index: i + 1,
+        ids,
+        items: items.slice(i * batchSize, i * batchSize + ids.length),
+        contract,
+        prompt: join(promptDir, `${id}.md`),
+        output: join(outDir, `${id}.json`),
+        schema: spec.schema,
+        fold: ph.apply,
+      };
+    }),
+  };
+}
+
 /** One step of the loop, as data (#82). An `engine` step is a command with an exit-code
  *  contract; a `judgment` step is the model's work: a role, its contract, the worklist it fills
  *  and the batches a fan-out dispatches. */
@@ -185,6 +288,13 @@ export interface ManifestStep {
   worklist?: string;
   items?: number;
   batches?: string[][];
+  /** The harness-neutral batch file (`orchestration/<phase>.batches.json`) and, in batch order,
+   *  each batch's id, its self-contained prompt file and the file its answer is saved at (#158).
+   *  `orchestrate` (without --eco) writes them; the manifest names them either way. */
+  batchFile?: string;
+  batchIds?: string[];
+  prompts?: string[];
+  batchOutputs?: string[];
   /** The structured fragment one batch returns (fan-out); the sequential path fills the worklist in place. */
   schema?: unknown;
   /** Every input that is a real file exists now (placeholders are the caller's to substitute). */
@@ -233,21 +343,28 @@ export function buildManifest(runDir: string, engineAbs: string, batchSize = BAT
     ready: ready(inputs),
     next,
   });
-  const judgment = (id: string, ph: PhaseInfo, role: "adjudicator" | "refuter", title: string, inputs: string[], next: string): ManifestStep => ({
-    id,
-    kind: "judgment",
-    title,
-    role,
-    contract: join(run, "orchestration", "agents", `${role}.md`),
-    worklist: ph.worklist,
-    items: ph.items,
-    batches: toBatches(ph.ids, batchSize),
-    schema: phaseSpec(ph.name).schema,
-    inputs,
-    outputs: [ph.worklist],
-    ready: ph.ready && ph.items > 0,
-    next,
-  });
+  const judgment = (id: string, ph: PhaseInfo, role: "adjudicator" | "refuter", title: string, inputs: string[], next: string): ManifestStep => {
+    const pb = phaseBatches(ph, run, engineAbs, batchSize);
+    return {
+      id,
+      kind: "judgment",
+      title,
+      role,
+      contract: join(run, "orchestration", "agents", `${role}.md`),
+      worklist: ph.worklist,
+      items: ph.items,
+      batches: pb.batches.map((b) => b.ids),
+      batchFile: batchPaths(run, ph.name).file,
+      batchIds: pb.batches.map((b) => b.id),
+      prompts: pb.batches.map((b) => b.prompt),
+      batchOutputs: pb.batches.map((b) => b.output),
+      schema: pb.schema,
+      inputs,
+      outputs: [ph.worklist],
+      ready: ph.ready && ph.items > 0,
+      next,
+    };
+  };
   const [adj, ver] = phases as [PhaseInfo, PhaseInfo];
   const verAudit = v.flagArgs[v.flagArgs.indexOf("--in") + 1]!;
   return {
@@ -426,21 +543,31 @@ export function orchestrateRun(runDir: string, engineAbs: string, opts: Orchestr
     written.push(p);
   }
 
-  // Reconcile before emitting: a workflow script left behind by an earlier
-  // emission whose worklist has since emptied or disappeared is a launchable
+  // Reconcile before emitting: a workflow script or a batch set left behind by an
+  // earlier emission whose worklist has since emptied or disappeared is a launchable
   // fan-out over ids that no longer exist — "deterministic and idempotent"
-  // means the orchestration dir always mirrors the CURRENT run state.
+  // means the orchestration dir always mirrors the CURRENT run state. Answers
+  // already saved under out/<phase>/ are left alone: they are the caller's to fold.
   const emitted = new Set(opts.eco ? [] : selected.filter((p) => p.items > 0).map((p) => p.name));
   for (const ph of phases) {
     if (emitted.has(ph.name)) continue;
-    const stale = join(orchDir, `${ph.name}.workflow.mjs`);
-    if (existsSync(stale)) {
-      rmSync(stale, { force: true });
-      notices.push(`phase "${ph.name}": stale workflow removed — its worklist ${ph.ready ? "is now empty" : "no longer exists"}.`);
+    const { file, promptDir } = batchPaths(run, ph.name);
+    const stale = [join(orchDir, `${ph.name}.workflow.mjs`), file, promptDir].filter((f) => existsSync(f));
+    if (stale.length) {
+      for (const f of stale) rmSync(f, { recursive: true, force: true });
+      const why = opts.eco
+        ? "--eco takes the sequential path"
+        : !ph.ready
+          ? "its worklist no longer exists"
+          : ph.items === 0
+            ? "its worklist is now empty"
+            : `--phase ${opts.phase} emits that phase only`;
+      notices.push(`phase "${ph.name}": stale workflow and batches removed — ${why}.`);
     }
   }
 
   if (!opts.eco) {
+    const contracts = agentContracts(run, { verify: verifyRunContext(run) });
     for (const ph of selected) {
       if (ph.items === 0) {
         notices.push(`phase "${ph.name}": worklist is empty — nothing to orchestrate.`);
@@ -449,8 +576,22 @@ export function orchestrateRun(runDir: string, engineAbs: string, opts: Orchestr
       if (ph.items <= SMALL_WORKLIST) {
         notices.push(`phase "${ph.name}": only ${ph.items} item(s) — the sequential --eco path is equivalent and cheaper.`);
       }
+      // ONE SOURCE, EVERY ADAPTER (#158): the batches are built once, and the JSON, the prompt
+      // files and the Claude Code workflow script all render from them, so they cannot drift.
+      const pb = phaseBatches(ph, run, engineAbs, BATCH_SIZE);
+      const paths = batchPaths(run, ph.name);
+      // The prompt dir mirrors the CURRENT partition: a batch that no longer exists must not linger.
+      rmSync(paths.promptDir, { recursive: true, force: true });
+      mkdirSync(paths.promptDir, { recursive: true });
+      mkdirSync(paths.outDir, { recursive: true });
+      writeFileSync(paths.file, `${JSON.stringify(pb, null, 2)}\n`);
+      written.push(paths.file);
+      for (const b of pb.batches) {
+        writeFileSync(b.prompt, batchPromptMd(pb, b, contracts[pb.role] ?? ""));
+        written.push(b.prompt);
+      }
       const p = join(orchDir, `${ph.name}.workflow.mjs`);
-      writeFileSync(p, phaseWorkflowScript(ph, run, engineAbs, BATCH_SIZE));
+      writeFileSync(p, phaseWorkflowScript(pb));
       written.push(p);
     }
   }

@@ -107,7 +107,11 @@ engine, standard?, placeholders[], phases[], steps[] }`. Each step carries:
 - judgment steps: `role` (`adjudicator` | `refuter`), `contract` (the dispatch contract
   `orchestrate` writes under `orchestration/agents/`), `worklist`, `items`, `batches` (the item ids
   one subagent handles each) and `schema` (the structured fragment a batch returns when fanned
-  out; the sequential path fills the worklist in place);
+  out; the sequential path fills the worklist in place); plus, for the same batches in the same
+  order, `batchFile` (`orchestration/<phase>.batches.json`), `batchIds`, `prompts` (one
+  self-contained prompt file per batch) and `batchOutputs` (where each batch's answer is saved).
+  `orchestrate` without `--eco` writes those files; the manifest names them either way (see
+  `references/orchestration.md`);
 - `ready` — every real input exists now (placeholders are yours to substitute).
 
 `placeholders[]` names the tokens a caller substitutes: `<globs>` (what to audit) and, until a trial

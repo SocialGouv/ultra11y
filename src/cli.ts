@@ -284,11 +284,13 @@ Commands:
              criterion, or only show its subject exists?). A refuted conformity
              sends its criterion back to « to assess », never to NC.
   orchestrate  Emit the run's multi-agent orchestration from its CURRENT worklists:
-             one launchable Workflow script per ready phase (adjudicate over
-             ADJUDICATE.todo.json, verify-report over VERIFY.todo.json), the
-             agents/<role>.md dispatch contracts they reference, and a sequential
-             RUNBOOK.md fallback — absolute paths and the real worklist ids baked
-             in. Subagents only RETURN verdict fragments; you (the caller) stay
+             per ready phase (adjudicate over ADJUDICATE.todo.json, verify-report
+             over VERIFY.todo.json) a harness-neutral <phase>.batches.json, one
+             self-contained prompt per batch under <phase>/ (hand it verbatim to
+             any subagent), and the Claude Code Workflow script rendered from the
+             same batches; the agents/<role>.md dispatch contracts, and a
+             sequential RUNBOOK.md fallback — absolute paths and the real worklist
+             ids baked in. Subagents only RETURN verdict fragments; you (the caller) stay
              the sole writer and fold them via verify --apply. --eco emits only
              the RUNBOOK + contracts (the explicit low-token path); --list prints
              the phases and their readiness as JSON. Re-run after a worklist
@@ -546,7 +548,7 @@ Options:
                      VERIFY.todo.json); artifacts land under <dir>/orchestration/
   --phase <name>     orchestrate: emit one phase only — adjudicate | verify-report
                      (exit 2 with the producing command if its worklist is missing)
-  --eco              orchestrate: emit only RUNBOOK.md + agents/*.md — the explicit
+  --eco              orchestrate: emit only RUNBOOK.md + agents/*.md (no batches, no workflow) — the explicit
                      sequential low-token path (also what a no-subagent harness follows)
   --merge <file>     scan: fold dynamic findings into this AuditResult JSON. With --json the
                      printed document opens with a 'pages' summary of the run —
@@ -5619,13 +5621,20 @@ function cmdOrchestrate(p: ParsedArgs): number {
   for (const w of res.written) console.log(`  ${w}`);
   for (const n of res.notices) console.error(`ultra11y orchestrate: note — ${n}`);
   const workflows = res.written.filter((w) => w.endsWith(".workflow.mjs"));
+  const batchFiles = res.written.filter((w) => w.endsWith(".batches.json"));
   if (workflows.length) {
     console.log("");
+    for (const b of batchFiles)
+      console.log(
+        lang === "fr"
+          ? `Lots : ${b} — tout harness : confiez chaque prompt de ${b.replace(/\.batches\.json$/, "")}/ tel quel à un sous-agent, et enregistrez son JSON au chemin \`output\` du lot.`
+          : `Batches: ${b} — any harness: hand each prompt in ${b.replace(/\.batches\.json$/, "")}/ verbatim to one subagent, and save its JSON at the batch's \`output\` path.`,
+      );
     for (const w of workflows) console.log(`Launch: Workflow({ scriptPath: ${JSON.stringify(w)} })`);
     console.log(
       lang === "fr"
-        ? "Puis fusionnez les fragments retournés dans la worklist et lancez le `verify --apply` indiqué en fin de workflow (vous restez le seul écrivain)."
-        : "Then fold the returned fragments into the worklist and run the `verify --apply` shown at the end of each workflow (you stay the sole writer).",
+        ? "Puis fusionnez les fragments retournés dans la worklist et lancez le `verify --apply` indiqué en fin de prompt ou de workflow (vous restez le seul écrivain)."
+        : "Then fold the returned fragments into the worklist and run the `verify --apply` shown at the end of each prompt or workflow (you stay the sole writer).",
     );
   } else {
     console.log(
