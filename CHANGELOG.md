@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [7.0.0](https://github.com/SocialGouv/ultra11y/compare/v6.0.0...v7.0.0) (2026-11-23)
+
+
+* feat!: ultra11y is a skill and a test-runner library, nothing else ([#172](https://github.com/SocialGouv/ultra11y/issues/172)) ([d76223d](https://github.com/SocialGouv/ultra11y/commit/d76223d7b667740558be43a88691d403990f9665)), closes [#168](https://github.com/SocialGouv/ultra11y/issues/168) [#168](https://github.com/SocialGouv/ultra11y/issues/168)
+
+
+### BREAKING CHANGES
+
+* the mcp, dev, judge, affected and import commands, audit
+--lite, --format sarif|github, init --ci, the --baseline gate, render --e2e,
+pages --diff, scan --runtime docker and the remediation formats are removed.
+
 # [6.0.0](https://github.com/SocialGouv/ultra11y/compare/v5.59.0...v6.0.0) (2026-11-23)
 
 
