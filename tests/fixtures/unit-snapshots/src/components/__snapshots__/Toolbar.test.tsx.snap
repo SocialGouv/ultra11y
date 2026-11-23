@@ -1,0 +1,46 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Toolbar > renders the icon-only close button 1`] = `
+<div>
+  <div
+    class="fr-btns-group"
+  >
+    <button
+      class="fr-btn fr-icon-close-line"
+      type="button"
+    />
+    <button
+      class="fr-btn"
+      type="button"
+    >
+      Enregistrer
+    </button>
+  </div>
+</div>
+`;
+
+exports[`Toolbar > renders the logo 1`] = `
+<DocumentFragment>
+  <a
+    class="fr-header__brand"
+    href="/"
+  >
+    <img
+      class="fr-responsive-img"
+      src="/logo.svg"
+    />
+  </a>
+</DocumentFragment>
+`;
+
+exports[`Toolbar > exposes its state 1`] = `
+{
+  "expanded": false,
+  "items": [
+    "save",
+    "close",
+  ],
+}
+`;
+
+exports[`Toolbar > label text 1`] = `"Enregistrer le brouillon"`;

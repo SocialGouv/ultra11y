@@ -63,6 +63,42 @@ node scripts/ultra11y.mjs audit              # auto-ingests .ultra11y/captures; 
   spawned vitest+jsdom project renders, the capture lands with correct provenance, and the
   engine ingests it) — the escaping scheme it embeds is locked byte-identical to the parser's.
 
+## Unit-test snapshots (`__snapshots__/*.snap`) — nothing to install
+
+The project's Jest/Vitest snapshot files already hold what its components rendered. `audit`
+reads every `.snap` in scope: one **component** document per entry whose value is markup —
+Testing Library's pretty-format DOM (`container`, `asFragment()`), react-test-renderer's
+`toJSON()` (`className`, `onClick={[Function]}` → plain HTML), an `innerHTML` string snapshot.
+
+- Each finding sits on the `.snap` **file and line** of the element, and names the entry
+  (`origin.snapshot`, printed under the occurrence). It is attributed to `Button.tsx` when that
+  file sits beside `Button.test.tsx`.
+- A component, never a page: the page-scoped rules (title, lang) stay off. Rendered by jsdom:
+  no computed style, so contrast, reflow and focus stay « à évaluer ».
+- Skipped, and counted in `scope.unitSnapshots`: objects, prose, numbers, and shallow renders
+  (`<Button>` is the component call, not its output).
+- Snapshots are audited even under `__tests__/` — they are product output, not hand-typed
+  fixtures. A suite that snapshots deliberately broken markup opts out with
+  `--exclude "**/__snapshots__/**"`. A snapshot is never rewritten by `fix`: fix the component,
+  then `vitest -u` / `jest -u`.
+
+## Check a render inside the test (`ultra11y/vitest`, `ultra11y/jest`)
+
+```js
+import { checkA11y, toBeAccessible } from "ultra11y/vitest"; // or "ultra11y/jest"
+expect.extend({ toBeAccessible });
+
+const { container } = render(<Button variant="primary" />);
+await checkA11y(container, { as: "button-primary", failOn: "major" });
+expect(container).toBeAccessible();
+```
+
+Accepts an element, `asFragment()`, a render result, a document (its body) or an HTML string.
+Each check writes `.ultra11y/captures/<id>.html` (`capture write`, the same capture format as
+`render --setup`, marked `runner="vitest" env="jsdom" styles="none"`) and audits it; `failOn`
+(`blocking` by default, `false` to record only) decides the test. Commit the captures: `audit`
+re-reads them offline. `render --setup` remains the zero-touch way to record every render.
+
 ## Get rendered HTML
 
 `node scripts/ultra11y.mjs render [<dir>]` detects the framework and prints the
@@ -99,7 +135,9 @@ simplest to most faithful:
 
 ## Choosing
 
-- Components WITH a test suite → zero-touch captures (`render --setup`), then `audit --require-captures`.
+- Components WITH a test suite → their `.snap` files (read as they are), the
+  `ultra11y/vitest`/`ultra11y/jest` helper in the tests that matter, or zero-touch captures
+  (`render --setup`), then `audit --require-captures`.
 - Components / design system (no tests) → portable stories + `@storybook/test-runner` (real
   per-story HTML, then `render --storybook` to attribute it) **or** an SSR snapshot
   (`render --scaffold`), then `audit`. A bare `storybook build` alone is NOT enough (see above).

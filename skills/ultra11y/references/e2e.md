@@ -16,6 +16,12 @@ import "ultra11y/cypress";                         // cypress/support/e2e.js
 Versioned, typed, and they resolve the engine that ships inside the very package you
 installed, so a project can never pipe to a different build than the one it depends on.
 
+One level down, the **unit tests** are a render source too: `ultra11y/vitest` and
+`ultra11y/jest` (`checkA11y(container)`, `expect(container).toBeAccessible()`) audit a
+component in the test's state and record it to `.ultra11y/captures/`, and `audit` reads the
+suite's `__snapshots__/*.snap` as they are. Both are jsdom renders: components, not pages, with
+no computed style. See `references/rendered.md`.
+
 ## Sweeping the declared sample (`sweepSample`)
 
 The sample in `.ultra11yrc.json` already says what every page is — id, name, URL, whether it

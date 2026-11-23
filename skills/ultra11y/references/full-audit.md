@@ -32,6 +32,22 @@ block of `.ultra11yrc.json` and the PDF document checks are described in `refere
 
 ## 2. Audit source and rendered pages
 
+Inventory the render sources the project already has, and use **all** of them — each sees
+what the others cannot:
+
+- unit-test snapshots (`__snapshots__/*.snap`) — read by `audit` as they are;
+- unit-test captures (`.ultra11y/captures/`, from `ultra11y/vitest`/`ultra11y/jest` or
+  `render --setup`) — run the test suite to refresh them;
+- E2E captures (`.ultra11y/pages/`, from `ultra11y/playwright`/`ultra11y/cypress`) — run the
+  E2E suite to refresh them;
+- an SSR harness or a static build (`render`, `references/rendered.md`);
+- the browser pass on the sample or a crawl (`scan`, below).
+
+Name in the coverage annex which sources ran and which were absent. The report already states
+what `audit` read (`scope.unitSnapshots`, `scope.captures`, the pages); add the ones you could
+not run and why. Unit-test sources are jsdom renders: they decide markup criteria on
+components, never page-level or rendering criteria.
+
 ```sh
 node scripts/ultra11y.mjs audit <paths> --graph --standard <standard> --lang <lang> --out audits --json
 node scripts/ultra11y.mjs scan --sample --cwd . \

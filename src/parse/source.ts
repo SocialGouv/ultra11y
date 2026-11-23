@@ -8,6 +8,7 @@ import { jsxToHtml } from "./jsx.js";
 import { parseJsxAst, type AstFile } from "./jsx-ast.js";
 import { jsxAstToDoc } from "./jsx-bridge.js";
 import { parseCaptureProvenance } from "../capture.js";
+import { isUnitSnapshotFile, parseUnitSnapshotFile } from "./snap.js";
 
 export type SourceKind = "html" | "jsx" | "sfc";
 
@@ -38,6 +39,13 @@ export function splitAstroFrontmatter(source: string): { frontmatter: string; bl
   const frontmatter = fence.replace(/^---\r?\n/, "").replace(/\r?\n---\r?\n?$/, "");
   const blanked = fence.replace(/[^\n\r]/g, " ") + source.slice(fence.length);
   return { frontmatter, blanked };
+}
+
+/** Every document a file holds: one for a source or HTML file, one per markup entry for a
+ *  unit-test snapshot file (src/parse/snap.ts) — none when it holds no markup. */
+export function parseSourceDocs(source: string, file: string, opts: { forceJsx?: boolean } = {}): Doc[] {
+  if (isUnitSnapshotFile(file)) return parseUnitSnapshotFile(source, file).docs;
+  return [parseSource(source, file, opts)];
 }
 
 export function parseSource(source: string, file: string, opts: { forceJsx?: boolean } = {}): Doc {

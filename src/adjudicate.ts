@@ -27,6 +27,7 @@ import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
 import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
+import { isUnitSnapshotFile, parseUnitSnapshotFile } from "./parse/snap.js";
 import { isPdfPath, loadPdfDoc } from "./documents.js";
 import { runVeraPdf } from "./verapdf.js";
 import { attachSignals, PAGES_DIR, snapshotPageId } from "./snapshot.js";
@@ -276,6 +277,11 @@ function docsForAudit(audit: AuditResult, cwd?: string): Doc[] {
       // brief lists each one with what was established about it.
       if (isPdfPath(f)) {
         docs.push(loadPdfDoc(path, f));
+        continue;
+      }
+      // A unit-test snapshot file is one document per markup entry, as in `runAudit`.
+      if (isUnitSnapshotFile(f)) {
+        docs.push(...parseUnitSnapshotFile(readText(path), f).docs);
         continue;
       }
       const doc = parseSource(readText(path), f);

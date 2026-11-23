@@ -32,7 +32,16 @@ import {
   storyProvenance,
   type Detection,
 } from "./render.js";
-import { CAPTURES_DIR, computeCaptureCoverage, parseCaptureProvenance, formatCaptureComment, type CaptureEntry } from "./capture.js";
+import {
+  CAPTURES_DIR,
+  computeCaptureCoverage,
+  parseCaptureProvenance,
+  formatCaptureComment,
+  validateComponentCapture,
+  writeComponentCapture,
+  type CaptureEntry,
+  type ComponentCapturePayload,
+} from "./capture.js";
 import { buildGraphStreaming } from "./graph/build.js";
 import { discover } from "./discover.js";
 import { toPosix, GRAPH_ONLY_EXT } from "./glob.js";
@@ -157,6 +166,7 @@ Usage:
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
+  ultra11y capture write  [--root <dir>] [--fail-on blocking|major|minor] [--json]   (component payload on stdin → .ultra11y/captures/<id>.html + audit it)
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
@@ -297,6 +307,13 @@ Commands:
              has been captured. Because a snapshot is a FULL document (a component
              capture is a fragment), the page-scoped rules run on it: that is where
              html lang (RGAA 8.3) and page title (8.5/8.6) become decidable.
+  capture    Persist a rendered COMPONENT (.ultra11y/captures/<id>.html, provenance
+             comment included) and audit it. 'capture write' reads {meta, html} on
+             stdin — what the ultra11y/vitest and ultra11y/jest helpers send from a
+             unit test. A fragment, so the page-scoped rules stay off; rendered by a
+             DOM implementation, so it is marked styles="none" and the rendering
+             criteria stay to assess. Unit-test snapshot files (__snapshots__/*.snap)
+             need no command: 'audit' reads them wherever they are in scope.
   hook       INTERNAL — the decision half of the Claude Code plugin's PreToolUse
              hook. Reads the payload on stdin; when a pending 'git commit', 'git
              push' or 'gh pr create' carries findings >= the threshold, prints the
@@ -369,7 +386,7 @@ Options:
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
-  --root <dir>       snapshot, scan: project root holding
+  --root <dir>       snapshot, capture, scan: project root holding
                      .ultra11y/pages and .ultra11yrc.json (default: . — scan writes the
                      snapshots it collects under it)
   --glossary [<t>]   criteria: look up a term the country standard defines (or list all)
@@ -379,7 +396,7 @@ Options:
   --dry-run          fix: preview only — never write (this is the default)
   --safe             fix: apply only genuinely-automatic codemods (skip TODO placeholders / judgment proposals)
   --only <ids>       fix: limit auto-fixes to these rule ids (comma-separated)
-  --fail-on <sev>    audit/init/snapshot: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
+  --fail-on <sev>    audit/init/snapshot/capture: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
   --hook             init: write a git pre-commit accessibility gate (staged snapshot + auto-fix by default)
   --report <file>    check/verify: the report markdown to gate
   --theme <N>        criteria: with --standard <pack>, list the pack's theme N
@@ -546,6 +563,7 @@ export const COMMANDS = [
   "scan",
   "sample",
   "snapshot",
+  "capture",
   "pages",
   "fix",
   "init",
@@ -1670,6 +1688,61 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
   if (p.flags.json) console.log(JSON.stringify(result, null, 2));
   else {
     console.log(lang === "fr" ? `→ instantané écrit dans ${dir}` : `→ snapshot written to ${dir}`);
+    console.log(auditSummary(result, lang));
+  }
+  return failing.length ? 1 : 0;
+}
+
+/** `capture write` — the COMPONENT counterpart of `snapshot write`, for the unit-test helpers
+ *  (`ultra11y/vitest`, `ultra11y/jest`). Payload on stdin → `.ultra11y/captures/<id>.html` with
+ *  its provenance comment, then audited. A component capture, not a page snapshot: it is a
+ *  fragment, so the page-scoped rules stay off, and it joins no page of the per-page grid. */
+async function cmdCapture(p: ParsedArgs): Promise<number> {
+  const sub = p.positionals[0];
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  const lang = resolveLang(p.flags, {});
+  if (sub !== "write") {
+    console.error("ultra11y capture: expected `capture write` (payload on stdin).");
+    return 2;
+  }
+  const raw = await readStdin();
+  if (!raw.trim()) {
+    console.error("ultra11y capture write: no payload on stdin (expected {meta: {id, name?, component?, source?, test?, runner?, env?}, html}).");
+    return 2;
+  }
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    console.error("ultra11y capture write: stdin is not valid JSON.");
+    return 2;
+  }
+  const issues = validateComponentCapture(payload);
+  if (issues.length) {
+    for (const i of issues) console.error(`ultra11y capture write: ${i}`);
+    return 2;
+  }
+  let file: string;
+  try {
+    file = writeComponentCapture(root, payload as ComponentCapturePayload);
+  } catch (e) {
+    console.error(`ultra11y capture write: could not write the capture: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  // Exactly this capture, never the whole captures dir — a test checking one component must not
+  // be failed by another one's backlog.
+  const result = runAudit({ inputs: [file], captureDir: join(root, CAPTURES_DIR), onWarn: (m) => console.error(m) });
+  // Same presence-keyed gate as `snapshot write`: a producer that only records must not fail.
+  const failOnRaw = p.flags["fail-on"];
+  const failOnParsed = parseFailOn(failOnRaw);
+  if (failOnRaw !== undefined && failOnParsed === null) {
+    console.error(`ultra11y capture write: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
+    return 2;
+  }
+  const failing = failOnRaw !== undefined ? findingsAtOrAbove(result.findings, failOnParsed ?? "bloquant").filter((f) => !f.advisory) : [];
+  if (p.flags.json) console.log(JSON.stringify(result, null, 2));
+  else {
+    console.log(lang === "fr" ? `→ capture écrite dans ${file}` : `→ capture written to ${file}`);
     console.log(auditSummary(result, lang));
   }
   return failing.length ? 1 : 0;
@@ -4273,6 +4346,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdSample(p);
     case "snapshot":
       return cmdSnapshot(p);
+    case "capture":
+      return cmdCapture(p);
     case "pages":
       return cmdPages(p);
     case "fix":

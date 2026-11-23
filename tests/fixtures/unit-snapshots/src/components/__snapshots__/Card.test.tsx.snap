@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Card > renders a titled card 1`] = `
+<div>
+  <div
+    class="fr-card"
+  >
+    <h3
+      class="fr-card__title"
+    >
+      Démarches
+    </h3>
+    <p
+      class="fr-card__desc"
+    >
+      Toutes vos démarches en ligne.
+    </p>
+  </div>
+</div>
+`;
+
+exports[`Card > inner html 1`] = `"<div class=\\"fr-card\\"><h3 class=\\"fr-card__title\\">Démarches</h3><img src=\\"/card.png\\"></div>"`;

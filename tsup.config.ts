@@ -7,11 +7,16 @@ import { defineConfig } from "tsup";
 //    `npm install` at skill-use time. `scripts/copy-bundle.mjs` then mirrors the byte-exact
 //    bundle into each skill dir so it installs standalone.
 //
-// 2. The TEST-RUNNER PLUGINS (dist/) — `ultra11y/playwright`, `ultra11y/cypress` and
-//    `ultra11y/cypress/plugin`, imported by a project that has ultra11y as a devDependency.
+// 2. The TEST-RUNNER PLUGINS (dist/) — `ultra11y/playwright`, `ultra11y/cypress`,
+//    `ultra11y/cypress/plugin`, `ultra11y/vitest` and `ultra11y/jest`, imported by a project
+//    that has ultra11y as a devDependency.
 //    They are NOT part of the engine bundle: a Cypress support file must not pull 2.4 MB of
 //    audit engine into the browser. They stay tiny because they only pipe a collected page
 //    to the engine, which they spawn.
+//
+// 3. `ultra11y/jest` AGAIN, as CommonJS (dist/jest.cjs). Jest `require`s its dependencies unless
+//    the project runs it in ESM mode, and an `.mjs` cannot be required — so the one runner that
+//    needs it gets a CJS twin, built from the same source, its types shared with the ESM build.
 //
 // Both committed bundles are verified reproducible in CI via `pnpm run check:build`.
 export default defineConfig([
@@ -38,6 +43,8 @@ export default defineConfig([
       playwright: "src/integrations/playwright.ts",
       cypress: "src/integrations/cypress.ts",
       "cypress-plugin": "src/integrations/cypress-plugin.ts",
+      vitest: "src/integrations/vitest.ts",
+      jest: "src/integrations/jest.ts",
     },
     outDir: "dist",
     format: ["esm"],
@@ -52,10 +59,29 @@ export default defineConfig([
     // changes leaves its predecessor behind, and the stale one is then COMMITTED and PUBLISHED:
     // `check:build` compares what changed, never what is left over, so only
     // tests/integrations.test.ts caught it.
-    clean: true,
+    //
+    // Except the CJS twin below: the three configs build in parallel, so this clean must not
+    // delete what the next one writes.
+    clean: ["!jest.cjs"],
     minify: false,
     // Each entry is self-contained: shared chunks would need a fourth published path and
     // buy nothing at this size.
+    splitting: false,
+    sourcemap: false,
+  },
+  {
+    entry: { jest: "src/integrations/jest.ts" },
+    outDir: "dist",
+    format: ["cjs"],
+    outExtension: () => ({ js: ".cjs" }),
+    target: "node22",
+    platform: "node",
+    bundle: true,
+    // `import.meta.url` (the engine path, src/integrations/core.ts) has no CJS meaning: shimmed.
+    shims: true,
+    dts: false,
+    clean: false,
+    minify: false,
     splitting: false,
     sourcemap: false,
   },

@@ -15,6 +15,8 @@ import type { CaptureProvenance } from "./parse/html.js";
 import type { DepGraph } from "./graph/graph.js";
 import type { ComponentDef } from "./graph/imports.js";
 import type { Finding } from "./types.js";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, isAbsolute, join } from "node:path";
 import { toPosix, expandInputs } from "./glob.js";
 import { readText } from "./util.js";
 
@@ -59,7 +61,90 @@ export function formatCaptureComment(prov: CaptureProvenance): string {
   if (prov.name) attrs.push(`name="${escapeCommentValue(prov.name)}"`);
   if (prov.page) attrs.push(`page="${escapeCommentValue(prov.page)}"`);
   if (prov.url) attrs.push(`url="${escapeCommentValue(prov.url)}"`);
+  if (prov.runner) attrs.push(`runner="${escapeCommentValue(prov.runner)}"`);
+  if (prov.env) attrs.push(`env="${escapeCommentValue(prov.env)}"`);
+  if (prov.styles) attrs.push(`styles="${escapeCommentValue(prov.styles)}"`);
   return `<!-- ultra11y:capture ${attrs.join(" ")} -->`;
+}
+
+// ---- writing a component capture (`capture write`, the ultra11y/vitest + ultra11y/jest helpers)
+
+/** What a unit-test helper hands the engine: the rendered markup and who rendered it. */
+export interface ComponentCapturePayload {
+  meta: {
+    /** File stem under `.ultra11y/captures/` — the same character rule as a page id. */
+    id: string;
+    /** The test title, shown as the capture's name. */
+    name?: string;
+    component?: string;
+    /** Repo-relative source that rendered it; inferred from `test` when absent. */
+    source?: string;
+    /** Repo-relative test file. */
+    test?: string;
+    /** "vitest" | "jest". */
+    runner?: string;
+    /** The DOM implementation the test ran in: "jsdom" | "happy-dom". */
+    env?: string;
+  };
+  /** The rendered markup — `container.outerHTML`, a fragment's children, a body's innerHTML. */
+  html: string;
+}
+
+// An id becomes a file name, so it must not be able to leave the captures dir.
+const CAPTURE_ID_RE = /^[a-z0-9][a-z0-9-]*$/i;
+
+/** Validate a component-capture payload; the issues, or an empty list. */
+export function validateComponentCapture(raw: unknown): string[] {
+  const issues: string[] = [];
+  const p = raw as Partial<ComponentCapturePayload> | null;
+  if (!p || typeof p !== "object") return ["payload must be an object { meta, html }"];
+  const m = p.meta as Record<string, unknown> | undefined;
+  if (!m || typeof m !== "object") issues.push("meta must be an object { id, name?, component?, source?, test?, runner?, env? }");
+  else {
+    if (typeof m.id !== "string" || !CAPTURE_ID_RE.test(m.id)) issues.push(`meta.id must match ${CAPTURE_ID_RE} (it becomes a file name)`);
+    for (const k of ["name", "component", "source", "test", "runner", "env"])
+      if (m[k] !== undefined && typeof m[k] !== "string") issues.push(`meta.${k} must be a string`);
+  }
+  if (typeof p.html !== "string" || !p.html.trim()) issues.push("html must be the rendered markup (a non-empty string)");
+  return issues;
+}
+
+/** The component a test most likely renders: `src/Button.test.tsx` → `src/Button.tsx`, only when
+ *  that file exists under `root` — an attribution to a file that is not there is a guess. */
+export function sourceForTest(root: string, test: string | undefined): string | undefined {
+  if (!test) return undefined;
+  const candidate = test.replace(/\.(test|spec)\.([cm]?[jt]sx?)$/i, ".$2");
+  return candidate !== test && existsSync(isAbsolute(candidate) ? candidate : join(root, candidate)) ? candidate : undefined;
+}
+
+/** Write a component capture to `<root>/.ultra11y/captures/<id>.html`, returning its path.
+ *
+ *  THE PROVENANCE SAYS WHAT WAS NOT MEASURED. A DOM implementation (jsdom, happy-dom) builds the
+ *  tree and computes no style and lays out no box, so the comment carries `styles="none"` beside
+ *  the runner and the environment: the markup criteria are decided on this file, and colour,
+ *  contrast, reflow and focus visibility stay « à évaluer » — never concluded from a render that
+ *  could not have shown them. An unchanged capture is not rewritten, so a re-run stays
+ *  byte-stable in git, as with the zero-touch harvester. */
+export function writeComponentCapture(root: string, payload: ComponentCapturePayload): string {
+  const m = payload.meta;
+  const source = m.source ?? sourceForTest(root, m.test);
+  const component = m.component ?? (source ? basename(source).replace(/\.[cm]?[jt]sx?$/i, "") : undefined);
+  const comment = formatCaptureComment({
+    v: 1,
+    ...(source ? { sourceFile: toPosix(source) } : {}),
+    ...(component ? { component } : {}),
+    ...(m.test ? { test: toPosix(m.test) } : {}),
+    ...(m.name ? { name: m.name } : {}),
+    ...(m.runner ? { runner: m.runner } : {}),
+    ...(m.env ? { env: m.env } : {}),
+    styles: "none",
+  });
+  const dir = join(root, CAPTURES_DIR);
+  const file = join(dir, `${m.id}.html`);
+  const content = `${comment}\n${payload.html.trim()}\n`;
+  mkdirSync(dir, { recursive: true });
+  if (!existsSync(file) || readFileSync(file, "utf8") !== content) writeFileSync(file, content);
+  return file;
 }
 
 // Only the head of the file can hold the marker (the harvester writes it first), so
@@ -90,6 +175,9 @@ export function parseCaptureProvenance(source: string): CaptureProvenance | unde
     ...(kv.has("name") ? { name: kv.get("name") } : {}),
     ...(kv.has("page") ? { page: kv.get("page") } : {}),
     ...(kv.has("url") ? { url: kv.get("url") } : {}),
+    ...(kv.has("runner") ? { runner: kv.get("runner") } : {}),
+    ...(kv.has("env") ? { env: kv.get("env") } : {}),
+    ...(kv.has("styles") ? { styles: kv.get("styles") } : {}),
   };
 }
 

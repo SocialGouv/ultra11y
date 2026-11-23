@@ -13,7 +13,11 @@ import { walk as walkRepo } from "./walk.js";
 // HTML + JSX/TSX + the HTML-shaped single-file component formats (Vue/Svelte/Astro
 // templates parse cleanly through the HTML path). Server templates (.twig/.erb/.hbs/
 // .liquid/.njk…) are opt-in via `--ext` since their extensions are ambiguous.
-const DEFAULT_EXT = new Set([".html", ".htm", ".xhtml", ".jsx", ".tsx", ".vue", ".svelte", ".astro"]);
+//
+// `.snap` is the Jest/Vitest snapshot file (src/parse/snap.ts): the markup a component's unit
+// test rendered, written down. A `.snap` in another format (or holding no markup) yields no
+// document, so admitting the extension costs nothing where there is none.
+const DEFAULT_EXT = new Set([".html", ".htm", ".xhtml", ".jsx", ".tsx", ".vue", ".svelte", ".astro", ".snap"]);
 
 // GRAPH-ONLY extensions: plain TS/JS modules are never markup, so they never enter
 // the AUDIT allowlist above (`DEFAULT_EXT`) — but a barrel (`components/index.ts`
@@ -54,11 +58,22 @@ const SKIP_DIR = new Set(["audits", ".ultra11y"]);
 // product code; re-admit by naming the file/dir directly, with an `--include` glob, or
 // `--no-default-excludes`. NOT in SKIP_DIR (which prunes the walk unconditionally) so
 // the opt-outs can still reach these files.
+//
+// UNIT-TEST SNAPSHOTS ARE THE EXCEPTION, and deliberately. A test FILE holds markup someone
+// typed — a fixture, often wrong on purpose. A snapshot holds what the PRODUCT's component
+// rendered when the test ran: the output a user meets, serialized by the test runner, not
+// written by a person. So a `.snap` file, and anything else under a `__snapshots__` directory
+// (Vitest's `toMatchFileSnapshot` files), is audited even inside `__tests__/`. A suite that
+// snapshots deliberately broken markup (an a11y linter's own tests) opts out the way any other
+// path does: `--exclude "**/__snapshots__/**"`.
 const TEST_DIR = new Set(["__tests__", "__mocks__", ".storybook"]);
 const TEST_FILE = /\.(test|spec|stories|story|cy)\.[^./]+$/i;
+const SNAPSHOT_DIR = "__snapshots__";
 export function isTestArtifact(rel: string): boolean {
+  const segs = rel.split("/");
+  if (/\.snap$/i.test(rel) || segs.slice(0, -1).includes(SNAPSHOT_DIR)) return false;
   if (TEST_FILE.test(rel)) return true;
-  return rel.split("/").some((seg) => TEST_DIR.has(seg));
+  return segs.some((seg) => TEST_DIR.has(seg));
 }
 
 // The glob dialect: `**` crosses `/`, `**/` makes the segment optional, `*` runs

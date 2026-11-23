@@ -66,6 +66,9 @@ export interface Doc {
   // rendered rules (src/rules/rendered.ts) simply do not fire there, and adding that tier
   // cannot change any pre-existing verdict.
   signals?: RenderSignals;
+  // Set on the FIRST document of a unit-test snapshot file (src/parse/snap.ts) — the one that
+  // counts the file — with how many of its entries were not markup and so were not audited.
+  unitSnapshot?: { skipped: number };
   roots: HNode[];
   elements: El[];
   byId: Map<string, El>;
@@ -86,6 +89,17 @@ export interface CaptureProvenance {
   // page identity into `Finding.page`, and with it the per-page criterion grid.
   page?: string;
   url?: string;
+  // Set when the Doc is one ENTRY of a unit-test snapshot file (`__snapshots__/*.snap`, see
+  // src/parse/snap.ts): the entry's key, e.g. "Button > renders the primary variant 1". Carried
+  // into `Finding.origin.snapshot` so a finding names the render it was raised on.
+  snapshot?: string;
+  // Who rendered a component capture and with what, when the producer says so — the
+  // `ultra11y/vitest` / `ultra11y/jest` helpers write `runner="vitest" env="jsdom" styles="none"`.
+  // `styles: "none"` is the honest half: a DOM implementation computes no style and lays out no
+  // box, so nothing about colour, contrast, reflow or focus visibility was measured here.
+  runner?: string;
+  env?: string;
+  styles?: string;
 }
 
 const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);

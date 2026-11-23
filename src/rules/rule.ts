@@ -87,6 +87,21 @@ export function selectorOf(el: El): string {
   return el.tag;
 }
 
+/** `Finding.origin` for a finding raised on a rendered capture — one definition for every rule
+ *  family (core, cross-file, pack). A unit-test snapshot entry also names the entry, so the
+ *  finding says which render it is. Empty for an ordinary source file. */
+export function captureOrigin(doc: Doc): Pick<Finding, "origin"> {
+  if (!doc.capture) return {};
+  return {
+    origin: {
+      capture: doc.file,
+      sourceFile: doc.capture.sourceFile,
+      component: doc.capture.component,
+      ...(doc.capture.snapshot ? { snapshot: doc.capture.snapshot } : {}),
+    },
+  };
+}
+
 export function toFinding(doc: Doc, ruleId: string, def: Severity, rf: RuleFinding, ruleAdvisory?: boolean): Finding {
   const entry = MSG_CATALOG[rf.msgId];
   if (!entry) {
@@ -116,7 +131,7 @@ export function toFinding(doc: Doc, ruleId: string, def: Severity, rf: RuleFindi
     ...(doc.kind === "sfc" || doc.kind === "jsx-lossy" || rf.preliminary ? { preliminary: true } : {}),
     // Capture findings are rendered ground truth (NOT preliminary): re-attribute them
     // to the source component recorded in the capture's provenance.
-    ...(doc.capture ? { origin: { capture: doc.file, sourceFile: doc.capture.sourceFile, component: doc.capture.component } } : {}),
+    ...captureOrigin(doc),
     // A PAGE snapshot's capture carries which page it is; stamp it so the per-page grid can
     // key on the finding directly (src/pages.ts). Component captures carry no page.
     ...(doc.capture?.page ? { page: doc.capture.page } : {}),

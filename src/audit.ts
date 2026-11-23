@@ -22,6 +22,7 @@ import type {
 import { VERSION, SCHEMA_VERSION } from "./types.js";
 import { allSC, allGuidelines } from "./wcag.js";
 import { parseSource } from "./parse/source.js";
+import { isUnitSnapshotFile, parseUnitSnapshotFile } from "./parse/snap.js";
 import { attachSignals, isSnapshotDom, PROBES_VERSION, snapshotPageId, WALK_DEPENDENT_SCS } from "./snapshot.js";
 import { attr, dynamicSpreadMayProvide, elementsByTag, type Doc, type CaptureProvenance } from "./parse/html.js";
 import { CAPTURES_DIR, computeCaptureCoverage, enrichCaptureOrigins, isUnderDir, readCaptureDir, capturesForSources } from "./capture.js";
@@ -400,6 +401,11 @@ interface Accum {
   sfcFiles: number; // .vue/.svelte/.astro source templates audited (verdicts preliminary)
   sfcExts: Set<string>; // which SFC extensions were seen
   captures: { file: string; provenance: CaptureProvenance }[]; // rendered capture files audited
+  // Unit-test snapshot files (`.snap`) read: files with at least one markup entry, entries
+  // audited, entries skipped as not markup. A data-only `.snap` contributes no doc, so it is
+  // neither here nor in `fileCount`: nothing was audited there. Kept apart from `captures`: an entry is one render
+  // inside a file, and a jsdom render is not the browser pass `captures` is read as.
+  unitSnapshots: { files: number; entries: number; skipped: number };
   langCounts: Map<string, number>; // <html lang> primary subtags seen, for repo-language detection
   // Success criteria the RENDERED tier measured, from the snapshots ingested in this run
   // (src/rules/rendered.ts renderedTestedScs). Stamped onto scope.scan.testedScs so the
@@ -501,6 +507,7 @@ function newAccum(): Accum {
     sfcFiles: 0,
     sfcExts: new Set(),
     captures: [],
+    unitSnapshots: { files: 0, entries: 0, skipped: 0 },
     langCounts: new Map(),
     renderedScs: new Set(),
     pageIds: new Set(),
@@ -738,12 +745,21 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
     const e = doc.file.toLowerCase().match(/\.[a-z]+$/)?.[0];
     if (e) acc.sfcExts.add(e);
   }
-  if (doc.capture) acc.captures.push({ file: doc.file, provenance: doc.capture });
+  // A unit-test snapshot entry: one render among the file's, so the FILE is counted once — on
+  // its first entry, which also carries how many entries the file held that were not markup.
+  const snapshotEntry = doc.capture?.snapshot !== undefined;
+  if (snapshotEntry) {
+    acc.unitSnapshots.entries++;
+    if (doc.unitSnapshot) {
+      acc.unitSnapshots.files++;
+      acc.unitSnapshots.skipped += doc.unitSnapshot.skipped;
+    }
+  } else if (doc.capture) acc.captures.push({ file: doc.file, provenance: doc.capture });
   const html = elementsByTag(doc, "html")[0];
   const htmlLang = html ? (attr(html, "lang") ?? attr(html, "xml:lang") ?? "").trim() : "";
   const subtag = htmlLang ? primarySubtag(htmlLang) : undefined;
   if (subtag) acc.langCounts.set(subtag, (acc.langCounts.get(subtag) ?? 0) + 1);
-  acc.fileCount++;
+  if (!snapshotEntry || doc.unitSnapshot) acc.fileCount++;
 }
 
 /** Fold one downloadable DOCUMENT. Its findings go to `documentFindings`, never to the criteria:
@@ -1139,6 +1155,7 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
             },
           }
         : {}),
+      ...(acc.unitSnapshots.entries ? { unitSnapshots: { ...acc.unitSnapshots } } : {}),
       ...(acc.langCounts.size ? { langs: [...acc.langCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([lang]) => lang) } : {}),
       // Coverage the RENDERED tier earned from the snapshots this run ingested. Same field the
       // live-browser merge stamps (`mergeDynamic`), because it is the same claim: these criteria
@@ -1328,6 +1345,15 @@ export function runAudit(opts: AuditInput): AuditResult {
         continue; // identical to an already-audited file — cite the canonical one
       }
       seen.add(h);
+    }
+    // A UNIT-TEST SNAPSHOT FILE is many documents, one per markup entry (src/parse/snap.ts), each
+    // a component render anchored to its own lines of the `.snap`. Counted as ONE audited file —
+    // `scope.files` counts files — and not at all when it holds no markup (a data-only snapshot,
+    // or another tool's `.snap`): nothing was audited there.
+    // The accounting lives in `foldDoc`, so `buildAudit` over the same docs agrees.
+    if (isUnitSnapshotFile(file)) {
+      for (const d of parseUnitSnapshotFile(content, file).docs) foldDoc(acc, d, graph);
+      continue;
     }
     // `--jsx` forces the JSX parser "for inputs of any extension" — meaning the user's OWN inputs.
     // Captures and page snapshots are appended to the input list by the CLI, not asked for, and
