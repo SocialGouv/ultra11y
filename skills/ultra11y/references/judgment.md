@@ -261,13 +261,11 @@ The standard is one pipeline choice, not an extra comparison pass. With `--stand
 the worklist, schemas, verdict ids and fold are RGAA-only; WCAG remains internal crosswalk
 plumbing and is not separately adjudicated.
 
-**In the GitHub Action.** `adjudicate: api` runs exactly the command above; `adjudicate: agent`
-hands the same worklist — plus `orchestrate --eco`'s runbook and the adjudicator contract — to
-a `claude-code-action` run, then folds it with `verify --apply`. The agent mode exists because
-`judge` rules from the harvested evidence alone (30 items per criterion, snippets truncated)
-while an agent can open the cited files, which is what *link purpose in context* really needs.
-Both skip themselves when `ANTHROPIC_API_KEY` is absent from the job environment, and both
-absorb their own failure rather than taking the audit down with them. See `references/ci.md`.
+**In CI.** iterion's `rgaa-audit` bot does not call `judge`: it hands the `verify --manual`
+worklist to read-only agents, which can open the cited files — `judge` rules from the harvested
+evidence alone (30 items per criterion, snippets truncated), while *link purpose in context*
+really needs the surrounding source — then folds their verdicts with `verify --apply`. See
+`references/ci.md`.
 
 `--max` bounds the spend and says out loud which criteria it did not submit. It now composes
 with `--apply`: the fold is per-verdict, so a bounded run lands what it covered and the rest stay

@@ -1,6 +1,7 @@
 # One paid, exhaustive path. The ordinary CI replays the committed ledger for free; this
 # manual workflow deliberately starts from an empty run ledger so it proves that the keyed
-# Claude transport, the composite Action and the browser tier still work.
+# Claude transport (`judge --runner claude`), the browser tier and the fold still work together
+# on a real crawl. It drives the engine CLI from the checkout, step by step.
 #
 # Cost controls are fixed rather than dispatch inputs: Haiku, low effort, batches of eight,
 # and up to three adjudication passes over residue only.
@@ -14,9 +15,9 @@
 # And size the ceiling above what one batch actually costs at the chosen model and effort:
 # below that, every batch aborts and is paid for anyway. $0.35 is calibrated for Haiku at `low`
 # on this nine-page fixture (measured: ~$2.9 for 13 batches). It is NOT a figure to copy onto a
-# bigger model, a higher effort, or a repository with more evidence per criterion. One composite
-# invocation performs one audit and one unbounded crawl; there is no baseline pass, refutation
-# fold or runner matrix duplicating that work.
+# bigger model, a higher effort, or a repository with more evidence per criterion. One audit
+# and one unbounded crawl; there is no baseline pass, refutation fold or runner matrix
+# duplicating that work.
 name: Adjudication (keyed)
 
 on:
@@ -36,7 +37,7 @@ jobs:
     timeout-minutes: 60
     env:
       # This repository uses the Claude subscription/OAuth transport. Do not expose an API key:
-      # it would make the billing route ambiguous and is unnecessary for `--runner cli`.
+      # it would make the billing route ambiguous and is unnecessary for `--runner claude`.
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v7
@@ -80,68 +81,76 @@ jobs:
             exit 1
           fi
 
-      # The Action owns the complete acquisition and first judgment phase: one source audit,
-      # one crawl with no page cap, then batched Haiku adjudication. FRESH_LEDGER does not exist
-      # before this step, so no committed verdict can make the paid path a no-op; accepted
-      # verdicts are nevertheless checkpointed there and survive in the final artifact.
-      - name: Audit, crawl and adjudicate once
-        uses: ./
-        with:
-          paths: tests/fixtures/realworld
-          standard: rgaa
-          lang: fr
-          since: ""
-          fail-on: ""
-          sarif: "false"
-          annotations: "false"
-          comment: "false"
-          report: "false"
-          html: "false"
-          evidence: "false"
-          # One compact status document is written both to the visible job summary and to the
-          # artifact. No HTML, screenshots, evidence crops or remediation/fix report.
-          pages-report: compact
-          artifact-name: adjudication-rgaa-haiku
-          artifact-retention-days: "14"
-          adjudicate: agent
-          adjudicate-runner: cli
-          adjudicate-grain: worklist
-          adjudicate-model: haiku
-          adjudicate-effort: low
-          # Per batch: ceil(106 / 8) × $0.35 = $4.90/pass, $14.70 for three nominal passes.
-          adjudicate-budget-usd: "0.35"
-          adjudicate-passes: "3"
-          ledger: audits/fresh-rgaa-ledger.json
-          crawl: http://127.0.0.1:8932/
-          crawl-max: "0"
-          runtime: local
-          require-rendered: "true"
-          # NOT `pages`, AND NOT `true` EITHER — this lane must not go red because a model
-          # said « I do not know ».
-          #
-          # An adjudicator that answers `manual / undecidable` on a judgment criterion is
-          # behaving correctly: several RGAA criteria ask whether information is carried by
-          # colour alone, whether a reading order survives without CSS, whether every button
-          # label is relevant in context. Measured on a real 37-page consumer repository, with
-          # everything else fixed: 102 of 106 criteria ruled, and four the model declined —
-          # not for want of a bigger model, and not for volume (a criterion with 516 evidence
-          # classes was ruled while one with 141 was not), but because clearing 2700
-          # occurrences it has not all read would be a lie.
-          #
-          # A job red on that motive teaches nobody anything. It does not say « something
-          # regressed », it says « these criteria need a human » — true before the run and
-          # after it. And a permanent red is worse than a green: it spends the one colour
-          # available for a real breakage, of which this lane has real ones to report.
-          #
-          # What still fails here, deliberately: a dead transport (the Action's own gate on
-          # « every adjudication pass failed operationally »), a rendering criterion left open
-          # with nothing rendered (`require-rendered`), and the nine-page shape asserted below.
-          # Facts about the RUN, never about the verdict.
-          #
-          # The residue stays NAMED either way — the job summary and the artifact both print
-          # « N criteria still to assess », so nothing is hidden by this.
-          require-decided: "false"
-          undecidable-file: .ultra11y/undecidable-rgaa.json
+      # A SCRATCH PREFIX, never the checkout: the engine installs nothing itself, and the
+      # adjudicator is the caller's dependency, not the repository's.
+      - name: Install the Claude Code CLI
+        run: |
+          prefix="$RUNNER_TEMP/a11y-adjudicator"
+          mkdir -p "$prefix"
+          npm i --no-save --prefix "$prefix" "@anthropic-ai/claude-code@2" > /dev/null
+          echo "ULTRA11Y_CLAUDE_BIN=$prefix/node_modules/.bin/claude" >> "$GITHUB_ENV"
+
+      # ONE AUDIT, ONE SCAN, no page cap. `scan --merge` audits the snapshots it just wrote and
+      # carries them into the adjudication worklist.
+      - name: Audit and crawl the fixture
+        run: |
+          node scripts/ultra11y.mjs audit tests/fixtures/realworld --standard rgaa --out audits --json > /dev/null
+          node scripts/ultra11y.mjs scan --crawl http://127.0.0.1:8932/ --max 0 --standard rgaa \
+            --runtime local --cwd "$PWD" --merge audits/audit-latest.json --out audits
+
+      # FRESH_LEDGER does not exist before this step, so no committed verdict can make the paid
+      # path a no-op; accepted verdicts are nevertheless recorded there and survive in the
+      # artifact. Up to three passes: `judge` re-derives the worklist from what is STILL manual
+      # on every call, so a later pass costs the residue — and invokes no model at all once
+      # there is none.
+      #
+      # What fails here, deliberately: a dead transport (every pass failed operationally), and
+      # the provider circuit breaker. Never a criterion the model declined — an adjudicator that
+      # answers `manual / undecidable` on a judgment criterion is behaving correctly, and the
+      # residue stays NAMED in the grid below.
+      - name: Adjudicate with Haiku (batched, bounded)
+        run: |
+          args=(--in audits/audit-latest.json --out audits --apply --runner claude --grain batch)
+          args+=(--standard rgaa --lang fr --model haiku --effort low --max-budget-usd 0.35)
+          args+=(--ledger audits/fresh-rgaa-ledger.json)
+          ok=1
+          for i in 1 2 3; do
+            pass_log="$RUNNER_TEMP/ultra11y-judge-$i.log"
+            set +e
+            node scripts/ultra11y.mjs judge "${args[@]}" 2>&1 | tee "$pass_log"
+            status=${PIPESTATUS[0]}
+            set -e
+            if [ "$status" = '0' ]; then
+              ok=0
+            else
+              echo "ultra11y: adjudication pass $i did not apply cleanly (exit $status)."
+            fi
+            # Another process would forget the prior 429/5xx and pay for the same bounded
+            # retries all over again: stop the outer loop on provider saturation.
+            if grep -Eqi 'provider unavailable|api status 429|http 429|rate.?limit|service unavailable|overload' "$pass_log"; then
+              echo "::error::provider unavailable — stopping before pass $((i + 1)) instead of repeating failed paid requests."
+              break
+            fi
+          done
+          if [ "$ok" != '0' ]; then
+            echo "::error::every adjudication pass failed operationally. The model did not adjudicate this audit."
+            exit 1
+          fi
+
+      - name: Per-page grid
+        run: |
+          node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --lang fr \
+            --json --out audits > /dev/null
+          node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --lang fr \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # NOT `--require-decided`: this lane must not go red because a model said « I do not
+      # know ». The instrument gate still holds — a rendering criterion left open with nothing
+      # rendered is a fact about the RUN, never about the verdict.
+      - name: The rendering criteria were given a browser
+        run: |
+          node scripts/ultra11y.mjs check --in audits/audit-latest.json \
+            --standard rgaa --require-rendered
 
       - name: Verify the nine-page shape
         run: |
@@ -158,3 +167,15 @@ jobs:
           }
           console.log(`verified ${grid.pages.length} pages × 106 RGAA criteria`);
           NODE
+
+      - name: Upload the adjudicated audit
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: adjudication-rgaa-haiku
+          path: |
+            audits/audit-latest.json
+            audits/pages.json
+            audits/fresh-rgaa-ledger.json
+          if-no-files-found: ignore
+          retention-days: 14

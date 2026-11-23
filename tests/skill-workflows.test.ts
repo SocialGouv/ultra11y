@@ -184,13 +184,24 @@ describe("ci.md teaches the CI output formats", () => {
     expect(t).toMatch(/advisory/i);
     expect(t).toMatch(/no\s+\*\*?physical\*\*?\s*location|no\*\*? physical location|\*\*no\*\* physical location/i);
   });
-  it("documents the shipped action, its permissions and the gate-runs-last ordering", () => {
-    expect(t).toContain("SocialGouv/ultra11y@");
-    // A moving branch would change under the reader with no version to blame.
-    expect(t).not.toMatch(/SocialGouv\/ultra11y@(main|master|HEAD)\b/);
-    expect(t).toContain("security-events: write");
-    expect(t).toMatch(/gate\*\* runs last|gate runs last/i);
-    expect(t).toContain("fail-on");
+  it("sends CI to iterion's rgaa-audit bot and ships no integration of its own", () => {
+    expect(t).toContain("https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit");
+    expect(t).not.toMatch(/uses:\s*SocialGouv\/ultra11y@/);
+    expect(t).not.toMatch(/gitlab-ci|GitLab CI/);
+  });
+  it("names the CLI commands the bot relies on as the stable contract", () => {
+    for (const command of [
+      "status --browser",
+      "scan --sample",
+      "verify --manual",
+      "verify --apply",
+      "check --report",
+      "--require-decided=pages",
+      "pages --in",
+      "tickets --in",
+    ]) {
+      expect(t, command).toContain(command);
+    }
   });
 
   it("documents the authenticated scan, since most page samples sit behind a login", () => {
@@ -259,26 +270,13 @@ describe("devtools.md teaches the dev side-car", () => {
   });
 });
 
-// Six hand-written `@v3` pins survived two majors, because nothing compared them to the
-// version being shipped. A reader who copies one gets an action frozen two majors back and
-// no error to explain it — the alias resolves, it is simply the wrong one. The generated
-// workflow (src/init.ts) derives its pin from VERSION and never drifted; only prose did, so
-// prose is what this gates.
-describe("the documented action pin tracks the version being shipped", () => {
+// The composite action is gone (#165): no doc may still tell a reader to `uses:` it, since a
+// pin would resolve to a release that no longer carries one — or to nothing at all.
+describe("no doc still points at the removed action", () => {
   const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-  const MAJOR = (JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string }).version.split(".")[0];
-  const DOCS = ["README.md", "skills/ultra11y/references/ci.md"];
-
-  for (const doc of DOCS) {
-    it(`pins only @v${MAJOR} in ${doc}`, () => {
-      const text = readFileSync(join(ROOT, doc), "utf8");
-      // Trailing punctuation belongs to the prose around the pin, not to the ref.
-      const pins = [...text.matchAll(/SocialGouv\/ultra11y@(\S+)/g)].map((m) => (m[1] ?? "").replace(/[.,`)]+$/, ""));
-      expect(pins.length, `${doc} documents no action pin at all`).toBeGreaterThan(0);
-      for (const pin of pins) {
-        // An exact `vX.Y.Z` is fine too — `init --ci` writes one — as long as it is this major.
-        expect(pin, `${doc} pins ${pin}, but this repo ships ${MAJOR}.x`).toMatch(new RegExp(`^v${MAJOR}(\\.\\d+\\.\\d+)?$`));
-      }
+  for (const doc of ["README.md", "skills/ultra11y/references/ci.md", "site/workflow.html"]) {
+    it(`has no \`uses: SocialGouv/ultra11y@\` in ${doc}`, () => {
+      expect(readFileSync(join(ROOT, doc), "utf8")).not.toMatch(/SocialGouv\/ultra11y@/);
     });
   }
 });

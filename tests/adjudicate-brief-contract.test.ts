@@ -2,8 +2,8 @@
 //
 // `writeAdjudication` émet trois surfaces : le gros `ADJUDICATE.md` (une session avec un shell),
 // le `ADJUDICATE.verdicts.json` mince (ce que l'adjudicateur ÉCRIT) et un petit
-// `adjudicate/<criteriaId>.md` par critère (ce qu'il LIT). Le prompt CI de `action.yml` lui
-// ordonne de ne lire que le troisième — et celui-ci était rendu avec `preamble: false`, ce qui
+// `adjudicate/<criteriaId>.md` par critère (ce qu'il LIT). Le prompt CI de l'ancienne GitHub Action lui
+// ordonnait de ne lire que le troisième — et celui-ci était rendu avec `preamble: false`, ce qui
 // retirait le vocabulaire des verdicts, la règle de citation, l'avertissement du référentiel et
 // la note « la page rendue est sur le disque ».
 //

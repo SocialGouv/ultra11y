@@ -154,7 +154,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
 | `references/harnesses.md` | Where this runs: Claude Code, Codex CLI, OpenCode 1.x and 2.x, and the AGENTS.md fallback |
 | `references/orchestrators.md` | Driving the engine from a workflow engine / non-GitHub CI: pinning, the six-step pipeline, exit codes, the ticket set as JSON for any tracker |
-| `references/ci.md` | `--format sarif\|github`: inline PR annotations, code scanning, job summary |
+| `references/ci.md` | CI: run iterion's `rgaa-audit` bot; the CLI contract it relies on; `--format sarif\|github` |
 | `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |
 | `references/e2e.md` | `render --e2e`: auditing a page during your Playwright/Cypress run |
 | `references/devtools.md` | `dev`: the live overlay while you build, and the per-page dashboard |
@@ -177,7 +177,8 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   them into the ledger, then publish the dated Markdown report, printable HTML and evidenced
   per-page dossiers and pass the `check` gates (`--require-decided=pages` included). Read
   **`references/full-audit.md`** and finish with its full deliverable set. **When in doubt
-  between this and the quick path, take this one.** The compact summary is the CI branch below.
+  between this and the quick path, take this one.** In CI, the same audit is iterion's
+  `rgaa-audit` bot (branch below).
 - **"Quick audit / first look / what does the engine find"** → `node scripts/ultra11y.mjs
   audit … --json`, then `report` (synthesis table + one **auditor conformance block** per NC
   criterion — same block `prd` and `tickets` use), then `check`; read
@@ -287,14 +288,11 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   declared. Then `sample check` lints the coverage and `scan --sample` scans and snapshots it.
   A client-rendered SPA exposes no routes in its served HTML — use a sitemap there; read
   **`references/dynamic.md`**.
-- **"Audit these URLs page by page, in CI"** → the shipped Action takes `urls`, `sitemap`,
-  `crawl` or `sample`, snapshots every page it visits and writes every criterion's status under
-  every page both in the job summary and in `audits/pages-status.md`. Use
-  `pages-report: compact` for that status-only package: the Markdown, page JSON, source audit
-  and verdict ledger only (no adjudication worklists, remediation report, HTML or crops),
-  or keep the default `true` for the detailed page dossiers too. Request a `pages`/`full` PR
-  comment when the same grid is wanted on the pull request; read
-  **`references/ci.md`**.
+- **"Audit in CI" / "audit these URLs page by page, in CI"** → ultra11y ships no CI
+  integration of its own: run iterion's **`rgaa-audit` bot**
+  (https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit). It installs this engine
+  pinned, renders the page sample, adjudicates and refutes with read-only agents, gates with
+  `check` and files one issue per non-conforming criterion. Read **`references/ci.md`**.
 - **"Nobody is here to rule on the judgment criteria"** → `judge --in audits/audit-latest.json
   --standard rgaa [--apply]` adjudicates them with a model, for a run with no coding agent in
   the loop (CI, an E2E run). It is a CALLER, not a second judge: same worklist,

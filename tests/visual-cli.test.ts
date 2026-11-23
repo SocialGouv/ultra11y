@@ -122,7 +122,7 @@ describe("pages --evidence", () => {
   });
 
   // `--evidence-max` is the artifact's size fuse: one design-system defect repeated across
-  // 38 routes is 38 pictures of the same thing. It shipped as an `action.yml` input read by
+  // 38 routes is 38 pictures of the same thing. It once shipped as a GitHub Action input read by
   // nothing, documented in references/ci.md as if it worked — so it is asserted here by its
   // EFFECT on the files, not by the flag being accepted.
   it("caps the crops it writes at --evidence-max", async () => {
@@ -214,7 +214,7 @@ describe("--html", () => {
     const files = readdirSync(join(root, "out", "audits"));
     expect(files).toContain("index.html");
     expect(files.some((f) => /^ultra11y-wcag-\d{4}-\d{2}-\d{2}\.html$/.test(f))).toBe(true);
-    // Stdout still carries ONE line, the Markdown path: action.yml reads it into an output.
+    // Stdout still carries ONE line, the Markdown path an orchestrator captures.
     expect(r.out.split("\n").filter(Boolean)).toHaveLength(1);
     expect(r.out).toMatch(/wcag-.*\.md$/);
   });

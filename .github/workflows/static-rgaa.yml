@@ -4,17 +4,19 @@ on:
   pull_request:
   workflow_dispatch: {}
 
-# No model credential is wired here. The pull-request token only reads the checkout and
-# edits ultra11y's own sticky digest; fork tokens are downgraded by GitHub and the comment
-# path degrades without affecting the audit artifact.
+# No model credential is wired here, and nothing is written back: the engine runs from the
+# checkout, annotates through workflow commands and uploads its audit as an artifact.
 permissions:
   contents: read
-  pull-requests: write
 
 concurrency:
   group: static-rgaa-${{ github.ref }}
   cancel-in-progress: true
 
+# This repository's own accessibility gate, driven through the engine CLI from the checkout.
+# Changed source files are audited first, then a real page is rendered, snapshotted and folded
+# into the same audit. No model is reached, so every judgment criterion stays honestly
+# « à évaluer »; the full adjudicated audit is iterion's rgaa-audit bot's job.
 jobs:
   static-rgaa:
     runs-on: ubuntu-latest
@@ -22,48 +24,83 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # `--since` needs the base ref
+
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: pnpm
 
-      - name: Cache the Chromium binary
+      - run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: ultra11y-static-${{ runner.os }}-${{ hashFiles('action.yml') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
-      # This is the production PR shape: changed source files are audited first, then a real
-      # page is measured and snapshotted. `adjudicate: none` is explicit, so this lane never
-      # reaches Claude and every judgment criterion stays honestly « à évaluer ».
-      - name: Audit changed code and the rendered fixture
-        uses: ./
+      # NO --with-deps, for the reason ci.yml gives: apt on the Azure runners can hang for 30min+.
+      - run: pnpm exec playwright install chromium
+
+      - name: Serve the rendered fixture
+        run: |
+          nohup python3 -m http.server 8933 --directory tests/fixtures/clean-landing > /tmp/fixture.log 2>&1 &
+          deadline=$(( SECONDS + 30 ))
+          until curl -sSf -o /dev/null http://127.0.0.1:8933/; do
+            if [ $SECONDS -ge $deadline ]; then
+              echo "::error::the fixture server never came up"
+              cat /tmp/fixture.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+      # On a pull request only the files the PR changed; on a manual dispatch the whole tree.
+      # Fixtures are non-conformant by design (the golden grids, bad.html…): a PR that edits one
+      # must not fail on the defects it exists to carry.
+      - name: Audit changed code
+        run: |
+          args=()
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then args+=(--since "origin/$GITHUB_BASE_REF"); else args+=(.); fi
+          node scripts/ultra11y.mjs audit "${args[@]}" --exclude 'tests/fixtures/**' \
+            --standard rgaa --out audits --json > /dev/null
+
+      - name: Render, snapshot and fold the fixture page
+        run: |
+          node scripts/ultra11y.mjs scan http://127.0.0.1:8933/ --runtime local --cwd "$PWD" \
+            --standard rgaa --merge audits/audit-latest.json --out audits
+
+      - name: Annotations and job summary
+        run: |
+          node scripts/ultra11y.mjs report --in audits/audit-latest.json \
+            --standard rgaa --lang fr --format github
+
+      - name: Per-page grid
+        run: |
+          node scripts/ultra11y.mjs pages --in audits/audit-latest.json \
+            --standard rgaa --lang fr --json --out audits > /dev/null
+
+      # The instrument gate: the criteria that need a browser were actually given one.
+      - name: The rendering criteria were given a browser
+        run: |
+          node scripts/ultra11y.mjs check --in audits/audit-latest.json \
+            --standard rgaa --require-rendered
+
+      # The gate runs LAST and re-audits the SOURCE, so the red/green is a pure function of the
+      # commit and every surface above has already been produced on a failing run.
+      - name: Gate — no blocking non-conformity introduced by the pull request
+        if: github.event_name == 'pull_request'
+        run: |
+          node scripts/ultra11y.mjs audit --since "origin/$GITHUB_BASE_REF" --exclude 'tests/fixtures/**' \
+            --standard rgaa --fail-on blocking
+
+      - name: Upload the audit
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          paths: .
-          # Fixtures are non-conformant by design (the golden grids, bad.html…): a PR that
-          # edits one must not fail on the defects it exists to carry.
-          exclude: "tests/fixtures/**"
-          standard: rgaa
-          since: auto
-          fail-on: ${{ github.event_name == 'pull_request' && 'blocking' || '' }}
-          sarif: "false"
-          annotations: "true"
-          comment: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
-          comment-kind: digest
-          artifact-name: ultra11y-pr-static-rgaa
-          report: "true"
-          html: "true"
-          pages-report: "true"
-          evidence: "true"
-          adjudicate: none
-          ledger: "false"
-          require-decided: "false"
-          require-rendered: "true"
-          browser: install
-          runtime: local
-          start: python3 -m http.server 8933 --directory tests/fixtures/clean-landing
-          wait-on: http://127.0.0.1:8933/
-          urls: http://127.0.0.1:8933/
-          snapshot: "true"
-          lang: fr
+          name: ultra11y-pr-static-rgaa
+          path: audits/
+          if-no-files-found: ignore
+          retention-days: 14

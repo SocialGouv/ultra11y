@@ -8,7 +8,7 @@
 // ÉDITION de `ADJUDICATE.verdicts.json`.
 //
 // Émettre le contrat fan-out là et dire « obéis-y VERBATIM » — ce que faisait le prompt de
-// `action.yml` — c'est donner à un petit modèle deux jeux d'instructions qui se contredisent sur
+// l'ancienne GitHub Action — c'est donner à un petit modèle deux jeux d'instructions qui se contredisent sur
 // le fichier à lire, le fichier à écrire, la sélection des items et le canal de sortie.
 import { describe, expect, it } from "vitest";
 

@@ -57,11 +57,10 @@ what it cost.
 | `--runner claude` | Claude subscription/OAuth, read-only tools, safe mode, real dollar ceiling, wall-clock kill and reported cost. `--runner cli` is its compatibility alias. |
 | `--runner codex` | ChatGPT subscription through local `codex exec`, ephemeral/read-only/offline with config, rules and hooks ignored. It inherits the account model unless pinned. Use `--timeout`/`--max`; Codex has no `--max-budget-usd`. |
 | `--grain batch` | Batches of 8 criteria amortise the system prompt and normative context. Verdicts are checkpointed during the run; each loop pass re-reads the updated audit and receives only the refused or unanswered residue. Use `criterion` only to diagnose a stubborn criterion. |
-| `--ledger` | A verdict paid for once becomes a claim re-verified on every push by `ledger-gate`. |
+| `--ledger` | A verdict paid for once becomes a claim re-verified on every later run (`verify --apply <ledger>`). |
 
 Not the others, and for concrete reasons: `--runner api` reports no cost, honours no timeout
-and enforces no dollar ceiling. `adjudicate-runner: action` refuses `--grain criterion`, needs `Write`
-on the audited repository, has no intra-pass resume, and does not run on `push` at all.
+and enforces no dollar ceiling.
 `verify --manual` in a session is free and has the best evidence of any of them — it stays the
 recourse for the hard residue, not the recipe.
 
