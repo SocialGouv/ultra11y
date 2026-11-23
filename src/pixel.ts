@@ -15,13 +15,7 @@
 //
 // The WRITE side (`encodePng` and the small raster ops beneath it) is the exact reciprocal,
 // and exists so a non-conformity can be shown rather than only cited: `src/evidence.ts` crops
-// the screenshot around the offending element and rings it. It is deliberately the same
-// encoder `scripts/build-extension-icons.mjs` uses, so the committed icons double as an
-// external PNG-conformance fixture that a decode/encode round-trip could never provide.
-//
-// THIS MODULE IS A LEAF, and must stay one: exactly one runtime import (`node:zlib`),
-// everything else `import type`. The icon script imports it directly through Node's
-// type-stripping, which a value import would break.
+// the screenshot around the offending element and rings it.
 import { deflateSync, inflateSync } from "node:zlib";
 import type { RGBA } from "./color.js";
 
@@ -280,8 +274,7 @@ function chunk(type: string, data: Buffer): Buffer {
  *
  *  Filter 0 and `level: 9` are not tuning knobs, they are the reproducibility contract: the
  *  bytes are then a function of the pixels alone, never of zlib's defaults or of a heuristic
- *  filter choice that could change between Node releases. `scripts/build-extension-icons.mjs`
- *  `--check` proves the committed icons still match, which only holds while this stays fixed.
+ *  filter choice that could change between Node releases.
  *
  *  Throws when `data` disagrees with the dimensions — that is a programming error upstream,
  *  never user input, and silently padding it would write a skewed image. */

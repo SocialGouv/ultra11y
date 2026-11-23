@@ -397,11 +397,6 @@ or malformed file is reported unreadable. See `skills/ultra11y/references/audit.
   a snapshot is a full document, the page-scoped rules finally run — RGAA **8.3** (`lang`),
   **8.5/8.6** (`title`) — and every finding carries both its page and the source file that
   rendered it. See `references/e2e.md` and `references/pages.md`.
-- **In your browser** — a Chrome extension (`extension/`) audits the page you are *looking at*:
-  a staging build, a page behind a login you walked through by hand. It is a client of the
-  side-car, not a second engine — it fetches the engine's own collector rather than copying it,
-  its manifest can reach **loopback and nothing else**, and the popup decides nothing the engine
-  did not. See `references/extension.md`.
 - **While you build** — `dev --next` writes a one-line Next overlay component and `dev` starts
   a loopback side-car: a floating panel lists the current page's non-conformities as you
   browse, each linking to its `file:line` in your editor, and `http://127.0.0.1:4111` shows
@@ -599,8 +594,8 @@ outside GitHub: `ultra11y affected --since origin/main --json`, your capture, th
 
 ### Optional model tier (`judge`) — for the runs with no agent in the loop
 
-Inside a coding agent the judgment criteria are the agent's to rule on. Outside one — CI, a
-browser extension, an E2E run — nobody does, so they stay « à évaluer ». `judge` adjudicates
+Inside a coding agent the judgment criteria are the agent's to rule on. Outside one — CI or an
+E2E run — nobody does, so they stay « à évaluer ». `judge` adjudicates
 them with a model, and is a **caller, not a second judge**: the worklist, the evidence and the
 prompt are `verify --manual`'s own, and the verdicts pass through the **same fail-closed gate**
 an agent's do. An unjustified `C`, an `NC` citing a line that does not resolve, a verdict for a
@@ -721,7 +716,6 @@ pnpm run check:build    # asserts every committed artefact is reproducible from 
 pnpm run build:wcag     # re-derive src/data/wcag.json from the vendored W3C source
 pnpm run build:pack:rgaa # re-build the RGAA pack from the vendored DINUM source
 pnpm run build:criteria  # regenerate skills/ultra11y/references/criteria.md
-pnpm run build:icons     # re-generate the browser extension's icons from their source
 ```
 
 Releases are cut automatically by **semantic-release** on push to `main` (GitHub release +

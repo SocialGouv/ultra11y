@@ -4205,7 +4205,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
 }
 
 // `judge` — adjudicate the manual criteria with a model, for the runs where no coding agent
-// is in the loop (CI, a browser extension, an E2E run).
+// is in the loop (CI, an E2E run).
 //
 // It is a CALLER, not a second judge. The worklist, its harvested evidence, the decision
 // protocol and the prompt all come from `verify --manual`'s own machinery, and the verdicts

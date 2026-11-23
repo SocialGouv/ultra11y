@@ -203,7 +203,6 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "devtools.md",
       "dynamic.md",
       "e2e.md",
-      "extension.md",
       "false-positives.md",
       "fix.md",
       "focus-and-logic.md",

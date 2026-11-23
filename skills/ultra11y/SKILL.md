@@ -141,7 +141,6 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |
 | `references/e2e.md` | `render --e2e`: auditing a page during your Playwright/Cypress run |
 | `references/devtools.md` | `dev`: the live overlay while you build, and the per-page dashboard |
-| `references/extension.md` | The browser extension: audit the page you are looking at, through the side-car |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/scale.md` | Focusing an audit on a large repository |
 | `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
@@ -275,7 +274,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   **`references/ci.md`**.
 - **"Nobody is here to rule on the judgment criteria"** → `judge --in audits/audit-latest.json
   --standard rgaa [--apply]` adjudicates them with a model, for a run with no coding agent in
-  the loop (CI, the extension, an E2E run). It is a CALLER, not a second judge: same worklist,
+  the loop (CI, an E2E run). It is a CALLER, not a second judge: same worklist,
   same evidence, same prompt, and the verdicts pass the same fail-closed gate yours do. Use
   `--runner api` with an API key, or `--runner claude|codex` with that local CLI's existing
   subscription login (`--runner cli` still aliases Claude). Inside an agent, prefer

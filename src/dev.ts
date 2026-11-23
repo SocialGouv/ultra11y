@@ -14,19 +14,17 @@
 // is permissive on purpose (the app runs on a different port) but the loopback bind is what
 // actually contains it.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { runAudit } from "./audit.js";
 import { resolveMessage } from "./messages.js";
 import { packCriteriaForFinding } from "./standards/derive.js";
-import { attributePages, derivePages, pageScopesFrom, pagesOf } from "./pages.js";
+import { attributePages, derivePages, pageScopesFrom } from "./pages.js";
 import { renderHtmlDocument } from "./html.js";
 import { crossGridBlocks, scoreboardBlocks } from "./html-report.js";
-import { applyAdjudication, buildAdjudicationWorklist, formatAdjudication } from "./adjudicate.js";
-import { BATCH_SIZE, applyRawVerdicts, judgeAll } from "./llm.js";
 import { readSnapshots, validateSnapshotMeta, writeSnapshot, type AxNode, type BoxDigest, type CssDigest, type StyleDigest } from "./snapshot.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
-import { SCHEMA_VERSION, VERSION, type AuditResult, type Finding, type Lang, type PageResult } from "./types.js";
+import type { AuditResult, Finding, Lang, PageResult } from "./types.js";
 import { COLLECT_SNAPSHOT } from "./snapshot.js";
 
 export const DEV_DEFAULT_PORT = 4111;
@@ -291,20 +289,11 @@ export function auditCollected(
     boxes?: BoxDigest;
     axtree?: AxNode;
     css?: CssDigest;
-    screenshot?: unknown;
-    screenshotFull?: unknown;
   },
 ): { ok: true; result: AuditResult } | { ok: false; error: string } {
   const v = validateSnapshotMeta(payload.meta);
   if (!v.ok || !v.meta) return { ok: false, error: v.issues.map((i) => `${i.path}: ${i.message}`).join("; ") };
   if (typeof payload.dom !== "string" || !payload.dom.trim()) return { ok: false, error: "dom is required" };
-  // The browser extension DOES capture a viewport screenshot and posts it here
-  // (extension/background.js). It used to be dropped on the floor: this signature had no
-  // `screenshot`, so `screen.png` was never written for an extension-collected page and the
-  // pixel tier — the only tier that can answer contrast over a gradient or an image — silently
-  // declined on every one of them. Typed `unknown` and checked, because a producer is
-  // untrusted input like any other field here.
-  const shot = typeof payload.screenshot === "string" && payload.screenshot.trim() ? payload.screenshot : undefined;
   const dir = writeSnapshot(root, {
     meta: v.meta,
     dom: payload.dom,
@@ -312,8 +301,6 @@ export function auditCollected(
     ...(payload.boxes ? { boxes: payload.boxes } : {}),
     ...(payload.axtree ? { axtree: payload.axtree } : {}),
     ...(payload.css ? { css: payload.css } : {}),
-    ...(shot ? { screenshotBase64: shot } : {}),
-    ...(typeof payload.screenshotFull === "string" && payload.screenshotFull.trim() ? { screenshotFullBase64: payload.screenshotFull } : {}),
   });
   return { ok: true, result: runAudit({ inputs: [join(dir, "dom.html")] }) };
 }
@@ -335,18 +322,6 @@ export function projectPages(root: string): { result: AuditResult | null; pages:
   attributePages(result, scope);
   foldRecordedAdjudication(root, result);
   return { result, pages: derivePages(result, scope) };
-}
-
-/** The per-page rates the judge endpoint reports back to the dashboard.
- *
- *  It goes through `attributePages` for the same reason every other consumer does: deriving pages
- *  from a result whose findings were never attributed gives each page an empty finding list, so
- *  every page reports as though nothing were wrong with it. The endpoint used to skip that step
- *  and reproduced the empty-grid artefact inside the dashboard alone. */
-function judgePages(result: AuditResult): { id: string; name: string; rate: number | null; decided: number; total: number }[] {
-  const scope = pagesOf(result);
-  attributePages(result, scope);
-  return derivePages(result, scope).map((p) => ({ id: p.id, name: p.name, rate: p.conformancePct, decided: p.decided, total: p.total }));
 }
 
 /** Carry a previously applied adjudication onto a freshly measured audit. Only the agent's
@@ -396,29 +371,6 @@ export function startDevServer(opts: DevOptions): Promise<DevServer> {
       res.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" }).end(overlayJs());
       return;
     }
-    // The browser extension asks for the collector rather than shipping a copy — same reason
-    // the overlay is served rather than pasted. One collector, one format, no drift.
-    if (url.pathname === "/collector.js") {
-      res
-        .writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" })
-        .end(`window.__ULTRA11Y_COLLECT__ = ${JSON.stringify(COLLECT_SNAPSHOT)};`);
-      return;
-    }
-    // A liveness probe, so a client can say "run `ultra11y dev`" instead of failing silently.
-    if (url.pathname === "/health") {
-      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(
-        JSON.stringify({
-          ok: true,
-          tool: "ultra11y",
-          version: VERSION,
-          port: opts.port,
-          standard: opts.standard,
-          lang: opts.lang,
-          pages: readSnapshots(opts.root).length,
-        }),
-      );
-      return;
-    }
     if (url.pathname === "/snapshot" && req.method === "POST") {
       void (async () => {
         try {
@@ -443,80 +395,6 @@ export function startDevServer(opts: DevOptions): Promise<DevServer> {
           res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ findings: r.result.findings }));
         } catch (e) {
           res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
-        }
-      })();
-      return;
-    }
-    // Adjudicate the judgment criteria of the pages captured so far, for a client with no
-    // coding agent behind it (the browser extension).
-    //
-    // THE KEY. It arrives per request in `x-anthropic-key`, is used for the call, and is
-    // never written to disk, never logged, never echoed back. A server-side
-    // ANTHROPIC_API_KEY is the fallback for someone who would rather keep it out of the
-    // browser entirely. With neither, the endpoint says so — it never quietly does nothing.
-    if (url.pathname === "/judge" && req.method === "POST") {
-      void (async () => {
-        const key = (req.headers["x-anthropic-key"] as string | undefined)?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
-        if (!key) {
-          res.writeHead(400, { "content-type": "application/json" }).end(
-            JSON.stringify({
-              error:
-                "No API key. Set it in the extension's options, or start `ultra11y dev` with ANTHROPIC_API_KEY in its environment. This is the only part of ultra11y that takes one.",
-            }),
-          );
-          return;
-        }
-        try {
-          const { result } = projectPages(opts.root);
-          if (!result) {
-            res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ error: "No page captured yet — audit a page first." }));
-            return;
-          }
-          const items = buildAdjudicationWorklist(result, { standard: opts.standard });
-          if (!items.length) {
-            res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ adjudicated: 0, remaining: 0, applied: false }));
-            return;
-          }
-          const batches: { items: typeof items; prompt: string }[] = [];
-          for (let i = 0; i < items.length; i += BATCH_SIZE) {
-            const slice = items.slice(i, i + BATCH_SIZE);
-            batches.push({ items: slice, prompt: formatAdjudication(slice, opts.lang, opts.standard) });
-          }
-          log(opts.lang === "fr" ? `ultra11y dev : adjudication de ${items.length} critère(s)…` : `ultra11y dev: adjudicating ${items.length} criterion(ia)…`);
-          const { verdicts, failures } = await judgeAll(batches, { apiKey: key });
-          applyRawVerdicts(items, verdicts);
-          // The SAME fail-closed gate an agent's verdicts pass. A model cannot assert a
-          // conformance here that it could not assert on the CLI.
-          const applied = applyAdjudication(result, {
-            tool: "ultra11y",
-            kind: "adjudication",
-            schemaVersion: SCHEMA_VERSION,
-            standard: opts.standard,
-            auditDate: result.date,
-            items,
-          });
-          // A gate-refused adjudication changes nothing on disk — that is the point of the
-          // gate. An ACCEPTED one is persisted, or the button would appear to work while
-          // leaving the dashboard, the report and the per-page grid exactly as they were.
-          let auditPath: string | undefined;
-          if (applied.ok) {
-            auditPath = join(opts.root, "audits", "audit-latest.json");
-            mkdirSync(dirname(auditPath), { recursive: true });
-            writeFileSync(auditPath, `${JSON.stringify(applied.audit, null, 2)}\n`);
-          }
-          res.writeHead(200, { "content-type": "application/json" }).end(
-            JSON.stringify({
-              adjudicated: verdicts.length,
-              total: items.length,
-              applied: applied.ok,
-              ...(auditPath ? { auditPath } : {}),
-              issues: applied.ok ? [] : applied.issues.slice(0, 20),
-              failures,
-              pages: applied.ok ? judgePages(applied.audit) : [],
-            }),
-          );
-        } catch (e) {
-          res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
         }
       })();
       return;

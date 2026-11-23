@@ -208,8 +208,8 @@ Look a defined term up on its own with `criteria --standard rgaa --glossary <ter
 Inside a coding agent, the judgment criteria are adjudicated by the agent: `verify --manual`
 builds the worklist, the agent rules, `verify --apply` folds the verdicts through the gate.
 
-Outside one — a CI job, a browser extension, an E2E run — nobody rules on them, so they stay
-« à évaluer » forever. Honest, and unusable on its own. `judge` closes that through an API or
+Outside one — a CI job, an E2E run — nobody rules on them, so they stay « à évaluer »
+forever. Honest, and unusable on its own. `judge` closes that through an API or
 an already authenticated local CLI:
 
 ```
