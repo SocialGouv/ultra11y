@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.58.4](https://github.com/SocialGouv/ultra11y/compare/v5.58.3...v5.58.4) (2026-11-23)
+
+
+### Bug Fixes
+
+* **rules:** a <head> rendered by an App Router layout with a metadata title is not a missing title ([#149](https://github.com/SocialGouv/ultra11y/issues/149)) ([#152](https://github.com/SocialGouv/ultra11y/issues/152)) ([d122c93](https://github.com/SocialGouv/ultra11y/commit/d122c938c99aada36a27e6a460b24abfd8441cdf))
+
 ## [5.58.3](https://github.com/SocialGouv/ultra11y/compare/v5.58.2...v5.58.3) (2026-11-09)
 
 
