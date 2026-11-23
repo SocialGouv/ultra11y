@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [5.58.5](https://github.com/SocialGouv/ultra11y/compare/v5.58.4...v5.58.5) (2026-11-23)
+
+
+### Bug Fixes
+
+* **pages:** each page's RGAA rate is conforming ÷ (conforming + non-conforming), with what stays open beside it ([#156](https://github.com/SocialGouv/ultra11y/issues/156)) ([#163](https://github.com/SocialGouv/ultra11y/issues/163)) ([9bf495f](https://github.com/SocialGouv/ultra11y/commit/9bf495f7e370839019c530e7de3a191ea33337b4))
+
 ## [5.58.4](https://github.com/SocialGouv/ultra11y/compare/v5.58.3...v5.58.4) (2026-11-23)
 
 
