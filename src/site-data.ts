@@ -263,8 +263,6 @@ export const fmt = (n: number): string => String(n).replace(/\B(?=(\d{3})+(?!\d)
 export const PAGES: { file: string; label: string }[] = [
   { file: "index.html", label: "Accueil" },
   { file: "installation.html", label: "Installer" },
-  { file: "principes.html", label: "Principes" },
-  { file: "workflow.html", label: "Intégration" },
   { file: "audit.html", label: "Audit" },
   { file: "couverture.html", label: "Couverture" },
   { file: "fiabilite.html", label: "Fiabilité" },

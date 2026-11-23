@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>L’audit complet : une boucle, pas une passe — ultra11y</title>
-<meta name="description" content="La boucle d’audit d’ultra11y : audit du code, scan de la page, arbitrage par l’IA, contre-vérification, correction, puis livrables RGAA.">
+<title>L’audit RGAA complet, ses livrables, les tests et la CI — ultra11y</title>
+<meta name="description" content="Comment l’agent mène un audit RGAA avec ultra11y : moteur statique, pages rendues, arbitrage de l’IA, contre-vérification, livrables et contrôle final. Puis la capture des pages depuis Playwright ou Cypress, et la CI avec le bot rgaa-audit d’iterion.">
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/site.js"></script>
 </head>
@@ -18,8 +18,6 @@
       <ul>
         <li><a href="index.html">Accueil</a></li>
         <li><a href="installation.html">Installer</a></li>
-        <li><a href="principes.html">Principes</a></li>
-        <li><a href="workflow.html">Intégration</a></li>
         <li><a href="audit.html" aria-current="page">Audit</a></li>
         <li><a href="couverture.html">Couverture</a></li>
         <li><a href="fiabilite.html">Fiabilité</a></li>
@@ -31,52 +29,20 @@
 </header>
 <!-- /gen:nav -->
 <main id="contenu">
-<h1>L’audit complet : une boucle, pas une passe</h1>
-<p class="lede">Un audit ultra11y ne s’arrête pas au premier rapport. Il enchaîne la lecture du code, la page affichée, le jugement de l’IA et sa contre-vérification, puis recommence après correction.</p>
+<h1>L’audit RGAA complet</h1>
+<p class="lede">Dans l’agent, une phrase suffit : « audite ce site selon le RGAA ». La skill <code>ultra11y</code> suit alors le même parcours sur Claude Code, Codex et OpenCode, décrit dans <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/full-audit.md"><code>references/full-audit.md</code></a>. Chaque étape est une commande du moteur ; l’agent tient le rôle de l’auditeur.</p>
 
-<figure class="dia lp" aria-labelledby="lp-cap">
-  <ol class="lp-steps">
-    <li class="bx bx-fill"><strong>1 · Audit</strong><span><code>audit --graph</code></span><span>le moteur lit le code</span></li>
-    <li class="bx bx-fill"><strong>2 · Rendu</strong><span><code>scan</code></span><span>vraie page, mesures</span></li>
-    <li class="bx bx-line"><strong>3 · Arbitrage IA</strong><span><code>verify --manual</code></span><span>une fiche par critère</span></li>
-    <li class="bx bx-pale"><strong>4 · Contre-vérification</strong><span><code>verify --report</code></span><span>C, NA et NC contestés</span></li>
-    <li class="bx bx-fill"><strong>5 · Correction</strong><span><code>fix --write</code></span><span>correctifs sûrs</span></li>
-  </ol>
-  <p class="lp-back"><span class="lp-head" aria-hidden="true"></span><span class="lp-label">ré-audit : retour à l’étape 1</span></p>
-  <p class="lp-exit"><span class="lp-head" aria-hidden="true"></span><span class="lp-label">quand tout est prouvé</span></p>
-  <ul class="lp-out">
-    <li class="bx bx-grey"><strong>Livrables</strong><span>rapport RGAA daté, backlog, tickets</span></li>
-    <li class="bx bx-pale"><strong><code>review-a11y</code></strong><span>en sous-agent, sur le diff corrigé</span></li>
-  </ul>
-  <figcaption id="lp-cap">La boucle d’audit en cinq étapes : le moteur lit le code (1), le scan mesure la vraie page (2), l’IA arbitre chaque critère non tranché (3), puis ses verdicts sont contestés (4). Ce qui reste non conforme est corrigé (5) et l’audit repart de l’étape 1. Quand tout est prouvé, la contre-vérification ouvre sur les livrables, puis le diff corrigé passe à <code>review-a11y</code>.</figcaption>
-</figure>
-<p>Chaque étape est détaillée dans la suite de cette page.</p>
+<h2>Le déroulé</h2>
+<ol class="steps">
+  <li><p><strong>Le périmètre.</strong> L’agent confirme le référentiel, la langue et l’<strong>échantillon de pages</strong> (accueil, contact, mentions légales, formulaires…), déclaré dans <code>.ultra11yrc.json</code>. Sans échantillon, il parcourt le site.</p></li>
+  <li><p><strong>Le code et les pages rendues.</strong> Le moteur statique lit le code source, puis chaque page est ouverte dans un vrai navigateur : axe-core, sondes de focus, zoom, espacement et survol. Sans cette capture, les critères de rendu restent « à évaluer » ; un rapport sans elle est signalé comme partiel.</p></li>
+  <li><p><strong>L’arbitrage.</strong> Pour chaque critère non tranché, l’agent reçoit une fiche : les preuves collectées et le texte officiel du critère, avec ses tests et son glossaire. Il conclut, preuve à l’appui. Sur un gros site, il répartit les fiches entre des sous-agents.</p></li>
+  <li><p><strong>La contre-vérification.</strong> Chaque verdict écrit est remis en cause, les « conforme » et « non applicable » compris. Ce qui ne tient pas est retiré ou repart « à évaluer ».</p></li>
+  <li><p><strong>Le registre et les livrables.</strong> Les verdicts acceptés sont consignés dans un registre, rejoué et revérifié au prochain audit. L’agent publie le rapport, la grille et les dossiers de pages.</p></li>
+  <li><p><strong>Le contrôle final.</strong> <code>check</code> valide chaque livrable et échoue tant qu’un critère reste « à évaluer » sans raison déclarée. Un contrôle en échec fait partie du résultat : il n’est jamais présenté comme un rapport complet.</p></li>
+</ol>
 
-<h2>1. Audit : le moteur lit le code</h2>
-<pre><code>npx ultra11y audit "src/**/*.{html,tsx}" --graph --standard rgaa --out audits --json</code></pre>
-<p>Le moteur applique ses <span data-gen="engine.staticRules">102</span> vérifications. <code>--graph</code> suit les imports entre fichiers : il repère par exemple un composant icône utilisé sans nom accessible dans un autre fichier. Le résultat, <code>audits/audit-latest.json</code>, classe chaque critère : C, NC, NA ou « à évaluer ».</p>
-<p>Un composant Vue, Svelte ou Astro est lu comme un modèle source : ce qu’injectent les <em lang="en">slots</em> et les liaisons dynamiques est invisible. Ses constats sont marqués « provisoires ». Pour un résultat fiable, on audite le HTML produit (voir <code>render --setup</code> dans <a href="commandes.html">Commandes</a>).</p>
-
-<h2>2. Rendu : scanner avant d’arbitrer</h2>
-<pre><code>npx ultra11y scan http://localhost:3000 --merge audits/audit-latest.json --out audits</code></pre>
-<p><code>scan</code> ouvre la page dans un vrai navigateur, y lance axe-core et des sondes : focus visible, zoom à 200 %, espacement du texte, contenu au survol, affichage à 320 pixels. Il garde une copie de la page et de ses mesures, puis les fusionne dans l’audit.</p>
-<p>Cette étape passe <strong>avant</strong> le jugement de l’IA. Aucune lecture du code ne dit si un contraste calculé est suffisant ou si la page tient au zoom. Sans scan, ces critères ne sont pas seulement ouverts : personne ne peut les trancher. Sur un essai documenté dans la skill, le scan d’une seule page a refermé près de la moitié des critères qui restaient à juger depuis le code seul.</p>
-<p>Un audit RGAA porte normalement sur un <strong>échantillon de pages</strong> représentatif (accueil, contact, mentions légales, formulaires…). <code>pages discover --crawl &lt;url&gt; --write</code> le construit, <code>sample check</code> vérifie qu’il couvre les types de pages attendus, <code>scan --sample</code> le parcourt. Un rapport RGAA sans scan est signalé comme <strong>partiel</strong>.</p>
-
-<h2>3. Arbitrage : l’IA juge</h2>
-<pre><code>npx ultra11y verify --manual --in audits/audit-latest.json --out audits</code></pre>
-<p>Cette commande écrit une liste de travail : une fiche par critère non tranché. Chaque fiche contient les preuves collectées par le moteur (toutes les alternatives d’images, les intitulés de liens et leur contexte, les étiquettes de champs, le plan des titres…) et le texte officiel du critère, avec ses tests et la méthodologie publiée par la DINUM.</p>
-<p>L’agent IA rend un verdict pour chaque fiche :</p>
-<ul>
-  <li><strong>Conforme</strong>, en citant les éléments vérifiés ;</li>
-  <li><strong>Non conforme</strong>, en désignant l’élément fautif ;</li>
-  <li><strong>Non applicable</strong>, avec une justification ;</li>
-  <li><strong>Manuel</strong>, avec la raison pour laquelle il ne peut pas trancher.</li>
-</ul>
-<pre><code>npx ultra11y verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json --out audits</code></pre>
-<p>Les verdicts sont réintégrés <strong>en mode fermé</strong> : un verdict incomplet, une citation introuvable ou un « conforme » sur des preuves partielles sont refusés, et le critère reste « à évaluer ».</p>
-
-<h2>4. Contre-vérification : l’IA se fait contredire</h2>
+<h2>L’IA juge, puis se fait contredire</h2>
 <figure class="dia trial" aria-labelledby="trial-cap">
   <section class="tr-col" aria-labelledby="trial-1">
     <h3 id="trial-1">1 · Arbitrage</h3>
@@ -91,51 +57,60 @@
   </section>
   <section class="tr-col" aria-labelledby="trial-2">
     <h3 id="trial-2">2 · Contre-vérification</h3>
-    <div class="bx bx-grey tr-head"><strong>Chaque verdict est mis en doute</strong><span>« la preuve établit-elle le critère, ou juste que l’élément existe ? » · <code>verify --report</code></span></div>
+    <div class="bx bx-grey tr-head"><strong>Chaque verdict est mis en doute</strong><span>« la preuve établit-elle le critère, ou juste que l’élément existe ? » · <code>verify --report</code></span></div>
     <ul class="tr-kids">
       <li class="bx bx-fill"><strong>Tenu</strong><span>le verdict reste</span></li>
       <li class="bx bx-line"><strong>NC réfutée</strong><span>retirée</span></li>
-      <li class="bx bx-line"><strong>C réfutée</strong><span>repart « à évaluer »</span></li>
-      <li class="bx bx-line"><strong>NA réfuté</strong><span>repart « à évaluer »</span></li>
+      <li class="bx bx-line"><strong>C réfutée</strong><span>repart « à évaluer »</span></li>
+      <li class="bx bx-line"><strong>NA réfuté</strong><span>repart « à évaluer »</span></li>
     </ul>
   </section>
-  <figcaption id="trial-cap">L’IA juge, puis se fait contredire. Premier temps : pour chaque critère non tranché, l’agent IA reçoit une fiche (preuves du code et texte officiel) et conclut conforme, non conforme, non applicable ou manuel. Second temps : chaque verdict est mis en doute. Il est tenu, ou réfuté : une non-conformité réfutée est retirée ; une conformité ou une non-applicabilité réfutée repart « à évaluer ».</figcaption>
+  <figcaption id="trial-cap">L’IA juge, puis se fait contredire. Premier temps : pour chaque critère non tranché, l’agent IA reçoit une fiche (preuves du code et texte officiel) et conclut conforme, non conforme, non applicable ou manuel. Second temps : chaque verdict est mis en doute. Il est tenu, ou réfuté : une non-conformité réfutée est retirée ; une conformité ou une non-applicabilité réfutée repart « à évaluer ».</figcaption>
 </figure>
-<pre><code>npx ultra11y verify --report audits/rgaa-AAAA-MM-JJ.md --in audits/audit-latest.json</code></pre>
-<p>Cette seconde liste attaque dans tous les sens. Une non-conformité que la page réelle dément est retirée. Un « conforme » est rejugé avec une question inversée : <em>la preuve établit-elle le critère, ou montre-t-elle seulement que l’élément existe ?</em></p>
-<p>Un « non applicable » passe le même examen. Il compte comme un succès dans le taux de conformité : sans contre-vérification, il fermerait un critère que personne n’a regardé. Un NA est donc rejugé même quand le moteur n’a rien collecté pour ce critère. Seul échappe à l’examen le NA que le moteur prouve lui-même, quand aucun élément concerné n’existe dans le périmètre audité. Et les consignes données à l’IA ne lui proposent plus le NA là où il n’a pas de sens : l’ordre de lecture, l’ordre du focus, l’espacement du texte, l’affichage sur petit écran et l’orientation s’appliquent toujours à une page qui a du contenu.</p>
 <div class="callout">
-  <p><strong>Exemple.</strong> L’IA met le critère 1.1 en conforme parce que l’image a <code>alt="logo"</code>. La contre-vérification réfute : cela prouve qu’une alternative existe, pas qu’elle décrit l’image. Le critère repart « à évaluer ». Il ne passe pas en non conforme : réfuter une conformité ne prouve rien contre le critère.</p>
+  <p><strong>Exemple.</strong> L’IA met le critère 1.1 en conforme parce que l’image a <code>alt="logo"</code>. La contre-vérification réfute : cela prouve qu’une alternative existe, pas qu’elle décrit l’image. Le critère repart « à évaluer ». Il ne passe pas en non conforme : réfuter une conformité ne prouve rien contre le critère.</p>
 </div>
 
-<h2>5. Correction, puis ré-audit</h2>
-<pre><code>npx ultra11y fix "src/**/*.html" --write --iterate</code></pre>
-<p><code>fix</code> applique seulement des corrections sûres et mécaniques (un attribut <code>lang</code> manquant, par exemple). Sans <code>--write</code>, il montre ce qu’il ferait. Le reste (alternatives, intitulés, structure) se corrige à la main, par ordre de gravité : bloquant, majeur, mineur. Puis on relance l’audit.</p>
-<p>La boucle s’arrête quand <code>check</code> et <code>verify --apply</code> passent, et que seuls restent des risques résiduels nommés.</p>
-
-<h2>Les garde-fous en résumé</h2>
-<div class="two">
-  <div class="card">
-    <h3><code>check</code></h3>
-    <p>Contrôle l’intégrité d’un rapport : aucune section manquante, aucun critère inventé, aucun NA sans justification, chaque élément cité existe. <code>check --require-decided</code> échoue tant qu’un critère reste « à évaluer » sans raison déclarée.</p>
-  </div>
-  <div class="card">
-    <h3><code>verify</code></h3>
-    <p>Confronte chaque affirmation à sa preuve. <code>--manual</code> produit les fiches d’arbitrage, <code>--report</code> la contre-vérification, <code>--apply</code> réintègre les verdicts sans jamais accepter un verdict non prouvé.</p>
-  </div>
-</div>
+<h2>Les quatre statuts d’un critère</h2>
+<dl class="card">
+  <dt><strong>C : conforme</strong></dt>
+  <dd>Le critère est respecté, et le verdict cite les éléments vérifiés.</dd>
+  <dt><strong>NC : non conforme</strong></dt>
+  <dd>Au moins un élément réel échoue à un test. La non-conformité pointe vers la page, le fichier et la ligne.</dd>
+  <dt><strong>NA : non applicable</strong></dt>
+  <dd>Le critère ne concerne pas la page (pas de vidéo, pas de tableau…). Le NA est justifié, et contre-vérifié comme un « conforme » : il compte comme un succès dans le taux.</dd>
+  <dt><strong>À évaluer</strong></dt>
+  <dd>Personne n’a encore tranché. Ni échec ni réussite : un travail restant, affiché comme tel. Le moteur ne conclut jamais « conforme » sur un silence, sauf pour <span data-gen="rgaa.deterministic">8.3 et 8.5</span> (langue et titre de la page).</dd>
+</dl>
 
 <h2>Les livrables</h2>
 <ul>
-  <li><strong>Le rapport RGAA daté</strong> (<code>report --standard rgaa</code>) : il s’ouvre sur le résumé (niveau atteint, ce qu’il faut corriger), suivi d’un sommaire qui mène à chaque partie : synthèse par thématique, non-conformités par priorité, grille par page, critères à évaluer ; puis une annexe technique avec les occurrences fichier et ligne. Il existe aussi en HTML imprimable (<code>--html</code>).</li>
-  <li><strong>La grille page par page</strong> (<code>pages --standard rgaa</code>) : une ligne par critère, une colonne par page, ou un dossier par page avec sa capture d’écran.</li>
-  <li><strong>Le backlog</strong> (<code>prd</code>) : les mêmes blocs que le rapport, présentés comme une liste de travaux avec l’effort estimé.</li>
-  <li><strong>Les tickets</strong> (<code>tickets</code>) : GitHub, GitLab ou Jira, un ticket par critère, par page ou par fichier. Toujours essayer d’abord avec <code>--dry-run</code>.</li>
+  <li><strong>Le rapport RGAA daté</strong>, en Markdown et en HTML imprimable : résumé, synthèse par thématique, non-conformités par priorité, critères à évaluer, puis une annexe technique avec les occurrences.</li>
+  <li><strong>La grille page par page</strong> : une ligne par critère, une colonne par page, le taux de conformité de chaque page (conformes ÷ décidés) et le taux moyen de l’échantillon.</li>
+  <li><strong>Un dossier par page</strong> : sa capture d’écran, son taux, chacun des <span data-gen="rgaa.criteria">106</span> critères avec son statut, et chaque non-conformité illustrée.</li>
+  <li><strong>Sur demande, un <em lang="en">backlog</em> et des tickets</strong> GitHub, GitLab ou Jira : un ticket par critère, par page ou par fichier. Relancer ne crée pas de doublon.</li>
 </ul>
-<p>Chaque non-conformité y est décrite par le même <strong>bloc d’auditeur</strong> : thématique, critère et intitulé officiel, test, constat, état attendu, méthode de vérification, occurrences. Le rapport, le backlog et les tickets ne peuvent donc pas se contredire.</p>
+<p>Chaque non-conformité y est décrite par le même <strong>bloc d’auditeur</strong> : thématique, critère et intitulé officiel, test, constat, état attendu, méthode de vérification, occurrences. Le rapport, les dossiers et les tickets ne peuvent donc pas se contredire.</p>
 
-<h2>Dernière étape : la revue du changement</h2>
-<p>Une fois les corrections faites, la skill <code>ultra11y</code> confie le diff à <code>review-a11y</code>, dans un sous-agent. Un sous-agent part d’un contexte vierge : la revue n’est pas influencée par l’audit qui vient de tourner, de la même façon que <code>verify</code> rejuge les verdicts au lieu de leur faire confiance.</p>
+<h2 id="tests">Capturer les pages depuis vos tests</h2>
+<p>Le navigateur de l’audit ouvre les pages sans l’état que vos tests construisent : pas de session connectée, pas de formulaire rempli, pas de fenêtre modale ouverte. La bibliothèque audite au contraire la page <strong>telle que votre test l’a laissée</strong>, et l’enregistre dans <code>.ultra11y/pages/&lt;id&gt;/</code> : l’audit complet la reprend ensuite, hors ligne. Elle s’installe avec <code>npm i -D ultra11y</code>.</p>
+<pre><code>import { test } from "ultra11y/playwright";
+
+test("tableau de bord", async ({ page, ultra11y }) => {
+  await page.goto("/tableau-de-bord");
+  await ultra11y({ as: "tableau-de-bord" });   // ou checkA11y(page, { as: "tableau-de-bord" })
+});</code></pre>
+<p>Avec Cypress, deux branchements : <code>ultra11y(on)</code> dans <code>setupNodeEvents</code> (importé depuis <code>ultra11y/cypress/plugin</code>) et <code>import "ultra11y/cypress"</code> dans le fichier de support. Puis, dans un test :</p>
+<pre><code>cy.visit("/");
+cy.ultra11y({ as: "accueil" });</code></pre>
+<p><code>sweepSample()</code> parcourt d’un coup l’échantillon déclaré dans <code>.ultra11yrc.json</code>. <code>failOn: false</code> enregistre sans faire échouer le test : pratique pour démarrer sur un projet qui a déjà une dette. Toutes les options : <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/e2e.md"><code>references/e2e.md</code></a>.</p>
+
+<h2 id="ci">En CI : le bot <code>rgaa-audit</code> d’iterion</h2>
+<p>ultra11y ne fournit pas d’intégration CI à lui seul. En CI, l’audit passe par le <a href="https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit">bot <code>rgaa-audit</code> d’iterion</a> : il installe le moteur à une version épinglée, rend les pages de l’échantillon, fait arbitrer les critères de jugement par des agents en lecture seule, soumet chaque verdict à un second lecteur, contrôle le résultat avec <code>check</code>, puis ouvre un ticket par critère non conforme.</p>
+<p>Le moteur seul, sans agent, ne fait pas un audit : les critères de jugement resteraient « à évaluer ». La mise en place est décrite dans le README du bot ; le contrat entre les deux est dans <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/ci.md"><code>references/ci.md</code></a>.</p>
+
+<h2>Avant chaque commit : la revue du changement</h2>
+<p>Pendant le développement, la skill <code>review-a11y</code> relit le diff avant chaque commit, push ou <em lang="en">pull request</em>, grâce au hook installé avec l’extension (voir <a href="installation.html#hook">Installer</a>). Après un audit, la skill <code>ultra11y</code> lui confie aussi le diff corrigé, dans un sous-agent qui part d’un contexte vierge.</p>
 </main>
 <!-- gen:footer -->
 <footer class="site-footer">

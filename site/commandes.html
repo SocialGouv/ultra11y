@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Commandes : référence condensée — ultra11y</title>
-<meta name="description" content="Référence condensée de la ligne de commande ultra11y : audit, scan, verify, check, report, prd, tickets, fix, init, et liens vers la documentation détaillée.">
+<title>Commandes : les quelques commandes utiles à la main — ultra11y</title>
+<meta name="description" content="Les commandes d’ultra11y qu’une personne peut lancer elle-même : audit, scan, report, pages, check, tickets, criteria, status et install, et les fichiers de référence de la skill.">
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/site.js"></script>
 </head>
@@ -18,8 +18,6 @@
       <ul>
         <li><a href="index.html">Accueil</a></li>
         <li><a href="installation.html">Installer</a></li>
-        <li><a href="principes.html">Principes</a></li>
-        <li><a href="workflow.html">Intégration</a></li>
         <li><a href="audit.html">Audit</a></li>
         <li><a href="couverture.html">Couverture</a></li>
         <li><a href="fiabilite.html">Fiabilité</a></li>
@@ -31,82 +29,40 @@
 </header>
 <!-- /gen:nav -->
 <main id="contenu">
-<h1>Commandes : la référence condensée</h1>
-<p class="lede">Toutes les commandes s’utilisent avec <code>npx ultra11y &lt;commande&gt;</code>, sans installation. La liste complète des options est dans <code>npx ultra11y --help</code>.</p>
-<p>Deux options valent pour presque toutes les commandes : <code>--standard rgaa</code> fait parler toute la sortie en critères RGAA, et <code>--lang fr</code> choisit la langue des messages. <code>.ultra11yrc.json</code> peut fixer ces valeurs par défaut pour le dépôt.</p>
+<h1>Commandes</h1>
+<p class="lede">Le moteur en ligne de commande sert surtout à l’agent et au bot iterion. Voici les quelques commandes utiles à la main, à lancer avec <code>npx ultra11y &lt;commande&gt;</code>. La liste complète des options : <code>npx ultra11y --help</code>.</p>
 
-<h2>Auditer</h2>
-<dl class="card">
-  <dt><code>audit &lt;fichiers…&gt;</code></dt>
-  <dd>Lance le moteur statique. <code>--graph</code> suit les imports entre fichiers, <code>--out audits --json</code> enregistre <code>audits/audit-latest.json</code>. <code>audit - &lt; page.html</code> lit l’entrée standard.</dd>
-  <dt><code>audit --staged</code> · <code>--changed</code> · <code>--since &lt;ref&gt;</code></dt>
-  <dd>N’audite que les fichiers indexés, le diff de travail ou la branche depuis une référence git. <code>--fail-on blocking|major|minor</code> fixe le seuil d’échec.</dd>
-  <dt><code>scan &lt;url&gt; --merge audits/audit-latest.json</code></dt>
-  <dd>Ouvre la page dans un navigateur, lance axe-core et les sondes, fusionne le résultat. <code>--sitemap</code>, <code>--crawl</code> ou <code>--sample</code> pour plusieurs pages ; <code>--storage-state</code> pour une page derrière une connexion.</dd>
-  <dt><code>pages discover --crawl &lt;url&gt; --write</code> · <code>sample check</code></dt>
-  <dd>Construit l’échantillon de pages dans <code>.ultra11yrc.json</code>, puis vérifie qu’il couvre les types de pages attendus par le RGAA.</dd>
-  <dt><code>render --setup</code></dt>
-  <dd>Capture le HTML produit par vos composants pendant les tests. Pour une page entière pendant vos tests Playwright ou Cypress : <code>ultra11y/playwright</code> et <code>ultra11y/cypress</code>.</dd>
-</dl>
-
-<h2>Juger et vérifier</h2>
-<dl class="card">
-  <dt><code>verify --manual --in audits/audit-latest.json --out audits</code></dt>
-  <dd>Écrit les fiches d’arbitrage, une par critère non tranché, pour l’agent IA.</dd>
-  <dt><code>verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json --out audits</code></dt>
-  <dd>Réintègre les verdicts, en refusant tout verdict non prouvé.</dd>
-  <dt><code>verify --report &lt;rapport.md&gt; --in audits/audit-latest.json</code></dt>
-  <dd>Contre-vérifie les non-conformités et les conformités déjà prononcées.</dd>
-  <dt><code>check --report &lt;rapport.md&gt;</code> · <code>check --in &lt;audit.json&gt; --require-decided</code></dt>
-  <dd>Contrôle l’intégrité d’un rapport, ou échoue tant qu’un critère reste « à évaluer » sans raison déclarée.</dd>
-  <dt><code>orchestrate --run audits</code></dt>
-  <dd>Répartit les fiches d’arbitrage et de contre-vérification entre plusieurs sous-agents. Les verdicts reviennent par <code>verify --apply</code>, avec les mêmes garde-fous.</dd>
-  <dt><code>criteria --standard rgaa 8.3</code></dt>
-  <dd>Affiche le texte officiel d’un critère, ses tests numérotés et les définitions du glossaire. <code>criteria --standard rgaa --plan</code> donne le plan de travail : ce que le moteur tranche, ce qui demande une page affichée ou un navigateur, ce qui revient au jugement.</dd>
-</dl>
-
-<h2>Produire les livrables</h2>
-<dl class="card">
-  <dt><code>report --in audits/audit-latest.json --standard rgaa --out audits</code></dt>
-  <dd>Le rapport daté et son annexe technique. <code>--html</code> pour une version imprimable.</dd>
-  <dt><code>pages --in audits/audit-latest.json --standard rgaa</code></dt>
-  <dd>La grille critère par page. <code>--format report --split page</code> pour un dossier par page.</dd>
-  <dt><code>prd --in audits/audit-latest.json</code></dt>
-  <dd>Le backlog de corrections.</dd>
-  <dt><code>tickets --in audits/audit-latest.json --dry-run</code></dt>
-  <dd>Prépare les tickets GitHub, GitLab ou Jira. Sans <code>--dry-run</code>, les crée. Relancer ne crée pas de doublon.</dd>
-</dl>
-
-<h2>Corriger et brancher</h2>
-<dl class="card">
-  <dt><code>fix &lt;fichiers…&gt; --write --iterate</code></dt>
-  <dd>Applique les corrections sûres. Sans <code>--write</code>, montre seulement ce qui changerait.</dd>
-  <dt><code>init --hook</code></dt>
-  <dd>Installe un hook git avant commit, qui audite exactement les fichiers indexés. La CI passe par le bot <code>rgaa-audit</code> d’iterion.</dd>
-  <dt><code>install --all</code> · <code>status</code></dt>
-  <dd>Branche la relecture automatique dans les agents détectés, et dit ce qui est réellement actif.</dd>
-  <dt><code>pack check &lt;pack.json&gt;</code></dt>
-  <dd>Valide un paquet de référentiel (un autre pays, par exemple) avant de l’utiliser.</dd>
-</dl>
+<div class="scroll" role="region" aria-label="Commandes utiles à la main" tabindex="0">
+<table>
+  <caption class="sr-only">Les commandes d’ultra11y qu’une personne peut lancer elle-même</caption>
+  <thead><tr><th scope="col">Commande</th><th scope="col">Rôle</th></tr></thead>
+  <tbody>
+    <tr><th scope="row"><code>audit &lt;chemins&gt; --standard rgaa --out audits --json</code></th><td>Passe le moteur statique sur le code et écrit <code>audits/audit-latest.json</code>.</td></tr>
+    <tr><th scope="row"><code>scan &lt;url&gt; --merge audits/audit-latest.json</code></th><td>Ouvre une page dans un navigateur, la mesure et fusionne le résultat. <code>--sample</code> parcourt l’échantillon déclaré.</td></tr>
+    <tr><th scope="row"><code>report --in audits/audit-latest.json --standard rgaa --html</code></th><td>Écrit le rapport RGAA daté, en Markdown et en HTML imprimable.</td></tr>
+    <tr><th scope="row"><code>pages --in audits/audit-latest.json --format report --split page</code></th><td>Écrit un dossier par page, avec sa capture d’écran.</td></tr>
+    <tr><th scope="row"><code>check --report &lt;rapport.md&gt;</code></th><td>Contrôle l’intégrité d’un rapport : aucun critère inventé, aucun NA sans justification.</td></tr>
+    <tr><th scope="row"><code>tickets --in audits/audit-latest.json --dry-run</code></th><td>Prépare les tickets GitHub, GitLab ou Jira. Sans <code>--dry-run</code>, les crée.</td></tr>
+    <tr><th scope="row"><code>criteria --standard rgaa 8.3</code></th><td>Affiche le texte officiel d’un critère, ses tests et les définitions du glossaire.</td></tr>
+    <tr><th scope="row"><code>install --all</code> · <code>status</code></th><td>Branche la relecture automatique dans les agents détectés, et dit ce qui est réellement actif.</td></tr>
+  </tbody>
+</table>
+</div>
+<p><code>--standard rgaa</code> peut être fixé une fois pour toutes dans <code>.ultra11yrc.json</code> : <code>{ "standard": "rgaa" }</code>. Un audit lancé à la main n’est qu’un premier aperçu : sans arbitrage ni contre-vérification, la plupart des critères restent « à évaluer ». L’audit complet passe par l’agent (voir <a href="audit.html">Audit</a>).</p>
 
 <h2>Documentation détaillée</h2>
-<p>Les fichiers de référence de la skill, sur GitHub (en anglais) :</p>
+<p>Les fichiers de référence de la skill, sur GitHub (en anglais) :</p>
 <ul>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/full-audit.md"><code>full-audit.md</code></a> : l’audit complet, le même sur Claude Code, Codex et OpenCode</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/audit.md"><code>audit.md</code></a> : l’audit rapide et l’échantillon de pages</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/runbook.md"><code>runbook.md</code></a> : la recette fiable pour un audit complet</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/adjudication.md"><code>adjudication.md</code></a> : comment trancher chaque critère de jugement</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/judgment.md"><code>judgment.md</code></a> : les fiches d’arbitrage et de contre-vérification</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/verify.md"><code>verify.md</code></a> : les garde-fous <code>check</code> et <code>verify</code></li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/methodology.md"><code>methodology.md</code></a> : statuts, taux, gravités, format du rapport</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/dynamic.md"><code>dynamic.md</code></a> : le scan navigateur et ses sondes</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/pages.md"><code>pages.md</code></a> : copies de pages et grille page par page</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/ci.md"><code>ci.md</code></a> : la CI avec le bot <code>rgaa-audit</code> d’iterion, et le contrat de ligne de commande qu’il utilise</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/e2e.md"><code>e2e.md</code></a> : Playwright et Cypress</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/rgaa-automation.md"><code>rgaa-automation.md</code></a> : la matrice des <span data-gen="rgaa.tests.total">258</span> tests RGAA (générée)</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/act.md"><code>act.md</code></a> : le score sur le corpus W3C ACT, règle par règle (généré)</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/standards.md"><code>standards.md</code></a> et <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/packs.md"><code>packs.md</code></a> : référentiels nationaux et paquets</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/review-a11y/SKILL.md"><code>review-a11y/SKILL.md</code></a> : la skill de revue de code</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/full-audit.md"><code>full-audit.md</code></a> : l’audit complet, le même sur Claude Code, Codex et OpenCode</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/judgment.md"><code>judgment.md</code></a> : les fiches d’arbitrage et de contre-vérification</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/verify.md"><code>verify.md</code></a> : les garde-fous <code>check</code> et <code>verify</code></li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/methodology.md"><code>methodology.md</code></a> : statuts, taux, gravités, format du rapport</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/pages.md"><code>pages.md</code></a> : copies de pages et grille page par page</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/e2e.md"><code>e2e.md</code></a> : Playwright et Cypress</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/ci.md"><code>ci.md</code></a> : la CI avec le bot <code>rgaa-audit</code> d’iterion</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/harnesses.md"><code>harnesses.md</code></a> : les différences entre Claude Code, Codex et OpenCode</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/rgaa-automation.md"><code>rgaa-automation.md</code></a> : la matrice des <span data-gen="rgaa.tests.total">258</span> tests RGAA (générée)</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/packs.md"><code>packs.md</code></a> : ajouter le référentiel d’un autre pays</li>
 </ul>
 </main>
 <!-- gen:footer -->
