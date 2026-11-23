@@ -1,5 +1,5 @@
 // src/integrations/unit.ts
-import { basename, isAbsolute, relative } from "path";
+import { isAbsolute, relative } from "path";
 
 // src/integrations/core.ts
 import { spawnSync } from "child_process";
@@ -111,7 +111,7 @@ function capturePayload(target, opts, runner, ctx = currentTest()) {
   const title = ctx.currentTestName;
   let id = opts.as;
   if (!id) {
-    const stem = test ? basename(test).replace(/\.(test|spec)\.[cm]?[jt]sx?$|\.[cm]?[jt]sx?$/i, "") : "";
+    const stem = test ? test.replace(/\.(test|spec)\.[cm]?[jt]sx?$|\.[cm]?[jt]sx?$/i, "") : "";
     const base = idSlug([stem, title].filter(Boolean).join(" ")) || "capture";
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);

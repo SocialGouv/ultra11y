@@ -20,12 +20,12 @@
 // stay off, and it never enters the per-page grid. And jsdom/happy-dom compute no style and lay
 // out no box: the engine marks the capture `styles="none"`, and colour, contrast, reflow and
 // focus visibility stay « à évaluer ». Those are measured in a browser — `ultra11y/playwright`.
-import { basename, isAbsolute, relative } from "node:path";
+import { isAbsolute, relative } from "node:path";
 import { type AuditLike, type ComponentCapturePayload, type FindingLike, auditCapture, failingFindings, formatFailure } from "./core.js";
 
 /** Options of `checkA11y` and `toBeAccessible`. */
 export interface UnitCheckOptions {
-  /** Capture id — the file stem under `.ultra11y/captures/`. Defaults to the test file and title. */
+  /** Capture id — the file stem under `.ultra11y/captures/`. Defaults to the test file's repo-relative path and title. */
   as?: string;
   /** Human name for the capture. Defaults to the current test's title. */
   name?: string;
@@ -113,7 +113,7 @@ function currentTest(): TestContext {
   }
 }
 
-/** A file-safe id from a test file stem and title — accent-folded like a page id. A long
+/** A file-safe id from a test file's repo-relative path (extension dropped) and title — accent-folded like a page id. A long
  *  `describe` chain is cut and suffixed with a hash of the whole, so it stays a usable file name
  *  and two titles sharing a prefix never share a capture (nor depend on which ran first). */
 function idSlug(s: string): string {
@@ -147,7 +147,9 @@ export function capturePayload(target: Renderable, opts: UnitCheckOptions, runne
   const title = ctx.currentTestName;
   let id = opts.as;
   if (!id) {
-    const stem = test ? basename(test).replace(/\.(test|spec)\.[cm]?[jt]sx?$|\.[cm]?[jt]sx?$/i, "") : "";
+    // The test file's whole repo-relative path, not its basename: `src/a/index.test.tsx` and
+    // `src/b/index.test.tsx` running a same-titled test must never write the same capture.
+    const stem = test ? test.replace(/\.(test|spec)\.[cm]?[jt]sx?$|\.[cm]?[jt]sx?$/i, "") : "";
     const base = idSlug([stem, title].filter(Boolean).join(" ")) || "capture";
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);

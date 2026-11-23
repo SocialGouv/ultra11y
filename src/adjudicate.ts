@@ -27,7 +27,7 @@ import { SCHEMA_VERSION } from "./types.js";
 import { discover } from "./discover.js";
 import { readText } from "./util.js";
 import { parseSource } from "./parse/source.js";
-import { isUnitSnapshotFile, parseUnitSnapshotFile } from "./parse/snap.js";
+import { isUnitSnapshotFile, parseInlineSnapshotFile, parseUnitSnapshotFile } from "./parse/snap.js";
 import { isPdfPath, loadPdfDoc } from "./documents.js";
 import { runVeraPdf } from "./verapdf.js";
 import { attachSignals, PAGES_DIR, snapshotPageId } from "./snapshot.js";
@@ -262,8 +262,16 @@ export function adjudicationContract(): AdjudicationContract {
 function docsForAudit(audit: AuditResult, cwd?: string): Doc[] {
   const inputs = audit.scope.inputs.filter((i) => i !== "-" && i !== "<stdin>");
   if (!inputs.length) return [];
-  const { files } = discover(inputs, {});
+  const { files, inlineSnapshotHosts } = discover(inputs, { inlineSnapshots: true });
   const docs: Doc[] = [];
+  // The test files whose inline snapshots alone the audit read (src/parse/snap.ts).
+  for (const f of inlineSnapshotHosts) {
+    try {
+      docs.push(...parseInlineSnapshotFile(readText(cwd ? resolve(cwd, f) : f), f).docs);
+    } catch {
+      // unreadable / vanished, like the loop below
+    }
+  }
   for (const f of files) {
     try {
       // `resolve`, not `join`: a cwd resolves RELATIVE paths and must leave an absolute one
@@ -650,7 +658,8 @@ function auditFiles(audit: AuditResult, cwd?: string): Set<string> {
   if (!inputs.length) return new Set();
   try {
     void cwd; // `discover` returns the same repo-relative paths the harvest anchors use
-    return new Set(discover(inputs, {}).files);
+    const d = discover(inputs, { inlineSnapshots: true });
+    return new Set([...d.files, ...d.inlineSnapshotHosts]);
   } catch {
     return new Set();
   }

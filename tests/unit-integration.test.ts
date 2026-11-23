@@ -81,12 +81,27 @@ describe("checkA11y on a jsdom render", () => {
     const { container } = render("<p>Bonjour</p>");
     await checkA11y(container, { root });
     await checkA11y(container, { root });
-    const files = readdirSync(join(root, ".ultra11y/captures")).filter((f) => f.startsWith("unit-integration-"));
-    // Test file stem + title, slugged; two checks in one test are two captures.
+    const files = readdirSync(join(root, ".ultra11y/captures")).filter((f) => f.startsWith("tests-unit-integration-"));
+    // Test file path (repo-relative, extension dropped) + title, slugged — past 80 characters,
+    // cut and suffixed with a hash of the whole; two checks in one test are two captures.
     expect(files.sort()).toEqual([
-      "unit-integration-checka11y-on-a-jsdom-render-names-a-capture-after-its-test-2.html",
-      "unit-integration-checka11y-on-a-jsdom-render-names-a-capture-after-its-test.html",
+      "tests-unit-integration-checka11y-on-a-jsdom-render-names-a-capture-after-4ql5x-2.html",
+      "tests-unit-integration-checka11y-on-a-jsdom-render-names-a-capture-after-4ql5x.html",
     ]);
+  });
+
+  it("never gives two same-named test files in different directories the same capture", () => {
+    const title = "renders";
+    const a = capturePayload("<p>a</p>", { root }, "vitest", { testPath: join(root, "src/a/index.test.tsx"), currentTestName: title }).meta.id;
+    const b = capturePayload("<p>b</p>", { root }, "vitest", { testPath: join(root, "src/b/index.test.tsx"), currentTestName: title }).meta.id;
+    expect(a).toBe("src-a-index-renders");
+    expect(b).toBe("src-b-index-renders");
+    // Deep paths keep the bounded length, and stay distinct.
+    const deep = "packages/design-system/src/components/navigation/header/menu/dropdown";
+    const c = capturePayload("<p>c</p>", { root }, "vitest", { testPath: join(root, `${deep}/one/index.test.tsx`), currentTestName: title }).meta.id;
+    const d = capturePayload("<p>d</p>", { root }, "vitest", { testPath: join(root, `${deep}/two/index.test.tsx`), currentTestName: title }).meta.id;
+    expect(c.length).toBeLessThanOrEqual(80);
+    expect(c).not.toBe(d);
   });
 
   it("keeps a long title a bounded file name, distinct from its siblings", () => {

@@ -41,6 +41,7 @@ import { basename, dirname, join } from "node:path";
 import { type Doc, lineColAt, lineStartsOf, parseHtml } from "./html.js";
 import { normAttrName } from "./jsx-bridge.js";
 import { sourceForTest } from "../capture.js";
+import { isInlineSnapshotHost } from "../glob.js";
 
 /** Is this a Jest/Vitest snapshot file? */
 export function isUnitSnapshotFile(file: string): boolean {
@@ -312,6 +313,143 @@ export function parseUnitSnapshotFile(src: string, file: string): SnapshotDocs {
       v: 1,
       snapshot: e.name,
       ...(test ? { test } : {}),
+      ...(sourceFile ? { sourceFile } : {}),
+      ...(component ? { component } : {}),
+    };
+    docs.push(doc);
+  }
+  if (docs[0]) docs[0].unitSnapshot = { skipped: skipped.length };
+  return { docs, entries: entries.length, skipped };
+}
+
+// ---- inline snapshots --------------------------------------------------------------------
+//
+// `expect(container).toMatchInlineSnapshot(`…`)` writes the render INTO the test file, as the
+// matcher's template-literal argument (after an optional property-matcher object). The test
+// file is otherwise a test artifact — markup someone typed, never audited by default — so only
+// those literals are read from it, and only the ones holding markup. Each one is a component
+// Doc anchored to the TEST file and the literal's lines, exactly like a `.snap` entry.
+//
+// INDENTATION. The runner writes the literal indented to the call site and strips the common
+// indentation back off when comparing (Jest's `stripAddedIndentation`, which Vitest mirrors):
+// the first and last lines are blank, and every content line carries the first content line's
+// indentation. That inverse is applied line by line, so the line count never changes.
+
+export { isInlineSnapshotHost };
+
+/** Jest's `stripAddedIndentation`: the value as the runner compares it, or the literal itself
+ *  when it is not in the indented form the runner writes. */
+export function dedentInlineSnapshot(body: string): string {
+  const lines = body.split("\n");
+  if (lines.length <= 2 || (lines[0] as string).trim() !== "" || (lines[lines.length - 1] as string).trim() !== "") return body;
+  const indent = /^[^\S\n]*/.exec(lines[1] as string)?.[0] ?? "";
+  if (!indent) return body;
+  for (let i = 1; i < lines.length - 1; i++) {
+    const l = lines[i] as string;
+    if (l.trim() === "") continue;
+    if (!l.startsWith(indent)) return body;
+    lines[i] = l.slice(indent.length);
+  }
+  lines[lines.length - 1] = "";
+  return lines.join("\n");
+}
+
+/** Skip a balanced `{…}` / `(…)` / `[…]` argument, strings and templates skipped over, returning
+ *  the index just past it — undefined when it never closes. */
+function skipBalanced(src: string, start: number): number | undefined {
+  let depth = 0;
+  for (let i = start; i < src.length; i++) {
+    const c = src[i];
+    if (c === '"' || c === "'") {
+      i++;
+      while (i < src.length && src[i] !== c) i += src[i] === "\\" ? 2 : 1;
+      continue;
+    }
+    if (c === "`") {
+      const t = readTemplate(src, i);
+      if (!t) return undefined;
+      i = t.end - 1;
+      continue;
+    }
+    if (c === "{" || c === "(" || c === "[") depth++;
+    else if ((c === "}" || c === ")" || c === "]") && --depth === 0) return i + 1;
+  }
+  return undefined;
+}
+
+/** The title of the last `it(…)` / `test(…)` opened before `offset` — the enclosing test, read
+ *  lexically. Undefined when none is found or its title is not a plain string. */
+function testTitleBefore(src: string, offset: number): string | undefined {
+  const re = /\b(?:it|test)(?:\.(?:only|skip|todo|concurrent|fails))*\s*\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+  let title: string | undefined;
+  for (let m = re.exec(src); m && m.index < offset; m = re.exec(src)) {
+    const raw = m[2] as string;
+    title = m[1] === "`" && raw.includes("${") ? undefined : raw.replace(/\\([\s\S])/g, "$1");
+  }
+  return title;
+}
+
+/** Every `toMatchInlineSnapshot(` literal of a test file, in file order. A call still waiting
+ *  for the runner to fill it (no literal) yields none, nor does a literal with a `${…}`
+ *  expression — the runner never writes one. */
+export function parseInlineSnapshotEntries(src: string): SnapshotEntry[] {
+  const out: SnapshotEntry[] = [];
+  const call = /\.toMatchInlineSnapshot\s*(?:<[^>()]*>\s*)?\(\s*/g;
+  const starts = lineStartsOf(src);
+  const lineOf = (offset: number): number => lineColAt(starts, offset).line;
+  const perTitle = new Map<string, number>();
+  for (let m = call.exec(src); m; m = call.exec(src)) {
+    let i = m.index + m[0].length;
+    // `toMatchInlineSnapshot({ id: expect.any(String) }, `…`)`: the property matcher first.
+    if (src[i] === "{") {
+      const end = skipBalanced(src, i);
+      if (end === undefined) continue;
+      const comma = /^\s*,\s*/.exec(src.slice(end, end + 200));
+      if (!comma) continue;
+      i = end + comma[0].length;
+    }
+    if (src[i] !== "`") continue;
+    const tpl = readTemplate(src, i);
+    if (!tpl) break;
+    call.lastIndex = tpl.end;
+    if (/(^|[^\\])\$\{/.test(tpl.body)) continue;
+    const line = lineOf(m.index);
+    const title = testTitleBefore(src, m.index);
+    const base = title ?? `inline snapshot @ line ${line}`;
+    const n = (perTitle.get(base) ?? 0) + 1;
+    perTitle.set(base, n);
+    out.push({
+      name: title ? `${title} ${n}` : base,
+      line,
+      value: dedentInlineSnapshot(unescapeTemplate(tpl.body)),
+      valueLine: lineOf(i),
+    });
+  }
+  return out;
+}
+
+/** Parse a test file's inline snapshots into one COMPONENT Doc per markup literal, anchored to
+ *  the test file and the literal's own lines. The rest of the test file is never read. */
+export function parseInlineSnapshotFile(src: string, file: string): SnapshotDocs {
+  if (!src.includes("toMatchInlineSnapshot")) return { docs: [], entries: 0, skipped: [] };
+  const entries = parseInlineSnapshotEntries(src);
+  const test = file.split("\\").join("/");
+  const sourceFile = sourceForTest(".", test);
+  const component = sourceFile ? basename(sourceFile).replace(/\.[cm]?[jt]sx?$/i, "") : undefined;
+  const docs: Doc[] = [];
+  const skipped: SnapshotDocs["skipped"] = [];
+  for (const e of entries) {
+    const conv = snapshotMarkupToHtml(e.value);
+    if ("skip" in conv) {
+      skipped.push({ name: e.name, line: e.line, reason: conv.skip });
+      continue;
+    }
+    // Same padding as a `.snap` entry: a parsed element's line IS its line in the test file.
+    const doc = parseHtml("\n".repeat(e.valueLine - 1) + conv.html, file, true);
+    doc.capture = {
+      v: 1,
+      snapshot: e.name,
+      test,
       ...(sourceFile ? { sourceFile } : {}),
       ...(component ? { component } : {}),
     };

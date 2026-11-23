@@ -76,6 +76,14 @@ export function isTestArtifact(rel: string): boolean {
   return segs.some((seg) => TEST_DIR.has(seg));
 }
 
+/** A unit-test file that may hold inline snapshots (`.test`/`.spec` + JS/TS). Such a file is
+ *  still a test artifact — never audited whole by default — but the renders its
+ *  `toMatchInlineSnapshot(`…`)` calls hold are product output, like a `.snap` entry, and are
+ *  read alone (src/parse/snap.ts, `inlineSnapshotHosts` below). */
+export function isInlineSnapshotHost(rel: string): boolean {
+  return /\.(test|spec)\.[cm]?[jt]sx?$/i.test(rel);
+}
+
 // The glob dialect: `**` crosses `/`, `**/` makes the segment optional, `*` runs
 // within a segment, `?` is one non-`/` char, dotfiles match like any other name.
 // Everything else is LITERAL — no braces, brackets, extglobs or `!` negation —
@@ -216,6 +224,43 @@ function walkCached(dir: string, opts: ExpandOpts): string[] {
   walk(dir, acc);
   opts.walkCache?.set(dir, acc);
   return acc;
+}
+
+/** The test files in scope whose INLINE SNAPSHOTS alone are read: unit-test files (any JS/TS
+ *  extension, whatever `--ext` says — the markup lives in the literal, not the file) that the
+ *  default test-artifact exclusion keeps out of the audit. Inputs, globs and `--include` /
+ *  `--exclude` scope them like any file; one already in `audited` (named directly, re-admitted)
+ *  is audited whole instead, never twice. Empty under `--no-default-excludes`, where test files
+ *  are audited as sources. Whether a file holds any inline snapshot is the parser's call. */
+export function inlineSnapshotHosts(inputs: string[], audited: readonly string[], opts: ExpandOpts = {}): string[] {
+  if (opts.noDefaultExcludes) return [];
+  const taken = new Set(audited);
+  const keep = inlineHostFilter(opts);
+  const out = new Set<string>();
+  for (const input of inputs) {
+    if (input === "-") continue;
+    if (hasGlob(input)) {
+      if (PDF_GLOB.test(input)) continue;
+      const match = globMatcher([input])!;
+      for (const f of walkCached(staticBase(input), opts)) if (!taken.has(f) && match(toPosix(f)) && keep(f)) out.add(f);
+    } else if (existsSync(input) && statSync(input).isDirectory()) {
+      for (const f of walkCached(input, opts)) if (!taken.has(f) && keep(f)) out.add(f);
+    }
+  }
+  return [...out].sort();
+}
+
+/** The predicate behind `inlineSnapshotHosts`, for callers holding a file list (git-changed). */
+export function inlineHostFilter(opts: ExpandOpts = {}): (file: string) => boolean {
+  const include = compileGlobs(opts.include);
+  const exclude = compileGlobs(opts.exclude);
+  return (file: string): boolean => {
+    if (opts.noDefaultExcludes) return false;
+    const rel = toPosix(file);
+    if (!isInlineSnapshotHost(rel) || !isTestArtifact(rel)) return false;
+    if (include && !include(rel)) return false;
+    return !exclude?.(rel);
+  };
 }
 
 /** Expand inputs (paths/dirs/globs) into a sorted, de-duplicated file list. */

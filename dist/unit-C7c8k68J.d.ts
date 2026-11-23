@@ -1,6 +1,6 @@
 /** Options of `checkA11y` and `toBeAccessible`. */
 interface UnitCheckOptions {
-    /** Capture id — the file stem under `.ultra11y/captures/`. Defaults to the test file and title. */
+    /** Capture id — the file stem under `.ultra11y/captures/`. Defaults to the test file's repo-relative path and title. */
     as?: string;
     /** Human name for the capture. Defaults to the current test's title. */
     name?: string;

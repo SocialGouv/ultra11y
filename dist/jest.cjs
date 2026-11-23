@@ -142,7 +142,7 @@ function capturePayload(target, opts, runner, ctx = currentTest()) {
   const title = ctx.currentTestName;
   let id = opts.as;
   if (!id) {
-    const stem = test ? (0, import_node_path.basename)(test).replace(/\.(test|spec)\.[cm]?[jt]sx?$|\.[cm]?[jt]sx?$/i, "") : "";
+    const stem = test ? test.replace(/\.(test|spec)\.[cm]?[jt]sx?$|\.[cm]?[jt]sx?$/i, "") : "";
     const base = idSlug([stem, title].filter(Boolean).join(" ")) || "capture";
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);

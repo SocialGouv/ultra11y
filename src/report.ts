@@ -176,8 +176,8 @@ const L = {
     sourceTemplateAudited: (n: number, exts: string, pages: number) =>
       `${n} composant(s) ${exts} audité(s) en SOURCE (template) — slots et liaisons dynamiques invisibles en analyse statique. ${pages} page(s) ont été capturées et auditées sur leur DOM réel ; ce qu'ils rendent sur une page non capturée reste un angle mort.`,
     captures: (n: number) => `${n} fichier(s) de capture rendus audités à pleine fidélité (DOM réel) — le vrai HTML produit, pas l'appel de composant.`,
-    unitSnapshots: (entries: number, files: number, skipped: number) =>
-      `${entries} rendu(s) de composant lus dans ${files} fichier(s) d'instantanés de tests unitaires (\`__snapshots__/*.snap\`)${skipped ? `, ${skipped} entrée(s) non balisées ignorées` : ""} — composants rendus par jsdom, jamais une page, sans styles calculés : les critères de rendu y restent à évaluer.`,
+    unitSnapshots: (entries: number, files: number, skipped: number, inline = 0) =>
+      `${entries} rendu(s) de composant lus dans ${files} fichier(s) d'instantanés de tests unitaires (\`__snapshots__/*.snap\`${inline ? `, dont ${inline} instantané(s) en ligne \`toMatchInlineSnapshot\`` : ""})${skipped ? `, ${skipped} entrée(s) non balisées ignorées` : ""} — composants rendus par jsdom, jamais une page, sans styles calculés : les critères de rendu y restent à évaluer.`,
     blindSpots: (n: number) =>
       `${n} composant(s) sans capture rendue (angles morts) — audités sur source opaque uniquement ; auditez leur DOM rendu (\`render --setup\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
@@ -419,8 +419,8 @@ const L = {
     sourceTemplateAudited: (n: number, exts: string, pages: number) =>
       `${n} ${exts} component(s) audited as SOURCE (template) — slots and dynamic bindings invisible to static analysis. ${pages} page(s) were captured and audited on their real DOM; what they render on a page nobody captured remains a blind spot.`,
     captures: (n: number) => `${n} rendered capture file(s) audited at full fidelity (real DOM) — the true produced HTML, not the component call.`,
-    unitSnapshots: (entries: number, files: number, skipped: number) =>
-      `${entries} component render(s) read from ${files} unit-test snapshot file(s) (\`__snapshots__/*.snap\`)${skipped ? `, ${skipped} non-markup entr(y/ies) skipped` : ""} — components rendered by jsdom, never a page, with no computed style: the rendering criteria stay to assess there.`,
+    unitSnapshots: (entries: number, files: number, skipped: number, inline = 0) =>
+      `${entries} component render(s) read from ${files} unit-test snapshot file(s) (\`__snapshots__/*.snap\`${inline ? `, ${inline} of them \`toMatchInlineSnapshot\` inline snapshot(s)` : ""})${skipped ? `, ${skipped} non-markup entr(y/ies) skipped` : ""} — components rendered by jsdom, never a page, with no computed style: the rendering criteria stay to assess there.`,
     blindSpots: (n: number) =>
       `${n} component(s) without a rendered capture (blind spots) — audited from opaque source only; audit their rendered DOM (\`render --setup\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
@@ -1893,8 +1893,8 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   }
   if (r.scope.captures) ax.push(`> ✅ ${s.captures(r.scope.captures.files)}`, "");
   if (r.scope.unitSnapshots) {
-    const { entries, files, skipped } = r.scope.unitSnapshots;
-    ax.push(`> 🧪 ${s.unitSnapshots(entries, files, skipped)}`, "");
+    const { entries, files, skipped, inline } = r.scope.unitSnapshots;
+    ax.push(`> 🧪 ${s.unitSnapshots(entries, files, skipped, inline)}`, "");
   }
   if (r.scope.captureCoverage?.blindSpots.length) ax.push(`> ⚠️ ${s.blindSpots(r.scope.captureCoverage.blindSpots.length)}`, "");
 

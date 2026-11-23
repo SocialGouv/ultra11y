@@ -6,7 +6,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runAudit } from "../src/audit.js";
 import { expandInputs, isTestArtifact } from "../src/glob.js";
-import { parseUnitSnapshotFile, parseSnapshotEntries, snapshotMarkupToHtml, snapshotTestFile } from "../src/parse/snap.js";
+import {
+  dedentInlineSnapshot,
+  parseInlineSnapshotEntries,
+  parseUnitSnapshotFile,
+  parseSnapshotEntries,
+  snapshotMarkupToHtml,
+  snapshotTestFile,
+} from "../src/parse/snap.js";
+import { discover } from "../src/discover.js";
 import { renderAuditorBacklog } from "../src/auditor.js";
 import { ALL_RULES, runRules } from "../src/rules/registry.js";
 import { parseHtml } from "../src/parse/html.js";
@@ -179,4 +187,71 @@ it("does not mistake a data-only snapshot file for a render", () => {
   expect(r.scope.unitSnapshots).toBeUndefined();
   expect(r.findings).toEqual([]);
   expect(r.scope.files).toBe(0);
+});
+
+describe("inline snapshots (`toMatchInlineSnapshot`)", () => {
+  const INLINE = "tests/fixtures/inline-snapshots";
+  const DIALOG = `${INLINE}/src/components/Dialog.test.tsx`;
+  const FORMAT = `${INLINE}/src/format.test.ts`;
+
+  it("reads every literal, dedented as the runner compares it, property matcher first or not", () => {
+    const entries = parseInlineSnapshotEntries(readFileSync(DIALOG, "utf8"));
+    expect(entries.map((e) => e.name)).toEqual([
+      "renders the icon-only close button 1",
+      "keeps its state out of the markup 1",
+      "renders with a generated id 1",
+    ]);
+    expect(entries[0]!.value.split("\n").slice(0, 3)).toEqual(["", "<div>", "  <div"]);
+    expect(entries[0]!.valueLine).toBe(lineOf(DIALOG, "toMatchInlineSnapshot(`"));
+    expect(entries[2]!.value).toContain("<DocumentFragment>\n  <img");
+  });
+
+  it("strips only the indentation the runner added, keeping the line count", () => {
+    expect(dedentInlineSnapshot("\n    <p>\n      a\n    </p>\n  ")).toBe("\n<p>\n  a\n</p>\n");
+    // Not the runner's indented form: kept as written.
+    expect(dedentInlineSnapshot('"one line"')).toBe('"one line"');
+    expect(dedentInlineSnapshot("\n    <p>\n  a\n  ")).toBe("\n    <p>\n  a\n  ");
+  });
+
+  it("names a literal outside any test by its line, and skips an unfilled call", () => {
+    expect(parseInlineSnapshotEntries("expect(x).toMatchInlineSnapshot(`<p>a</p>`);\n").map((e) => e.name)).toEqual(["inline snapshot @ line 1"]);
+    // The runner writes the literal on the next run: nothing to read yet.
+    expect(parseInlineSnapshotEntries("expect(x).toMatchInlineSnapshot();\n")).toEqual([]);
+  });
+
+  it("brings the test files in scope for their inline snapshots alone", () => {
+    const d = discover([INLINE], { inlineSnapshots: true });
+    // Never audited whole: still a test artifact.
+    expect(d.files).not.toContain(DIALOG);
+    expect(d.inlineSnapshotHosts).toEqual([DIALOG, FORMAT]);
+    expect(discover([INLINE], { inlineSnapshots: true, exclude: ["**/components/**"] }).inlineSnapshotHosts).toEqual([FORMAT]);
+    expect(discover([INLINE]).inlineSnapshotHosts).toEqual([]);
+  });
+
+  const r = runAudit({ inputs: [INLINE] });
+  const of = (file: string) => r.findings.filter((f) => f.file === file);
+
+  it("finds the defects of the markup literals, anchored to the test file and the element's line", () => {
+    const close = of(DIALOG).find((f) => f.ruleId === "button-empty-name")!;
+    expect(close).toBeTruthy();
+    expect(close.line).toBe(lineOf(DIALOG, "<button"));
+    expect(close.origin?.snapshot).toBe("renders the icon-only close button 1");
+    expect(close.origin?.sourceFile).toBe(`${INLINE}/src/components/Dialog.tsx`);
+    const logo = of(DIALOG).find((f) => f.ruleId === "img-alt-missing")!;
+    expect(logo.line).toBe(lineOf(DIALOG, "<img"));
+    expect(logo.origin?.snapshot).toBe("renders with a generated id 1");
+  });
+
+  it("never audits the rest of the test file, nor a literal that is not markup", () => {
+    // The hand-typed `<input type="text" />` below the snapshots is not a render.
+    expect(of(DIALOG).every((f) => f.origin?.snapshot !== undefined)).toBe(true);
+    expect(of(DIALOG).some((f) => f.line >= lineOf(DIALOG, "<input"))).toBe(false);
+    expect(of(FORMAT)).toEqual([]);
+  });
+
+  it("counts them in the scope: one test file, two markup literals, one object skipped", () => {
+    expect(r.scope.unitSnapshots).toEqual({ files: 1, entries: 2, skipped: 1, inline: 2 });
+    // Dialog.test.tsx (its literals) + Dialog.tsx (the source); format.test.ts held no markup.
+    expect(r.scope.files).toBe(2);
+  });
 });

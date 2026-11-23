@@ -23351,6 +23351,9 @@ function isTestArtifact(rel) {
   if (TEST_FILE.test(rel)) return true;
   return segs.some((seg) => TEST_DIR.has(seg));
 }
+function isInlineSnapshotHost(rel) {
+  return /\.(test|spec)\.[cm]?[jt]sx?$/i.test(rel);
+}
 var GLOB_SYNTAX = /[\\()[\]{}!+@$^|]/g;
 var GLOB_OPTS = { dot: true, nobrace: true, nobracket: true, noextglob: true, nonegate: true };
 function globMatcher(globs) {
@@ -23433,6 +23436,34 @@ function walkCached(dir, opts) {
   walk2(dir, acc);
   opts.walkCache?.set(dir, acc);
   return acc;
+}
+function inlineSnapshotHosts(inputs, audited, opts = {}) {
+  if (opts.noDefaultExcludes) return [];
+  const taken = new Set(audited);
+  const keep = inlineHostFilter(opts);
+  const out = /* @__PURE__ */ new Set();
+  for (const input of inputs) {
+    if (input === "-") continue;
+    if (hasGlob(input)) {
+      if (PDF_GLOB.test(input)) continue;
+      const match = globMatcher([input]);
+      for (const f2 of walkCached(staticBase(input), opts)) if (!taken.has(f2) && match(toPosix2(f2)) && keep(f2)) out.add(f2);
+    } else if (existsSync(input) && statSync2(input).isDirectory()) {
+      for (const f2 of walkCached(input, opts)) if (!taken.has(f2) && keep(f2)) out.add(f2);
+    }
+  }
+  return [...out].sort();
+}
+function inlineHostFilter(opts = {}) {
+  const include = compileGlobs(opts.include);
+  const exclude = compileGlobs(opts.exclude);
+  return (file) => {
+    if (opts.noDefaultExcludes) return false;
+    const rel = toPosix2(file);
+    if (!isInlineSnapshotHost(rel) || !isTestArtifact(rel)) return false;
+    if (include && !include(rel)) return false;
+    return !exclude?.(rel);
+  };
 }
 function expandInputs(inputs, opts = {}) {
   const include = compileGlobs(opts.include);
@@ -23838,6 +23869,110 @@ function parseUnitSnapshotFile(src, file) {
       v: 1,
       snapshot: e.name,
       ...test ? { test } : {},
+      ...sourceFile ? { sourceFile } : {},
+      ...component ? { component } : {}
+    };
+    docs.push(doc);
+  }
+  if (docs[0]) docs[0].unitSnapshot = { skipped: skipped.length };
+  return { docs, entries: entries.length, skipped };
+}
+function dedentInlineSnapshot(body) {
+  const lines = body.split("\n");
+  if (lines.length <= 2 || lines[0].trim() !== "" || lines[lines.length - 1].trim() !== "") return body;
+  const indent = /^[^\S\n]*/.exec(lines[1])?.[0] ?? "";
+  if (!indent) return body;
+  for (let i = 1; i < lines.length - 1; i++) {
+    const l = lines[i];
+    if (l.trim() === "") continue;
+    if (!l.startsWith(indent)) return body;
+    lines[i] = l.slice(indent.length);
+  }
+  lines[lines.length - 1] = "";
+  return lines.join("\n");
+}
+function skipBalanced(src, start) {
+  let depth = 0;
+  for (let i = start; i < src.length; i++) {
+    const c = src[i];
+    if (c === '"' || c === "'") {
+      i++;
+      while (i < src.length && src[i] !== c) i += src[i] === "\\" ? 2 : 1;
+      continue;
+    }
+    if (c === "`") {
+      const t3 = readTemplate(src, i);
+      if (!t3) return void 0;
+      i = t3.end - 1;
+      continue;
+    }
+    if (c === "{" || c === "(" || c === "[") depth++;
+    else if ((c === "}" || c === ")" || c === "]") && --depth === 0) return i + 1;
+  }
+  return void 0;
+}
+function testTitleBefore(src, offset) {
+  const re2 = /\b(?:it|test)(?:\.(?:only|skip|todo|concurrent|fails))*\s*\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+  let title;
+  for (let m3 = re2.exec(src); m3 && m3.index < offset; m3 = re2.exec(src)) {
+    const raw = m3[2];
+    title = m3[1] === "`" && raw.includes("${") ? void 0 : raw.replace(/\\([\s\S])/g, "$1");
+  }
+  return title;
+}
+function parseInlineSnapshotEntries(src) {
+  const out = [];
+  const call = /\.toMatchInlineSnapshot\s*(?:<[^>()]*>\s*)?\(\s*/g;
+  const starts = lineStartsOf(src);
+  const lineOf2 = (offset) => lineColAt(starts, offset).line;
+  const perTitle = /* @__PURE__ */ new Map();
+  for (let m3 = call.exec(src); m3; m3 = call.exec(src)) {
+    let i = m3.index + m3[0].length;
+    if (src[i] === "{") {
+      const end = skipBalanced(src, i);
+      if (end === void 0) continue;
+      const comma = /^\s*,\s*/.exec(src.slice(end, end + 200));
+      if (!comma) continue;
+      i = end + comma[0].length;
+    }
+    if (src[i] !== "`") continue;
+    const tpl = readTemplate(src, i);
+    if (!tpl) break;
+    call.lastIndex = tpl.end;
+    if (/(^|[^\\])\$\{/.test(tpl.body)) continue;
+    const line = lineOf2(m3.index);
+    const title = testTitleBefore(src, m3.index);
+    const base = title ?? `inline snapshot @ line ${line}`;
+    const n = (perTitle.get(base) ?? 0) + 1;
+    perTitle.set(base, n);
+    out.push({
+      name: title ? `${title} ${n}` : base,
+      line,
+      value: dedentInlineSnapshot(unescapeTemplate(tpl.body)),
+      valueLine: lineOf2(i)
+    });
+  }
+  return out;
+}
+function parseInlineSnapshotFile(src, file) {
+  if (!src.includes("toMatchInlineSnapshot")) return { docs: [], entries: 0, skipped: [] };
+  const entries = parseInlineSnapshotEntries(src);
+  const test = file.split("\\").join("/");
+  const sourceFile = sourceForTest(".", test);
+  const component = sourceFile ? basename3(sourceFile).replace(/\.[cm]?[jt]sx?$/i, "") : void 0;
+  const docs = [];
+  const skipped = [];
+  for (const e of entries) {
+    const conv = snapshotMarkupToHtml(e.value);
+    if ("skip" in conv) {
+      skipped.push({ name: e.name, line: e.line, reason: conv.skip });
+      continue;
+    }
+    const doc = parseHtml("\n".repeat(e.valueLine - 1) + conv.html, file, true);
+    doc.capture = {
+      v: 1,
+      snapshot: e.name,
+      test,
       ...sourceFile ? { sourceFile } : {},
       ...component ? { component } : {}
     };
@@ -42642,6 +42777,7 @@ function discover(inputs, opts = {}) {
   let files;
   let gitUnavailable = false;
   let staged;
+  let hosts;
   if (opts.staged) {
     const stagedFiles = gitStagedFiles();
     if (stagedFiles === null) {
@@ -42652,8 +42788,11 @@ function discover(inputs, opts = {}) {
       const filter = makeFilter(opts);
       const inScope = inScopeMatcher(inputs);
       const scoped = stagedFiles.filter((f2) => filter(f2) && (!inScope || inScope(f2)));
-      staged = stagedContents(scoped);
-      files = [...staged.keys()];
+      const hostFilter = inlineHostFilter(opts);
+      hosts = opts.inlineSnapshots ? stagedFiles.filter((f2) => !filter(f2) && hostFilter(f2) && (!inScope || inScope(f2))) : [];
+      staged = stagedContents([...scoped, ...hosts]);
+      files = scoped.filter((f2) => staged.has(f2));
+      hosts = hosts.filter((f2) => staged.has(f2));
     }
   } else if (changedMode) {
     const changed = gitChangedFiles(opts.since);
@@ -42665,12 +42804,15 @@ function discover(inputs, opts = {}) {
       const filter = makeFilter(opts);
       const inScope = inScopeMatcher(inputs);
       files = changed.filter((f2) => existsSync5(f2) && filter(f2) && (!inScope || inScope(f2)));
+      const hostFilter = inlineHostFilter(opts);
+      hosts = opts.inlineSnapshots ? changed.filter((f2) => existsSync5(f2) && !filter(f2) && hostFilter(f2) && (!inScope || inScope(f2))) : [];
     }
   } else {
     files = expandInputs(inputs, opts);
   }
   files = sortByPriorityThenPath([...new Set(files)]);
-  return { files, changedMode, gitUnavailable, ...staged ? { stagedContent: staged } : {} };
+  const inlineHosts = opts.inlineSnapshots ? (hosts ?? inlineSnapshotHosts(inputs, files, opts)).sort() : [];
+  return { files, changedMode, gitUnavailable, ...staged ? { stagedContent: staged } : {}, inlineSnapshotHosts: inlineHosts };
 }
 
 // src/documents.ts
@@ -44323,7 +44465,7 @@ function newAccum() {
     sfcFiles: 0,
     sfcExts: /* @__PURE__ */ new Set(),
     captures: [],
-    unitSnapshots: { files: 0, entries: 0, skipped: 0 },
+    unitSnapshots: { files: 0, entries: 0, skipped: 0, inline: 0 },
     langCounts: /* @__PURE__ */ new Map(),
     renderedScs: /* @__PURE__ */ new Set(),
     pageIds: /* @__PURE__ */ new Set(),
@@ -44478,6 +44620,7 @@ function foldDoc(acc, doc, graph) {
   const snapshotEntry = doc.capture?.snapshot !== void 0;
   if (snapshotEntry) {
     acc.unitSnapshots.entries++;
+    if (!isUnitSnapshotFile(doc.file)) acc.unitSnapshots.inline++;
     if (doc.unitSnapshot) {
       acc.unitSnapshots.files++;
       acc.unitSnapshots.skipped += doc.unitSnapshot.skipped;
@@ -44753,7 +44896,14 @@ function finalize(acc, inputs, extra = {}) {
           components: [...new Set(acc.captures.map((c) => c.provenance.component).filter((x2) => !!x2))].sort()
         }
       } : {},
-      ...acc.unitSnapshots.entries ? { unitSnapshots: { ...acc.unitSnapshots } } : {},
+      ...acc.unitSnapshots.entries ? {
+        unitSnapshots: {
+          files: acc.unitSnapshots.files,
+          entries: acc.unitSnapshots.entries,
+          skipped: acc.unitSnapshots.skipped,
+          ...acc.unitSnapshots.inline ? { inline: acc.unitSnapshots.inline } : {}
+        }
+      } : {},
       ...acc.langCounts.size ? { langs: [...acc.langCounts.entries()].sort((a2, b) => b[1] - a2[1] || a2[0].localeCompare(b[0])).map(([lang]) => lang) } : {},
       // Coverage the RENDERED tier earned from the snapshots this run ingested. Same field the
       // live-browser merge stamps (`mergeDynamic`), because it is the same claim: these criteria
@@ -44799,7 +44949,8 @@ function runAudit(opts) {
   const {
     files: discovered,
     gitUnavailable,
-    stagedContent: stagedContent2
+    stagedContent: stagedContent2,
+    inlineSnapshotHosts: inlineHosts
   } = discover(opts.inputs, {
     include: opts.include,
     exclude: opts.exclude,
@@ -44809,12 +44960,14 @@ function runAudit(opts) {
     staged: opts.staged,
     noDefaultExcludes: opts.noDefaultExcludes,
     onWarn: opts.onWarn,
-    walkCache
+    walkCache,
+    inlineSnapshots: true
   });
   const useStaged = opts.staged === true && !gitUnavailable;
   const diffMode = opts.changed || opts.since || opts.staged;
   const relevantCaptures = opts.captureDiff && diffMode && opts.captureDir ? capturesForSources(opts.captureDir, discovered).filter((c) => !discovered.includes(c)) : [];
-  const files = relevantCaptures.length ? [...discovered, ...relevantCaptures] : discovered;
+  const inlineOnly = new Set(inlineHosts);
+  const files = relevantCaptures.length || inlineHosts.length ? [...discovered, ...relevantCaptures, ...inlineHosts] : discovered;
   let graph;
   let carried;
   if (opts.graph || opts.captureCoverage) {
@@ -44897,6 +45050,10 @@ function runAudit(opts) {
     }
     if (isUnitSnapshotFile(file)) {
       for (const d2 of parseUnitSnapshotFile(content, file).docs) foldDoc(acc, d2, graph);
+      continue;
+    }
+    if (inlineOnly.has(file)) {
+      for (const d2 of parseInlineSnapshotFile(content, file).docs) foldDoc(acc, d2, graph);
       continue;
     }
     const ingested = isSnapshotDom(file) || isUnderDir(file, opts.captureDir ?? CAPTURES_DIR);
@@ -51348,7 +51505,7 @@ var L6 = {
     sourceTemplate: (n, exts) => `Verdict source pr\xE9liminaire : ${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template). Les slots, snippets et liaisons dynamiques (:attr, {@render}) sont invisibles en analyse statique \u2014 auditez le rendu (\`render\` / \`scan\`) avant de conclure.`,
     sourceTemplateAudited: (n, exts, pages) => `${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template) \u2014 slots et liaisons dynamiques invisibles en analyse statique. ${pages} page(s) ont \xE9t\xE9 captur\xE9es et audit\xE9es sur leur DOM r\xE9el ; ce qu'ils rendent sur une page non captur\xE9e reste un angle mort.`,
     captures: (n) => `${n} fichier(s) de capture rendus audit\xE9s \xE0 pleine fid\xE9lit\xE9 (DOM r\xE9el) \u2014 le vrai HTML produit, pas l'appel de composant.`,
-    unitSnapshots: (entries, files, skipped) => `${entries} rendu(s) de composant lus dans ${files} fichier(s) d'instantan\xE9s de tests unitaires (\`__snapshots__/*.snap\`)${skipped ? `, ${skipped} entr\xE9e(s) non balis\xE9es ignor\xE9es` : ""} \u2014 composants rendus par jsdom, jamais une page, sans styles calcul\xE9s : les crit\xE8res de rendu y restent \xE0 \xE9valuer.`,
+    unitSnapshots: (entries, files, skipped, inline = 0) => `${entries} rendu(s) de composant lus dans ${files} fichier(s) d'instantan\xE9s de tests unitaires (\`__snapshots__/*.snap\`${inline ? `, dont ${inline} instantan\xE9(s) en ligne \`toMatchInlineSnapshot\`` : ""})${skipped ? `, ${skipped} entr\xE9e(s) non balis\xE9es ignor\xE9es` : ""} \u2014 composants rendus par jsdom, jamais une page, sans styles calcul\xE9s : les crit\xE8res de rendu y restent \xE0 \xE9valuer.`,
     blindSpots: (n) => `${n} composant(s) sans capture rendue (angles morts) \u2014 audit\xE9s sur source opaque uniquement ; auditez leur DOM rendu (\`render --setup\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
@@ -51554,7 +51711,7 @@ var L6 = {
     sourceTemplate: (n, exts) => `Preliminary source verdict: ${n} ${exts} component(s) audited as SOURCE (template). Slots, snippets and dynamic bindings (:attr, {@render}) are invisible to static analysis \u2014 audit the rendered output (\`render\` / \`scan\`) before concluding.`,
     sourceTemplateAudited: (n, exts, pages) => `${n} ${exts} component(s) audited as SOURCE (template) \u2014 slots and dynamic bindings invisible to static analysis. ${pages} page(s) were captured and audited on their real DOM; what they render on a page nobody captured remains a blind spot.`,
     captures: (n) => `${n} rendered capture file(s) audited at full fidelity (real DOM) \u2014 the true produced HTML, not the component call.`,
-    unitSnapshots: (entries, files, skipped) => `${entries} component render(s) read from ${files} unit-test snapshot file(s) (\`__snapshots__/*.snap\`)${skipped ? `, ${skipped} non-markup entr(y/ies) skipped` : ""} \u2014 components rendered by jsdom, never a page, with no computed style: the rendering criteria stay to assess there.`,
+    unitSnapshots: (entries, files, skipped, inline = 0) => `${entries} component render(s) read from ${files} unit-test snapshot file(s) (\`__snapshots__/*.snap\`${inline ? `, ${inline} of them \`toMatchInlineSnapshot\` inline snapshot(s)` : ""})${skipped ? `, ${skipped} non-markup entr(y/ies) skipped` : ""} \u2014 components rendered by jsdom, never a page, with no computed style: the rendering criteria stay to assess there.`,
     blindSpots: (n) => `${n} component(s) without a rendered capture (blind spots) \u2014 audited from opaque source only; audit their rendered DOM (\`render --setup\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
@@ -52425,8 +52582,8 @@ function render(r2, lang, opts) {
   }
   if (r2.scope.captures) ax.push(`> \u2705 ${s2.captures(r2.scope.captures.files)}`, "");
   if (r2.scope.unitSnapshots) {
-    const { entries, files, skipped } = r2.scope.unitSnapshots;
-    ax.push(`> \u{1F9EA} ${s2.unitSnapshots(entries, files, skipped)}`, "");
+    const { entries, files, skipped, inline } = r2.scope.unitSnapshots;
+    ax.push(`> \u{1F9EA} ${s2.unitSnapshots(entries, files, skipped, inline)}`, "");
   }
   if (r2.scope.captureCoverage?.blindSpots.length) ax.push(`> \u26A0\uFE0F ${s2.blindSpots(r2.scope.captureCoverage.blindSpots.length)}`, "");
   ax.push(`## ${s2.annexNcTitle}`, "");
@@ -55550,8 +55707,14 @@ function adjudicationContract() {
 function docsForAudit(audit, cwd) {
   const inputs = audit.scope.inputs.filter((i) => i !== "-" && i !== "<stdin>");
   if (!inputs.length) return [];
-  const { files } = discover(inputs, {});
+  const { files, inlineSnapshotHosts: inlineSnapshotHosts2 } = discover(inputs, { inlineSnapshots: true });
   const docs = [];
+  for (const f2 of inlineSnapshotHosts2) {
+    try {
+      docs.push(...parseInlineSnapshotFile(readText(cwd ? resolve9(cwd, f2) : f2), f2).docs);
+    } catch {
+    }
+  }
   for (const f2 of files) {
     try {
       const path = cwd ? resolve9(cwd, f2) : f2;
@@ -55778,7 +55941,8 @@ function auditFiles(audit, cwd) {
   if (!inputs.length) return /* @__PURE__ */ new Set();
   try {
     void cwd;
-    return new Set(discover(inputs, {}).files);
+    const d2 = discover(inputs, { inlineSnapshots: true });
+    return /* @__PURE__ */ new Set([...d2.files, ...d2.inlineSnapshotHosts]);
   } catch {
     return /* @__PURE__ */ new Set();
   }

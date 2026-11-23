@@ -81,6 +81,12 @@ Testing Library's pretty-format DOM (`container`, `asFragment()`), react-test-re
   fixtures. A suite that snapshots deliberately broken markup opts out with
   `--exclude "**/__snapshots__/**"`. A snapshot is never rewritten by `fix`: fix the component,
   then `vitest -u` / `jest -u`.
+- Inline snapshots too: each `toMatchInlineSnapshot(`…`)` literal (after a property matcher
+  or not) of a `.test`/`.spec` JS/TS file is dedented as the runner compares it and read the same
+  way — findings on the **test file** and the literal's line, named after the enclosing
+  `it`/`test` title (`inline snapshot @ line N` outside one). Only the markup literals: the rest
+  of the test file stays a test artifact, never audited. Counted in `scope.unitSnapshots`
+  (`inline`: how many of the `entries` were inline).
 
 ## Check a render inside the test (`ultra11y/vitest`, `ultra11y/jest`)
 
@@ -95,7 +101,8 @@ expect(container).toBeAccessible();
 
 Accepts an element, `asFragment()`, a render result, a document (its body) or an HTML string.
 Each check writes `.ultra11y/captures/<id>.html` (`capture write`, the same capture format as
-`render --setup`, marked `runner="vitest" env="jsdom" styles="none"`) and audits it; `failOn`
+`render --setup`, marked `runner="vitest" env="jsdom" styles="none"`; without `as`, the id is
+the test file's repo-relative path and the test title, slugged) and audits it; `failOn`
 (`blocking` by default, `false` to record only) decides the test. Commit the captures: `audit`
 re-reads them offline. `render --setup` remains the zero-touch way to record every render.
 
