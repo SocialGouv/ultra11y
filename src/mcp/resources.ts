@@ -41,9 +41,8 @@ export interface ResourceContents {
 //   <repo>/scripts/ultra11y.mjs     → <repo>/skills/ultra11y/SKILL.md (repo-root bundle)
 //   <repo>/src/mcp/resources.ts     → <repo>/skills/ultra11y/SKILL.md (source tree, tests)
 //
-// `moduleDir` is injectable for the same reason the vendored engine makes it
-// injectable (codeindex-engine.mjs:5560): a test must be able to point this at
-// a fixture without staging a fake bundle on disk.
+// `moduleDir` is injectable so a test can point this at a fixture without
+// staging a fake bundle on disk.
 export function resolveSkillRoot(moduleDir?: string): string | undefined {
   const here = moduleDir ?? dirname(fileURLToPath(import.meta.url));
   const candidates = [resolve(here, ".."), resolve(here, "..", "skills", SKILL_NAME), resolve(here, "..", "..", "skills", SKILL_NAME)];

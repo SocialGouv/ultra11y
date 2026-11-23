@@ -5,8 +5,7 @@
 // Written by hand rather than pulled from @modelcontextprotocol/sdk: the shipped
 // bundle has zero runtime dependencies (design principle 2), and the surface an
 // ultra11y server needs — initialize, ping, tools/list, tools/call — is a few
-// hundred lines. The vendored codeindex engine ships the same shape at
-// src/vendor/codeindex-engine.mjs:10468; this is that shape, retargeted.
+// hundred lines.
 
 // Oldest first. We answer on whichever of these the client asks for, and fall
 // back to the newest when it asks for something we don't know — the spec's

@@ -205,8 +205,17 @@ those licences require.
   entities           BSD-2-Clause Copyright (c) Felix Böhm
   @babel/parser      MIT          Copyright (C) 2012-2014 by various
                                   contributors (see the package's AUTHORS)
+  fdir               MIT          Copyright 2023 Abdullah Atta
+  picomatch          MIT          Copyright (c) 2017-present, Jon Schlinkert.
+  ignore             MIT          Copyright (c) 2013 Kael Zhang <i@kael.me>,
+                                  contributors
+  get-tsconfig       MIT          Copyright (c) Hiroki Osame
+                                  <hiroki.osame@gmail.com>
+  resolve-pkg-maps   MIT          Copyright (c) Hiroki Osame
+                                  <hiroki.osame@gmail.com>
 
-The MIT licence (htmlparser2, @babel/parser):
+The MIT licence (htmlparser2, @babel/parser, fdir, picomatch, ignore,
+get-tsconfig, resolve-pkg-maps):
 
         Permission is hereby granted, free of charge, to any person obtaining a
         copy of this software and associated documentation files (the
@@ -245,12 +254,3 @@ The BSD 2-Clause licence (domhandler, domelementtype, entities):
         LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
         NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS,
         EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-================================================================================
-Vendored codeindex engine
-================================================================================
-
-src/vendor/codeindex-engine.mjs (with its .d.mts) is a vendored build of
-@maxgfr/codeindex (MIT, Copyright (c) maxgfr — https://github.com/maxgfr/codeindex),
-re-pinned by `feat(engine): re-pin vendored engines` commits. It provides the
-file walker and glob engine behind `src/glob.ts` and ships inside the bundle.

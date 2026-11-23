@@ -22,10 +22,10 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, posix, relative, resolve } from "node:path";
-import { makeSpecResolver, type SpecResolver } from "./graph/engine-resolve.js";
+import { globMatcher, isTestArtifact, toPosix } from "./glob.js";
+import { makeSpecResolver, type SpecResolver } from "./graph/spec-resolve.js";
 import { readTsAliases } from "./graph/tsconfig.js";
-import { isTestArtifact, toPosix } from "./glob.js";
-import { compileGlobs as engineCompileGlobs, walk as engineWalk } from "./vendor/codeindex-engine.mjs";
+import { walk } from "./walk.js";
 
 /** Files the graph follows. Markup, scripts and stylesheets — what can change a rendered page. */
 const GRAPH_EXT = new Set([
@@ -273,7 +273,7 @@ export function buildAffectedGraph(root: string, files?: string[]): AffectedGrap
   // for everything this module reports, and translate at the boundary.
   const rootRel = toPosix(relative(process.cwd(), resolve(root))) || ".";
   const toFull = (rel: string): string => (rootRel === "." ? rel : posix.join(rootRel, rel));
-  const listed = files ?? engineWalk(root, { maxFiles: Number.MAX_SAFE_INTEGER }).files.map((f: { rel: string }) => f.rel);
+  const listed = files ?? walk(root).files.map((f) => f.rel);
   const known = new Set<string>();
   for (const f of listed) {
     const rel = norm(f);
@@ -425,10 +425,10 @@ export function selectAffected(input: AffectedInput, graph: AffectedGraph = buil
   // Computed before anything can return early: a global change selecting every DECLARED page
   // still captures none of the undeclared ones.
   const declared = new Set(input.pages.flatMap((p) => (p.sources ?? []).map(norm)));
-  const isExempt = input.exempt?.length ? (engineCompileGlobs(input.exempt.map(norm)) ?? (() => false)) : () => false;
+  const isExempt = input.exempt?.length ? (globMatcher(input.exempt.map(norm)) ?? (() => false)) : () => false;
   const unsampled = changed.filter((f) => isRouteFile(f) && !declared.has(f) && !isExempt(f) && existsSync(join(input.root, f)));
 
-  const isGlobal = engineCompileGlobs([...IMPLICIT_GLOBAL, ...(input.global ?? []).map(norm)]) ?? (() => false);
+  const isGlobal = globMatcher([...IMPLICIT_GLOBAL, ...(input.global ?? []).map(norm)]) ?? (() => false);
   const globalHits = changed.filter((f) => isGlobal(f));
   if (globalHits.length)
     return {

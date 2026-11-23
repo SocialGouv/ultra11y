@@ -1,12 +1,14 @@
-// Zero-dependency input expansion for `audit`: turn file paths, directories and
-// globs into a concrete file list, then apply --include/--exclude predicates.
-// The generic machinery (directory walking, glob → RegExp) is the vendored
-// codeindex engine's; everything ultra11y-specific (markup extension allowlist,
-// test-artifact policy, audit-output skips, input-scope matching) stays here.
+// Input expansion for `audit`: turn file paths, directories and globs into a
+// concrete file list, then apply --include/--exclude predicates. The generic
+// machinery is shared: directory walking is src/walk.ts (fdir + ignore), glob
+// matching is picomatch; everything ultra11y-specific (markup extension
+// allowlist, test-artifact policy, audit-output skips, input-scope matching)
+// stays here.
 import { type Dirent, existsSync, readdirSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
+import picomatch from "picomatch/posix";
 import { ext } from "./util.js";
-import { compileGlobs as engineCompileGlobs, walk as engineWalk } from "./vendor/codeindex-engine.mjs";
+import { walk as walkRepo } from "./walk.js";
 
 // HTML + JSX/TSX + the HTML-shaped single-file component formats (Vue/Svelte/Astro
 // templates parse cleanly through the HTML path). Server templates (.twig/.erb/.hbs/
@@ -35,16 +37,16 @@ function extSet(extra: string[] | undefined): Set<string> {
   }
   return set;
 }
-// Directories the engine's walk does not know about but ultra11y must never
+// Directories the shared walk does not know about but ultra11y must never
 // auto-walk: `audits/` holds generated reports, and `.ultra11y/` (captures +
 // generated setup) is ingested only via the explicit `.ultra11y/captures` input
 // the CLI appends (so `--no-captures` genuinely opts out) or a direct
 // `--captures <dir>` / coverage scan of that dir. Like the old SKIP_DIR, these
 // prune DESCENDANTS of a walked root — naming such a dir directly as the walk
 // root still descends into it. The rest of the old SKIP_DIR (node_modules,
-// .git, dist, build, coverage, .next, out) is covered by the engine's own
-// ignore universe (a superset), and the engine walk additionally honours
-// .gitignore files under the walked root.
+// .git, dist, build, coverage, .next, out) is covered by the walk's own
+// ignore universe (a superset), and the walk additionally honours .gitignore
+// files under the walked root.
 const SKIP_DIR = new Set(["audits", ".ultra11y"]);
 
 // Test / spec / story / mock markup is bad-by-design (intentionally non-conformant
@@ -59,9 +61,26 @@ export function isTestArtifact(rel: string): boolean {
   return rel.split("/").some((seg) => TEST_DIR.has(seg));
 }
 
-// Glob matching is the engine's (same dialect as before: `**` crosses `/`,
-// `**/` makes the segment optional, `*` runs within a segment, `?` is one
-// non-`/` char). ultra11y's flag semantics on top: each --include/--exclude
+// The glob dialect: `**` crosses `/`, `**/` makes the segment optional, `*` runs
+// within a segment, `?` is one non-`/` char, dotfiles match like any other name.
+// Everything else is LITERAL — no braces, brackets, extglobs or `!` negation —
+// so framework route segments (`app/[slug]/page.tsx`, `app/(group)/**`) match
+// themselves. picomatch's posix build (paths are posix here on every platform);
+// the characters it would read as syntax are escaped before it sees them, and
+// the no* options keep anything left over literal too.
+const GLOB_SYNTAX = /[\\()[\]{}!+@$^|]/g;
+const GLOB_OPTS: picomatch.PicomatchOptions = { dot: true, nobrace: true, nobracket: true, noextglob: true, nonegate: true };
+
+/** One predicate matching a posix path against ANY of `globs`; null when the list is empty. */
+export function globMatcher(globs: readonly string[]): ((rel: string) => boolean) | null {
+  if (globs.length === 0) return null;
+  return picomatch(
+    globs.map((g) => g.replace(GLOB_SYNTAX, "\\$&")),
+    GLOB_OPTS,
+  );
+}
+
+// ultra11y's flag semantics on top of globMatcher: each --include/--exclude
 // value may carry a comma-separated LIST of globs, split and trimmed here.
 export function compileGlobs(globs: string[] | undefined): ((rel: string) => boolean) | null {
   if (!globs || globs.length === 0) return null;
@@ -71,7 +90,7 @@ export function compileGlobs(globs: string[] | undefined): ((rel: string) => boo
     .filter(Boolean);
   // A non-empty flag that splits to nothing (e.g. ",") historically compiled to
   // a match-nothing predicate — keep that, never silently widen to "no filter".
-  return engineCompileGlobs(list) ?? (() => false);
+  return globMatcher(list) ?? (() => false);
 }
 
 export const toPosix = (p: string): string => p.split(sep).join("/");
@@ -109,25 +128,25 @@ export function inScopeMatcher(inputs: string[]): ((file: string) => boolean) | 
   };
 }
 
-// Walk a directory with the engine (gitignore honoured, dependency/build/VCS
-// dirs, lockfiles, binaries and >1 MiB files skipped), returning full paths the
+// Walk a directory (gitignore honoured, dependency/build/VCS dirs, lockfiles,
+// binaries and >1 MiB files skipped — see src/walk.ts), returning full paths the
 // way the old recursive walker did (the input dir joined back onto each hit).
-// No maxFiles cap here: the audit's own --max-files budget applies downstream,
-// and a silent walk truncation must never masquerade as a clean "0 findings".
+// No file cap here: the audit's own --max-files budget applies downstream, and a
+// silent walk truncation must never masquerade as a clean "0 findings".
 function walk(dir: string, acc: string[]): void {
-  for (const f of engineWalk(dir, { maxFiles: Number.MAX_SAFE_INTEGER }).files) {
-    // Engine rel paths are posix; prune ultra11y's own output dirs at any depth
+  for (const f of walkRepo(dir).files) {
+    // Walk rel paths are posix; prune ultra11y's own output dirs at any depth
     // below the walked root (the root itself may be named directly, as before).
     if (f.rel.split("/").some((seg) => SKIP_DIR.has(seg))) continue;
     acc.push(join(dir, f.rel));
   }
 }
 
-// DOWNLOADABLE DOCUMENTS. The engine's walk skips binaries, PDFs included — right for a markup
+// DOWNLOADABLE DOCUMENTS. The shared walk skips binaries, PDFs included — right for a markup
 // audit, and the reason a directory input never pulls in every PDF a repository happens to hold.
 // A PDF is audited only when it is ASKED for: named directly, or matched by a glob that names the
 // `.pdf` extension itself (`docs/**/*.pdf`, `.ultra11y/documents/*.pdf`). Such a glob gets this
-// small walk of its own, pruned like the engine's (VCS and dependency dirs, ultra11y's outputs).
+// small walk of its own, pruned like the shared one (VCS and dependency dirs, ultra11y's outputs).
 const PDF_GLOB = /\.pdf$/i;
 const PDF_WALK_SKIP = new Set(["node_modules", ".git", ".hg", ".svn"]);
 const PDF_WALK_MAX = 10_000;
@@ -196,8 +215,8 @@ export function expandInputs(inputs: string[], opts: ExpandOpts = {}): string[] 
     if (input === "-") continue; // stdin handled by the caller
     if (hasGlob(input)) {
       // A positional glob input is ONE glob (no comma-splitting — that is an
-      // --include/--exclude flag affordance), compiled by the engine.
-      const match = engineCompileGlobs([input])!;
+      // --include/--exclude flag affordance).
+      const match = globMatcher([input])!;
       if (PDF_GLOB.test(input)) {
         for (const f of walkPdfs(staticBase(input))) if (match(toPosix(f))) files.add(f);
         continue;

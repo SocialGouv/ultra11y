@@ -4,7 +4,7 @@ import { resolveUsage } from "../src/graph/graph.js";
 import { computeCaptureCoverage } from "../src/capture.js";
 import { discover } from "../src/discover.js";
 import { GRAPH_ONLY_EXT, toPosix } from "../src/glob.js";
-import { makeSpecResolver } from "../src/graph/engine-resolve.js";
+import { makeSpecResolver } from "../src/graph/spec-resolve.js";
 import { runAudit } from "../src/audit.js";
 
 const FIX = new URL("./fixtures/graph-sfc/", import.meta.url).pathname;
@@ -44,14 +44,14 @@ describe("graph — SFC (.vue/.svelte/.astro) synthesizes a self component def",
   });
 });
 
-// Vendored codeindex regression coverage (v2.10.0+): the engine's own candidate
-// probe (JS_EXT_PROBES) resolves an EXTENSIONLESS specifier to a .vue/.svelte/.astro/
-// .html/.htm target (see src/graph/engine-resolve.ts). The .vue case is pinned by
+// Regression coverage: the primary resolver's candidate probe (JS_EXT_PROBES)
+// resolves an EXTENSIONLESS specifier to a .vue/.svelte/.astro/.html/.htm target
+// (see src/graph/spec-resolve.ts). The .vue case is pinned by
 // tests/fixtures/golden-graph (extensionless import of Widget.vue). .svelte and .astro
 // had NO fixture pinning it before this — ConsumerExt.tsx below closes that gap the
 // same way, and ties into the same self-component-synthesis path the .vue tests above
 // already exercise (opts.sfc in src/graph/imports.ts).
-describe("graph — extensionless .svelte/.astro SFC resolution (engine candidate probe)", () => {
+describe("graph — extensionless .svelte/.astro SFC resolution (resolver candidate probe)", () => {
   it("resolves a .tsx EXTENSIONLESS default import of a .svelte SFC to a synthesized component def", () => {
     const g = graph();
     const consumerFile = [...g.nodes.keys()].find((f) => f.endsWith("ConsumerExt.tsx"))!;
@@ -86,10 +86,10 @@ describe("graph — extensionless .svelte/.astro SFC resolution (engine candidat
 // .html never synthesizes a self component (detectKind only treats .vue/.svelte/.astro
 // as "sfc" — see src/parse/source.ts and src/graph/build.ts), so it can't be pinned via
 // resolveUsage like the SFC kinds above. What IS specifically claimed for .html (same
-// engine-resolve.ts comment) is that the engine's candidate probe (JS_EXT_PROBES) also
+// spec-resolve.ts comment) is that the resolver's candidate probe (JS_EXT_PROBES) also
 // tries ".html"/".htm" for an extensionless specifier — pin that directly at the
 // resolver level, over the same fixture directory.
-describe("graph — engine resolveImport target-probing covers .html (extensionless import target)", () => {
+describe("graph — resolver target-probing covers .html (extensionless import target)", () => {
   it("resolves an extensionless specifier from a .tsx importer to a .html target file", () => {
     const consumer = `${FIX}ConsumerExt.tsx`;
     const fragment = `${FIX}Fragment.html`;
