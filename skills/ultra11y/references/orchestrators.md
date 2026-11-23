@@ -1,7 +1,8 @@
 # Drive the engine from an orchestrator
 
-The skill and the GitHub Action assume a person or a coding harness is in the loop. An
-**orchestrator** — an agent workflow engine, a CI job that is not GitHub, a cron runner —
+The skill assumes a person or a coding harness is in the loop. An
+**orchestrator** — an agent workflow engine such as iterion's
+[`rgaa-audit` bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit), a CI job, a cron runner —
 is different: nothing reads a banner, nothing retries on a hunch, and the only things that
 travel between steps are exit codes and JSON. This page is the contract for that caller.
 
@@ -23,7 +24,7 @@ npm_config_update_notifier=false npx -y ultra11y@5.43.0 --version   # → 5.43.0
 - **`ULTRA11Y_BIN`** points at an engine you already have (a vendored `ultra11y.mjs`, a
   container layer). For every command but `scan` the engine is one self-contained file with
   no runtime dependencies, so vendoring is a supported path — that is exactly what the skills
-  and the Action do. `scan` resolves `@playwright/test` and `@axe-core/playwright` from
+  do. `scan` resolves `@playwright/test` and `@axe-core/playwright` from
   `--cwd` first, then from the engine's own install, so a vendored file alone cannot scan.
 - **Node ≥ 22.18.** No other system dependency, no API key. (`judge` takes a key; nothing
   else does. `scan` needs a browser tier — see `references/dynamic.md`.)
@@ -80,12 +81,9 @@ verdict with no justification, an NC with no resolvable `normativeRef`, a criter
 from the adjudication — each is refused by name, and the run stops. That is what keeps the
 final report defensible.
 
-**The shipped GitHub Action now runs this pipeline for you.** `adjudicate: agent` performs
-steps 2–4 — `verify --manual`, then `orchestrate --run audits --phase adjudicate --eco`, then a
-`claude-code-action` run pointed at the emitted `RUNBOOK.md`, then `verify --apply`. Reach for
-the raw pipeline above when your orchestrator is *not* GitHub Actions, or when you want to fan
-step 3 out across subagents rather than walk the eco path. Either way steps 1, 2, 4, 5 and 6
-stay deterministic, and only step 3 involves a model.
+**In CI, iterion's `rgaa-audit` bot runs this pipeline for you**, with read-only agents on
+step 3 and a refutation pass after it (see `references/ci.md`). Either way steps 1, 2, 4, 5 and
+6 stay deterministic, and only step 3 involves a model.
 
 ## The loop as data — `orchestrate --manifest`
 

@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
-import { hookScript, stagedHookScript, ciWorkflow, writeHook, writeCi } from "../src/init.js";
+import { hookScript, stagedHookScript, ciWorkflow, writeHook, writeCi, ITERION_RGAA_AUDIT_URL } from "../src/init.js";
 import { VERSION } from "../src/types.js";
 
 const tmps: string[] = [];
@@ -55,13 +55,19 @@ describe("pre-commit hook", () => {
 });
 
 describe("CI workflow", () => {
+  type Step = { uses?: string; name?: string; run?: string; with?: Record<string, string> };
   const doc = (failOn: "bloquant" | "majeur") => {
     const path = writeCi(tmp(), "scripts/ultra11y.mjs", failOn);
     return parse(readFileSync(path, "utf8")) as {
       on: unknown;
       permissions?: Record<string, string>;
-      jobs: { ultra11y: { steps: { uses?: string; with?: Record<string, string> }[] } };
+      jobs: { ultra11y: { steps: Step[] } };
     };
+  };
+  const gate = (failOn: "bloquant" | "majeur"): string => {
+    const step = doc(failOn).jobs.ultra11y.steps.find((s) => s.run?.includes(" audit"));
+    if (!step?.run) throw new Error("the workflow runs no audit");
+    return step.run;
   };
 
   it("is valid YAML with an ultra11y job, triggered on pull requests", () => {
@@ -70,33 +76,33 @@ describe("CI workflow", () => {
     expect(ciWorkflow("x", "bloquant")).toContain("pull_request");
   });
 
-  it("consumes the shipped action, so a user gets the annotations and not just an exit code", () => {
-    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("SocialGouv/ultra11y"));
-    expect(step, "the workflow must use the ultra11y action").toBeDefined();
+  it("runs the engine CLI itself — the composite action no longer exists", () => {
+    const steps = doc("bloquant").jobs.ultra11y.steps;
+    expect(steps.some((s) => s.uses?.startsWith("SocialGouv/ultra11y"))).toBe(false);
+    expect(gate("bloquant")).toContain("npx -y ultra11y@");
   });
 
-  it("PINS the action to a tag that exists — never a moving branch", () => {
-    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("SocialGouv/ultra11y"));
-    // `@main` would silently change under the user; the engine's own version always has a
-    // matching `v<version>` release tag, so pinning to it is both valid and reproducible.
-    expect(step?.uses).toBe(`SocialGouv/ultra11y@v${VERSION}`);
-    expect(step?.uses).not.toContain("@main");
+  it("PINS the engine to the version that generated it — never `latest`", () => {
+    expect(gate("bloquant")).toContain(`ultra11y@${VERSION} audit`);
+    expect(ciWorkflow("x", "bloquant")).not.toMatch(/ultra11y@latest/);
   });
 
-  it("tells the reader the major alias exists, for those who want fixes automatically", () => {
-    expect(ciWorkflow("x", "bloquant")).toContain(`SocialGouv/ultra11y@v${VERSION.split(".")[0]}`);
+  it("points at iterion's rgaa-audit bot for the full audit, since this is only a gate", () => {
+    expect(ciWorkflow("x", "bloquant")).toContain(ITERION_RGAA_AUDIT_URL);
+    expect(ITERION_RGAA_AUDIT_URL).toBe("https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit");
   });
 
   it("passes the regression gate through: diff vs the base ref, against the committed baseline", () => {
-    const step = doc("bloquant").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("SocialGouv/ultra11y"));
-    expect(step?.with?.since).toBe("auto");
-    expect(step?.with?.baseline).toBe("audits/baseline.json");
-    expect(step?.with?.["fail-on"]).toBe("blocking");
+    const run = gate("bloquant");
+    expect(run).toContain(`--since "origin/$\{{ github.base_ref }}"`);
+    expect(run).toContain("--baseline audits/baseline.json");
+    expect(run).toContain("--fail-on blocking");
+    // Annotations on the diff plus a job summary, on every plan — no code-scanning scope needed.
+    expect(run).toContain("--format github");
   });
 
   it("carries the chosen severity through", () => {
-    const step = doc("majeur").jobs.ultra11y.steps.find((s) => s.uses?.startsWith("SocialGouv/ultra11y"));
-    expect(step?.with?.["fail-on"]).toBe("major");
+    expect(gate("majeur")).toContain("--fail-on major");
   });
 
   it("checks out enough history for the diff gate to resolve the base ref", () => {
@@ -104,14 +110,11 @@ describe("CI workflow", () => {
     expect(String(checkout?.with?.["fetch-depth"])).toBe("0");
   });
 
-  it("grants the permission SARIF upload needs, and no write it does not", () => {
-    const perms = doc("bloquant").permissions ?? {};
-    expect(perms["security-events"]).toBe("write");
-    expect(perms.contents).toBe("read");
-    expect(perms["pull-requests"]).toBeUndefined(); // opt-in, together with `comment`
+  it("grants read access to the checkout and no write at all", () => {
+    expect(doc("bloquant").permissions).toEqual({ contents: "read" });
   });
 
-  it("still documents the vendored no-action route", () => {
+  it("still documents the vendored route", () => {
     expect(ciWorkflow("vendor/ultra11y.mjs", "bloquant")).toContain("vendor/ultra11y.mjs");
   });
 });

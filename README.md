@@ -125,12 +125,12 @@ with `SKIP_A11Y=1`, or per-session with `ULTRA11Y_HOOK=off`; raise or lower the 
 claude mcp add ultra11y -- npx -y ultra11y mcp
 ```
 
-**As a GitHub Action** — audits the PR diff and, optionally, the served pages:
-
-```yaml
-- uses: SocialGouv/ultra11y@v5
-  with: { since: auto, standard: rgaa, fail-on: blocking }
-```
+**In CI — run iterion's [`rgaa-audit` bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit).**
+ultra11y ships no CI integration of its own. The bot is the harness that turns the engine into an
+audit with no one at the keyboard: it installs the engine pinned (version and sha256), renders
+your page sample, has read-only agents adjudicate the judgment criteria, puts every claim on
+trial, gates with `check` and files one issue per non-conforming criterion. See
+[`references/ci.md`](skills/ultra11y/references/ci.md).
 
 Or clone and run the bundled engine straight from the repo:
 
@@ -454,44 +454,30 @@ or malformed file is reported unreadable. See `skills/ultra11y/references/audit.
   block. It re-decides nothing and invents no format, so a page sheet and the compliance report
   cannot disagree; `check` gates it against invented criteria like any other report.
   See `references/pages.md`.
-- **A shipped GitHub Action** — `uses: SocialGouv/ultra11y@v5` audits the **code** (PR diff) and,
-  optionally, the **pages** (it can start your app, wait for it, then scan real URLs or your
-  declared sample). The engine ships inside the action, so there is nothing to install and no
-  `setup-node`. With pages in scope, its job summary and `pages-status.md` artifact list every
-  criterion under every page; `pages-report: compact` packages only `pages-status.md`,
-  `pages.json`, the source audit and its verdict ledger, omitting adjudication worklists,
-  detailed remediation dossiers, HTML and crops. The gate runs **last**, after SARIF,
-  annotations, the summary, the sticky PR comment and the report — a red job is never a dead
-  end. `adjudicate: api|agent` optionally
-  rules on the judgment criteria that would otherwise stay « à évaluer » in CI, reading its key
-  from the job environment and skipping itself without one. `ultra11y init --ci` writes a
-  workflow using it. `mode: lite` is the per-pull-request **rendered** gate: only the pages the
-  diff reaches, the engine alone, failing only on new findings (see below). See `references/ci.md`.
-- **Two PR comments, not one** — `comment-kind: digest` (the default) posts the distinct
-  defects a reviewer can act on; `comment-kind: pages` posts the **page-by-page grid**: one row
-  per page with its basis, its rate *and its denominator*, then the non-conforming criteria of
-  each failing page. Each kind is keyed by its own sticky marker, so a workflow that gates code
-  in one job and sweeps pages in another keeps **both** comments — sharing a marker is how a
-  684-occurrence sweep silently overwrote a four-finding gate, and the actionable half is the
-  one that vanished.
+- **CI through iterion** — ultra11y ships no GitHub Action or GitLab template. CI audits run
+  through iterion's [`rgaa-audit` bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit),
+  which drives the engine CLI pinned, adjudicates and refutes with read-only agents, and files
+  the issues. The CLI it calls — `audit`, `scan --sample`, `verify --manual`/`--apply`/`--report`,
+  `check`, `report`, `pages`, `tickets` — is the engine's stable contract. See `references/ci.md`.
 - **CI surfaces** — a red job says *that* the build broke, not *where*. `--format sarif` emits
   SARIF 2.1.0 for GitHub code scanning, so each finding lands as an **inline annotation on the
   causing line** of the PR; `--format github` does the same via `::error::` workflow commands
   plus a `$GITHUB_STEP_SUMMARY` table, for plans without code scanning. Alert identity reuses
   the baseline's `findingId`, so an alert survives line drift; a URL-keyed finding gets **no**
   location rather than a guessed one. Run it from `report --standard rgaa` for pack-keyed
-  output. See `references/ci.md`.
+  output. `ULTRA11Y_PR_COMMENT=1` also keeps one sticky PR comment per standard and kind
+  (`digest`, `pages`, `full`), edited in place. See `references/ci.md`.
 - **Automation** — `init --hook` (default) wires a zero-dependency git pre-commit gate over the
   **strict staged snapshot**: it audits the exact index blobs, auto-applies the safe fixes and
   re-stages them, and blocks only on judgment issues. `init --baseline`/`--ci` is the opt-in
   regression variant (hook + committed baseline / GitHub Actions job) that fails only on **new**
   non-conformities, not the existing backlog. See `references/automation.md`.
 
-### Rendered regressions on every pull request (`mode: lite`)
+### Rendered regressions on every pull request (`audit --lite`)
 
 The full page-by-page run captures every page and adjudicates with a model, which is minutes of
 browser and tens of minutes of model: it belongs on a schedule. The static gate runs on every pull
-request but cannot see the rendered page. `mode: lite` is the gate in between, priced for every
+request but cannot see the rendered page. `audit --lite` is the gate in between, priced for every
 pull request:
 
 - **only the pages the diff can change** — `ultra11y affected --since origin/main` diffs from the
@@ -506,21 +492,20 @@ pull request:
 - **only NEW findings fail** — the baseline keys a rendered finding on
   `page|rule|criterion|normalized selector` (generated ids, hashes and digits folded), not on its
   position in the serialized DOM, which moves whenever anything above it changes. A finding that
-  only moved is not new; a third `img` without `alt` on a page that had two is. The baseline lives
-  in the Actions cache: the push to the default branch audits every page and saves it under a key
-  carrying the SHA, and a pull request restores the one of its merge-base (else the closest by
-  prefix);
+  only moved is not new; a third `img` without `alt` on a page that had two is. Where the baseline
+  is kept is the caller's choice: the push to the default branch audits every page and writes it
+  (`--write-baseline`), and a pull request compares against the one of its merge-base;
 - **a new page is judged with no reference** — that push records every sample page, clean ones
   included, so a page the merge-base's own baseline does not know was added by the pull request:
   every finding on it at `fail-on` is new and fails, and the summary says the page is new. Only a
   baseline that cannot speak for it only warns: none at all, one written by another ultra11y
-  version, or the closest entry by prefix (`--baseline-approximate`, set by the action). A page
+  version, or one that is not the merge-base's own (`--baseline-approximate`). A page
   the push was asked for, or that the sample declares, but that left no snapshot is recorded as
   `skipped` in the baseline and never judged new;
 - **a route nobody declared is named** — `affected` lists the route files the diff adds or changes
   (Next.js App Router `page.*`, a `pages/` router — Next, Nuxt, Astro —, SvelteKit
-  `+page.svelte`) that no sample page declares in its `sources`, as `unsampled` and the action
-  output `affected-unsampled`. `--require-sampled` / `require-sampled: true` fails on them: declare
+  `+page.svelte`) that no sample page declares in its `sources`, as `unsampled`.
+  `--require-sampled` fails on them: declare
   the page in `sample.pages`, or exempt it in `sample.exempt` with a reason. A router configured in
   code (React Router, Vue Router) has no route files to recognise: declare those pages.
 
@@ -538,44 +523,6 @@ pull request:
 }
 ```
 
-```yaml
-name: Accessibility (rendered, per PR)
-on:
-  pull_request:
-  push:
-    branches: [main] # writes the baseline the pull requests compare against
-permissions:
-  contents: read
-  security-events: write # SARIF → code scanning (optional: annotations cover it without)
-jobs:
-  a11y-lite:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0 # the merge-base
-      - id: affected
-        uses: SocialGouv/ultra11y@v5
-        with:
-          mode: lite
-          step: affected
-          require-sampled: true # a new route no sample page declares fails here
-      # Your own capture, of those pages only. Here a Playwright suite whose tests call
-      # `checkA11y` and filter their routes on ULTRA11Y_PAGES (empty = every page).
-      - if: steps.affected.outputs.affected-none != 'true'
-        run: npx playwright test e2e/a11y
-        env:
-          ULTRA11Y_PAGES: ${{ steps.affected.outputs.affected-pages }}
-      - if: steps.affected.outputs.affected-none != 'true'
-        uses: SocialGouv/ultra11y@v5
-        with:
-          mode: lite
-          step: audit
-          pages: ${{ steps.affected.outputs.affected-pages }}
-          standard: rgaa
-          fail-on: blocking
-```
-
 ```ts
 // e2e/a11y/sweep.a11y.ts — capture only what `affected` selected
 const only = process.env.ULTRA11Y_PAGES?.split(",").filter(Boolean);
@@ -587,11 +534,10 @@ for (const route of ROUTES.filter((r) => !only?.length || only.includes(r.id))) 
 }
 ```
 
-The job summary lists each new finding (page, criterion, rule, element); annotations and a SARIF
-upload (category `ultra11y-lite-<standard>`) carry them too. No sticky comment. The same gate
-outside GitHub: `ultra11y affected --since origin/main --json`, your capture, then
+The loop is `ultra11y affected --since origin/main --json`, your capture of those pages, then
 `ultra11y audit --lite --pages <ids> --baseline <file> --fail-on blocking` (and
-`--write-baseline <file>` on the default branch).
+`--write-baseline <file>` on the default branch); `--format sarif|github` renders the new
+findings for code scanning or as annotations.
 
 ### Optional model tier (`judge`) — for the runs with no agent in the loop
 
@@ -619,14 +565,9 @@ it uses the model attached to the ChatGPT account unless `--model` is given. Its
 has no per-run dollar-budget flag, so `--max-budget-usd` is rejected for Codex rather than
 pretending to enforce a ceiling. Use `--timeout` and `--max` to bound the local run.
 
-The GitHub Action wires this as `adjudicate: api`, and offers `adjudicate: agent` as the other
-half — the same worklist handed to a `claude-code-action` run, which can **open the cited files**
-instead of ruling from harvested evidence alone. Both end in the same fail-closed gate; they
-differ in evidence, not in trust. Both read `ANTHROPIC_API_KEY` from the **job environment**,
-never from an input, and **skip themselves when it is absent** — which is exactly what a fork's
-pull request looks like, so the job stays green and the criteria stay « à évaluer ». See
-`references/ci.md` for the cost per run and for `gate-adjudicated`, which lets a model-ruled
-non-conformity fail the build at the price of a red/green that no longer reproduces.
+In CI, the judgment criteria are adjudicated by iterion's
+[`rgaa-audit` bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit), with
+read-only agents and a second reader, through the same fail-closed fold.
 ChatGPT-subscription authentication stays local: public CI does not receive or manufacture a
 Codex subscription secret.
 
@@ -655,10 +596,9 @@ node scripts/ultra11y.mjs check  --report audits/wcag-YYYY-MM-DD.md # integrity 
 There are two deliberate publication profiles. In an interactive audit — on Claude Code, Codex
 or OpenCode alike, following `skills/ultra11y/references/full-audit.md` — the skill produces the
 detailed deliverable: adjudicated Markdown, a printable single-file HTML report,
-per-page HTML/Markdown dossiers, screenshots and annotated evidence. In GitHub Actions,
-`pages-report: compact` with `report`, `html` and `evidence` disabled still gates every criterion
-on every page but uploads only the status Markdown, page JSON, source audit and verdict ledger.
-The CI profile is a gate and handoff; it is not a second remediation report.
+per-page HTML/Markdown dossiers, screenshots and annotated evidence. In CI, iterion's
+`rgaa-audit` bot publishes the dated report, the per-page grid, the coverage annex and the
+verdict ledger.
 
 `--html` turns the audit into a page: `audits/index.html` as the entry point, plus — from
 `report` — a detachable single file that prints to PDF. Self-contained — no script, no
@@ -682,9 +622,6 @@ It needs snapshots, and it says per page and per criterion what it could not dra
 occurrence with no picture must never read as an occurrence with no defect. It distinguishes
 an occurrence *folded* into another's picture from a distinct defect a limit *cut off*, because
 only the second is a gap.
-
-In the GitHub Action both are **on by default**, so the uploaded artifact has a front door
-without changing a workflow. See `references/ci.md`.
 
 The skill (`skills/ultra11y/SKILL.md` + `references/`) teaches the agent when and how to run these, how to complete the manual criteria, and the native-first authoring doctrine.
 

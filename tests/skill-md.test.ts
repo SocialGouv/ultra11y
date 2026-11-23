@@ -127,16 +127,16 @@ describe("skill docs stay in sync with the CLI", () => {
     // exemption is DERIVED from the CLI's own table rather than restated here. A typo in a
     // doc still fails, because a misspelling is not in the table either.
     const removed = new Set(Object.keys(REMOVED_FLAGS).map((f) => `--${f}`));
-    // FLAGS THAT ARE NOT OURS. `adjudicate-runner: cli` spawns the Claude Code CLI and the CI
-    // templates call npm and npx, so the docs now quote three tools rather than one. Listed
+    // FLAGS THAT ARE NOT OURS. `judge --runner claude` spawns the Claude Code CLI and the docs
+    // quote npm and npx, so they cite three tools rather than one. Listed
     // rather than pattern-matched, and each one earns its line: an ultra11y flag that goes
     // missing from `--help` must still fail here, which is the whole point of this test.
     const foreign = new Set([
-      // Claude Code CLI, cited by the `adjudicate-runner: cli` documentation.
+      // Claude Code CLI, cited by the `judge --runner claude` documentation.
       "--safe-mode",
       "--max-turns",
       "--max-budget-usd",
-      // npm / npx, cited by the CI templates.
+      // npm / npx, cited by the install and browser-tier docs.
       "--no-save",
       "--prefix",
       "--yes",
@@ -251,9 +251,9 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
     expect(full).toContain("--require-decided=pages");
     expect(full).toContain("references/orchestration.md");
     expect(full).not.toMatch(/ultra11y\.mjs judge[^\n]*--runner claude/);
-    for (const setting of ["report: 'false'", "html: 'false'", "evidence: 'false'", "pages-report: compact", "require-decided: pages"]) {
-      expect(ci).toContain(setting);
-    }
+    // CI is iterion's rgaa-audit bot, which drives the same gates through the CLI.
+    expect(ci).toContain("bots/rgaa-audit");
+    expect(ci).toContain("--require-decided=pages");
   });
 
   // Issue #157: the full-audit route used to be conditioned on "in Claude Code", so the same

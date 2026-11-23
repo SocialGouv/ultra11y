@@ -22,6 +22,11 @@ The first two block on what a machine can decide. The third exists because most 
 *judgment* — is this `alt` relevant, is this link's purpose clear — which no exit code
 settles. See below.
 
+`init --ci` is a regression gate, not a CI audit: the adjudicated, refuted audit in CI is
+iterion's [`rgaa-audit` bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit)
+(`references/ci.md`). The workflow it writes runs the engine pinned to the version that
+generated it (`npx -y ultra11y@<version>`) and annotates the new findings with `--format github`.
+
 ## The agent-harness hook — the agent review, unprompted
 
 Shipped by the plugin (`hooks/hooks.json` → `hooks/pre-tool-use.mjs` → `ultra11y hook

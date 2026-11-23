@@ -1,11 +1,10 @@
 // THE CLAUDE CODE CLI AS AN ADJUDICATION BACKEND.
 //
 // The second transport behind `judgeAll`, and the one that makes the agent tier portable. The
-// `agent` tier existed only as three `uses: anthropics/claude-code-action@v1` steps in
-// action.yml, which means it could not run from the skill, from a GitLab CI, or on a `push`
-// event — claude-code-action parses the event context before it reads the prompt and refuses
-// the ones it does not know, `push` above all, which is the event an accessibility gate
-// actually fires on.
+// `agent` tier first existed only as `anthropics/claude-code-action` steps in the (since
+// removed) GitHub Action, which means it could not run from the skill, from another CI, or on
+// a `push` event — claude-code-action parses the event context before it reads the prompt and
+// refuses the ones it does not know, `push` above all.
 //
 // This is the same tier as a local process: `claude -p`, the rendered worklist on stdin, the
 // verdicts back on stdout. Nothing about a verdict is decided here — the prompt, the schema

@@ -67,7 +67,7 @@
   <ol class="tl-steps">
     <li><strong>J’écris du code</strong><span>dans mon agent (Claude Code, Codex…)</span></li>
     <li><strong><code>git commit</code> ou <code>push</code></strong><span>le hook audite le diff et bloque une seule fois</span></li>
-    <li><strong>Pull request</strong><span>la GitHub Action annote le diff</span></li>
+    <li><strong>Pull request</strong><span>en CI, le bot <code>rgaa-audit</code> d’iterion audite</span></li>
     <li><strong>Recette ou audit</strong><span>rapport RGAA daté, backlog, tickets</span></li>
   </ol>
   <p class="tl-note">Aussi : <code>checkA11y(page)</code> dans les tests Playwright ou Cypress, et un serveur MCP.</p>
@@ -95,15 +95,8 @@ npx ultra11y install --opencode                    # OpenCode</code></pre>
 <p>Pour le couper : <code>SKIP_A11Y=1</code> pour une commande, <code>ULTRA11Y_HOOK=off</code> pour une session, ou <code>"hook": { "failOn": "off" }</code> dans <code>.ultra11yrc.json</code> pour le dépôt.</p>
 
 <h3>3. Sur la pull request</h3>
-<p>La GitHub Action audite le diff de la pull request et annote les lignes concernées. Elle peut aussi ouvrir les pages servies dans un vrai navigateur.</p>
-<pre><code>- uses: actions/checkout@v4
-  with: { fetch-depth: 0 }      # le diff a besoin de la branche de base
-- uses: SocialGouv/ultra11y@v5
-  with:
-    since: auto                 # compare à la branche de base de la PR
-    standard: rgaa
-    fail-on: blocking           # échoue seulement sur les défauts bloquants</code></pre>
-<p>Le détail (annotations SARIF, commentaire de PR, audit page par page, pages derrière une connexion) est dans <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/ci.md"><code>references/ci.md</code></a>.</p>
+<p>ultra11y ne fournit pas d’intégration CI à lui seul. En CI, l’audit passe par le <a href="https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit">bot <code>rgaa-audit</code> d’iterion</a> : il installe le moteur à une version épinglée, rend les pages de l’échantillon, fait adjuger les critères de jugement par des agents en lecture seule, soumet chaque verdict à un second lecteur, puis ouvre un ticket par critère non conforme.</p>
+<p>Le moteur seul, sans agent, ne fait pas un audit : les critères de jugement resteraient « à évaluer ». Le bot appelle la ligne de commande du moteur, qui est le contrat stable entre les deux ; le détail est dans <a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/ci.md"><code>references/ci.md</code></a>.</p>
 
 <h3>4. En recette ou pour l’audit</h3>
 <p>Pour un audit de conformité, on demande à l’agent : « audite ce site selon le RGAA ». La skill <code>ultra11y</code> déroule alors la boucle complète décrite sur la page <a href="audit.html">Audit</a>.</p>

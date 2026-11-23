@@ -180,7 +180,7 @@ node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --
 `--json --out <dir>` writes `<dir>/pages.json` beside the sheets it mirrors. The grid, the
 dossiers and the HTML are documents for a person; this is the one file a later job, a badge or
 a dashboard can read without re-deriving anything, and stdout alone cannot serve them — in CI
-the caller is a composite action step, and a criterion × page matrix does not fit in an action
+the caller is an orchestrator step, and a criterion × page matrix does not fit in a step
 output. Its shape is `{ pages: [{ id, name, url, basis, criteria: [{ id, status, decidedBy }],
 conformancePct, decided, total }], unattributed, averageRate }`.
 

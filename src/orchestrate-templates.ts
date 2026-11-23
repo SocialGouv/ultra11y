@@ -239,7 +239,7 @@ The main agent is the sole writer. Once every batch of this phase has answered, 
  *  and its only output is an EDIT of `ADJUDICATE.verdicts.json`.
  *
  *  Emitting the fan-out contract there and then telling the agent to obey it VERBATIM — which
- *  is what the composite action's prompt says — hands a small model two sets of instructions
+ *  is what the (since removed) composite action's prompt said — hands a small model two sets of instructions
  *  that contradict each other on the file to read, the file to write, the item selection and
  *  the output channel. Measured on run 32385981037 (Haiku, RGAA, 3 passes): 3 of 41 criteria
  *  came back with no verdict at all. So `--eco` gets a contract written for the harness it

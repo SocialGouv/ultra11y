@@ -93,20 +93,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm exec semantic-release
-
-      # `uses: SocialGouv/ultra11y@v<major>` has to resolve to something. semantic-release only creates
-      # the exact `v<version>` tag, so move the major alias onto it. Idempotent: when no
-      # release happened, package.json still holds the previous version and the alias is
-      # already there. The generated workflow (`init --ci`) pins the exact version instead —
-      # this alias exists for users who prefer to track the major line.
-      - name: Move the major-version tag
-        run: |
-          v=$(node -p "require('./package.json').version")
-          major="v${v%%.*}"
-          if ! git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
-            echo "No tag v$v — no release was cut; leaving $major where it is."
-            exit 0
-          fi
-          git tag -f "$major" "v$v"
-          git push -f origin "refs/tags/$major"
-          echo "$major → v$v"

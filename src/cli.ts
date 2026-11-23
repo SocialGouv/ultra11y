@@ -882,7 +882,7 @@ const BOOLEAN_FLAGS = new Set([
   "all",
   "project",
   // `status`: ALSO ask whether the browser tier resolves here — the question `scan --runtime
-  // local` answers for itself, exposed so a caller (the GitHub Action) can branch on it
+  // local` answers for itself, exposed so a caller (a CI harness such as iterion's rgaa-audit bot) can branch on it
   // instead of re-deriving it in shell.
   "browser",
   "no-skills",
@@ -1120,7 +1120,7 @@ function emitCiFormat(result: AuditResult, format: CiFormat, standard: StandardI
       lang,
       kind,
       // The run is known before the artifact exists, so the link is always safe. The artifact
-      // NAME is only set by the action when it actually uploads one — naming an artifact that
+      // NAME is only set by the caller when it actually uploads one — naming an artifact that
       // was never uploaded sends the reader to a page that does not exist.
       ...(process.env.ULTRA11Y_RUN_URL ? { runUrl: process.env.ULTRA11Y_RUN_URL } : {}),
       ...(process.env.ULTRA11Y_ARTIFACT_NAME ? { artifactName: process.env.ULTRA11Y_ARTIFACT_NAME } : {}),
@@ -1971,7 +1971,7 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
     //
     // The grid, the sheets and the HTML are all documents for a human. This is the same
     // projection for a machine — a later job, a badge, a dashboard — and stdout alone cannot
-    // serve it: in CI the caller is a composite action step, an action output is size-capped,
+    // serve it: in CI the caller is an orchestrator step, a step output is size-capped,
     // and a criterion × page matrix is not a scalar. So `--json --out <dir>` also writes
     // `<dir>/pages.json`, which the artifact then carries beside the sheets it mirrors.
     const outDir = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "";
@@ -2171,7 +2171,7 @@ function evidenceCapsOf(p: ParsedArgs): { caps: { total: number } } | Record<str
  *  the two commands cannot degrade images differently.
  *
  *  It writes to STDERR only. Stdout carries one thing on these commands — the path the caller
- *  captures (`action.yml` reads it into an output) — and a second line there would break it. */
+ *  captures (an orchestrator reads it into a variable) — and a second line there would break it. */
 function emitHtml(result: AuditResult, opts: Parameters<typeof writeHtml>[1]): ReturnType<typeof writeHtml> {
   const res = writeHtml(result, opts);
   for (const n of res.notices) console.error(`ultra11y: ${n}`);
@@ -4890,12 +4890,12 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     }
     sampleConfig = v.sample;
     if (!useLocal && sampleConfig.pages.some((pg) => pg.storageState)) {
-      // `--runtime local` is not always the caller's to pass: inside the GitHub Action the
-      // scan is invoked for them. On `auto` the runtime fell back to Docker because the local
-      // tier could not resolve, so naming the missing dependency is the only actionable half
-      // of this message — "use --runtime local" alone sends an Action user to a flag they
-      // cannot reach, and telling them to force a runtime that still cannot load would
-      // exchange this error for a worse one.
+      // `--runtime local` is not always the caller's to pass: under an orchestrator the scan
+      // is invoked for them. On `auto` the runtime fell back to Docker because the local tier
+      // could not resolve, so naming the missing dependency is the only actionable half of
+      // this message — "use --runtime local" alone sends such a user to a flag they cannot
+      // reach, and telling them to force a runtime that still cannot load would exchange this
+      // error for a worse one.
       // `runtimeFlag`, not `p.flags.runtime`: `--docker` is a documented alias, and reading the
       // raw flag would hand a caller who typed it the OTHER half of this message — "install
       // these dependencies" when the fix is to drop the flag they just passed.
@@ -4905,12 +4905,12 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
           ? `ultra11y scan : l'échantillon comporte des pages authentifiées (storageState), non prises en charge par le runtime Docker.${
               forced
                 ? " Retirez --runtime docker."
-                : " Le runtime local n'a pas pu être résolu : installez @playwright/test et @axe-core/playwright dans le projet audité (ou pointez --cwd dessus). Via l'Action, ce sont des dépendances du dépôt."
+                : " Le runtime local n'a pas pu être résolu : installez @playwright/test et @axe-core/playwright dans le projet audité (ou pointez --cwd dessus)."
             }`
           : `ultra11y scan: the sample has authenticated pages (storageState), unsupported by the Docker runtime.${
               forced
                 ? " Drop --runtime docker."
-                : " The local runtime could not be resolved: install @playwright/test and @axe-core/playwright in the audited project (or point --cwd at it). Through the Action, those are dependencies of the repository."
+                : " The local runtime could not be resolved: install @playwright/test and @axe-core/playwright in the audited project (or point --cwd at it)."
             }`,
       );
       return 2;

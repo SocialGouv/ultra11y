@@ -375,7 +375,7 @@ describe("orchestrate — stale artifact reconciliation", () => {
   });
 });
 
-// The contract IS the spec the agent obeys — `action.yml` tells it to follow
+// The contract IS the spec the agent obeys — an orchestrator tells it to follow
 // `agents/adjudicator.md` VERBATIM. So anything the fold requires and the contract omits is
 // not a documentation gap, it is an instruction to produce work that will be thrown away.
 //

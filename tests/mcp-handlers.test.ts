@@ -249,7 +249,7 @@ describe("ultra11y_init fail_on reaches the generated gate as a token the CLI ac
       ci_workflow: string;
     };
     expect(readFileSync(res.written.find((p) => p.endsWith("pre-commit"))!, "utf8")).toContain("--fail-on blocking");
-    expect(res.ci_workflow).toContain("fail-on: blocking");
+    expect(res.ci_workflow).toContain("--fail-on blocking");
     expect(res.ci_workflow).not.toContain("undefined");
   });
 

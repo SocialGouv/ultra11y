@@ -687,7 +687,7 @@ export function checkDecided(
       // A paid refresh is allowed to improve on yesterday's explicit residual: the new verdict
       // wins and the obsolete declaration is ignored for this run. The default stays strict so
       // a deterministic gate still forces the repository to clean exceptions that outlived
-      // their subject. The GitHub Action enables this only while an adjudicator is active.
+      // their subject. A caller enables this only while an adjudicator is active.
       if (opts.allowStale) continue;
       issues.push(
         fr
