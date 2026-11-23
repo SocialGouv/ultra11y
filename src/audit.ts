@@ -32,6 +32,7 @@ import { AXE_DECIDES, PROBE_SEVERITY, PROBE_WCAG, axeNodeTreatment, scForAxe } f
 import { subjectsAbsent, subjectsForSc, subjectsPresentIn } from "./adjudicate-subjects.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
+import { exportsMetadataTitle, isAppLayoutFile, isUnderAppDir } from "./rules/next-metadata.js";
 import { listPacks } from "./standards/registry.js";
 import { docRuleRan, runPackRules } from "./standards/pack-rules.js";
 import { buildGraphAndDocs } from "./graph/build.js";
@@ -388,6 +389,11 @@ interface Accum {
   // Static criteria whose source shape makes the deterministic rule inconclusive. A clean
   // rule run is not conformity here: the criterion remains manual and enters residualRisks.
   uncertainStatic: Map<string, string>;
+  // Without a graph: an App Router layout in scope that sets the document <title> through the
+  // Next.js metadata API, and the shell components outside `app/` whose title-less <head> it
+  // may fill, held back from a decisive 2.4.2 failure (see holdBackFrameworkTitle).
+  metadataTitleLayout?: string;
+  metadataTitleShells: Set<string>;
   allFindings: Finding[];
   packFindings: Finding[]; // declarative pack-rule findings (namespaced pack:<key>:<id>)
   documents: DocumentAudit[]; // downloadable documents read (PDF), with their check outcomes
@@ -488,6 +494,7 @@ function newAccum(): Accum {
     byCriterion: new Map(),
     applicable: new Map(),
     uncertainStatic: new Map(),
+    metadataTitleShells: new Set(),
     allFindings: [],
     packFindings: [],
     documents: [],
@@ -514,6 +521,40 @@ function newAccum(): Accum {
 function primarySubtag(lang: string): string | undefined {
   const m = lang.trim().match(/^[a-z]{1,8}/i);
   return m ? m[0].toLowerCase() : undefined;
+}
+
+/** The first App Router `layout` among `files` that sets the document <title> through the
+ *  Next.js metadata API. `source` reads a candidate's text; an unreadable one is skipped. */
+function findMetadataTitleLayout(files: string[], source: (file: string) => string | undefined): string | undefined {
+  for (const file of files) {
+    if (!isAppLayoutFile(file)) continue;
+    const text = source(file);
+    if (text !== undefined && exportsMetadataTitle(text)) return file;
+  }
+  return undefined;
+}
+
+/** WITHOUT A GRAPH, A TITLE-LESS <head> IN A SHELL COMPONENT IS NOT A PROVEN FAILURE.
+ *
+ *  Next.js App Router pages get their <title> from `export const metadata = { title }` (or
+ *  `generateMetadata`) in a layout, and a root layout commonly renders `<html><head>` through
+ *  a component it imports from outside `app/` (a DSFR provider shell, say). The single-file
+ *  rule sees that component's head without a title and nothing else. When the scope holds a
+ *  layout setting a metadata title, such a component outside `app/` is held back from a
+ *  decisive 2.4.2 failure: the criterion stays open (manual, with a residual risk naming the
+ *  files) rather than conforming, because only the import graph (`--graph`) or the rendered
+ *  page can tell whether that layout renders it. */
+function holdBackFrameworkTitle(acc: Accum, doc: Doc, findings: Finding[]): Finding[] {
+  const layout = acc.metadataTitleLayout;
+  if (!layout || (doc.kind !== "jsx-ast" && doc.kind !== "jsx-lossy") || !/\.[jt]sx$/i.test(doc.file) || isUnderAppDir(doc.file)) return findings;
+  if (!findings.some((f) => f.ruleId === "title-missing-empty")) return findings;
+  acc.metadataTitleShells.add(doc.file);
+  const shells = [...acc.metadataTitleShells].sort().join(", ");
+  acc.uncertainStatic.set(
+    "2.4.2",
+    `The <head> rendered by ${shells} has no <title>, but the App Router layout ${layout} sets one through the Next.js metadata API and may render it. Re-run the audit with --graph to prove which routes render it, or check the rendered page title.`,
+  );
+  return findings.filter((f) => f.ruleId !== "title-missing-empty");
 }
 
 /** Fold one parsed document into the accumulator, then let it be GC'd. When a
@@ -543,6 +584,7 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
     if (id) doc.capture = { v: 1, ...(doc.capture ?? {}), page: id };
   }
   let findings = runRules(doc);
+  if (!graph) findings = holdBackFrameworkTitle(acc, doc, findings);
   if (graph) {
     const cross = runCrossRules(doc, graph);
     if (cross.suppress.length) {
@@ -1137,6 +1179,8 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
  *  any in-memory caller). The streaming runAudit produces an identical result. */
 export function buildAudit(docs: Doc[], inputs: string[]): AuditResult {
   const acc = newAccum();
+  const sources = new Map(docs.map((d) => [d.file, d.source]));
+  acc.metadataTitleLayout = findMetadataTitleLayout([...sources.keys()], (file) => sources.get(file));
   for (const d of docs) foldDoc(acc, d);
   return finalize(acc, inputs);
 }
@@ -1216,6 +1260,17 @@ export function runAudit(opts: AuditInput): AuditResult {
     const built = buildGraphAndDocs(graphFiles, { carryDocs: !useStaged && !opts.forceJsx });
     graph = built.graph;
     if (built.docs.size) carried = built.docs;
+  } else {
+    // No graph to prove which routes render a title-less <head>: find the App Router layout
+    // that may (see holdBackFrameworkTitle). Only `layout` files are read here, a handful.
+    acc.metadataTitleLayout = findMetadataTitleLayout(files, (file) => {
+      if (useStaged) return stagedContent?.get(file);
+      try {
+        return readText(file);
+      } catch {
+        return undefined;
+      }
+    });
   }
 
   for (let i = 0; i < files.length; i++) {

@@ -100,7 +100,7 @@
   },
   "engine": {
     "staticRules": 102,
-    "crossRules": 7,
+    "crossRules": 8,
     "renderedRules": 6,
     "packRules": 4,
     "axeRules": 69,
@@ -165,7 +165,7 @@
     "overallPct": 47
   },
   "tests": {
-    "fixtures": 149
+    "fixtures": 160
   },
   "criteria": [
     {

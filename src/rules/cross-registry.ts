@@ -1,14 +1,14 @@
 // The cross-file rule set + runner. Two raise findings the graph makes visible,
-// two suppress single-file findings the graph proves are false positives. Findings
+// the others suppress single-file findings the graph proves are false positives. Findings
 // fold into the same AuditResult; suppressions are applied (by ruleId + line) to
 // the same Doc's single-file findings in audit.ts.
 import type { Doc, El } from "../parse/html.js";
 import type { Finding } from "../types.js";
-import { attr, hasAttr, visibleText } from "../parse/html.js";
+import { attr, hasAttr, visibleText, elementsByTag } from "../parse/html.js";
 import { isIntrinsic } from "../parse/jsx-bridge.js";
 import { isFullDocument } from "./rule.js";
 import { type CrossRule, type Suppression, crossToFinding } from "./cross-rule.js";
-import { type DepGraph, resolveUsage, idDefinedAnywhere, htmlLangProvidedFor } from "../graph/graph.js";
+import { type DepGraph, resolveUsage, idDefinedAnywhere, htmlLangProvidedFor, titleSetByImportingRoute } from "../graph/graph.js";
 import { NOTE_CATALOG } from "../messages.js";
 
 const SEVERITY_ORDER: Record<string, number> = { bloquant: 0, majeur: 1, mineur: 2 };
@@ -76,6 +76,32 @@ const crossPageLang: CrossRule = {
     const html = doc.elements.find((e) => e.tag === "html");
     if (html && (attr(html, "lang") ?? "") === "" && htmlLangProvidedFor(graph, doc.file)) {
       suppress.push({ ruleId: "html-lang-missing", line: html.line, reason: "lang fourni par un layout/wrapper importé" });
+    }
+    return { findings: [], suppress };
+  },
+};
+
+// 2b) A document shell component whose <head> carries no <title>, rendered by Next.js App
+//     Router routes that all get a title from the metadata API (`export const metadata =
+//     { title }` / `generateMetadata` in the route or a layout above it) → suppress the
+//     title-missing-empty false positive. The framework injects that <title> into the very
+//     <head> the shell renders. A shell no route renders, or rendered by one route with no
+//     metadata title, keeps its finding.
+const crossNextMetadataTitle: CrossRule = {
+  id: "cross-next-metadata-title",
+  criteria: ["2.4.2"],
+  severity: "bloquant",
+  run(doc, graph) {
+    const suppress: Suppression[] = [];
+    if ((doc.kind !== "jsx-ast" && doc.kind !== "jsx-lossy") || !isFullDocument(doc)) return { findings: [], suppress };
+    // The same anchor title-missing-empty reports on.
+    const anchor = elementsByTag(doc, "head")[0] ?? elementsByTag(doc, "html")[0] ?? doc.elements[0];
+    if (anchor && titleSetByImportingRoute(graph, doc.file)) {
+      suppress.push({
+        ruleId: "title-missing-empty",
+        line: anchor.line,
+        reason: "title injected by the Next.js metadata of every App Router route rendering this shell",
+      });
     }
     return { findings: [], suppress };
   },
@@ -240,6 +266,7 @@ const crossNameRefCrossFile: CrossRule = {
 export const CROSS_RULES: CrossRule[] = [
   crossIconOnlyUnnamed,
   crossPageLang,
+  crossNextMetadataTitle,
   crossAriaForwarding,
   crossSkipLinkTarget,
   crossPropDrilledNameLost,

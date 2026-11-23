@@ -1,13 +1,15 @@
 // Extract a compact, bounded per-file record for the cross-file dependency graph.
 // We keep ONLY what cross-file rules need — import bindings, the components a file
 // defines and the accessibility-relevant signals of the control each renders, the
-// ids it defines, and whether it declares <html lang>. The parsed AST/Doc are
-// discarded after extraction, so memory stays O(file count), never whole-repo.
+// ids it defines, whether it declares <html lang>, and whether it exports a Next.js
+// metadata title. The parsed AST/Doc are discarded after extraction, so memory stays
+// O(file count), never whole-repo.
 import { type AstNode, type AstFile, asNode, asNodes, walkAst } from "../parse/jsx-ast.js";
 import { jsxName, isIntrinsic, normAttrName } from "../parse/jsx-bridge.js";
 import type { Doc } from "../parse/html.js";
 import { hasAttr, attr } from "../parse/html.js";
 import { toPosix } from "../glob.js";
+import { exportsMetadataTitle } from "../rules/next-metadata.js";
 
 export interface ImportRec {
   source: string; // raw specifier, e.g. "./IconButton"
@@ -40,6 +42,9 @@ export interface FileGraphNode {
   components: Map<string, ComponentDef>; // by local/export name, plus a "default" alias
   definesIds: string[]; // literal id="…" anywhere in the file
   providesHtmlLang: boolean; // an <html> with a lang attribute (literal or expression)
+  // Exports Next.js metadata (`metadata` / `generateMetadata`) carrying a `title`. On an App
+  // Router layout/page, the framework then owns the <title> of whatever <head> it renders.
+  exportsMetadataTitle: boolean;
   starReexports: string[]; // `export * from "./x"` sources — a name may be defined in any of them
   // Component-LIBRARY specifiers this file renders (e.g. "@codegouvfr/react-dsfr/Button").
   // A non-empty list marks the file as a rendered-output BLIND SPOT for coverage: the
@@ -333,6 +338,7 @@ export function extractGraphNode(ast: AstFile | null, doc: Doc, file: string, op
   }
 
   const opaqueComponents = doc.opaqueComponents ?? [];
+  const metadataTitle = exportsMetadataTitle(doc.source);
   const finish = (): FileGraphNode => {
     if (opts.sfc) {
       // The SFC IS the component (no self-declaring JS function to find). `hasControl:
@@ -359,7 +365,7 @@ export function extractGraphNode(ast: AstFile | null, doc: Doc, file: string, op
         if (!components.has("default")) components.set("default", def);
       }
     }
-    return { file: posix, imports, components, definesIds, providesHtmlLang, starReexports, opaqueComponents };
+    return { file: posix, imports, components, definesIds, providesHtmlLang, exportsMetadataTitle: metadataTitle, starReexports, opaqueComponents };
   };
   if (!ast) return finish();
 

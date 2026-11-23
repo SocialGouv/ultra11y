@@ -3,15 +3,17 @@ import type { Doc, El, HNode } from "../parse/html.js";
 import { attr, hasAttr, dynamicSpreadMayProvide, visibleText, allIds, elementsByTag, ancestors } from "../parse/html.js";
 import { isDisplayHidden } from "../name.js";
 import { type Rule, type RuleFinding, shellHeadInjected } from "./rule.js";
+import { exportsMetadataTitle } from "./next-metadata.js";
 
 // Next.js App Router sets the document <title> via `export const metadata = { title }`
 // or `generateMetadata`, not a literal <title> in JSX — invisible to source analysis.
 // When that API is present in a JSX/TSX file, the title is managed by the framework, so
-// title-missing-empty must not assert a (false) non-conformity.
-const NEXT_METADATA = /export\s+(const\s+metadata\b|(async\s+)?function\s+generateMetadata\b)/;
+// title-missing-empty must not assert a (false) non-conformity. The same export in a
+// layout that IMPORTS the file holding the <head> is the graph's to prove
+// (cross-next-metadata-title), or the audit's to downgrade without one.
 function titleSetByFramework(doc: Doc): boolean {
   if (doc.kind === "html") return false;
-  return NEXT_METADATA.test(doc.source) && /\btitle\s*:/.test(doc.source);
+  return exportsMetadataTitle(doc.source);
 }
 
 /** The doctype this document declares: the capture records it beside the DOM, a source file
@@ -320,6 +322,17 @@ function governsText(el: El): boolean {
   return el.children.some(walk);
 }
 
+/** A JSX/SFC attribute bound to an expression (`lang={lang}`, `lang={locale ?? "fr"}`) keeps
+ *  its raw `{…}` source slice (src/parse/jsx-bridge.ts): its value is decided at runtime, so
+ *  it is never judged an invalid language tag. Not resolved to a same-file constant on
+ *  purpose: a rule sees no scopes, and a component prop or parameter of the same name
+ *  shadows the module constant in exactly the provider/shell components this occurs in.
+ *  Plain HTML has no expression syntax: `lang="{x}"` there is a literal, and invalid. */
+function boundToExpression(doc: Doc, value: string): boolean {
+  const expressive = doc.kind === "jsx-ast" || doc.kind === "jsx-lossy" || doc.kind === "sfc";
+  return expressive && value.startsWith("{") && value.endsWith("}");
+}
+
 const langInvalid: Rule = {
   id: "lang-invalid",
   criteria: ["3.1.1", "3.1.2"],
@@ -329,6 +342,7 @@ const langInvalid: Rule = {
     for (const el of doc.elements) {
       const lang = (attr(el, "lang") ?? "").trim();
       if (!lang) continue; // empty handled by inline-lang-change-missing / html-lang-missing
+      if (boundToExpression(doc, lang)) continue;
       if (BCP47.test(lang) && !primarySubtagUnregistered(lang)) continue;
       // A malformed `lang` only misdeclares something if it actually GOVERNS text. On
       // <html> that is the whole document; elsewhere, text sitting under a descendant with
