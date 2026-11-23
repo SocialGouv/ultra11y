@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { toDynamicResult, mergeDynamic, cleanTempContexts } from "../src/scan.js";
+import { toDynamicResult, mergeDynamic } from "../src/scan.js";
 import { runAudit } from "../src/audit.js";
 import { resolveMessage, resolveRemediation } from "../src/messages.js";
 
@@ -142,23 +141,11 @@ describe("toDynamicResult — stateful probes (input-overflow + live-region)", (
     expect(lr.advisory).toBeUndefined();
   });
 
-  it("a Docker RunnerOutput (no stateful arrays) folds unchanged — the fields are absent", () => {
+  it("a RunnerOutput without stateful arrays folds unchanged — the fields are absent", () => {
     const dockerOut = { url: "https://exemple.fr", violations: [], reflow: { horizontalScroll: false } };
     const d = toDynamicResult(dockerOut, "https://exemple.fr");
     expect(d.findings.filter((f) => f.engine.startsWith("input-overflow")).length).toBe(0);
     expect(d.findings.some((f) => f.engine === "live-region")).toBe(false);
-  });
-});
-
-describe("cleanTempContexts", () => {
-  it("removes leftover dynamic build contexts from the temp dir", () => {
-    const a = mkdtempSync(join(tmpdir(), "ultra11y-dyn-"));
-    const b = mkdtempSync(join(tmpdir(), "ultra11y-dyn-"));
-    expect(existsSync(a)).toBe(true);
-    const removed = cleanTempContexts();
-    expect(removed).toBeGreaterThanOrEqual(2);
-    expect(existsSync(a)).toBe(false);
-    expect(existsSync(b)).toBe(false);
   });
 });
 
@@ -366,15 +353,6 @@ import { writeFileSync as wf, mkdtempSync as mkd } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 describe("toDynamicResult — host-source anchoring (R3)", () => {
-  it("maps the container mount (/work/input.html) back to the host target path", () => {
-    const out = {
-      url: "/work/input.html",
-      violations: [{ id: "image-alt", impact: "critical", help: "Images must have alt", nodes: [{ target: ["img"], html: "<img src=x>" }] }],
-    };
-    const dyn = toDynamicResult(out as never, "/repo/site/index.html");
-    expect(dyn.findings[0]!.page).toBe("/repo/site/index.html");
-    expect(dyn.findings[0]!.page).not.toContain("/work/input.html");
-  });
   it("converts a file:// url to a host filesystem path", () => {
     const out = { url: pathToFileURL("/repo/site/index.html").href, violations: [] as unknown[], reflow: { horizontalScroll: true } };
     const dyn = toDynamicResult(out as never, "/repo/site/index.html");

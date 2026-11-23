@@ -7,7 +7,6 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AuditResult, Finding, Lang, Severity } from "./types.js";
 import { getSC, guidelineTitle, scTitle, techniques as scTechniques } from "./wcag.js";
-import { resolveRemediation } from "./messages.js";
 import {
   type StandardId,
   isCore,
@@ -24,9 +23,7 @@ import {
 import { guidanceEntriesFor } from "./guidance/resolve.js";
 import type { GuidanceEntry } from "./guidance/types.js";
 import { renderAuditorBacklog, renderAuditorPerCriterion, occurrenceLine, relatedLine } from "./auditor.js";
-import { mdText } from "./md.js";
 
-const SEV_ORDER: Severity[] = ["bloquant", "majeur", "mineur"];
 const SEV_RANK: Record<Severity, number> = { bloquant: 0, majeur: 1, mineur: 2 };
 const ICON: Record<Severity, string> = { bloquant: "🔴", majeur: "🟠", mineur: "🟡" };
 
@@ -181,7 +178,7 @@ const SEV_WEIGHT: Record<Severity, number> = { bloquant: 3, majeur: 2, mineur: 1
 
 /** Deterministic effort heuristic: Σ severity weights over the occurrences, bucketed.
  *  Exported so the auditor block (src/auditor.ts) renders the same t-shirt size + points
- *  as the remediation backlog — one heuristic, never two that can drift. */
+ *  everywhere it appears — one heuristic, never two that can drift. */
 export function effortOf(unit: PrdUnit): { bucket: "S" | "M" | "L"; points: number } {
   const points = unit.findings.reduce((sum, f) => sum + SEV_WEIGHT[f.severity], 0);
   return { bucket: points <= 4 ? "S" : points <= 12 ? "M" : "L", points };
@@ -191,8 +188,8 @@ export function effortOf(unit: PrdUnit): { bucket: "S" | "M" | "L"; points: numb
  *  falling back to the unit's WCAG refs so a pack criterion with no direct entry still
  *  surfaces its SCs' guidance. Stable order, deduped by id. */
 export function guidanceFor(unit: PrdUnit, standard: StandardId): GuidanceEntry[] {
-  // Same order, same dedup — the chain now lives in guidance/resolve.ts so the MCP
-  // reference tools and the criteria lookup can use it too, instead of the PRD being the
+  // Same order, same dedup — the chain now lives in guidance/resolve.ts so the criteria
+  // lookup can use it too, instead of the PRD being the
   // only surface that can reach a criterion's guidance.
   return guidanceEntriesFor(standard, unit.criteriaId, unit.refs);
 }
@@ -214,29 +211,6 @@ export function guidanceExampleBlock(entries: GuidanceEntry[], lang: Lang): stri
   return [];
 }
 
-// One backlog item: criterion heading, fix, effort, a guidance example, and the checklist.
-function unitBlock(unit: PrdUnit, lang: Lang, heading: string, standard: StandardId): string[] {
-  const s = L[lang];
-  const out: string[] = [];
-  // `unit.refs` is empty under the core (the unit IS the success criterion) and holds the
-  // mapped SCs under a pack — where naming them appends a second referential to a heading
-  // that already reads « RGAA 11.1 — … ». Same rule as `renderPrdDoc` and the auditor block.
-  const refs = isCore(standard) && unit.refs.length ? `  ·  WCAG ${unit.refs.join(", ")}` : "";
-  out.push(`${heading} ${ICON[unit.severity]} ${unit.label}${refs}`, "");
-  const fixes = [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))];
-  for (const fx of fixes) out.push(`- _${s.fix} :_ ${mdText(fx)}`);
-  const { bucket, points } = effortOf(unit);
-  out.push(`- _${s.effort} :_ ${bucket} (${points} pts)`, "");
-  out.push(...guidanceExampleBlock(guidanceFor(unit, standard), lang));
-  out.push(`**${s.affected} (${unit.findings.length})**`, "");
-  for (const f of unit.findings) {
-    out.push(occurrenceLine(f, lang, { marker: "checkbox" }));
-    if (f.related) out.push(relatedLine(f.related, lang, { selector: true }));
-  }
-  out.push("");
-  return out;
-}
-
 // `ratePct`: the pack-projection rate (packConformancePct over that standard's own
 // criteria), passed by pack callers so the PRD header matches the pack report's header
 // (and its own NC table) instead of the core WCAG `conformancePct`. Core callers pass
@@ -255,40 +229,9 @@ function header(r: AuditResult, lang: Lang, title: string, note: string = L[lang
   ];
 }
 
-/** A single combined backlog, sectioned by priority (bloquant → majeur → mineur). */
-export function renderBacklog(r: AuditResult, lang: Lang = "en", standard: StandardId = "wcag"): string {
-  const s = L[lang];
-  const units = prdUnits(r, standard, lang);
-  const ratePct = isCore(standard) ? undefined : packConformancePct(derivePackResults(r, standard));
-  const out = header(r, lang, s.title(standardLabel(standard)), undefined, ratePct);
-  if (!units.length) {
-    out.push(s.none, "");
-    out.push(...toRuleOnSection(r, standard, lang));
-    return out.join("\n");
-  }
-  for (const sev of SEV_ORDER) {
-    const group = units.filter((u) => u.severity === sev);
-    if (!group.length) continue;
-    out.push(`## ${ICON[sev]} ${s.sev[sev]} (${group.length})`, "");
-    for (const u of group) out.push(...unitBlock(u, lang, "###", standard));
-  }
-  return out.join("\n");
-}
-
 export interface PrdFile {
   name: string;
   content: string;
-}
-
-/** One standalone PRD document per criterion (for `--split criterion`). */
-export function renderPerCriterion(r: AuditResult, lang: Lang = "en", standard: StandardId = "wcag"): PrdFile[] {
-  const s = L[lang];
-  const ratePct = isCore(standard) ? undefined : packConformancePct(derivePackResults(r, standard));
-  return prdUnits(r, standard, lang).map((u) => {
-    const out = header(r, lang, s.prdTitle(u.label), undefined, ratePct);
-    out.push(...unitBlock(u, lang, "##", standard));
-    return { name: `prd-${u.criteriaId}-${r.date}.md`, content: out.join("\n") };
-  });
 }
 
 interface DocEpic {
@@ -433,8 +376,8 @@ export function renderPrdDoc(r: AuditResult, lang: Lang = "en", standard: Standa
 }
 
 // Output shape: `audit` (DEFAULT) = the auditor conformance block (src/auditor.ts);
-// `remediation` = the dev backlog above (kept for back-compat); `doc` = the user-story PRD.
-export type PrdFormat = "audit" | "remediation" | "doc";
+// `doc` = the user-story PRD.
+export type PrdFormat = "audit" | "doc";
 
 export interface PrdOpts {
   out: string;
@@ -456,10 +399,9 @@ export function writePrd(r: AuditResult, opts: PrdOpts): string[] {
     writeFileSync(p, renderPrdDoc(r, opts.lang, opts.standard));
     return [p];
   }
-  const remediation = opts.format === "remediation";
   const technical = opts.technical ?? true;
   if (opts.split === "criterion") {
-    const files = remediation ? renderPerCriterion(r, opts.lang, opts.standard) : renderAuditorPerCriterion(r, opts.lang, opts.standard, { technical });
+    const files = renderAuditorPerCriterion(r, opts.lang, opts.standard, { technical });
     const paths: string[] = [];
     for (const f of files) {
       const p = join(opts.out, f.name);
@@ -469,6 +411,6 @@ export function writePrd(r: AuditResult, opts: PrdOpts): string[] {
     return paths;
   }
   const p = join(opts.out, `prd-${r.date}.md`);
-  writeFileSync(p, remediation ? renderBacklog(r, opts.lang, opts.standard) : renderAuditorBacklog(r, opts.lang, opts.standard, { technical }));
+  writeFileSync(p, renderAuditorBacklog(r, opts.lang, opts.standard, { technical }));
   return [p];
 }

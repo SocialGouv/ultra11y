@@ -7,7 +7,8 @@
 // the worldwide one it is derived from.
 import { describe, expect, it } from "vitest";
 import { allSC, coreGlossary, getSC, scText } from "../src/wcag.js";
-import { criterionView } from "../src/criteria-view.js";
+import { formatSC } from "../src/criteria.js";
+import { adjudicationText } from "../src/adjudication-data.js";
 
 describe("every shipped success criterion carries its normative wording", () => {
   it("leaves none of the 55 without text", () => {
@@ -55,11 +56,10 @@ describe("the WCAG glossary", () => {
   it("attaches to a criterion only the terms its wording actually links", () => {
     // Resolved from the W3C source's own `<a>` term links, never by matching words against
     // prose — a definition must be attached because the criterion cites it.
-    const r = criterionView("wcag", "1.4.3", "en");
-    const anchors = (r.criterion as { glossary: { anchor: string }[] }).glossary.map((g) => g.anchor);
-    expect(anchors).toContain("large-scale");
-    expect(anchors).toContain("contrast-ratio");
-    expect(anchors).not.toContain("captcha");
+    const out = formatSC(getSC("1.4.3")!, "en");
+    expect(out).toContain("(#large-scale)");
+    expect(out).toContain("(#contrast-ratio)");
+    expect(out).not.toContain("(#captcha)");
   });
 
   it("resolves every term a criterion cites", () => {
@@ -74,11 +74,12 @@ describe("the WCAG glossary", () => {
 
 describe("the core reference is now as rich as the country pack derived from it", () => {
   it("gives a WCAG criterion text, terms and a decision protocol", () => {
-    const r = criterionView("wcag", "1.1.1", "en");
-    const c = r.criterion as { text?: string; glossary: unknown[]; adjudication?: unknown };
-    expect(c.text).toBeTruthy();
-    expect(c.glossary.length).toBeGreaterThan(0);
-    expect(c.adjudication).toBeTruthy();
+    // `criteria 1.1.1` prints the wording and the terms it cites; the decision protocol is
+    // what `verify --manual` inlines in the adjudication brief.
+    const out = formatSC(getSC("1.1.1")!, "en");
+    expect(out).toContain(scText("1.1.1", "en")!);
+    expect(out).toMatch(/Defined terms \(glossary\):/);
+    expect(adjudicationText("1.1.1", "en")).toBeTruthy();
   });
 });
 
@@ -124,12 +125,7 @@ describe("the French frame is French all the way down", () => {
   });
 
   it("attaches a criterion's defined terms in the frame's language", () => {
-    const fr = criterionView("wcag", "1.4.3", "fr");
-    const terms = (fr.criterion as { glossary: { anchor: string; title: string }[] }).glossary;
-    expect(terms.find((t) => t.anchor === "large-scale")!.title).toBe("(texte) agrandi");
-
-    const en = criterionView("wcag", "1.4.3", "en");
-    const enTerms = (en.criterion as { glossary: { anchor: string; title: string }[] }).glossary;
-    expect(enTerms.find((t) => t.anchor === "large-scale")!.title).toBe("large scale");
+    expect(formatSC(getSC("1.4.3")!, "fr")).toContain("  (texte) agrandi (#large-scale) — ");
+    expect(formatSC(getSC("1.4.3")!, "en")).toContain("  large scale (#large-scale) — ");
   });
 });

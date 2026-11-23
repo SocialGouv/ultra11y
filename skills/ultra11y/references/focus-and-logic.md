@@ -52,7 +52,7 @@ of the division of labour, and it is where reading the *actual source* matters m
    refute an engine candidate in `VERIFY.todo.json`: `supported` / `partial` / `refuted` /
    `unsupported`, with a concrete cited reason. What needs a rendered DOM (focus *visible*, *not
    obscured*) is marked `needs-rendered-dom` and goes through the `scan` dynamic tier
-   (`references/dynamic.md`). The local runtime (`scan --runtime local`) now **probes focus
+   (`references/dynamic.md`). The scan **probes focus
    visibility (2.4.7)** directly — tabbing through focusables and flagging any whose computed
    style does not change on focus — alongside 200% zoom (1.4.4), text spacing (1.4.12) and
    content-on-hover (1.4.13). A probe finding is a real NC; a clean probe still leaves the SC

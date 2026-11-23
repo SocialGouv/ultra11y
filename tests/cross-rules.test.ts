@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { runAudit } from "../src/audit.js";
 import type { AuditResult, Finding } from "../src/types.js";
-import { renderBacklog } from "../src/prd.js";
+import { renderAuditorBacklog as renderBacklog } from "../src/auditor.js";
 import { NOTE_CATALOG } from "../src/messages.js";
 
 const SCOPE = ["tests/fixtures/cross-file"];
 const find = (fs: Finding[], ruleId: string, fileEndsWith: string): Finding | undefined => fs.find((f) => f.ruleId === ruleId && f.file.endsWith(fileEndsWith));
 
 /** Wrap a single real finding in a minimal AuditResult so it can be run through the
- *  actual renderers (renderBacklog), exercising the full engine → render pipeline. */
+ *  actual renderers (renderAuditorBacklog), exercising the full engine → render pipeline. */
 function auditOf(finding: Finding): AuditResult {
   return {
     tool: "ultra11y",

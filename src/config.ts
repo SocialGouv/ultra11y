@@ -137,7 +137,7 @@ function packPaths(path: string): { pack: string; glossary?: string; guidance?: 
  *  Must run BEFORE any `resolveStandard`/`loadPack` so a runtime pack is resolvable.
  *
  *  `opts.scope` confines the packs to one project root instead of the process-wide
- *  registry — what a long-lived MCP server needs, since it serves many projects and two
+ *  registry — what a long-lived host serving many projects would need, since two
  *  of them may each declare a different pack under the same key. Guidance datasets stay
  *  process-wide: they are keyed by pack key and only ever ADD examples, so a stray one
  *  cannot change a verdict. */

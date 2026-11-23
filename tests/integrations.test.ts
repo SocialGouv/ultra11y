@@ -2,9 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { RANK, THRESHOLD, failingFindings, formatFailure, buildPayload, slugify, gate, type FindingLike } from "../src/integrations/payload.js";
-import { playwrightFixture, cypressPlugin, cypressCommands } from "../src/e2e.js";
-import { COLLECT_SNAPSHOT } from "../src/collector.js";
+import { failingFindings, formatFailure, buildPayload, slugify, gate, type FindingLike } from "../src/integrations/payload.js";
 import { slugifyPageId } from "../src/snapshot.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -14,10 +12,9 @@ const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
   files: string[];
 };
 
-// The e2e integration ships TWICE: as published entry points (`ultra11y/playwright`,
-// `ultra11y/cypress`) for a project that depends on ultra11y, and as install-free generated
-// fixtures (`render --e2e`) for one that does not. Two shipping shapes, one behaviour — the
-// tests below pin the shared tables and the packaging that makes both resolvable.
+// The e2e integration ships as published entry points (`ultra11y/playwright`,
+// `ultra11y/cypress`). The tests below pin the shared tables and the packaging that makes them
+// resolvable.
 
 describe("severity gating", () => {
   const f = (severity: string, advisory?: boolean): FindingLike => ({
@@ -101,8 +98,7 @@ describe("buildPayload", () => {
   });
 
   it("matches the engine's own slug rule, character for character", () => {
-    // Four copies of this rule ship (engine, published plugin, two generated fixtures, dev
-    // overlay). They disagreeing means one page recorded under two ids — two columns in the
+    // Two copies of this rule ship (engine, published plugin). They disagreeing means one page recorded under two ids — two columns in the
     // grid for one page. Accented routes are the case that used to break: `new URL()`
     // percent-encodes, so `/Accès` slugified to `acc-c3-a8s`, the UTF-8 bytes spelled out.
     for (const url of [
@@ -118,40 +114,6 @@ describe("buildPayload", () => {
     }
     expect(slugify("https://exemple.fr/")).toBe("accueil");
     expect(slugify("https://exemple.fr/Accès")).toBe("acces");
-  });
-});
-
-describe("the generated fixtures cannot drift from the published plugins", () => {
-  const pw = playwrightFixture("/abs/ultra11y.mjs");
-  const cyPlugin = cypressPlugin("/abs/ultra11y.mjs");
-  const cyCommands = cypressCommands();
-
-  it("interpolates the severity tables instead of restating them", () => {
-    // A fixture gating differently from the published plugin would fail two projects
-    // differently while claiming to be the same tool.
-    expect(pw).toContain(`const RANK = ${JSON.stringify(RANK)};`);
-    expect(pw).toContain(`const THRESHOLD = ${JSON.stringify(THRESHOLD)};`);
-    expect(cyPlugin).toContain(`const THRESHOLD = ${JSON.stringify(THRESHOLD)};`);
-  });
-
-  it("embeds the engine's own collector, never a copy of it", () => {
-    expect(pw).toContain(JSON.stringify(COLLECT_SNAPSHOT));
-    expect(cyCommands).toContain(JSON.stringify(COLLECT_SNAPSHOT));
-  });
-
-  it("gates identically to the published implementation on the same findings", () => {
-    // Evaluate the fixture's own failingFindings and compare verdicts, rather than trusting
-    // that two look-alike sources behave the same.
-    const src = pw.slice(pw.indexOf("const RANK"), pw.indexOf("export function formatFailure"));
-    const fixtureFailing = new Function(`${src.replace(/export /g, "")}; return failingFindings;`)() as typeof failingFindings;
-    const findings: FindingLike[] = [
-      { ruleId: "a", criteriaId: "1.1.1", file: "f", line: 1, severity: "bloquant", message: "m" },
-      { ruleId: "b", criteriaId: "1.1.1", file: "f", line: 1, severity: "majeur", message: "m" },
-      { ruleId: "c", criteriaId: "1.1.1", file: "f", line: 1, severity: "mineur", message: "m", advisory: true },
-    ];
-    for (const t of ["blocking", "major", "minor"]) {
-      expect(fixtureFailing({ findings }, t).length).toBe(failingFindings({ findings }, t).length);
-    }
   });
 });
 

@@ -3,8 +3,8 @@
 //
 // The static engine reads source; `scan` needs a live browser and a served app. These rules
 // sit in between: they read the COMPUTED styles, the LAID-OUT boxes and the SCREENSHOT that a
-// snapshot recorded, so CI can decide contrast and colour-only affordances with no browser, no
-// Docker and no running server — from a committed artefact.
+// snapshot recorded, so CI can decide contrast and colour-only affordances with no browser
+// and no running server — from a committed artefact.
 //
 // Every rule here is inert without `doc.signals`, so an ordinary source audit is byte-for-byte
 // unchanged. And every one of them reports only what it MEASURED: a colour it could not

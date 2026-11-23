@@ -2,7 +2,7 @@
 // snapshot ids the run recorded and which pages it refused, with why. Before, that accounting
 // lived only on stderr (the refusal warnings) and in the `.ultra11y/pages` mtimes, so an
 // orchestrator reporting the rendered layer (« N pages capturées, M refusées ») had to
-// re-derive it. Mocks the Docker tier so the real CLI merge path runs without a browser
+// re-derive it. Mocks the local runtime so the real CLI merge path runs without a browser
 // (same shape as tests/scan-merge-lang.test.ts).
 import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
@@ -15,7 +15,7 @@ const FIX = new URL("./fixtures/", import.meta.url).pathname;
 
 const dynamicResult: DynamicResult = {
   tool: "ultra11y",
-  engine: "axe-core@playwright (docker)",
+  engine: "axe-core@playwright (local)",
   target: "https://exemple.fr",
   date: "2026-07-06",
   findings: [],
@@ -23,12 +23,11 @@ const dynamicResult: DynamicResult = {
   redirected: [{ id: "compte", name: "Mon compte", requested: "https://exemple.fr/compte", landed: "https://exemple.fr/connexion", reason: "redirect" }],
 };
 
-vi.mock("../src/scan.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/scan.js")>();
+vi.mock("../src/scan-local.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/scan-local.js")>();
   return {
     ...actual,
-    dockerAvailable: () => true,
-    runScan: () => dynamicResult,
+    runScanLocal: async () => dynamicResult,
   };
 });
 
@@ -52,7 +51,7 @@ describe("scanPageSummary — the recorded/refused accounting of one scan", () =
   });
 
   it("a scan with no snapshots and no refusals records and refuses nothing", () => {
-    const empty: DynamicResult = { tool: "ultra11y", engine: "axe-core@playwright (docker)", target: "https://exemple.fr", date: "2026-07-06", findings: [] };
+    const empty: DynamicResult = { tool: "ultra11y", engine: "axe-core@playwright (local)", target: "https://exemple.fr", date: "2026-07-06", findings: [] };
     expect(scanPageSummary(empty)).toEqual({ recorded: [], refused: [] });
     expect(scanPageSummary(empty)).not.toHaveProperty("sample");
   });
@@ -69,7 +68,7 @@ describe("scan --merge --json — the printed document opens with the pages summ
       let code: number;
       let printed: { pages: unknown; tool: string; findings: unknown[] };
       try {
-        code = await main(["scan", "https://exemple.fr", "--runtime", "docker", "--merge", auditPath, "--out", tmp, "--json"]);
+        code = await main(["scan", "https://exemple.fr", "--merge", auditPath, "--out", tmp, "--json"]);
         printed = JSON.parse(log.mock.calls[0]![0] as string);
       } finally {
         log.mockRestore();

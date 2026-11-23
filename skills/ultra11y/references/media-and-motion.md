@@ -74,7 +74,7 @@ movement lasts the 5 seconds 2.2.2 requires.
 
 ## Orientation, reflow, spacing, zoom (1.3.4, 1.4.4, 1.4.10, 1.4.12)
 
-All four are decided on the rendered page (`scan --runtime local` probes zoom, spacing and
+All four are decided on the rendered page (`scan` probes zoom, spacing and
 overflow). What to check:
 
 - **1.3.4 Orientation** — the content works in both portrait and landscape, unless the

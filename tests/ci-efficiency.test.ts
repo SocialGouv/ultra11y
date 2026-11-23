@@ -111,66 +111,26 @@ describe("the PR accessibility gate", () => {
   });
 });
 
-// This is the paid end-to-end path CI cannot run on every push. Keep one runner and one
-// acquisition pass: a comparison matrix doubles both the browser work and the model bill.
-describe("the keyed adjudication workflow is singular, exhaustive and bounded", () => {
-  const WF = () => workflow("adjudication.yml");
-  const j = () => job("adjudication.yml", "adjudicate");
-
-  it("exposes one dispatch and no paid runner comparison", () => {
-    expect(WF().on?.workflow_dispatch).toBeDefined();
+// Issue #168: the headless `judge` runner, and the paid workflow that drove it, are gone. The
+// agent adjudicates through `verify --manual`; in CI, iterion's rgaa-audit bot does.
+describe("no paid adjudication workflow", () => {
+  it("ships no adjudication workflow", () => {
+    expect(existsSync(join(ROOT, ".github/workflows/adjudication.yml"))).toBe(false);
     expect(existsSync(join(ROOT, ".github/workflows/adjudication-compare.yml"))).toBe(false);
-    expect(read(".github/workflows/adjudication.yml")).not.toMatch(/matrix:/);
   });
 
-  it("serialises paid dispatches instead of cancelling or racing them", () => {
-    expect(WF().concurrency?.group).toBe("adjudication-keyed");
-    expect(WF().concurrency?.["cancel-in-progress"]).toBe(false);
-    expect(j()["timeout-minutes"]).toBe(60);
-  });
-
-  it("uses only the subscription credential", () => {
-    const env = j().env ?? {};
-    expect(env.CLAUDE_CODE_OAUTH_TOKEN).toContain("secrets.CLAUDE_CODE_OAUTH_TOKEN");
-    expect(env.ANTHROPIC_API_KEY).toBeUndefined();
-  });
-
-  it("acquires once: one audit and one unbounded crawl", () => {
-    const run = script(j());
-    expect(run.match(/ultra11y\.mjs audit /g)).toHaveLength(1);
-    expect(run.match(/scan --crawl/g)).toHaveLength(1);
-    expect(run).toContain("--max 0");
-  });
-
-  it("runs the bounded, batched Haiku CLI transport, at most three passes, into a fresh ledger", () => {
-    const run = script(j());
-    for (const flag of [
-      "--runner claude",
-      "--grain batch",
-      "--model haiku",
-      "--effort low",
-      "--max-budget-usd 0.35",
-      "--ledger audits/fresh-rgaa-ledger.json",
-      "--apply",
-    ]) {
-      expect(run, flag).toContain(flag);
+  it("calls no removed command or CI output in any workflow", () => {
+    for (const file of WORKFLOWS) {
+      const text = read(`.github/workflows/${file}`);
+      for (const removed of [
+        /\bultra11y\.mjs (judge|mcp|dev|affected|import)\b/,
+        /--format (sarif|github)\b/,
+        /audit --lite\b/,
+        /--runtime docker\b/,
+        /init --ci\b/,
+      ]) {
+        expect(removed.test(text), `${file} matches ${removed}`).toBe(false);
+      }
     }
-    expect(run).toContain("for i in 1 2 3");
-    // The circuit breaker carries provider saturation across passes.
-    expect(run).toMatch(/provider unavailable/);
-  });
-
-  it("never fails on a declined criterion, only on facts about the run", () => {
-    const run = script(j());
-    expect(run).not.toContain("--require-decided");
-    expect(run).toContain("--require-rendered");
-    expect(run).toContain("grid.pages.length !== 9");
-    expect(run).toContain("page.criteria.length !== 106");
-  });
-
-  it("does not buy a second model fold after the exhaustive adjudication", () => {
-    const run = script(j());
-    expect(run).not.toContain("judge --refute");
-    expect(run).not.toContain("--max-verify 0");
   });
 });

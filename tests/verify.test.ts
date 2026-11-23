@@ -91,8 +91,8 @@ describe("buildWorklist", () => {
 - **Rate** : 50%
 ## 1. x
 ## 2. y
-- **E205.4 — Focus Visible** — \`a.html:1\` (\`a\`)
-  - focus indicator missing
+**Criterion** : E205.4 — Focus Visible
+- [ ] \`a.html:1\` (\`a\`) — focus indicator missing
 ## 3. z
 ## 4. NA
 ## 5. manual
@@ -123,8 +123,8 @@ describe("buildWorklist", () => {
 - **Rate** : 50%
 ## 1. x
 ## 2. y
-- **E205.4 — Focus Visible** — \`a.html:42\` (\`button.cta\`)
-  - focus indicator missing
+**Criterion** : E205.4 — Focus Visible
+- [ ] \`a.html:42\` (\`button.cta\`) — focus indicator missing
 ## 3. z
 ## 4. NA
 ## 5. manual
@@ -269,26 +269,6 @@ describe("round-trip guard: buildWorklist(renderReport(...)) recovers EXACTLY th
       expect(it.claim.length).toBeGreaterThan(0);
     }
   });
-
-  it("still verifies a LEGACY (pre-Phase-4) flat-bullet report via the fallback parser", () => {
-    const legacy = [
-      "# Report",
-      "- **Rate** : 50%",
-      "## 1. x",
-      "## 2. y",
-      "- **1.4.3 — Contrast (Minimum)** — `a.html:1` (`div`)",
-      "  - contrast too low",
-      "  - _Fix :_ increase contrast",
-      "## 3. z",
-      "## 4. NA",
-      "## 5. manual",
-      "",
-    ].join("\n");
-    const items = buildWorklist(legacy, "wcag");
-    expect(items).toHaveLength(1);
-    expect(items[0]!.criteriaId).toBe("1.4.3");
-    expect(items[0]!.claim).toBe("contrast too low");
-  });
 });
 
 describe("applyVerdicts", () => {
@@ -403,33 +383,6 @@ describe("writeWorklist", () => {
     expect(regenerated[0]!.verdict).toBe("supported");
     expect(regenerated[0]!.note).toBe("source re-opened");
     expect(regenerated[1]!.verdict).toBeNull();
-  });
-
-  it("migrates legacy per-citation conformities only when every anchor was upheld", () => {
-    const out = mkdtempSync(join(tmpdir(), "ultra11y-verify-group-resume-"));
-    const legacy: VerifyItem[] = [
-      { n: 1, criteriaId: "12.2", file: "a.html", line: 2, selector: "nav", claim: "navigation stable", verdict: "supported", note: "a", kind: "c" },
-      { n: 2, criteriaId: "12.2", file: "b.html", line: 3, selector: "nav", claim: "navigation stable", verdict: "partial", note: "b", kind: "c" },
-    ];
-    writeFileSync(join(out, "VERIFY.todo.json"), JSON.stringify(legacy));
-    const grouped: VerifyItem = {
-      ...legacy[0]!,
-      verdict: null,
-      note: "",
-      citations: [
-        { file: "a.html", line: 2, selector: "nav", snippet: "<nav>A</nav>" },
-        { file: "b.html", line: 3, selector: "nav", snippet: "<nav>B</nav>" },
-      ],
-    };
-    writeWorklist([grouped], out, false);
-    let regenerated = JSON.parse(readFileSync(join(out, "VERIFY.todo.json"), "utf8")) as VerifyItem[];
-    expect(regenerated[0]!.verdict).toBe("partial");
-
-    legacy[1]!.verdict = "refuted";
-    writeFileSync(join(out, "VERIFY.todo.json"), JSON.stringify(legacy));
-    writeWorklist([grouped], out, false);
-    regenerated = JSON.parse(readFileSync(join(out, "VERIFY.todo.json"), "utf8")) as VerifyItem[];
-    expect(regenerated[0]!.verdict).toBeNull();
   });
 });
 

@@ -409,7 +409,7 @@ function bump(t: EvidencePageTally, reason: EvidenceSkip): void {
 }
 
 /** A filesystem-safe, stable, collision-free name for a finding's crop. Derived from the same
- *  identity SARIF fingerprints use (src/baseline.ts `findingId`), hashed only because that
+ *  stable finding identity (src/baseline.ts `findingId`), hashed only because that
  *  identity contains path separators and pipes. The identity itself is never altered. */
 function cropName(f: Finding): string {
   return `${createHash("sha1").update(findingId(f)).digest("hex").slice(0, 12)}.png`;

@@ -5,7 +5,7 @@ on:
   workflow_dispatch: {}
 
 # No model credential is wired here, and nothing is written back: the engine runs from the
-# checkout, annotates through workflow commands and uploads its audit as an artifact.
+# checkout, writes its report and per-page grid, and uploads them as an artifact.
 permissions:
   contents: read
 
@@ -72,10 +72,12 @@ jobs:
           node scripts/ultra11y.mjs scan http://127.0.0.1:8933/ --runtime local --cwd "$PWD" \
             --standard rgaa --merge audits/audit-latest.json --out audits
 
-      - name: Annotations and job summary
+      - name: Report, and its integrity gate
         run: |
           node scripts/ultra11y.mjs report --in audits/audit-latest.json \
-            --standard rgaa --lang fr --format github
+            --standard rgaa --lang fr --out audits
+          node scripts/ultra11y.mjs check --report audits/rgaa-*.md \
+            --in audits/audit-latest.json --standard rgaa
 
       - name: Per-page grid
         run: |

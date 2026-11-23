@@ -13,7 +13,7 @@ import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { findingId } from "./baseline.js";
 import { evidenceRefusals, type EvidenceManifest } from "./evidence.js";
-import { renderHtmlDocument, type Doc, type Run } from "./html.js";
+import { renderHtmlDocument, type Run } from "./html.js";
 import { compositeDoc, indexDoc, pageDoc, pagesIndexDoc, type CropLookup, type RefusalLookup } from "./html-report.js";
 import { derivePages, pagesOf } from "./pages.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
@@ -296,11 +296,6 @@ function noticeRuns(notices: string[]): Run[] {
   return notices.flatMap((n, i) => (i ? [{ text: " " }, { text: n }] : [{ text: n }]));
 }
 
-/** The composite's own filename, so the CLI can report it without rebuilding the rule. */
-export function compositeFileName(standard: StandardId, date: string): string {
-  return `ultra11y-${isCore(standard) ? "wcag" : loadPack(standard).key}-${date}.html`;
-}
-
 /** Every `src`/`href` the emitted pages carry, for the self-containment gate. A report that
  *  points outside its own directory is a report that breaks the moment it is unzipped
  *  somewhere else — which is the only way anyone ever reads an artifact. */
@@ -319,9 +314,4 @@ export function externalReferences(html: string, depth: number): string[] {
     if (climbs > depth) out.push(ref);
   }
   return out;
-}
-
-/** Convenience for a caller that only wants the single file. */
-export function renderComposite(result: AuditResult, opts: { standard?: StandardId; lang?: Lang } = {}): string {
-  return renderHtmlDocument(compositeDoc(result, opts) as Doc);
 }

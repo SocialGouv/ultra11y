@@ -87,23 +87,75 @@ describe("parseArgs", () => {
   });
 });
 
-describe("judge runner validation", () => {
-  const audit = join(FIX, "judge-audit.json");
-
-  it("keeps `cli` as the Claude runner alias", async () => {
-    const r = await run(["judge", "--in", audit, "--runner", "cli", "--effort", "minimal"]);
+describe("removed commands and flags fail loudly, naming the replacement", () => {
+  it.each(["mcp", "dev", "judge", "affected", "import"])("`%s` exits 2 with a pointer, not a bare unknown command", async (cmd) => {
+    const r = await run([cmd]);
     expect(r.code).toBe(2);
-    expect(r.err).toContain("not valid for claude");
+    expect(r.err).toContain("is no longer a command");
   });
 
-  it("uses Codex's effort vocabulary and refuses a fictional dollar ceiling", async () => {
-    const effort = await run(["judge", "--in", audit, "--runner", "codex", "--effort", "max"]);
-    expect(effort.code).toBe(2);
-    expect(effort.err).toContain("not valid for codex");
+  it.each([
+    ["audit", "--lite"],
+    ["audit", "--baseline", "b.json"],
+    ["init", "--ci"],
+    ["init", "--baseline"],
+    ["render", "--e2e"],
+    ["scan", "--docker"],
+    ["scan", "--clean"],
+    ["pages", "--diff", "x.json"],
+  ])("`%s %s` exits 2 and names what replaced it", async (cmd, ...flag) => {
+    const r = await run([cmd, ...flag]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain(`${flag[0]} was removed`);
+  });
 
-    const budget = await run(["judge", "--in", audit, "--runner", "codex", "--max-budget-usd", "1"]);
-    expect(budget.code).toBe(2);
-    expect(budget.err).toContain("does not exist for a ChatGPT-subscription Codex run");
+  it("`report --format sarif` is refused rather than silently writing Markdown", async () => {
+    const r = await run(["report", "--in", join(FIX, "judge-audit.json"), "--format", "sarif"]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("--format");
+  });
+
+  // A removed VALUE of a still-valid flag must fail just as loudly: otherwise it only earned
+  // the generic "using the default" warning and exit 0, so a CI job kept passing on nothing.
+  it.each([
+    ["audit", ".", "--format", "sarif"],
+    ["audit", ".", "--format", "github"],
+    ["audit", "--in", join(FIX, "judge-audit.json"), "--format", "sarif"],
+    ["audit", "--in", join(FIX, "judge-audit.json"), "--format=github"],
+    ["report", "--in", join(FIX, "judge-audit.json"), "--format", "github"],
+  ])("`%s %s %s %s` (a removed CI format) exits 2 and names iterion and --json", async (...argv) => {
+    const r = await run(argv);
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/--format (sarif|github) was removed/);
+    expect(r.err).toContain("rgaa-audit");
+    expect(r.err).toContain("--json");
+    expect(r.err).not.toContain("using the default");
+  });
+
+  it.each(["prd", "tickets"])("`%s --format remediation` exits 2 and points at prd / tickets", async (cmd) => {
+    const r = await run([cmd, "--in", join(FIX, "judge-audit.json"), "--format", "remediation"]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("--format remediation was removed");
+    expect(r.err).toContain("ultra11y prd");
+    expect(r.err).toContain("ultra11y tickets");
+  });
+
+  it.each(["audit", "doc"])("`prd --format %s` still works", async (format) => {
+    const tmpd = mkdtempSync(join(tmpdir(), "u11y-prd-format-"));
+    try {
+      const r = await run(["prd", "--in", join(FIX, "judge-audit.json"), "--out", tmpd, "--format", format]);
+      expect(r.code, r.err).toBe(0);
+      expect(r.err).not.toContain("was removed");
+    } finally {
+      rmSync(tmpd, { recursive: true, force: true });
+    }
+  });
+
+  it("`pages --format grid` still works", async () => {
+    const r = await run(["pages", "--in", join(FIX, "judge-audit.json"), "--format", "grid"]);
+    // This fixture has no pages in scope (exit 1): what matters is that --format got through.
+    expect(r.code, r.err).not.toBe(2);
+    expect(r.err).not.toContain("--format");
   });
 });
 
@@ -284,28 +336,6 @@ describe("resolveLang — --lang auto default (conversation-first, repo/standard
   });
 });
 
-describe("init — --baseline is a boolean selector, not a value flag", () => {
-  it("init --baseline does not swallow the following token", () => {
-    const p = parseArgs(["init", "--baseline", "--hook"]);
-    expect(p.flags.baseline).toBe(true);
-    expect(p.flags.hook).toBe(true);
-  });
-  it("init --baseline alone selects baseline only", () => {
-    const p = parseArgs(["init", "--baseline"]);
-    expect(p.flags.baseline).toBe(true);
-  });
-  it("init --ci --baseline --fail-on majeur keeps fail-on as its value", () => {
-    const p = parseArgs(["init", "--ci", "--baseline", "--fail-on", "majeur"]);
-    expect(p.flags.ci).toBe(true);
-    expect(p.flags.baseline).toBe(true);
-    expect(p.flags["fail-on"]).toBe("majeur");
-  });
-  it("audit --baseline still consumes its path value", () => {
-    const p = parseArgs(["audit", "x.html", "--baseline", "bl.json"]);
-    expect(p.flags.baseline).toBe("bl.json");
-  });
-});
-
 describe("subcommand --help is intercepted (no side effects)", () => {
   it("check --help prints help and exits 0 (instead of erroring on missing --report)", async () => {
     const r = await run(["check", "--help"]);
@@ -361,7 +391,6 @@ describe("audit --in re-gates an audit that already exists", () => {
   // report on something other than what you asked it to report on.
   it.each([
     ["--since", "main"],
-    ["--baseline", "b.json"],
     ["--out", "somewhere"],
   ])("refuses %s, which cannot change an audit that is already computed", async (flag, value) => {
     const r = await run(["audit", "--in", AUDIT, flag, value]);
@@ -482,23 +511,17 @@ describe("verify — input validation hardening", () => {
   });
 });
 
-describe("scan --storage-state + an EXPLICIT docker runtime is an unsupported combination", () => {
-  it("--runtime docker --storage-state exits 2 with a clear message (not a silent ignore)", async () => {
-    const r = await run(["scan", "http://example.com", "--runtime", "docker", "--storage-state", join(tmpdir(), "auth.json")]);
+describe("scan runtime selection", () => {
+  it("--runtime docker exits 2: the Docker runtime is gone, and the scan never silently runs another way", async () => {
+    const r = await run(["scan", "http://example.com", "--runtime", "docker"]);
     expect(r.code).toBe(2);
-    expect(r.err.toLowerCase()).toContain("storage-state");
-    expect(r.err.toLowerCase()).toContain("docker");
-  });
-
-  it("--docker (alias) --storage-state also exits 2", async () => {
-    const r = await run(["scan", "http://example.com", "--docker", "--storage-state", join(tmpdir(), "auth.json")]);
-    expect(r.code).toBe(2);
+    expect(r.err.toLowerCase()).toContain("docker runtime was removed");
   });
 
   // Where no browser starts this fails fast (exit 1); where one does — the launcher now falls
   // back on an installed Google Chrome, which CI runners carry — the scan really runs, so the
   // test gets a real scan's time budget. Either way the gate under test never answers 2.
-  it("--runtime local --storage-state is unaffected by the new gate (fails later for an unrelated reason, never exit 2)", { timeout: 90_000 }, async () => {
+  it("--runtime local --storage-state is accepted (fails later for an unrelated reason, never exit 2)", { timeout: 90_000 }, async () => {
     const r = await run(["scan", "http://example.com", "--runtime", "local", "--storage-state", join(tmpdir(), "auth.json")]);
     expect(r.code).not.toBe(2);
   });
@@ -537,12 +560,6 @@ describe("CLI gate & input hardening", () => {
     expect(r.err.toLowerCase()).toContain("--lang");
   });
 
-  it("accepts judge --grain batch without the generic ticket-grain warning", async () => {
-    const r = await run(["judge", "--in", join(tmpdir(), "missing-judge-audit.json"), "--runner", "claude", "--grain", "batch"]);
-    expect(r.err).not.toContain("is not one of criterion|page|page-criterion|single|file");
-    expect(r.err).toContain("--in file not found");
-  });
-
   it("a single-dash flag typo (-grph) is surfaced as unknown", async () => {
     const r = await run(["audit", `${FIX}conforming/good.html`, "-grph"]);
     expect(r.err.toLowerCase()).toContain("unknown flag");
@@ -555,11 +572,8 @@ describe("verify — fail-closed apply gate", () => {
     const dir = mkdtempSync(join(tmpdir(), "u11y-cov-"));
     const page = join(dir, "page.html");
     writeFileSync(page, `<html><body>\n${Array.from({ length: n + 2 }, () => "<img>").join("\n")}\n</body></html>`);
-    const bullets = Array.from(
-      { length: n },
-      (_, i) => `- **1.1.1 — Non-text Content** — \`${page}:${i + 2}\` (\`img\`)\n  - image without a text alternative`,
-    ).join("\n");
-    const md = `# Report\n- **Rate** : 10%\n## 1. s\n## 2. NC\n${bullets}\n## 3. x\n## 4. NA\n## 5. manual\n`;
+    const bullets = Array.from({ length: n }, (_, i) => `- [ ] \`${page}:${i + 2}\` (\`img\`) — image without a text alternative`).join("\n");
+    const md = `# Report\n- **Rate** : 10%\n## 1. s\n## 2. NC\n**Success criterion** : 1.1.1 — Non-text Content\n${bullets}\n## 3. x\n## 4. NA\n## 5. manual\n`;
     const report = join(dir, "report.md");
     writeFileSync(report, md);
     return { dir, page, report };
@@ -710,7 +724,7 @@ describe("sample check + scan --sample + partial-audit advisory (Task 5)", () =>
   });
 
   it("`scan --sample` without a sample block exits 2 with guidance", async () => {
-    const r = await withConfig({ standard: "rgaa" }, ["scan", "--sample", "--runtime", "docker"]);
+    const r = await withConfig({ standard: "rgaa" }, ["scan", "--sample"]);
     expect(r.code).toBe(2);
     expect(r.err).toContain(".ultra11yrc.json");
   });

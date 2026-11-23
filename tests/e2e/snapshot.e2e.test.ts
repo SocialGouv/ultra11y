@@ -1,7 +1,6 @@
 // The `snapshot` command as a producer really uses it: the shipped bundle, a payload on
 // stdin, artifacts on disk. This is the contract the generated E2E fixtures depend on.
 import { describe, it, expect, afterAll } from "vitest";
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runCli, mkTmp, cleanupTmp } from "./helpers.js";
@@ -136,44 +135,6 @@ describe("snapshot list", () => {
   });
 });
 
-describe("render --e2e writes fixtures that actually drive the engine", () => {
-  it("writes the Playwright fixture and it round-trips a page through the CLI", () => {
-    const cwd = mkTmp();
-    writeFileSync(join(cwd, "package.json"), JSON.stringify({ name: "demo", devDependencies: { "@playwright/test": "^1.49.0" } }));
-    const gen = runCli(["render", "--e2e", "--json"], { cwd });
-    expect(gen.code).toBe(0);
-    const fixture = join(cwd, ".ultra11y", "e2e", "playwright.mjs");
-    expect(existsSync(fixture)).toBe(true);
-    // The baked engine path must be usable from the generated file's own project.
-    expect(readFileSync(fixture, "utf8")).toContain("ultra11y.mjs");
-
-    // Drive the fixture in a subprocess rooted at the generated project — it spawns the
-    // engine at process.cwd(), which is exactly what a real Playwright run gives it.
-    const driver = join(cwd, "drive.mjs");
-    writeFileSync(
-      driver,
-      `import { auditSnapshot, failingFindings } from "./.ultra11y/e2e/playwright.mjs";
-const r = auditSnapshot(${JSON.stringify(PAGE)});
-console.log(JSON.stringify({ findings: r.findings.length, failing: failingFindings(r, "blocking").length }));
-`,
-    );
-    const run = spawnSync(process.execPath, [driver], { cwd, encoding: "utf8" });
-    expect(run.status, run.stderr).toBe(0);
-    const out = JSON.parse(run.stdout) as { findings: number; failing: number };
-    expect(out.findings).toBeGreaterThan(0);
-    expect(out.failing).toBeGreaterThan(0);
-    expect(existsSync(join(cwd, ".ultra11y", "pages", "accueil", "dom.html"))).toBe(true);
-  });
-
-  it("fails with an actionable message when no runner is present", () => {
-    const cwd = mkTmp();
-    writeFileSync(join(cwd, "package.json"), JSON.stringify({ name: "demo" }));
-    const r = runCli(["render", "--e2e"], { cwd });
-    expect(r.code).toBe(1);
-    expect(r.stderr).toMatch(/--runner/);
-  });
-});
-
 describe("the per-page grid, rebuilt from the audit JSON alone", () => {
   const twoPages = (cwd: string) => {
     write(cwd, PAGE); // Accueil: no lang, no title, image without alt
@@ -227,6 +188,6 @@ describe("the per-page grid, rebuilt from the audit JSON alone", () => {
     runCli(["audit", "a.html", "--out", ".", "--json"], { cwd });
     const r = runCli(["pages", "--in", "audit-latest.json"], { cwd });
     expect(r.code).toBe(1);
-    expect(r.stderr).toMatch(/render --e2e|scan --sample/);
+    expect(r.stderr).toMatch(/ultra11y\/playwright|scan --sample/);
   });
 });

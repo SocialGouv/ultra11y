@@ -1,16 +1,10 @@
-# Run the whole toolchain in Docker so the host stays clean — no local Node/pnpm
+# Run the toolchain in Docker so the host stays clean — no local Node/pnpm
 # needed. Tear everything down with `make clean` or:
 #   docker compose down --rmi local -v
 #
 #   docker compose run --rm ci                     # typecheck + test (engine)
-#   docker compose run --rm dynamic https://x.fr   # dynamic axe-core scan
 services:
   ci:
     build: .
     image: ultra11y-ci
     command: sh -c "pnpm run typecheck && pnpm test"
-
-  dynamic:
-    build: ./docker
-    image: ultra11y-dyn:1
-    init: true

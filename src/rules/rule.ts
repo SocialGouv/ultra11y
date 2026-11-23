@@ -107,7 +107,7 @@ export function toFinding(doc: Doc, ruleId: string, def: Severity, rf: RuleFindi
     snippet: snippet(doc, rf.el),
     // Only carry source offsets when they index into the *real* file. For lossy
     // JSX/TSX the offsets are into the transformed HTML string, so `fix` must not
-    // edit by range and baseline diffing falls back to line/selector identity.
+    // edit by range and finding identity falls back to line/selector.
     ...(doc.lossy ? {} : { sourceStart: rf.el.start, sourceEnd: rf.el.end }),
     // SFC-source findings are preliminary (slot/dynamic content unseen); lossy-JSX findings
     // are too (regex fallback — offsets into transformed HTML, may be fabricated from string

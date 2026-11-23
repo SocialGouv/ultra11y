@@ -1202,7 +1202,7 @@ export function applyAdjudication(
         // Either clearing verdict must cite. A `C` says "everything here conforms" and a `NA`
         // says "none of this is what the criterion is about" — both rule on the harvested
         // evidence, and the contract the filler was given (adjudicationContract, echoed by the
-        // judge schema and the brief) already requires citations[] whenever evidence was
+        // brief) already requires citations[] whenever evidence was
         // presented: "to say which of those items fall outside the criterion's scope". The
         // fold used to enforce only the `C` half, so a bare NA cleared shown evidence without
         // naming it — an agent could wave what it had been shown out of scope with a sentence.
@@ -1323,8 +1323,8 @@ export function applyAdjudication(
         // AN NC NOBODY CAN OPEN IS NOT A FINDING. Checked before the normativeRef, because a
         // finding with no file cannot be grounded at all — there is nothing to go and read.
         // Measured once: a model returned an NC with no `file`, the fold minted it anyway, and
-        // it reached `repoRelative`, which crashed on `undefined.split` and took SARIF, the
-        // annotations, the comment, the report, the HTML and the artifact upload with it.
+        // it reached `repoRelative`, which crashed on `undefined.split` and took every
+        // rendering after it (the report, the HTML) down with it.
         if (typeof f.file !== "string" || !f.file.trim()) {
           blame(
             it.criteriaId,
@@ -1664,8 +1664,7 @@ export function applyAdjudication(
  *  not about a JSON file a model produced — or a verdict ledger replaying one it produced
  *  months ago. A run wrote `"moderate"`, axe's vocabulary, which a model reaches for naturally;
  *  it travelled through every renderer keyed on the three French levels and came out as
- *  « undefined moderate » in a pull-request comment, with no icon and no ordering. The same
- *  value would have produced an empty SARIF level and an unsorted annotation.
+ *  « undefined moderate » in a pull-request comment, with no icon and no ordering.
  *
  *  axe's four levels map the way `severityFromImpact` already maps them, so a model using them
  *  gets what it meant. Anything else falls back to the SAME default an absent severity gets —
@@ -2086,8 +2085,8 @@ const MAX_GLOSSARY_CHARS = 420;
 
 /** Characters of an official test methodology the brief prints. RGAA documents all 258 of
  *  its tests and the procedures run 200-900 characters each, so a criterion with eight tests
- *  can carry several kilobytes — read by a model that pays for its context, and batched eight
- *  criteria at a time by `judge`. Generous enough that a whole procedure normally fits, hard
+ *  can carry several kilobytes — read by a model that pays for its context, and often batched
+ *  with other criteria in one pass. Generous enough that a whole procedure normally fits, hard
  *  enough that one long one cannot swamp the evidence it is there to help read. */
 const MAX_METHODOLOGY_CHARS = 900;
 
@@ -2105,7 +2104,7 @@ const MAX_METHODOLOGY_CHARS = 900;
 const MAX_UNTOUCHED_METHODOLOGY_CHARS = 260;
 
 // `glossaryAnchorsOf` now lives in src/standards/pack.ts, next to the glossary it reads —
-// the criteria lookup and the MCP reference tools need it too, and none of them should
+// the criteria lookup needs it too, and should not
 // have to import the adjudication engine to get at a pure function over a criterion.
 // Re-exported here because it was part of this module's surface.
 export { glossaryAnchorsOf };
@@ -2259,9 +2258,9 @@ export function formatAdjudication(
   // `verdictSystemPrompt()` has already stated every one of these clauses — they come from the
   // same source, src/verdict-rules.ts — so repeating them in the brief buys nothing and is paid
   // for once per criterion. Measured on a full RGAA worklist at `--grain criterion`: 2 144
-  // characters × 81 criteria = 174 KB, 28% of everything the pass sends. Only `judge` sets it,
-  // and only because it is the only caller that provably ships a system prompt; the on-disk
-  // briefs, `verify --manual` and the emitted CI contracts are read with no system prompt at
+  // characters × 81 criteria = 174 KB, 28% of everything the pass sends. No caller sets it now:
+  // the headless `judge`, the only one that provably shipped a system prompt, was removed. The
+  // on-disk briefs, `verify --manual` and the emitted contracts are read with no system prompt at
   // all, and for them the contract stays exactly where it is.
   const out: string[] =
     opts.contract === false

@@ -69,7 +69,8 @@ export function verdictRulesMd(startAt: number): string {
   return lines.join("\n");
 }
 
-/** The system prompt the model-facing backends send. Same clauses, own framing.
+/** The rules framed as a system prompt, for a model-facing backend (none ships since the
+ *  headless `judge` was removed). Same clauses, own framing.
  *
  *  The framing sentence is what a system prompt has and a contract document does not: it says
  *  WHO the model is and what the criteria in front of it are. Everything normative below it

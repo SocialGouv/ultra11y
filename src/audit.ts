@@ -72,10 +72,6 @@ export interface AuditInput {
   // input instead — see cmdAudit's `useCaptures`).
   captureDiff?: boolean;
   noDefaultExcludes?: boolean; // also audit test/spec/story/__tests__ markup
-  // `false` leaves a snapshot's screenshot out of the signals, so the pixel tier (contrast
-  // sampled on the screenshot, src/rules/rendered.ts) never decodes a PNG. The lite gate's
-  // choice: it buys speed, and the CSSOM contrast rule still runs. Default: on.
-  pixel?: boolean;
   onWarn?: (msg: string) => void;
 }
 
@@ -719,7 +715,7 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
       }
     }
     // What AXE found on this page, when the producer ran it. Same treatment as the probes,
-    // and deliberately the same mapping the Docker/local scan tiers use (src/axe-map.ts), so
+    // and deliberately the same mapping the `scan` tier uses (src/axe-map.ts), so
     // a `color-contrast` hit is the same non-conformity whichever tier surfaced it.
     const axe = doc.signals?.axe;
     if (axe?.ran) {
@@ -981,7 +977,7 @@ function probeFindings(probes: NonNullable<RenderSignals["probes"]>, file: strin
  *  The mapping is `scan`'s, unchanged (src/axe-map.ts `scForAxe` / `severityFromImpact` /
  *  `isAxeAdvisory`): the criterion an axe rule evidences, the severity its impact carries, and
  *  the best-practice rules that are a RECOMMENDATION rather than a non-conformity. One table,
- *  so a `color-contrast` hit means the same thing whether Docker, a local scan or somebody's
+ *  so a `color-contrast` hit means the same thing whether a local scan or somebody's
  *  own Playwright suite surfaced it.
  *
  *  Anchored at the snapshot's own file:line 1, like the probes and for the same reason: axe
@@ -1348,7 +1344,6 @@ export function runAudit(opts: AuditInput): AuditResult {
     // already lives — is what lets the rendered rules decide criteria the source cannot,
     // OFFLINE and with no browser. A no-op for every other file.
     attachSignals(doc);
-    if (opts.pixel === false && doc.signals?.screenshot) doc.signals = { ...doc.signals, screenshot: undefined };
     foldDoc(acc, doc, graph);
   }
 

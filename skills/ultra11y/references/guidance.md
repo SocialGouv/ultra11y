@@ -12,8 +12,8 @@ Guidance is looked up at **render time** by criterion / WCAG SC, so the canonica
 
 - **`prd`** — each backlog item gains a before/after example and an effort estimate; the
   `--format doc` PRD weaves it into the user stories and acceptance criteria.
-- **`ultra11y_guidance`** over MCP — the direct lookup, by criterion.
-- **`ultra11y_criteria`** with `include_guidance: true`, attached to the criterion.
+- **the auditor block** of `report`, `prd`, `tickets` and the per-page sheets — the
+  « Changement attendu » example.
 
 Because attachment is presentation-only, guidance never marks anything conforming and
 never invents a non-conformity — it is illustration, not detection.

@@ -60,8 +60,7 @@ Then **adjudicate**. Do not paste the output at the user.
 Severity vocabulary: \`blocking\` > \`major\` > \`minor\`. Block the work on \`blocking\`.
 
 To make this automatic without relying on an agent, wire the repo itself — \`${e} init --hook\`
-(git pre-commit) and \`${e} init --ci\` (GitHub Actions) are harness-independent and are the
-real safety net here. Full audits, dated conformance reports, RGAA packs and remediation
+(git pre-commit) is harness-independent and is the real safety net here. Full audits, dated conformance reports, RGAA packs and remediation
 backlogs: \`${e} --help\`.`;
 }
 

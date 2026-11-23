@@ -34,7 +34,7 @@ block of `.ultra11yrc.json` and the PDF document checks are described in `refere
 
 ```sh
 node scripts/ultra11y.mjs audit <paths> --graph --standard <standard> --lang <lang> --out audits --json
-node scripts/ultra11y.mjs scan --sample --runtime local --cwd . \
+node scripts/ultra11y.mjs scan --sample --cwd . \
   --standard <standard> --merge audits/audit-latest.json --out audits
 ```
 
@@ -55,19 +55,17 @@ was resolved and the command that installs its browser.
 
 ## 3. Adjudicate
 
-Generate the judgment worklist with `verify --manual`, then rule on it in one of three ways —
+Generate the judgment worklist with `verify --manual`, then rule on it in one of two ways —
 the verdicts pass the same fail-closed fold whichever you pick:
 
 - **adjudicate directly** in this session (the default for an interactive request);
 - **fan out to subagents** when the worklist is large — `orchestrate --run audits --phase
   adjudicate` emits the batches and the per-role contracts, and any harness with subagents
   can dispatch them (Claude Code's Agent or Workflow tool, Codex subagents, OpenCode's Task
-  tool); see `references/orchestration.md`. Subagents return verdicts; you fold them;
-- **run `judge --runner <claude|codex|api>`** when nobody is in the loop to rule (CI, an
-  unattended run) — a caller of the same worklist and the same gate, not a second judge; see
-  `references/runbook.md`. Inside an interactive session, prefer one of the first two: nesting
-  a headless judge inside the active session wastes context and gives the report a weaker
-  reader.
+  tool); see `references/orchestration.md`. Subagents return verdicts; you fold them.
+
+When nobody is in the loop (CI), the caller is iterion's `rgaa-audit` bot, which rules the same
+worklist through the same gate; see `references/ci.md`.
 
 Ruling directly: read each small
 `audits/adjudicate/<criterion>.md` brief, decide against its official tests, fill the verdicts
@@ -99,10 +97,9 @@ the verdict schema (including the `citations[]` shape) and fail-closed fold.
 Render the report, generate the adversarial `VERIFY.todo.json`, adjudicate every claim, apply
 the verdicts with `--prune --ledger`, then render again. This trial covers both alleged
 non-conformities and agent-declared conformities **and** « non applicable » — on a small site
-that is easily 70+ claims. Rule on the trial the same three ways as step 3: directly, by
-fanning out (`orchestrate --run audits --phase verify-report`), or with `judge --refute
-audits/VERIFY.todo.json --runner <claude|codex>` for an unattended run (the refuter has to open
-the cited files, so the tool-less `api` runner does not take this phase).
+that is easily 70+ claims. Rule on the trial the same two ways as step 3: directly, or by
+fanning out (`orchestrate --run audits --phase verify-report`) — the refuter has to open the
+cited files.
 
 ```sh
 node scripts/ultra11y.mjs report --in audits/audit-latest.json \

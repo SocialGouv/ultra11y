@@ -84,8 +84,6 @@ export interface GrainOptions {
   grain: TicketGrain;
   standard: StandardId;
   lang: Lang;
-  /** Mirrors `prd --format`: the auditor block (default) or the legacy dev body. */
-  format?: "audit" | "remediation";
   /** Provider body budget in characters; bodies are clamped to it. */
   bodyLimit?: number;
   /** Repo root, used to make `file`-grain paths repo-relative. It is passed IN rather than

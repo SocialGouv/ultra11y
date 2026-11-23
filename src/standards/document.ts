@@ -4,13 +4,13 @@
 // `audit` used to be WCAG-keyed with no way out: it took no `--standard`, ignored
 // `.ultra11yrc.json { "standard": "rgaa" }`, and printed « WCAG 2.2 AA audit » with `[3.1.1]`
 // tags in English at a French project that had declared RGAA. Every other command already
-// spoke the pack — `report --standard rgaa --format github` emits `title=RGAA 8.4` — so the
+// spoke the pack (`report --standard rgaa`), so the
 // vocabulary was there and only the entry point was wired to the core.
 //
 // Selecting a standard now re-keys the DOCUMENT. It cannot re-key the ENGINE: a pack
 // criterion is defined as a projection of WCAG success criteria (rgaa.json maps each of its
 // 106 onto SCs), so without the core results there is nothing to project from — and
-// report/prd/tickets/pages/check/verify/judge and the verdict ledger all read them. The core
+// report/prd/tickets/pages/check/verify and the verdict ledger all read them. The core
 // therefore travels inside the document, under `core`, where no rendering looks; everything a
 // reader sees is the pack's own.
 //
@@ -53,8 +53,8 @@ export function unwrapAudit<T>(v: T | PackAuditResult): T | AuditResult {
  * The document a command should WRITE BACK, in the active standard's shape.
  *
  * The rule is one line long on purpose: **a document is written in the standard the command
- * was run under**, never in the shape of whatever file it happened to read. `scan --merge`,
- * `verify --apply` and `judge --apply` all rewrite `audit-latest.json` mid-chain, and a chain
+ * was run under**, never in the shape of whatever file it happened to read. `scan --merge`
+ * and `verify --apply` both rewrite `audit-latest.json` mid-chain, and a chain
  * whose shape depended on which step last touched the file would drift silently — the first
  * step keyed RGAA, the second read it, wrote core, and the third reported WCAG at a project
  * that never asked for it.

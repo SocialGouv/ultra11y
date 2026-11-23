@@ -144,7 +144,7 @@ export interface Snapshot {
 }
 
 /** What the browser-side collector (`COLLECT_SNAPSHOT`) returns. Every snapshot producer —
- *  the E2E fixtures, the dev side-car, `scan` — evaluates that one string and gets this
+ *  the E2E integrations (ultra11y/playwright, ultra11y/cypress), `scan` — evaluates that one string and gets this
  *  shape back, so the format has exactly one definition and cannot drift per producer. */
 export interface CollectedPage {
   dom: string;

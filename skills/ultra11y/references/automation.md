@@ -1,4 +1,4 @@
-# Automate in the repo — `init` (hook / CI)
+# Automate in the repo — `init` (hook)
 
 ultra11y can stay an **on-demand** skill, or become a **gate** that runs on its own.
 `init` wires it (zero-dependency, no husky):
@@ -6,8 +6,7 @@ ultra11y can stay an **on-demand** skill, or become a **gate** that runs on its 
 ```
 node scripts/ultra11y.mjs init --hook          # .git/hooks/pre-commit — strict STAGED gate (default)
 node scripts/ultra11y.mjs init                 # same as --hook
-node scripts/ultra11y.mjs init --ci            # .github/workflows/a11y.yml (PR diff vs base)
-node scripts/ultra11y.mjs init --baseline …    # opt into the legacy regression gate (below)
+node scripts/ultra11y.mjs init --fail-on major # the same gate, at another threshold
 ```
 
 ## Three gates, three different jobs
@@ -15,17 +14,16 @@ node scripts/ultra11y.mjs init --baseline …    # opt into the legacy regressio
 | | what runs | when | who decides |
 |---|---|---|---|
 | `init --hook` | the engine, mechanically | every `git commit` | the engine's `--fail-on` |
-| `init --ci` | the engine, in CI | every pull request | the engine's `--fail-on` |
+| iterion's `rgaa-audit` bot | the engine + read-only agents, in CI | when the workflow runs it | its agents, adjudicating and refuting, then the engine's gates |
 | the **agent-harness hook** | the `review-a11y` **skill** | a pending commit / push / PR, inside an agent session | the AI agent, adjudicating |
 
-The first two block on what a machine can decide. The third exists because most of WCAG is
+The first blocks on what a machine can decide. The other two exist because most of WCAG is
 *judgment* — is this `alt` relevant, is this link's purpose clear — which no exit code
 settles. See below.
 
-`init --ci` is a regression gate, not a CI audit: the adjudicated, refuted audit in CI is
+`init` writes no CI workflow: the adjudicated, refuted audit in CI is
 iterion's [`rgaa-audit` bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit)
-(`references/ci.md`). The workflow it writes runs the engine pinned to the version that
-generated it (`npx -y ultra11y@<version>`) and annotates the new findings with `--format github`.
+(`references/ci.md`).
 
 ## The agent-harness hook — the agent review, unprompted
 
@@ -135,26 +133,7 @@ Treat this as a hard rule: **do not sign off on a component/SFC change from the 
 audit alone — verify the rendered semantic HTML, and prefer committed captures so the
 gate keeps verifying it.**
 
-## Opt-in: baseline regression gate (legacy)
-
-For large existing backlogs, keep the original "only block NEW regressions" gate. It is
-opt-in via `--baseline` (or an explicit `--fail-on`), and is what `--ci` uses:
-
-```
-node scripts/ultra11y.mjs init --baseline      # writes audits/baseline.json (commit it)
-node scripts/ultra11y.mjs init --hook --baseline
-node scripts/ultra11y.mjs init --ci            # audit --since <base> --baseline … in Actions
-```
-
-The hook/CI then run `audit --changed --baseline audits/baseline.json --fail-on blocking`:
-the audit is restricted to the **diff**, and only **NEW** non-conformities at/above the
-threshold fail — the existing backlog never blocks. Finding identity `(rule, criterion,
-file, source range)` is robust to line drift. **Commit `audits/baseline.json`** (add a
-`!audits/baseline.json` negation if `audits/` is git-ignored) and refresh it as you burn
-down backlog. `--fail-on blocking|major|minor` sets the threshold (French aliases
-`bloquant|majeur|mineur` accepted).
-
-> Either gate relies on the **static** engine. The **rendering** (contrast, focus, zoom) criteria
+> The pre-commit gate relies on the **static** engine. The **rendering** (contrast, focus, zoom) criteria
 > go to `scan` and the **judgment** criteria are adjudicated by the AI agent (`verify --manual`,
 > gated) in the full audit — the gate stops mechanical regressions, it is not the full audit
 > (a human is at most optional oversight).

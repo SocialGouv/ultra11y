@@ -161,7 +161,7 @@ const __frames = () => new Promise((res) => {
 });
 `;
 
-// The 320px reflow check (same semantics as the Docker RUNNER), mapped to 1.4.10.
+// The 320px reflow check, mapped to 1.4.10.
 //
 // « Horizontal scroll: YES » is a fact nobody can act on. The page scrolls sideways because
 // SOMETHING in it is wider than 320px, and finding that something by hand means opening a

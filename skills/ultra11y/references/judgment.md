@@ -203,29 +203,13 @@ is never an acceptable `normativeRef` — only the references the brief lists ar
 
 Look a defined term up on its own with `criteria --standard rgaa --glossary <term>`.
 
-## When no agent is in the loop (`judge`)
+## The fold, and who rules
 
 Inside a coding agent, the judgment criteria are adjudicated by the agent: `verify --manual`
-builds the worklist, the agent rules, `verify --apply` folds the verdicts through the gate.
-
-Outside one — a CI job, an E2E run — nobody rules on them, so they stay « à évaluer »
-forever. Honest, and unusable on its own. `judge` closes that through an API or
-an already authenticated local CLI:
-
-```
-export ANTHROPIC_API_KEY=…
-node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --runner api --out .
-node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --runner claude --apply
-node scripts/ultra11y.mjs judge --in audits/audit-latest.json --standard rgaa --runner codex --apply
-```
-
-**It is a caller, not a second judge.** The items and their harvested evidence come from
-`buildAdjudicationWorklist`; the prompt is `formatAdjudication` — the same decision protocol,
-numbered tests, technical notes, particular cases and glossary the agent reads, so there is no
-second protocol to keep in step; and the verdicts go through `applyAdjudication` unchanged.
-
-That last point is what makes the tier trustworthy. A model cannot assert a conformance the
-gate refuses:
+builds the worklist, the agent rules (directly, or fanned out to subagents with `orchestrate`,
+see `references/orchestration.md`), and `verify --apply` folds the verdicts through the gate.
+The engine runs no model of its own: whoever writes a verdict, it reaches the same
+`applyAdjudication` gate, and a verdict cannot assert a conformance the gate refuses:
 
 | It returns | The gate does |
 |---|---|
@@ -234,7 +218,7 @@ gate refuses:
 | `NC` citing a `normativeRef` belonging to another criterion | refuses it |
 | `manual` with no reason | refuses it |
 | a verdict for a criterion nobody asked about | dropped before it reaches the gate |
-| fewer verdicts than criteria (a bounded `--max` run, a failed batch) | the missing ones stay « à évaluer »; the rest lands |
+| fewer verdicts than criteria (a partial pass, a failed batch) | the missing ones stay « à évaluer »; the rest lands |
 | all `manual` with reasons | **accepts** — that is a correct answer, not a failure |
 
 **The fold is fail-closed per VERDICT, not per FILE.** No refused verdict is ever applied, and a
@@ -251,25 +235,10 @@ signed off in one pass); there, a rejected adjudication leaves `audit-latest.jso
 Whatever lands can be RECORDED with `--ledger <path>` and replayed on a later run with no model
 in the loop — see `references/ci.md`.
 
-**Strictly opt-in.** The API transport needs `ANTHROPIC_API_KEY`; Claude and Codex reuse their
-local CLI login. `cli` remains an alias of `claude`. Codex runs ephemerally, read-only and
-offline, with project instructions, user config, rules and hooks disabled. Its subscription
-has no dollar-budget flag, so `--max-budget-usd` is rejected; use `--timeout` and `--max`.
-Nothing else in the engine changes.
-
 The standard is one pipeline choice, not an extra comparison pass. With `--standard rgaa`,
 the worklist, schemas, verdict ids and fold are RGAA-only; WCAG remains internal crosswalk
 plumbing and is not separately adjudicated.
 
-**In CI.** iterion's `rgaa-audit` bot does not call `judge`: it hands the `verify --manual`
-worklist to read-only agents, which can open the cited files — `judge` rules from the harvested
-evidence alone (30 items per criterion, snippets truncated), while *link purpose in context*
-really needs the surrounding source — then folds their verdicts with `verify --apply`. See
-`references/ci.md`.
-
-`--max` bounds the spend and says out loud which criteria it did not submit. It now composes
-with `--apply`: the fold is per-verdict, so a bounded run lands what it covered and the rest stay
-« à évaluer » — which is exactly what bounding spend is for. (It used to be refused outright, and
-rightly so while the fold was all-or-nothing: the pair could only ever bill a full run to
-guarantee a coverage failure. That refusal survives under `--apply --strict`, where it is still
-true.)
+**In CI.** iterion's `rgaa-audit` bot hands the `verify --manual` worklist to read-only agents,
+which can open the cited files — *link purpose in context* really needs the surrounding source —
+then folds their verdicts with `verify --apply`. See `references/ci.md`.

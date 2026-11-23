@@ -459,7 +459,7 @@ const L = {
  *  `50 % (2/106)` when something was decided, `— (0/106)` when nothing was. The denominator is
  *  not decoration — a rate quoted without it is how « 100 % » travelled out of an index and into
  *  a PR while the sheet it came from said two criteria out of a hundred and six had been
- *  assessed. Exported so the grid, the report index, the PR comment and the dev dashboard all
+ *  assessed. Exported so the grid and the report index
  *  format it identically; a surface that prints its own is a surface that will drift. */
 export function formatRate(rate: number | null, decided: number, total: number): string {
   return `${rate === null ? "—" : `${rate} %`} (${decided}/${total})`;
@@ -702,8 +702,8 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
 
 /** The criterion rows to render, and each page's status for them.
  *
- *  Exported because the Markdown grid, the dev side-car dashboard and the HTML report all draw
- *  the same table: three copies of this loop is three chances to disagree about what a page's
+ *  Exported because the Markdown grid and the HTML report draw
+ *  the same table: two copies of this loop is two chances to disagree about what a page's
  *  status IS. Every status still comes from `derivePackResults` over a `pageView`, never from a
  *  local re-derivation. */
 export function pageGridModel(result: AuditResult, derived: PageResult[], standard: StandardId, lang: Lang): PageGridModel {

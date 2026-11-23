@@ -127,15 +127,10 @@ describe("skill docs stay in sync with the CLI", () => {
     // exemption is DERIVED from the CLI's own table rather than restated here. A typo in a
     // doc still fails, because a misspelling is not in the table either.
     const removed = new Set(Object.keys(REMOVED_FLAGS).map((f) => `--${f}`));
-    // FLAGS THAT ARE NOT OURS. `judge --runner claude` spawns the Claude Code CLI and the docs
-    // quote npm and npx, so they cite three tools rather than one. Listed
-    // rather than pattern-matched, and each one earns its line: an ultra11y flag that goes
-    // missing from `--help` must still fail here, which is the whole point of this test.
+    // FLAGS THAT ARE NOT OURS. The docs quote npm and npx. Listed rather than pattern-matched,
+    // and each one earns its line: an ultra11y flag that goes missing from `--help` must still
+    // fail here, which is the whole point of this test.
     const foreign = new Set([
-      // Claude Code CLI, cited by the `judge --runner claude` documentation.
-      "--safe-mode",
-      "--max-turns",
-      "--max-budget-usd",
       // npm / npx, cited by the install and browser-tier docs.
       "--no-save",
       "--prefix",
@@ -188,7 +183,7 @@ describe("skill docs stay in sync with the CLI", () => {
 });
 
 describe("SKILL.md routes to the references (progressive disclosure)", () => {
-  it("ships exactly the forty reference docs", () => {
+  it("ships exactly the thirty-eight reference docs", () => {
     expect(refFiles.sort()).toEqual([
       "act.md",
       "adjudication.md",
@@ -199,7 +194,6 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "correction.md",
       "criteria.md",
       "cross-file.md",
-      "devtools.md",
       "dynamic.md",
       "e2e.md",
       "false-positives.md",
@@ -211,7 +205,6 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "guidance.md",
       "harnesses.md",
       "judgment.md",
-      "mcp.md",
       "media-and-motion.md",
       "methodology.md",
       "naming.md",
