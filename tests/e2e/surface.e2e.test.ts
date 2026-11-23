@@ -125,9 +125,9 @@ describe("e2e: fix (dry-run) leaves the file byte-identical", () => {
   });
 });
 
-describe("e2e: render prints a setup recipe", () => {
-  it("render --json reports framework detection", () => {
-    const r = runCli(["render", ".", "--json"]);
+describe("e2e: render --detect prints a setup recipe", () => {
+  it("render --detect --json reports framework detection", () => {
+    const r = runCli(["render", ".", "--detect", "--json"]);
     expect(r.code).toBe(0);
     expect(() => JSON.parse(r.stdout)).not.toThrow();
   });

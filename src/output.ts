@@ -23,7 +23,7 @@ type Key =
   | "renderedNote"
   | "sfcNote"
   | "capturesNote"
-  | "unitSnapshotsNote";
+  | "rendersNote";
 
 /** The pack summary's title is assembled rather than tabled: only the standard's LABEL
  *  varies, and a per-pack entry in the string table would have to be written again for every
@@ -48,7 +48,7 @@ const STR: Record<Lang, Record<Key, string>> = {
     sfcNote:
       "composant(s) .vue/.svelte/.astro audité(s) en SOURCE (template) — slots et liaisons dynamiques invisibles : verdict préliminaire, auditez le rendu (render/scan)",
     capturesNote: "fichier(s) de capture rendus audités à pleine fidélité (DOM réel) — le vrai HTML produit",
-    unitSnapshotsNote: "rendu(s) de composant lus dans les instantanés de tests unitaires (.snap) — jsdom, sans styles calculés",
+    rendersNote: "unité(s) trouvée(s) par le moteur de rendu ultra11y (.ultra11y/render.json)",
   },
   en: {
     summaryTitle: "WCAG 2.2 AA audit (ultra11y static engine)",
@@ -66,7 +66,7 @@ const STR: Record<Lang, Record<Key, string>> = {
     sfcNote:
       ".vue/.svelte/.astro file(s) audited as SOURCE (template) — slots and dynamic bindings are invisible: preliminary verdict, audit the rendered output (render/scan)",
     capturesNote: "rendered capture file(s) audited at full fidelity (real DOM) — the true produced HTML",
-    unitSnapshotsNote: "component render(s) read from unit-test snapshots (.snap) — jsdom, no computed styles",
+    rendersNote: "unit(s) found by ultra11y's render engine (.ultra11y/render.json)",
   },
 };
 
@@ -141,7 +141,14 @@ export function auditSummary(r: AuditResult, lang: Lang, standard: StandardId = 
   if (r.scope.rendered) lines.push(`🧩 ${r.scope.rendered.files} ${t(lang, "renderedNote")} (${r.scope.rendered.opaqueLibraries.join(", ")}).`);
   if (r.scope.sourceTemplate) lines.push(`🧩 ${r.scope.sourceTemplate.files} ${t(lang, "sfcNote")} (${r.scope.sourceTemplate.extensions.join(", ")}).`);
   if (r.scope.captures) lines.push(`✅ ${r.scope.captures.files} ${t(lang, "capturesNote")}.`);
-  if (r.scope.unitSnapshots) lines.push(`🧪 ${r.scope.unitSnapshots.entries} ${t(lang, "unitSnapshotsNote")}.`);
+  if (r.scope.renders) {
+    const { units, rendered, skipped, notAttempted } = r.scope.renders;
+    const counts =
+      lang === "fr"
+        ? `${rendered} rendue(s), ${skipped} en échec, ${notAttempted} non tentée(s)`
+        : `${rendered} rendered, ${skipped} failed, ${notAttempted} not attempted`;
+    lines.push(`🧩 ${units.length} ${t(lang, "rendersNote")}${lang === "fr" ? " : " : ": "}${counts}.`);
+  }
   return lines.join("\n");
 }
 

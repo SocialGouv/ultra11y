@@ -48,27 +48,35 @@ sitemap or let its E2E captures supply the routes.
 
 ## 2. Audit source and rendered pages
 
-Inventory the render sources the project already has, and use **all** of them — each sees
-what the others cannot. **Playwright comes first**: when the project has Playwright tests, wire
-`ultra11y/playwright` into them (`checkA11y`, or `sweepSample` for the sample,
-`references/e2e.md`), or reuse the `.ultra11y/pages` captures they already wrote, before you
-fall back on the crawler. Those captures carry the state the tests built (a session, a filled
-form, an open dialog), and `scan --all-routes` never rescans a route they hold.
+Use every render source — each sees what the others cannot. **Playwright comes first** for
+real pages: when the project has Playwright tests, wire `ultra11y/playwright` into them
+(`checkA11y`, or `sweepSample` for the sample, `references/e2e.md`), or reuse the
+`.ultra11y/pages` captures they already wrote, before you fall back on the crawler. Those
+captures carry the state the tests built (a session, a filled form, an open dialog), and
+`scan --all-routes` never rescans a route they hold.
 
-- E2E captures (`.ultra11y/pages/`, from `ultra11y/playwright`/`ultra11y/cypress`) — run the
-  E2E suite to refresh them;
-- the browser pass on the sample, then on the rest of the inventory (`scan --sample
-  --all-routes`, below);
-- unit-test snapshots (`__snapshots__/*.snap`) — read by `audit` as they are;
-- unit-test captures (`.ultra11y/captures/`, from `ultra11y/vitest`/`ultra11y/jest` or
-  `render --setup`) — run the test suite to refresh them. Together with the snapshots they
-  cover components that no route shows in every state;
-- an SSR harness or a static build (`render`, `references/rendered.md`).
+- **Pages**: E2E captures (`.ultra11y/pages/`, from `ultra11y/playwright`/`ultra11y/cypress`)
+  — run the E2E suite to refresh them — then the browser pass on the sample and the rest of
+  the inventory (`scan --sample --all-routes`, below).
+- **Components**: ultra11y's own render engine. It finds the exported components, the
+  framework pages and the Storybook stories, renders each with the project's own
+  `react-dom/server` in a throwaway harness, and writes `.ultra11y/captures/` plus the
+  manifest `.ultra11y/render.json` (`references/rendered.md`). It never reads or runs the
+  project's tests or snapshots.
 
-Name in the coverage annex which sources ran and which were absent. The report already states
-what `audit` read (`scope.unitSnapshots`, `scope.captures`, the pages); add the ones you could
-not run and why. Unit-test sources are jsdom renders: they decide markup criteria on
-components, never page-level or rendering criteria.
+```sh
+node scripts/ultra11y.mjs render .        # components, pages and stories → .ultra11y/captures
+```
+
+Do not read the project's test files, `__snapshots__` or inline snapshots to find markup: they
+hold what a test author wrote, sometimes broken on purpose, and go stale. Run `render` before
+`audit`: the annex (section G) then lists every unit the engine rendered, skipped (with the
+reason: missing provider, props, browser-only API, data fetching, transpile error, timeout) or
+did not attempt. A component that takes props is rendered through its stories, or not at all:
+cover the ones the annex lists with a story or the page that shows them. Component renders
+have no computed style (`styles="none"`): they decide markup criteria on components, never
+page-level or rendering criteria. Name in the coverage annex any source you could not run, and
+why.
 
 ```sh
 node scripts/ultra11y.mjs audit <paths> --graph --standard <standard> --lang <lang> --out audits --json

@@ -2471,11 +2471,11 @@ var require_ignore = __commonJS({
         const rules = this._rules;
         const { length } = rules;
         const shortcut = this._basenameCount * 2 >= length;
-        const basename6 = shortcut ? basenameOf(path) : path;
+        const basename4 = shortcut ? basenameOf(path) : path;
         for (let index = length - 1; index >= 0; index--) {
           const rule = rules[index];
           if (rule[mode].test(
-            shortcut && rule._basenameOnly ? basename6 : path
+            shortcut && rule._basenameOnly ? basename4 : path
           )) {
             const { negative } = rule;
             const ret = {
@@ -2632,8 +2632,8 @@ var require_ignore = __commonJS({
 });
 
 // src/cli.ts
-import { realpathSync as realpathSync6, writeFileSync as writeFileSync17, mkdirSync as mkdirSync17, existsSync as existsSync32, readFileSync as readFileSync26, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
-import { join as join33, relative as relative9, resolve as resolve13, dirname as dirname18 } from "path";
+import { realpathSync as realpathSync6, writeFileSync as writeFileSync17, mkdirSync as mkdirSync17, existsSync as existsSync32, copyFileSync as copyFileSync4 } from "fs";
+import { join as join32, relative as relative10, resolve as resolve14, dirname as dirname18 } from "path";
 import { fileURLToPath as fileURLToPath4, pathToFileURL } from "url";
 
 // src/types.ts
@@ -2646,8 +2646,8 @@ var INAPPLICABLE_STATUS = "C";
 
 // src/audit.ts
 import { createHash as createHash2 } from "crypto";
-import { existsSync as existsSync9, readFileSync as readFileSync10, statSync as statSync4 } from "fs";
-import { dirname as dirname10, resolve as resolvePath } from "path";
+import { existsSync as existsSync8, readFileSync as readFileSync9, statSync as statSync4 } from "fs";
+import { dirname as dirname9, resolve as resolvePath } from "path";
 
 // src/data/wcag.json
 var wcag_default = {
@@ -22559,10 +22559,6 @@ function opaqueLibrarySpecifiers(ast, elements) {
   return [...opaque].sort();
 }
 
-// src/capture.ts
-import { existsSync as existsSync2, mkdirSync, readFileSync as readFileSync3, writeFileSync } from "fs";
-import { basename as basename2, isAbsolute, join as join3 } from "path";
-
 // src/glob.ts
 var import_posix = __toESM(require_posix(), 1);
 import { existsSync, readdirSync, statSync as statSync2 } from "fs";
@@ -23329,7 +23325,7 @@ function walk(root) {
 }
 
 // src/glob.ts
-var DEFAULT_EXT = /* @__PURE__ */ new Set([".html", ".htm", ".xhtml", ".jsx", ".tsx", ".vue", ".svelte", ".astro", ".snap"]);
+var DEFAULT_EXT = /* @__PURE__ */ new Set([".html", ".htm", ".xhtml", ".jsx", ".tsx", ".vue", ".svelte", ".astro"]);
 var GRAPH_ONLY_EXT = [".ts", ".js", ".mjs", ".cjs"];
 function extSet(extra) {
   const set = new Set(DEFAULT_EXT);
@@ -23344,15 +23340,9 @@ function extSet(extra) {
 var SKIP_DIR = /* @__PURE__ */ new Set(["audits", ".ultra11y"]);
 var TEST_DIR = /* @__PURE__ */ new Set(["__tests__", "__mocks__", ".storybook"]);
 var TEST_FILE = /\.(test|spec|stories|story|cy)\.[^./]+$/i;
-var SNAPSHOT_DIR = "__snapshots__";
 function isTestArtifact(rel) {
-  const segs = rel.split("/");
-  if (/\.snap$/i.test(rel) || segs.slice(0, -1).includes(SNAPSHOT_DIR)) return false;
   if (TEST_FILE.test(rel)) return true;
-  return segs.some((seg) => TEST_DIR.has(seg));
-}
-function isInlineSnapshotHost(rel) {
-  return /\.(test|spec)\.[cm]?[jt]sx?$/i.test(rel);
+  return rel.split("/").some((seg) => TEST_DIR.has(seg));
 }
 var GLOB_SYNTAX = /[\\()[\]{}!+@$^|]/g;
 var GLOB_OPTS = { dot: true, nobrace: true, nobracket: true, noextglob: true, nonegate: true };
@@ -23437,34 +23427,6 @@ function walkCached(dir, opts) {
   opts.walkCache?.set(dir, acc);
   return acc;
 }
-function inlineSnapshotHosts(inputs, audited, opts = {}) {
-  if (opts.noDefaultExcludes) return [];
-  const taken = new Set(audited);
-  const keep = inlineHostFilter(opts);
-  const out = /* @__PURE__ */ new Set();
-  for (const input of inputs) {
-    if (input === "-") continue;
-    if (hasGlob(input)) {
-      if (PDF_GLOB.test(input)) continue;
-      const match = globMatcher([input]);
-      for (const f2 of walkCached(staticBase(input), opts)) if (!taken.has(f2) && match(toPosix2(f2)) && keep(f2)) out.add(f2);
-    } else if (existsSync(input) && statSync2(input).isDirectory()) {
-      for (const f2 of walkCached(input, opts)) if (!taken.has(f2) && keep(f2)) out.add(f2);
-    }
-  }
-  return [...out].sort();
-}
-function inlineHostFilter(opts = {}) {
-  const include = compileGlobs(opts.include);
-  const exclude = compileGlobs(opts.exclude);
-  return (file) => {
-    if (opts.noDefaultExcludes) return false;
-    const rel = toPosix2(file);
-    if (!isInlineSnapshotHost(rel) || !isTestArtifact(rel)) return false;
-    if (include && !include(rel)) return false;
-    return !exclude?.(rel);
-  };
-}
 function expandInputs(inputs, opts = {}) {
   const include = compileGlobs(opts.include);
   const exclude = compileGlobs(opts.exclude);
@@ -23530,53 +23492,9 @@ function formatCaptureComment(prov) {
   if (prov.name) attrs.push(`name="${escapeCommentValue(prov.name)}"`);
   if (prov.page) attrs.push(`page="${escapeCommentValue(prov.page)}"`);
   if (prov.url) attrs.push(`url="${escapeCommentValue(prov.url)}"`);
-  if (prov.runner) attrs.push(`runner="${escapeCommentValue(prov.runner)}"`);
-  if (prov.env) attrs.push(`env="${escapeCommentValue(prov.env)}"`);
+  if (prov.renderer) attrs.push(`renderer="${escapeCommentValue(prov.renderer)}"`);
   if (prov.styles) attrs.push(`styles="${escapeCommentValue(prov.styles)}"`);
   return `<!-- ultra11y:capture ${attrs.join(" ")} -->`;
-}
-var CAPTURE_ID_RE = /^[a-z0-9][a-z0-9-]*$/i;
-function validateComponentCapture(raw) {
-  const issues = [];
-  const p2 = raw;
-  if (!p2 || typeof p2 !== "object") return ["payload must be an object { meta, html }"];
-  const m3 = p2.meta;
-  if (!m3 || typeof m3 !== "object") issues.push("meta must be an object { id, name?, component?, source?, test?, runner?, env? }");
-  else {
-    if (typeof m3.id !== "string" || !CAPTURE_ID_RE.test(m3.id)) issues.push(`meta.id must match ${CAPTURE_ID_RE} (it becomes a file name)`);
-    for (const k of ["name", "component", "source", "test", "runner", "env"])
-      if (m3[k] !== void 0 && typeof m3[k] !== "string") issues.push(`meta.${k} must be a string`);
-  }
-  if (typeof p2.html !== "string" || !p2.html.trim()) issues.push("html must be the rendered markup (a non-empty string)");
-  return issues;
-}
-function sourceForTest(root, test) {
-  if (!test) return void 0;
-  const candidate = test.replace(/\.(test|spec)\.([cm]?[jt]sx?)$/i, ".$2");
-  return candidate !== test && existsSync2(isAbsolute(candidate) ? candidate : join3(root, candidate)) ? candidate : void 0;
-}
-function writeComponentCapture(root, payload) {
-  const m3 = payload.meta;
-  const source = m3.source ?? sourceForTest(root, m3.test);
-  const component = m3.component ?? (source ? basename2(source).replace(/\.[cm]?[jt]sx?$/i, "") : void 0);
-  const comment = formatCaptureComment({
-    v: 1,
-    ...source ? { sourceFile: toPosix2(source) } : {},
-    ...component ? { component } : {},
-    ...m3.test ? { test: toPosix2(m3.test) } : {},
-    ...m3.name ? { name: m3.name } : {},
-    ...m3.runner ? { runner: m3.runner } : {},
-    ...m3.env ? { env: m3.env } : {},
-    styles: "none"
-  });
-  const dir = join3(root, CAPTURES_DIR);
-  const file = join3(dir, `${m3.id}.html`);
-  const content = `${comment}
-${payload.html.trim()}
-`;
-  mkdirSync(dir, { recursive: true });
-  if (!existsSync2(file) || readFileSync3(file, "utf8") !== content) writeFileSync(file, content);
-  return file;
 }
 var SCAN_LIMIT = 4096;
 var MARKER = /<!--\s*ultra11y:capture\b([\s\S]*?)-->/;
@@ -23601,8 +23519,7 @@ function parseCaptureProvenance(source) {
     ...kv.has("name") ? { name: kv.get("name") } : {},
     ...kv.has("page") ? { page: kv.get("page") } : {},
     ...kv.has("url") ? { url: kv.get("url") } : {},
-    ...kv.has("runner") ? { runner: kv.get("runner") } : {},
-    ...kv.has("env") ? { env: kv.get("env") } : {},
+    ...kv.has("renderer") ? { renderer: kv.get("renderer") } : {},
     ...kv.has("styles") ? { styles: kv.get("styles") } : {}
   };
 }
@@ -23668,320 +23585,6 @@ function enrichCaptureOrigins(findings, graph) {
   }
 }
 
-// src/parse/snap.ts
-import { basename as basename3, dirname as dirname2, join as join4 } from "path";
-function isUnitSnapshotFile(file) {
-  return /\.snap$/i.test(file);
-}
-function readTemplate(src, start) {
-  let i = start + 1;
-  while (i < src.length) {
-    const c = src[i];
-    if (c === "\\") {
-      i += 2;
-      continue;
-    }
-    if (c === "`") return { body: src.slice(start + 1, i), end: i + 1 };
-    i++;
-  }
-  return void 0;
-}
-var unescapeTemplate = (s2) => s2.replace(/\\([\s\S])/g, "$1");
-function parseSnapshotEntries(src) {
-  const out = [];
-  const head = /^exports\[`/gm;
-  const starts = lineStartsOf(src);
-  const lineOf2 = (offset) => lineColAt(starts, offset).line;
-  for (let m3 = head.exec(src); m3; m3 = head.exec(src)) {
-    const keyTpl = readTemplate(src, m3.index + "exports[".length);
-    if (!keyTpl) break;
-    const eq = /^\]\s*=\s*`/.exec(src.slice(keyTpl.end, keyTpl.end + 16));
-    if (!eq) continue;
-    const valueStart = keyTpl.end + eq[0].length - 1;
-    const valTpl = readTemplate(src, valueStart);
-    if (!valTpl) break;
-    const entryLine = lineOf2(m3.index);
-    const valueLine = lineOf2(valueStart);
-    out.push({ name: unescapeTemplate(keyTpl.body), line: entryLine, value: unescapeTemplate(valTpl.body), valueLine });
-    head.lastIndex = valTpl.end;
-  }
-  return out;
-}
-var VOID = /* @__PURE__ */ new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
-var UNWRAP = /* @__PURE__ */ new Set(["DocumentFragment", "html"]);
-var newlinesOf = (s2) => s2.replace(/[^\n]/g, "");
-function styleObjectToCss(body) {
-  const decls = [];
-  for (const m3 of body.matchAll(/"([\w-]+)":\s*(?:"([^"]*)"|(-?\d+(?:\.\d+)?))/g)) {
-    const prop = m3[1].replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
-    decls.push(`${prop}:${m3[2] ?? m3[3]}`);
-  }
-  return decls.join(";");
-}
-function braceValue(name, inner) {
-  const v2 = inner.trim();
-  const stringy = /^(?:aria-|data-)/.test(name);
-  if (v2 === "true") return stringy ? "true" : "";
-  if (v2 === "false") return stringy ? "false" : void 0;
-  if (/^-?\d+(?:\.\d+)?$/.test(v2)) return v2;
-  if (/^"[^"]*"$/.test(v2)) return v2.slice(1, -1);
-  if (name === "style" && /^Object\s*\{[\s\S]*\}$|^\{[\s\S]*\}$/.test(v2)) return styleObjectToCss(v2) || void 0;
-  return void 0;
-}
-var escAttr = (s2) => s2.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-function snapshotMarkupToHtml(value) {
-  let text = value;
-  const trimmed = value.trim();
-  if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
-    const inner = trimmed.slice(1, -1).replace(/\\(["\\])/g, "$1");
-    if (!/^<[A-Za-z!]/.test(inner.trim()) || !inner.trim().endsWith(">")) return { skip: "not-markup" };
-    const at = value.indexOf(trimmed);
-    const component = inner.replace(/<!doctype[^>]*>|<\/?html\b[^>]*>/gi, "");
-    text = `${value.slice(0, at)} ${component}`;
-    return { html: text };
-  }
-  if (!/^<[A-Za-z]/.test(trimmed) || !trimmed.endsWith(">")) return { skip: "not-markup" };
-  let out = "";
-  let i = 0;
-  const n = text.length;
-  while (i < n) {
-    const c = text[i];
-    if (c !== "<") {
-      out += c;
-      i++;
-      continue;
-    }
-    if (text.startsWith("<!--", i)) {
-      const end = text.indexOf("-->", i + 4);
-      const stop = end === -1 ? n : end + 3;
-      out += text.slice(i, stop);
-      i = stop;
-      continue;
-    }
-    const close = /^<\/([A-Za-z][\w:.-]*)\s*>/.exec(text.slice(i, i + 200));
-    if (close) {
-      out += UNWRAP.has(close[1]) ? newlinesOf(close[0]) : close[0];
-      i += close[0].length;
-      continue;
-    }
-    const open = /^<([A-Za-z][\w:.-]*)/.exec(text.slice(i, i + 200));
-    if (!open) {
-      out += c;
-      i++;
-      continue;
-    }
-    const tag = open[1];
-    if (/^[A-Z]/.test(tag) && tag !== "DocumentFragment") return { skip: "component-tree" };
-    const unwrap = UNWRAP.has(tag);
-    i += open[0].length;
-    let attrs = "";
-    let selfClosing = false;
-    const sp = () => /\s$/.test(attrs) ? "" : " ";
-    while (i < n) {
-      const ch = text[i];
-      if (/\s/.test(ch)) {
-        attrs += ch;
-        i++;
-        continue;
-      }
-      if (ch === ">") {
-        i++;
-        break;
-      }
-      if (ch === "/" && text[i + 1] === ">") {
-        selfClosing = true;
-        i += 2;
-        break;
-      }
-      const nm = /^[^\s=/>]+/.exec(text.slice(i, i + 200));
-      if (!nm) {
-        i++;
-        continue;
-      }
-      const rawName = nm[0];
-      const name = normAttrName(rawName);
-      i += rawName.length;
-      if (text[i] !== "=") {
-        attrs += `${sp()}${name}`;
-        continue;
-      }
-      i++;
-      if (text[i] === '"') {
-        let j = i + 1;
-        while (j < n && !(text[j] === '"' && text[j - 1] !== "\\")) j++;
-        const val = text.slice(i + 1, j);
-        attrs += `${sp()}${name}="${escAttr(val.replace(/\\(["\\])/g, "$1"))}"${newlinesOf(val)}`;
-        i = j + 1;
-        continue;
-      }
-      if (text[i] === "{") {
-        let depth = 0;
-        let j = i;
-        for (; j < n; j++) {
-          const cj = text[j];
-          if (cj === '"') {
-            j++;
-            while (j < n && text[j] !== '"') j += text[j] === "\\" ? 2 : 1;
-            continue;
-          }
-          if (cj === "{") depth++;
-          else if (cj === "}" && --depth === 0) break;
-        }
-        const inner = text.slice(i + 1, j);
-        const conv = braceValue(name, inner);
-        attrs += conv === void 0 ? newlinesOf(inner) : `${sp()}${name}="${escAttr(conv)}"${newlinesOf(inner)}`;
-        i = j + 1;
-        continue;
-      }
-      const bare = /^[^\s>]+/.exec(text.slice(i, i + 200))?.[0] ?? "";
-      attrs += `${sp()}${name}=${bare}`;
-      i += bare.length;
-    }
-    if (unwrap) {
-      out += newlinesOf(attrs);
-      continue;
-    }
-    out += `<${tag}${attrs}${!selfClosing ? ">" : VOID.has(tag.toLowerCase()) ? "/>" : `></${tag}>`}`;
-  }
-  return { html: out };
-}
-function snapshotTestFile(file) {
-  const posix3 = file.split("\\").join("/");
-  const dir = dirname2(posix3);
-  if (basename3(dir) !== "__snapshots__") return void 0;
-  return join4(dirname2(dir), basename3(posix3).replace(/\.snap$/i, "")).split("\\").join("/");
-}
-function parseUnitSnapshotFile(src, file) {
-  const entries = parseSnapshotEntries(src);
-  const test = snapshotTestFile(file);
-  const sourceFile = sourceForTest(".", test);
-  const component = sourceFile ? basename3(sourceFile).replace(/\.[cm]?[jt]sx?$/i, "") : void 0;
-  const docs = [];
-  const skipped = [];
-  for (const e of entries) {
-    const conv = snapshotMarkupToHtml(e.value);
-    if ("skip" in conv) {
-      skipped.push({ name: e.name, line: e.line, reason: conv.skip });
-      continue;
-    }
-    const doc = parseHtml("\n".repeat(e.valueLine - 1) + conv.html, file, true);
-    doc.capture = {
-      v: 1,
-      snapshot: e.name,
-      ...test ? { test } : {},
-      ...sourceFile ? { sourceFile } : {},
-      ...component ? { component } : {}
-    };
-    docs.push(doc);
-  }
-  if (docs[0]) docs[0].unitSnapshot = { skipped: skipped.length };
-  return { docs, entries: entries.length, skipped };
-}
-function dedentInlineSnapshot(body) {
-  const lines = body.split("\n");
-  if (lines.length <= 2 || lines[0].trim() !== "" || lines[lines.length - 1].trim() !== "") return body;
-  const indent = /^[^\S\n]*/.exec(lines[1])?.[0] ?? "";
-  if (!indent) return body;
-  for (let i = 1; i < lines.length - 1; i++) {
-    const l = lines[i];
-    if (l.trim() === "") continue;
-    if (!l.startsWith(indent)) return body;
-    lines[i] = l.slice(indent.length);
-  }
-  lines[lines.length - 1] = "";
-  return lines.join("\n");
-}
-function skipBalanced(src, start) {
-  let depth = 0;
-  for (let i = start; i < src.length; i++) {
-    const c = src[i];
-    if (c === '"' || c === "'") {
-      i++;
-      while (i < src.length && src[i] !== c) i += src[i] === "\\" ? 2 : 1;
-      continue;
-    }
-    if (c === "`") {
-      const t3 = readTemplate(src, i);
-      if (!t3) return void 0;
-      i = t3.end - 1;
-      continue;
-    }
-    if (c === "{" || c === "(" || c === "[") depth++;
-    else if ((c === "}" || c === ")" || c === "]") && --depth === 0) return i + 1;
-  }
-  return void 0;
-}
-function testTitleBefore(src, offset) {
-  const re2 = /\b(?:it|test)(?:\.(?:only|skip|todo|concurrent|fails))*\s*\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
-  let title;
-  for (let m3 = re2.exec(src); m3 && m3.index < offset; m3 = re2.exec(src)) {
-    const raw = m3[2];
-    title = m3[1] === "`" && raw.includes("${") ? void 0 : raw.replace(/\\([\s\S])/g, "$1");
-  }
-  return title;
-}
-function parseInlineSnapshotEntries(src) {
-  const out = [];
-  const call = /\.toMatchInlineSnapshot\s*(?:<[^>()]*>\s*)?\(\s*/g;
-  const starts = lineStartsOf(src);
-  const lineOf2 = (offset) => lineColAt(starts, offset).line;
-  const perTitle = /* @__PURE__ */ new Map();
-  for (let m3 = call.exec(src); m3; m3 = call.exec(src)) {
-    let i = m3.index + m3[0].length;
-    if (src[i] === "{") {
-      const end = skipBalanced(src, i);
-      if (end === void 0) continue;
-      const comma = /^\s*,\s*/.exec(src.slice(end, end + 200));
-      if (!comma) continue;
-      i = end + comma[0].length;
-    }
-    if (src[i] !== "`") continue;
-    const tpl = readTemplate(src, i);
-    if (!tpl) break;
-    call.lastIndex = tpl.end;
-    if (/(^|[^\\])\$\{/.test(tpl.body)) continue;
-    const line = lineOf2(m3.index);
-    const title = testTitleBefore(src, m3.index);
-    const base = title ?? `inline snapshot @ line ${line}`;
-    const n = (perTitle.get(base) ?? 0) + 1;
-    perTitle.set(base, n);
-    out.push({
-      name: title ? `${title} ${n}` : base,
-      line,
-      value: dedentInlineSnapshot(unescapeTemplate(tpl.body)),
-      valueLine: lineOf2(i)
-    });
-  }
-  return out;
-}
-function parseInlineSnapshotFile(src, file) {
-  if (!src.includes("toMatchInlineSnapshot")) return { docs: [], entries: 0, skipped: [] };
-  const entries = parseInlineSnapshotEntries(src);
-  const test = file.split("\\").join("/");
-  const sourceFile = sourceForTest(".", test);
-  const component = sourceFile ? basename3(sourceFile).replace(/\.[cm]?[jt]sx?$/i, "") : void 0;
-  const docs = [];
-  const skipped = [];
-  for (const e of entries) {
-    const conv = snapshotMarkupToHtml(e.value);
-    if ("skip" in conv) {
-      skipped.push({ name: e.name, line: e.line, reason: conv.skip });
-      continue;
-    }
-    const doc = parseHtml("\n".repeat(e.valueLine - 1) + conv.html, file, true);
-    doc.capture = {
-      v: 1,
-      snapshot: e.name,
-      test,
-      ...sourceFile ? { sourceFile } : {},
-      ...component ? { component } : {}
-    };
-    docs.push(doc);
-  }
-  if (docs[0]) docs[0].unitSnapshot = { skipped: skipped.length };
-  return { docs, entries: entries.length, skipped };
-}
-
 // src/parse/source.ts
 function detectKind(file, forceJsx = false) {
   if (forceJsx) return "jsx";
@@ -24019,8 +23622,8 @@ function parseSourceWithAst(source, file, opts = {}) {
 }
 
 // src/snapshot.ts
-import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync4, readdirSync as readdirSync2, writeFileSync as writeFileSync2 } from "fs";
-import { dirname as dirname3, join as join5 } from "path";
+import { existsSync as existsSync2, mkdirSync, readFileSync as readFileSync3, readdirSync as readdirSync2, writeFileSync } from "fs";
+import { dirname as dirname2, join as join3 } from "path";
 
 // src/probes.ts
 var PROBES_VERSION = 2;
@@ -24922,7 +24525,7 @@ async function waitForLoaded(page, timeoutMs, intervalMs = 150) {
     }
     const waitedMs = Date.now() - started;
     if (!markers.length || waitedMs >= timeoutMs) return { markers, waitedMs };
-    await new Promise((resolve14) => setTimeout(resolve14, Math.min(intervalMs, Math.max(1, timeoutMs - waitedMs))));
+    await new Promise((resolve15) => setTimeout(resolve15, Math.min(intervalMs, Math.max(1, timeoutMs - waitedMs))));
   }
 }
 var LOADING_TIMEOUT_MS = 1e4;
@@ -25062,8 +24665,8 @@ function slugifyPageId(input) {
     }
   } catch {
   }
-  const slug = path.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  if (slug) return slug;
+  const slug2 = path.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (slug2) return slug2;
   return path === "/" || path === "" ? "accueil" : "page";
 }
 var ID_RE = /^[a-z0-9][a-z0-9-]*$/i;
@@ -25122,12 +24725,12 @@ function validateSnapshotMeta(raw) {
   };
 }
 function snapshotDir(root, id) {
-  return join5(root, PAGES_DIR, id);
+  return join3(root, PAGES_DIR, id);
 }
 function writeSnapshot(root, snap) {
   const dir = snapshotDir(root, snap.meta.id);
-  mkdirSync2(dir, { recursive: true });
-  writeFileSync2(join5(dir, "meta.json"), `${JSON.stringify(snap.meta, null, 2)}
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join3(dir, "meta.json"), `${JSON.stringify(snap.meta, null, 2)}
 `);
   const comment = formatCaptureComment({
     v: 1,
@@ -25136,30 +24739,30 @@ function writeSnapshot(root, snap) {
     ...snap.meta.sources?.[0] ? { sourceFile: snap.meta.sources[0] } : {},
     name: snap.meta.name
   });
-  writeFileSync2(join5(dir, "dom.html"), `${comment}
+  writeFileSync(join3(dir, "dom.html"), `${comment}
 ${snap.dom}
 `);
-  if (snap.styles) writeFileSync2(join5(dir, "styles.json"), `${JSON.stringify(snap.styles)}
+  if (snap.styles) writeFileSync(join3(dir, "styles.json"), `${JSON.stringify(snap.styles)}
 `);
-  if (snap.boxes) writeFileSync2(join5(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}
+  if (snap.boxes) writeFileSync(join3(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}
 `);
-  if (snap.axtree) writeFileSync2(join5(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}
+  if (snap.axtree) writeFileSync(join3(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}
 `);
-  if (snap.css) writeFileSync2(join5(dir, "css.json"), `${JSON.stringify(snap.css)}
+  if (snap.css) writeFileSync(join3(dir, "css.json"), `${JSON.stringify(snap.css)}
 `);
-  if (snap.probes) writeFileSync2(join5(dir, "probes.json"), `${JSON.stringify(snap.probes)}
+  if (snap.probes) writeFileSync(join3(dir, "probes.json"), `${JSON.stringify(snap.probes)}
 `);
-  if (snap.axe) writeFileSync2(join5(dir, "axe.json"), `${JSON.stringify(snap.axe)}
+  if (snap.axe) writeFileSync(join3(dir, "axe.json"), `${JSON.stringify(snap.axe)}
 `);
   if (snap.screenshotBase64) {
     try {
-      writeFileSync2(join5(dir, "screen.png"), Buffer.from(snap.screenshotBase64, "base64"));
+      writeFileSync(join3(dir, "screen.png"), Buffer.from(snap.screenshotBase64, "base64"));
     } catch {
     }
   }
   if (snap.screenshotFullBase64) {
     try {
-      writeFileSync2(join5(dir, "screen-full.png"), Buffer.from(snap.screenshotFullBase64, "base64"));
+      writeFileSync(join3(dir, "screen-full.png"), Buffer.from(snap.screenshotFullBase64, "base64"));
     } catch {
     }
   }
@@ -25167,30 +24770,30 @@ ${snap.dom}
 }
 function readJson(file) {
   try {
-    return JSON.parse(readFileSync4(file, "utf8"));
+    return JSON.parse(readFileSync3(file, "utf8"));
   } catch {
     return void 0;
   }
 }
 function readSnapshot(dir) {
-  const rawMeta = readJson(join5(dir, "meta.json"));
+  const rawMeta = readJson(join3(dir, "meta.json"));
   if (rawMeta === void 0) return null;
   const v2 = validateSnapshotMeta(rawMeta);
   if (!v2.ok || !v2.meta) return null;
   let dom;
   try {
-    dom = readFileSync4(join5(dir, "dom.html"), "utf8");
+    dom = readFileSync3(join3(dir, "dom.html"), "utf8");
   } catch {
     return null;
   }
-  const styles = readJson(join5(dir, "styles.json"));
-  const boxes = readJson(join5(dir, "boxes.json"));
-  const axtree = readJson(join5(dir, "axtree.json"));
-  const css = readJson(join5(dir, "css.json"));
-  const probes = readJson(join5(dir, "probes.json"));
-  const axe = readJson(join5(dir, "axe.json"));
-  const shot = join5(dir, "screen.png");
-  const full = join5(dir, "screen-full.png");
+  const styles = readJson(join3(dir, "styles.json"));
+  const boxes = readJson(join3(dir, "boxes.json"));
+  const axtree = readJson(join3(dir, "axtree.json"));
+  const css = readJson(join3(dir, "css.json"));
+  const probes = readJson(join3(dir, "probes.json"));
+  const axe = readJson(join3(dir, "axe.json"));
+  const shot = join3(dir, "screen.png");
+  const full = join3(dir, "screen-full.png");
   return {
     meta: v2.meta,
     dom,
@@ -25200,19 +24803,19 @@ function readSnapshot(dir) {
     ...css ? { css } : {},
     ...probes ? { probes } : {},
     ...axe ? { axe } : {},
-    ...existsSync3(shot) ? { screenshot: "screen.png" } : {},
-    ...existsSync3(full) ? { screenshotFull: "screen-full.png" } : {}
+    ...existsSync2(shot) ? { screenshot: "screen.png" } : {},
+    ...existsSync2(full) ? { screenshotFull: "screen-full.png" } : {}
   };
 }
 function pageScreenshot(pagesDir, id) {
   for (const f2 of ["screen-full.png", "screen.png"]) {
-    const p2 = join5(pagesDir, id, f2);
-    if (existsSync3(p2)) return p2;
+    const p2 = join3(pagesDir, id, f2);
+    if (existsSync2(p2)) return p2;
   }
   return void 0;
 }
 function readSnapshots(root) {
-  const base = join5(root, PAGES_DIR);
+  const base = join3(root, PAGES_DIR);
   let dirs;
   try {
     dirs = readdirSync2(base, { withFileTypes: true }).filter((d2) => d2.isDirectory()).map((d2) => d2.name);
@@ -25221,7 +24824,7 @@ function readSnapshots(root) {
   }
   const out = [];
   for (const d2 of dirs.sort()) {
-    const s2 = readSnapshot(join5(base, d2));
+    const s2 = readSnapshot(join3(base, d2));
     if (s2) out.push(s2);
   }
   return out;
@@ -25262,16 +24865,16 @@ function align(doc, entries) {
 }
 function attachSignals(doc) {
   if (!isSnapshotDom(doc.file)) return;
-  const dir = dirname3(doc.file);
-  const styles = readJson(join5(dir, "styles.json"));
-  const boxes = readJson(join5(dir, "boxes.json"));
-  const axtree = readJson(join5(dir, "axtree.json"));
-  const css = readJson(join5(dir, "css.json"));
-  const meta2 = readJson(join5(dir, "meta.json"));
+  const dir = dirname2(doc.file);
+  const styles = readJson(join3(dir, "styles.json"));
+  const boxes = readJson(join3(dir, "boxes.json"));
+  const axtree = readJson(join3(dir, "axtree.json"));
+  const css = readJson(join3(dir, "css.json"));
+  const meta2 = readJson(join3(dir, "meta.json"));
   const loading = Array.isArray(meta2?.loading) ? meta2.loading.filter((m3) => typeof m3 === "string") : [];
-  const probes = readJson(join5(dir, "probes.json"));
-  const axe = readJson(join5(dir, "axe.json"));
-  const shot = join5(dir, "screen.png");
+  const probes = readJson(join3(dir, "probes.json"));
+  const axe = readJson(join3(dir, "axe.json"));
+  const shot = join3(dir, "screen.png");
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
   const alignedBoxMap = boxes ? align(doc, boxes.entries) : null;
   const truncated = Boolean(styles?.truncated || boxes?.truncated);
@@ -25281,7 +24884,7 @@ function attachSignals(doc) {
     ...axtree ? { axtree } : {},
     // Not element-indexed, so it needs no alignment — it is a property of the stylesheet.
     ...css ? { css } : {},
-    ...existsSync3(shot) ? { screenshot: shot } : {},
+    ...existsSync2(shot) ? { screenshot: shot } : {},
     ...meta2?.doctype !== void 0 ? { doctype: meta2.doctype } : {},
     ...probes ? { probes } : {},
     ...axe ? { axe } : {},
@@ -26556,14 +26159,7 @@ function selectorOf(el) {
 }
 function captureOrigin(doc) {
   if (!doc.capture) return {};
-  return {
-    origin: {
-      capture: doc.file,
-      sourceFile: doc.capture.sourceFile,
-      component: doc.capture.component,
-      ...doc.capture.snapshot ? { snapshot: doc.capture.snapshot } : {}
-    }
-  };
+  return { origin: { capture: doc.file, sourceFile: doc.capture.sourceFile, component: doc.capture.component } };
 }
 function toFinding(doc, ruleId, def, rf, ruleAdvisory) {
   const entry2 = MSG_CATALOG[rf.msgId];
@@ -26632,7 +26228,7 @@ function rendersNativeLink(doc, el) {
 }
 
 // src/rules/rendered.ts
-import { readFileSync as readFileSync5 } from "fs";
+import { readFileSync as readFileSync4 } from "fs";
 
 // src/color.ts
 var NAMED = {
@@ -27061,7 +26657,7 @@ var renderedContrastPixel = {
     if (!shot || !boxes || !doc.signals?.styles) return [];
     let img = null;
     try {
-      img = decodePng(readFileSync5(shot));
+      img = decodePng(readFileSync4(shot));
     } catch {
       return [];
     }
@@ -34900,9 +34496,9 @@ function criterionMeasuredOn(ruleIds2, scs, cov, ran) {
 }
 
 // src/axe-engine.ts
-import { existsSync as existsSync4, readFileSync as readFileSync6 } from "fs";
+import { existsSync as existsSync3, readFileSync as readFileSync5 } from "fs";
 import { createRequire as createRequire2 } from "module";
-import { dirname as dirname4, join as join6 } from "path";
+import { dirname as dirname3, join as join4 } from "path";
 import { fileURLToPath } from "url";
 var AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 var AXE_CORE_PIN = "4.13.0";
@@ -34941,27 +34537,27 @@ function loadBuilder(anchor) {
 function insideUltra11y(anchor) {
   let dir;
   try {
-    dir = dirname4(anchor.startsWith("file:") ? fileURLToPath(anchor) : anchor);
+    dir = dirname3(anchor.startsWith("file:") ? fileURLToPath(anchor) : anchor);
   } catch {
     return false;
   }
   for (; ; ) {
-    const manifest = join6(dir, "package.json");
-    if (existsSync4(manifest)) {
+    const manifest = join4(dir, "package.json");
+    if (existsSync3(manifest)) {
       try {
-        return JSON.parse(readFileSync6(manifest, "utf8")).name === "ultra11y";
+        return JSON.parse(readFileSync5(manifest, "utf8")).name === "ultra11y";
       } catch {
         return false;
       }
     }
-    const up = dirname4(dir);
+    const up = dirname3(dir);
     if (up === dir) return false;
     dir = up;
   }
 }
 function resolveAxeEngine(opts) {
   const self = opts.self ?? import.meta.url;
-  const project = join6(opts.cwd, "package.json");
+  const project = join4(opts.cwd, "package.json");
   const AxeBuilder = loadBuilder(self) ?? loadBuilder(project);
   if (!AxeBuilder) {
     throw new Error(`${BUILDER_SPEC} resolves neither from ultra11y itself nor from ${opts.cwd}.`);
@@ -34971,7 +34567,7 @@ function resolveAxeEngine(opts) {
   if (!located) throw new Error(`axe-core resolves neither from ultra11y itself nor from ${opts.cwd}.`);
   let source = sourceCache.get(located.path);
   if (source === void 0) {
-    source = readFileSync6(located.path, "utf8");
+    source = readFileSync5(located.path, "utf8");
     sourceCache.set(located.path, source);
   }
   const origin = own && insideUltra11y(self) ? located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned" : "project";
@@ -40790,7 +40386,7 @@ function crossToFinding(doc, ruleId, def, cf) {
 }
 
 // src/graph/spec-resolve.ts
-import { resolve as absPath, basename as basename4, dirname as dirname7, posix as posix2 } from "path";
+import { resolve as absPath, basename as basename2, dirname as dirname6, posix as posix2 } from "path";
 
 // node_modules/get-tsconfig/dist/index.mjs
 import m2 from "path";
@@ -41687,7 +41283,7 @@ var fn = r((e) => {
 }, "createPathsMatcher");
 
 // src/graph/resolve.ts
-import { dirname as dirname5, join as join7 } from "path";
+import { dirname as dirname4, join as join5 } from "path";
 var EXT_ORDER = [".tsx", ".jsx", ".ts", ".js"];
 function candidates(base) {
   const out = [base];
@@ -41697,7 +41293,7 @@ function candidates(base) {
     for (const e of EXT_ORDER) out.push(stripped + e);
   }
   for (const e of EXT_ORDER) out.push(base + e);
-  for (const e of EXT_ORDER) out.push(join7(base, `index${e}`));
+  for (const e of EXT_ORDER) out.push(join5(base, `index${e}`));
   return out;
 }
 function matchKnown(base, known) {
@@ -41709,7 +41305,7 @@ function matchKnown(base, known) {
 }
 function resolveSpecifier(fromFile, spec, known, aliases) {
   if (spec.startsWith(".")) {
-    return matchKnown(join7(dirname5(toPosix2(fromFile)), spec), known);
+    return matchKnown(join5(dirname4(toPosix2(fromFile)), spec), known);
   }
   if (aliases?.length) {
     for (const rule of aliases) {
@@ -41717,7 +41313,7 @@ function resolveSpecifier(fromFile, spec, known, aliases) {
         if (!spec.startsWith(rule.prefix)) continue;
         const rest = spec.slice(rule.prefix.length);
         for (const base of rule.bases) {
-          const hit = matchKnown(join7(base, rest), known);
+          const hit = matchKnown(join5(base, rest), known);
           if (hit) return hit;
         }
       } else if (spec === rule.prefix) {
@@ -41732,11 +41328,11 @@ function resolveSpecifier(fromFile, spec, known, aliases) {
 }
 
 // src/graph/tsconfig.ts
-import { existsSync as existsSync5, readFileSync as readFileSync7 } from "fs";
-import { dirname as dirname6, join as join8, resolve as resolve3, relative as relative3 } from "path";
+import { existsSync as existsSync4, readFileSync as readFileSync6 } from "fs";
+import { dirname as dirname5, join as join6, resolve as resolve3, relative as relative3 } from "path";
 function readJsonish(path) {
   try {
-    const raw = readFileSync7(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1").replace(/,(\s*[}\]])/g, "$1");
+    const raw = readFileSync6(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1").replace(/,(\s*[}\]])/g, "$1");
     return JSON.parse(raw);
   } catch {
     return null;
@@ -41745,9 +41341,9 @@ function readJsonish(path) {
 function findTsconfig(startDir) {
   let dir = resolve3(startDir);
   for (let i = 0; i < 30; i++) {
-    const p2 = join8(dir, "tsconfig.json");
-    if (existsSync5(p2)) return p2;
-    const parent = dirname6(dir);
+    const p2 = join6(dir, "tsconfig.json");
+    if (existsSync4(p2)) return p2;
+    const parent = dirname5(dir);
     if (parent === dir) break;
     dir = parent;
   }
@@ -41763,15 +41359,15 @@ function tsconfigChain(startDir) {
     const p2 = queue.shift();
     if (seen.has(p2)) continue;
     seen.add(p2);
-    if (!existsSync5(p2)) continue;
+    if (!existsSync4(p2)) continue;
     out.push(p2);
     const cfg = readJsonish(p2);
     const exts = Array.isArray(cfg?.extends) ? cfg.extends : typeof cfg?.extends === "string" ? [cfg.extends] : [];
-    const dir = dirname6(p2);
+    const dir = dirname5(p2);
     for (const e of exts) {
       if (typeof e !== "string") continue;
       const cands = e.endsWith(".json") ? [resolve3(dir, e)] : [resolve3(dir, `${e}.json`), resolve3(dir, e, "tsconfig.json")];
-      const hit = cands.find((c) => existsSync5(c));
+      const hit = cands.find((c) => existsSync4(c));
       if (hit) queue.push(hit);
     }
   }
@@ -41780,7 +41376,7 @@ function tsconfigChain(startDir) {
 function readTsAliases(startDir, cwd = process.cwd()) {
   const tsconfigPath = findTsconfig(startDir);
   if (!tsconfigPath) return [];
-  const root = dirname6(tsconfigPath);
+  const root = dirname5(tsconfigPath);
   const cfg = readJsonish(tsconfigPath);
   if (!cfg) return [];
   let co = cfg.compilerOptions ?? {};
@@ -41804,7 +41400,7 @@ function readTsAliases(startDir, cwd = process.cwd()) {
     const bases = targets.map((t3) => {
       const star = t3.indexOf("*");
       const tp = wildcard && star >= 0 ? t3.slice(0, star) : t3;
-      return toPosix2(relative3(cwd, join8(baseAbs, tp))) || ".";
+      return toPosix2(relative3(cwd, join6(baseAbs, tp))) || ".";
     });
     out.push({ prefix: prefix2, wildcard, bases });
   }
@@ -41855,7 +41451,7 @@ function loadScopedPaths(startDir) {
   const cache2 = /* @__PURE__ */ new Map();
   const out = [];
   for (const cfgPath of tsconfigChain(startDir)) {
-    if (!CONFIG_NAMES.has(basename4(cfgPath))) continue;
+    if (!CONFIG_NAMES.has(basename2(cfgPath))) continue;
     try {
       const config = ie(cfgPath, cache2);
       const paths = config.compilerOptions?.paths;
@@ -41864,7 +41460,7 @@ function loadScopedPaths(startDir) {
       if (!patterns.length) continue;
       const match = fn({ path: cfgPath, config });
       if (!match) continue;
-      out.push({ dir: toPosix2(dirname7(cfgPath)), patterns, match });
+      out.push({ dir: toPosix2(dirname6(cfgPath)), patterns, match });
     } catch {
     }
   }
@@ -42412,7 +42008,7 @@ function runPackRules(doc, pack) {
 }
 
 // src/graph/build.ts
-import { dirname as dirname8 } from "path";
+import { dirname as dirname7 } from "path";
 
 // src/graph/imports.ts
 var NAME_PROPS2 = /* @__PURE__ */ new Set(["aria-label", "aria-labelledby", "title", "label", "alt"]);
@@ -42759,9 +42355,7 @@ function buildGraphAndDocs(files, opts = {}) {
     let doc;
     let sfc = false;
     let auditable = false;
-    if (isUnitSnapshotFile(file)) {
-      doc = emptyDoc(file, content);
-    } else if (GRAPH_ONLY.has(ext(file))) {
+    if (GRAPH_ONLY.has(ext(file))) {
       ast = parseJsxAst(content);
       doc = emptyDoc(file, content);
     } else if (detectKind(file) === "sfc") {
@@ -42781,14 +42375,14 @@ function buildGraphAndDocs(files, opts = {}) {
     }
     nodes.push(extractGraphNode(ast, doc, file, { sfc }));
   }
-  const startDir = files[0] ? dirname8(files[0]) : process.cwd();
+  const startDir = files[0] ? dirname7(files[0]) : process.cwd();
   return { graph: buildGraph(nodes, readTsAliases(startDir), startDir), docs };
 }
 
 // src/discover.ts
-import { existsSync as existsSync6 } from "fs";
+import { existsSync as existsSync5 } from "fs";
 import { execFileSync } from "child_process";
-import { join as join9, relative as relative4 } from "path";
+import { join as join7, relative as relative4 } from "path";
 function git(args, maxBuffer) {
   try {
     return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], ...maxBuffer ? { maxBuffer } : {} });
@@ -42813,7 +42407,7 @@ function gitChangedFiles(ref) {
   add2(git(["diff", "--name-only", "--diff-filter=d", "--cached", base]));
   add2(git(["ls-files", "--others", "--exclude-standard"]));
   const cwd = process.cwd();
-  return [...out].map((p2) => relative4(cwd, join9(repoRoot2, p2)));
+  return [...out].map((p2) => relative4(cwd, join7(repoRoot2, p2)));
 }
 function gitStagedFiles() {
   const top = git(["rev-parse", "--show-toplevel"]);
@@ -42822,7 +42416,7 @@ function gitStagedFiles() {
   if (out === null) return null;
   const repoRoot2 = top.trim();
   const cwd = process.cwd();
-  return out.split("\n").map((s2) => s2.trim()).filter(Boolean).map((p2) => relative4(cwd, join9(repoRoot2, p2)));
+  return out.split("\n").map((s2) => s2.trim()).filter(Boolean).map((p2) => relative4(cwd, join7(repoRoot2, p2)));
 }
 function stagedContent(file) {
   return git(["show", `:./${toPosix2(file)}`], 32 * 1024 * 1024);
@@ -42885,7 +42479,6 @@ function discover(inputs, opts = {}) {
   let files;
   let gitUnavailable = false;
   let staged;
-  let hosts;
   if (opts.staged) {
     const stagedFiles = gitStagedFiles();
     if (stagedFiles === null) {
@@ -42896,11 +42489,8 @@ function discover(inputs, opts = {}) {
       const filter = makeFilter(opts);
       const inScope = inScopeMatcher(inputs);
       const scoped = stagedFiles.filter((f2) => filter(f2) && (!inScope || inScope(f2)));
-      const hostFilter = inlineHostFilter(opts);
-      hosts = opts.inlineSnapshots ? stagedFiles.filter((f2) => !filter(f2) && hostFilter(f2) && (!inScope || inScope(f2))) : [];
-      staged = stagedContents([...scoped, ...hosts]);
-      files = scoped.filter((f2) => staged.has(f2));
-      hosts = hosts.filter((f2) => staged.has(f2));
+      staged = stagedContents(scoped);
+      files = [...staged.keys()];
     }
   } else if (changedMode) {
     const changed = gitChangedFiles(opts.since);
@@ -42911,27 +42501,24 @@ function discover(inputs, opts = {}) {
     } else {
       const filter = makeFilter(opts);
       const inScope = inScopeMatcher(inputs);
-      files = changed.filter((f2) => existsSync6(f2) && filter(f2) && (!inScope || inScope(f2)));
-      const hostFilter = inlineHostFilter(opts);
-      hosts = opts.inlineSnapshots ? changed.filter((f2) => existsSync6(f2) && !filter(f2) && hostFilter(f2) && (!inScope || inScope(f2))) : [];
+      files = changed.filter((f2) => existsSync5(f2) && filter(f2) && (!inScope || inScope(f2)));
     }
   } else {
     files = expandInputs(inputs, opts);
   }
   files = sortByPriorityThenPath([...new Set(files)]);
-  const inlineHosts = opts.inlineSnapshots ? (hosts ?? inlineSnapshotHosts(inputs, files, opts)).sort() : [];
-  return { files, changedMode, gitUnavailable, ...staged ? { stagedContent: staged } : {}, inlineSnapshotHosts: inlineHosts };
+  return { files, changedMode, gitUnavailable, ...staged ? { stagedContent: staged } : {} };
 }
 
 // src/documents.ts
-import { existsSync as existsSync8, readFileSync as readFileSync9, realpathSync as realpathSync2, statSync as statSync3 } from "fs";
-import { dirname as dirname9, isAbsolute as isAbsolute2, join as join11, relative as relative5 } from "path";
+import { existsSync as existsSync7, readFileSync as readFileSync8, realpathSync as realpathSync2, statSync as statSync3 } from "fs";
+import { dirname as dirname8, isAbsolute, join as join9, relative as relative5 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 
 // src/document-store.ts
 import { createHash } from "crypto";
-import { existsSync as existsSync7, mkdirSync as mkdirSync3, readFileSync as readFileSync8, writeFileSync as writeFileSync3 } from "fs";
-import { join as join10 } from "path";
+import { existsSync as existsSync6, mkdirSync as mkdirSync2, readFileSync as readFileSync7, writeFileSync as writeFileSync2 } from "fs";
+import { join as join8 } from "path";
 var DOCUMENTS_DIR = ".ultra11y/documents";
 var DOCUMENT_MAX_COUNT = 20;
 var DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
@@ -43033,9 +42620,9 @@ var SIDECAR_KIND = "ultra11y-document";
 var SIDECAR_VERSION = 1;
 function readDocumentOrigin(pdfPath) {
   const side = pdfPath.replace(/\.pdf$/i, ".json");
-  if (side === pdfPath || !existsSync7(side)) return void 0;
+  if (side === pdfPath || !existsSync6(side)) return void 0;
   try {
-    const raw = JSON.parse(readFileSync8(side, "utf8"));
+    const raw = JSON.parse(readFileSync7(side, "utf8"));
     if (!raw || typeof raw !== "object" || raw.v !== SIDECAR_VERSION) return void 0;
     if (raw.kind !== SIDECAR_KIND && !(raw.kind === void 0 && /(?:^|[\\/])[0-9a-f]{64}\.pdf$/i.test(pdfPath))) return void 0;
     const url = typeof raw.url === "string" ? raw.url : void 0;
@@ -43048,15 +42635,15 @@ function readDocumentOrigin(pdfPath) {
 function recordDocumentPages(file, url, pageIds) {
   const prev = readDocumentOrigin(file);
   const pages = [.../* @__PURE__ */ new Set([...prev?.pages ?? [], ...pageIds])].sort();
-  writeFileSync3(file.replace(/\.pdf$/i, ".json"), `${JSON.stringify({ kind: SIDECAR_KIND, v: SIDECAR_VERSION, url: prev?.url ?? url, pages }, null, 2)}
+  writeFileSync2(file.replace(/\.pdf$/i, ".json"), `${JSON.stringify({ kind: SIDECAR_KIND, v: SIDECAR_VERSION, url: prev?.url ?? url, pages }, null, 2)}
 `);
 }
 function storeDocument(root, url, bytes, pageIds) {
-  const dir = join10(root, DOCUMENTS_DIR);
+  const dir = join8(root, DOCUMENTS_DIR);
   const sha = createHash("sha256").update(bytes).digest("hex");
-  const file = join10(dir, `${sha}.pdf`);
-  mkdirSync3(dir, { recursive: true });
-  writeFileSync3(file, bytes);
+  const file = join8(dir, `${sha}.pdf`);
+  mkdirSync2(dir, { recursive: true });
+  writeFileSync2(file, bytes);
   recordDocumentPages(file, url, pageIds);
   return file;
 }
@@ -43287,7 +42874,7 @@ var ByteSink = class {
   }
 };
 function inflate(data2) {
-  const attempt = (opts) => {
+  const attempt2 = (opts) => {
     try {
       return inflateSync2(data2, { ...opts, maxOutputLength: MAX_STREAM_DECODED });
     } catch (e) {
@@ -43296,11 +42883,11 @@ function inflate(data2) {
     }
   };
   try {
-    return attempt({});
+    return attempt2({});
   } catch (e) {
     if (e instanceof PdfUnreadable) throw e;
     try {
-      return attempt({ finishFlush: zlibConstants.Z_SYNC_FLUSH });
+      return attempt2({ finishFlush: zlibConstants.Z_SYNC_FLUSH });
     } catch (e2) {
       if (e2 instanceof PdfUnreadable) throw e2;
       throw new PdfUnreadable("malformed", "a FlateDecode stream could not be inflated");
@@ -44164,7 +43751,7 @@ function loadPdfDoc(path, file = path) {
     if (doc.pdf) doc.pdf = { ...doc.pdf, unreadable: "too-large", detail: `file is ${size} bytes; the reader stops at ${PDF_MAX_BYTES}` };
     return doc;
   }
-  return pdfDocFromBytes(readFileSync9(path), file, readDocumentOrigin(path));
+  return pdfDocFromBytes(readFileSync8(path), file, readDocumentOrigin(path));
 }
 function pdfLinksIn(html, pageUrl) {
   let page;
@@ -44203,7 +43790,7 @@ function pdfLinksIn(html, pageUrl) {
 function readStorageCookies(path) {
   let raw;
   try {
-    raw = JSON.parse(readFileSync9(path, "utf8"));
+    raw = JSON.parse(readFileSync8(path, "utf8"));
   } catch {
     return [];
   }
@@ -44270,13 +43857,13 @@ function nodeFetcher(timeoutMs, cookies) {
 }
 function readLocal(url, pageUrls, maxBytes) {
   const path = fileURLToPath2(url);
-  if (!existsSync8(path)) return { reason: "not found" };
+  if (!existsSync7(path)) return { reason: "not found" };
   const real = realpathSync2(path);
   const inside = pageUrls.some((pageUrl) => {
     try {
-      const dir = realpathSync2(dirname9(fileURLToPath2(pageUrl)));
+      const dir = realpathSync2(dirname8(fileURLToPath2(pageUrl)));
       const rel = relative5(dir, real);
-      return rel !== "" && !rel.startsWith("..") && !isAbsolute2(rel);
+      return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
     } catch {
       return false;
     }
@@ -44285,7 +43872,7 @@ function readLocal(url, pageUrls, maxBytes) {
   const st = statSync3(real);
   if (!st.isFile()) return { reason: "not a file" };
   if (st.size > maxBytes) return { reason: `larger than ${maxBytes} bytes` };
-  const bytes = readFileSync9(real);
+  const bytes = readFileSync8(real);
   if (!hasPdfHeader(bytes)) return { reason: "not a PDF \u2014 the file has no %PDF- header" };
   return { bytes, url };
 }
@@ -44341,11 +43928,11 @@ async function downloadLinkedDocuments(root, pages, opts = {}) {
 async function downloadSnapshotDocuments(root, snapshotIds, opts = {}) {
   const pages = [];
   for (const id of snapshotIds) {
-    const dir = join11(root, PAGES_DIR, id);
+    const dir = join9(root, PAGES_DIR, id);
     try {
-      const meta2 = JSON.parse(readFileSync9(join11(dir, "meta.json"), "utf8"));
+      const meta2 = JSON.parse(readFileSync8(join9(dir, "meta.json"), "utf8"));
       if (typeof meta2.url !== "string" || !meta2.url) continue;
-      pages.push({ id, url: meta2.url, html: readFileSync9(join11(dir, "dom.html"), "utf8") });
+      pages.push({ id, url: meta2.url, html: readFileSync8(join9(dir, "dom.html"), "utf8") });
     } catch {
     }
   }
@@ -44546,9 +44133,9 @@ function externalScripts(doc) {
       unreadable2++;
       continue;
     }
-    const path = resolvePath(dirname10(doc.file), src.split(/[?#]/)[0].replace(/^\//, ""));
+    const path = resolvePath(dirname9(doc.file), src.split(/[?#]/)[0].replace(/^\//, ""));
     try {
-      if (existsSync9(path) && statSync4(path).isFile() && statSync4(path).size <= SCRIPT_READ_LIMIT) readable.push(readFileSync10(path, "utf8"));
+      if (existsSync8(path) && statSync4(path).isFile() && statSync4(path).size <= SCRIPT_READ_LIMIT) readable.push(readFileSync9(path, "utf8"));
       else unreadable2++;
     } catch {
       unreadable2++;
@@ -44573,7 +44160,6 @@ function newAccum() {
     sfcFiles: 0,
     sfcExts: /* @__PURE__ */ new Set(),
     captures: [],
-    unitSnapshots: { files: 0, entries: 0, skipped: 0, inline: 0 },
     langCounts: /* @__PURE__ */ new Map(),
     renderedScs: /* @__PURE__ */ new Set(),
     pageIds: /* @__PURE__ */ new Set(),
@@ -44727,20 +44313,12 @@ function foldDoc(acc, doc, graph) {
     const e = doc.file.toLowerCase().match(/\.[a-z]+$/)?.[0];
     if (e) acc.sfcExts.add(e);
   }
-  const snapshotEntry = doc.capture?.snapshot !== void 0;
-  if (snapshotEntry) {
-    acc.unitSnapshots.entries++;
-    if (!isUnitSnapshotFile(doc.file)) acc.unitSnapshots.inline++;
-    if (doc.unitSnapshot) {
-      acc.unitSnapshots.files++;
-      acc.unitSnapshots.skipped += doc.unitSnapshot.skipped;
-    }
-  } else if (doc.capture) acc.captures.push({ file: doc.file, provenance: doc.capture });
+  if (doc.capture) acc.captures.push({ file: doc.file, provenance: doc.capture });
   const html = elementsByTag(doc, "html")[0];
   const htmlLang = html ? (attr(html, "lang") ?? attr(html, "xml:lang") ?? "").trim() : "";
   const subtag = htmlLang ? primarySubtag(htmlLang) : void 0;
   if (subtag) acc.langCounts.set(subtag, (acc.langCounts.get(subtag) ?? 0) + 1);
-  if (!snapshotEntry || doc.unitSnapshot) acc.fileCount++;
+  acc.fileCount++;
 }
 function foldDocument(acc, doc) {
   const findings = runRules(doc);
@@ -45006,14 +44584,6 @@ function finalize(acc, inputs, extra = {}) {
           components: [...new Set(acc.captures.map((c) => c.provenance.component).filter((x2) => !!x2))].sort()
         }
       } : {},
-      ...acc.unitSnapshots.entries ? {
-        unitSnapshots: {
-          files: acc.unitSnapshots.files,
-          entries: acc.unitSnapshots.entries,
-          skipped: acc.unitSnapshots.skipped,
-          ...acc.unitSnapshots.inline ? { inline: acc.unitSnapshots.inline } : {}
-        }
-      } : {},
       ...acc.langCounts.size ? { langs: [...acc.langCounts.entries()].sort((a2, b) => b[1] - a2[1] || a2[0].localeCompare(b[0])).map(([lang]) => lang) } : {},
       // Coverage the RENDERED tier earned from the snapshots this run ingested. Same field the
       // live-browser merge stamps (`mergeDynamic`), because it is the same claim: these criteria
@@ -45061,8 +44631,7 @@ function runAudit(opts) {
   const {
     files: discovered,
     gitUnavailable,
-    stagedContent: stagedContent2,
-    inlineSnapshotHosts: inlineHosts
+    stagedContent: stagedContent2
   } = discover(opts.inputs, {
     include: opts.include,
     exclude: opts.exclude,
@@ -45072,14 +44641,12 @@ function runAudit(opts) {
     staged: opts.staged,
     noDefaultExcludes: opts.noDefaultExcludes,
     onWarn: opts.onWarn,
-    walkCache,
-    inlineSnapshots: true
+    walkCache
   });
   const useStaged = opts.staged === true && !gitUnavailable;
   const diffMode = opts.changed || opts.since || opts.staged;
   const relevantCaptures = opts.captureDiff && diffMode && opts.captureDir ? capturesForSources(opts.captureDir, discovered).filter((c) => !discovered.includes(c)) : [];
-  const inlineOnly = new Set(inlineHosts);
-  const files = relevantCaptures.length || inlineHosts.length ? [...discovered, ...relevantCaptures, ...inlineHosts] : discovered;
+  const files = relevantCaptures.length ? [...discovered, ...relevantCaptures] : discovered;
   let graph;
   let carried;
   if (opts.graph || opts.captureCoverage) {
@@ -45119,7 +44686,7 @@ function runAudit(opts) {
       try {
         if (statSync4(file).size > PDF_MAX_BYTES) doc2 = loadPdfDoc(file);
         else {
-          const bytes = readFileSync10(file);
+          const bytes = readFileSync9(file);
           if (dedupMode !== "off") {
             const h3 = createHash2("sha1").update(bytes).digest("hex");
             if (seen.has(h3)) {
@@ -45160,14 +44727,6 @@ function runAudit(opts) {
       }
       seen.add(h3);
     }
-    if (isUnitSnapshotFile(file)) {
-      for (const d2 of parseUnitSnapshotFile(content, file).docs) foldDoc(acc, d2, graph);
-      continue;
-    }
-    if (inlineOnly.has(file)) {
-      for (const d2 of parseInlineSnapshotFile(content, file).docs) foldDoc(acc, d2, graph);
-      continue;
-    }
     const ingested = isSnapshotDom(file) || isUnderDir(file, opts.captureDir ?? CAPTURES_DIR);
     const doc = reused ?? parseSource(content, file, { forceJsx: opts.forceJsx && !ingested });
     attachSignals(doc);
@@ -45191,9 +44750,9 @@ function runAudit(opts) {
 // src/hook.ts
 import { execFileSync as execFileSync2 } from "child_process";
 import { createHash as createHash3 } from "crypto";
-import { existsSync as existsSync12, mkdirSync as mkdirSync4, writeFileSync as writeFileSync4 } from "fs";
+import { existsSync as existsSync11, mkdirSync as mkdirSync3, writeFileSync as writeFileSync3 } from "fs";
 import { tmpdir } from "os";
-import { join as join13 } from "path";
+import { join as join11 } from "path";
 
 // src/baseline.ts
 var RANK = { bloquant: 0, majeur: 1, mineur: 2 };
@@ -45213,11 +44772,11 @@ function findingsAtOrAbove(findings, failOn) {
 }
 
 // src/config.ts
-import { existsSync as existsSync11, statSync as statSync5 } from "fs";
-import { join as join12, isAbsolute as isAbsolute3 } from "path";
+import { existsSync as existsSync10, statSync as statSync5 } from "fs";
+import { join as join10, isAbsolute as isAbsolute2 } from "path";
 
 // src/pack.ts
-import { existsSync as existsSync10 } from "fs";
+import { existsSync as existsSync9 } from "fs";
 
 // src/standards/pack.ts
 function localize(pack, s2, lang) {
@@ -45396,7 +44955,7 @@ function checkGuidance(ds, pack) {
 function runPackCheck(packPath, guidancePath) {
   const errors = [];
   const warnings = [];
-  if (!existsSync10(packPath)) return { ok: false, errors: [`pack file not found: ${packPath}`], warnings };
+  if (!existsSync9(packPath)) return { ok: false, errors: [`pack file not found: ${packPath}`], warnings };
   let raw;
   try {
     raw = JSON.parse(readText(packPath));
@@ -45420,7 +44979,7 @@ function runPackCheck(packPath, guidancePath) {
     }
   }
   if (v2.ok && v2.pack && guidancePath) {
-    if (!existsSync10(guidancePath)) {
+    if (!existsSync9(guidancePath)) {
       errors.push(`guidance file not found: ${guidancePath}`);
     } else {
       let gRaw;
@@ -49343,8 +48902,8 @@ function hasGuidance(packKey) {
 // src/config.ts
 var CONFIG_FILE = ".ultra11yrc.json";
 function loadConfig(cwd) {
-  const p2 = join12(cwd, CONFIG_FILE);
-  if (!existsSync11(p2)) return null;
+  const p2 = join10(cwd, CONFIG_FILE);
+  if (!existsSync10(p2)) return null;
   let parsed;
   try {
     parsed = JSON.parse(readText(p2));
@@ -49357,16 +48916,16 @@ function loadConfig(cwd) {
   return parsed;
 }
 function packPaths(path) {
-  if (!existsSync11(path)) return null;
+  if (!existsSync10(path)) return null;
   if (statSync5(path).isDirectory()) {
-    const pack = join12(path, "pack.json");
-    if (!existsSync11(pack)) return null;
-    const glossary = join12(path, "glossary.json");
-    const guidance = join12(path, "guidance.json");
+    const pack = join10(path, "pack.json");
+    if (!existsSync10(pack)) return null;
+    const glossary = join10(path, "glossary.json");
+    const guidance = join10(path, "guidance.json");
     return {
       pack,
-      glossary: existsSync11(glossary) ? glossary : void 0,
-      guidance: existsSync11(guidance) ? guidance : void 0
+      glossary: existsSync10(glossary) ? glossary : void 0,
+      guidance: existsSync10(guidance) ? guidance : void 0
     };
   }
   return { pack: path };
@@ -49386,7 +48945,7 @@ function loadStandardsInto(cwd, packFlags, onWarn, override, opts) {
   }
   result.defaultStandard = config?.standard;
   for (const raw of [...config?.packs ?? [], ...packFlags]) {
-    const paths = packPaths(isAbsolute3(raw) ? raw : join12(cwd, raw));
+    const paths = packPaths(isAbsolute2(raw) ? raw : join10(cwd, raw));
     if (!paths) {
       result.errors.push(`--pack ${raw}: not found (expected a pack JSON file or a directory with pack.json)`);
       continue;
@@ -49416,7 +48975,7 @@ ${formatIssues(v2.issues).join("\n")}`);
     result.loadedPacks.push(v2.pack.key);
     if (paths.guidance) loadGuidanceFile(paths.guidance, result, onWarn);
   }
-  for (const g of config?.guidance ?? []) loadGuidanceFile(isAbsolute3(g) ? g : join12(cwd, g), result, onWarn);
+  for (const g of config?.guidance ?? []) loadGuidanceFile(isAbsolute2(g) ? g : join10(cwd, g), result, onWarn);
   for (const sm of config?.secondaryMappings ?? []) {
     if (!sm || typeof sm.standard !== "string" || typeof sm.ruleId !== "string" || typeof sm.criterion !== "string") {
       result.errors.push("secondaryMappings: each entry must be { standard, ruleId, criterion, note? }");
@@ -49431,7 +48990,7 @@ ${formatIssues(v2.issues).join("\n")}`);
   return result;
 }
 function loadGuidanceFile(path, result, onWarn) {
-  if (!existsSync11(path)) {
+  if (!existsSync10(path)) {
     onWarn(`ultra11y: guidance ${path} not found \u2014 skipping.`);
     return;
   }
@@ -49541,11 +49100,11 @@ function loopKey(sessionId, intent, findings) {
 }
 function firstSighting(key2) {
   try {
-    const dir = join13(tmpdir(), "ultra11y-hook");
-    mkdirSync4(dir, { recursive: true });
-    const marker = join13(dir, key2);
-    if (existsSync12(marker)) return false;
-    writeFileSync4(marker, "");
+    const dir = join11(tmpdir(), "ultra11y-hook");
+    mkdirSync3(dir, { recursive: true });
+    const marker = join11(dir, key2);
+    if (existsSync11(marker)) return false;
+    writeFileSync3(marker, "");
     return true;
   } catch {
     return false;
@@ -49627,12 +49186,12 @@ function decide(payload, deps = {}) {
 }
 
 // src/report.ts
-import { copyFileSync, existsSync as existsSync13, mkdirSync as mkdirSync6, writeFileSync as writeFileSync6 } from "fs";
-import { dirname as dirname11, join as join15, relative as relative6 } from "path";
+import { copyFileSync, existsSync as existsSync12, mkdirSync as mkdirSync5, writeFileSync as writeFileSync5 } from "fs";
+import { dirname as dirname10, join as join13, relative as relative6 } from "path";
 
 // src/prd.ts
-import { mkdirSync as mkdirSync5, writeFileSync as writeFileSync5 } from "fs";
-import { join as join14 } from "path";
+import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync4 } from "fs";
+import { join as join12 } from "path";
 
 // src/standards/derive.ts
 function ruler(decided) {
@@ -50567,7 +50126,6 @@ var L3 = {
     files: "fichier(s)",
     none: "Aucune non-conformit\xE9 relev\xE9e automatiquement par le moteur statique.",
     captureOf: (comp, src) => `capture rendue de \`${comp}\` \u2014 source \`${src}\``,
-    snapshotOf: (name) => `instantan\xE9 de test unitaire \xAB ${name} \xBB (rendu jsdom, sans styles calcul\xE9s)`,
     recommendationsTitle: "Recommandations (non normatives)",
     // Advisory (non-normative recommendation) vocabulary — deliberately NOT the NC wording.
     advisoryTag: "Recommandation (non normative)",
@@ -50615,7 +50173,6 @@ var L3 = {
     files: "file(s)",
     none: "No non-conformity found automatically by the static engine.",
     captureOf: (comp, src) => `rendered capture of \`${comp}\` \u2014 source \`${src}\``,
-    snapshotOf: (name) => `unit-test snapshot \u201C${name}\u201D (jsdom render, no computed styles)`,
     recommendationsTitle: "Recommendations (non-normative)",
     // Advisory (non-normative recommendation) vocabulary — deliberately NOT the NC wording.
     advisoryTag: "Recommendation (non-normative)",
@@ -50674,7 +50231,6 @@ function renderOccurrenceDetails(out, f2, lang, s2, indent, cropFor) {
     const srcFile = f2.origin.sourceFile ?? f2.origin.capture;
     const src = f2.origin.sourceFile && f2.origin.sourceLine !== void 0 ? `${f2.origin.sourceFile}:${f2.origin.sourceLine}` : srcFile;
     if (comp !== src) out.push(`${indent}  - _${s2.captureOf(comp, src)}_`);
-    if (f2.origin.snapshot) out.push(`${indent}  - _${s2.snapshotOf(f2.origin.snapshot)}_`);
   }
 }
 var isUrlLocation = (file) => /^https?:\/\//i.test(file);
@@ -51192,10 +50748,10 @@ function renderPrdDoc(r2, lang = "en", standard = "wcag") {
   return out.join("\n");
 }
 function writePrd(r2, opts) {
-  mkdirSync5(opts.out, { recursive: true });
+  mkdirSync4(opts.out, { recursive: true });
   if (opts.format === "doc") {
-    const p3 = join14(opts.out, `prd-doc-${r2.date}.md`);
-    writeFileSync5(p3, renderPrdDoc(r2, opts.lang, opts.standard));
+    const p3 = join12(opts.out, `prd-doc-${r2.date}.md`);
+    writeFileSync4(p3, renderPrdDoc(r2, opts.lang, opts.standard));
     return [p3];
   }
   const technical = opts.technical ?? true;
@@ -51203,14 +50759,14 @@ function writePrd(r2, opts) {
     const files = renderAuditorPerCriterion(r2, opts.lang, opts.standard, { technical });
     const paths = [];
     for (const f2 of files) {
-      const p3 = join14(opts.out, f2.name);
-      writeFileSync5(p3, f2.content);
+      const p3 = join12(opts.out, f2.name);
+      writeFileSync4(p3, f2.content);
       paths.push(p3);
     }
     return paths;
   }
-  const p2 = join14(opts.out, `prd-${r2.date}.md`);
-  writeFileSync5(p2, renderAuditorBacklog(r2, opts.lang, opts.standard, { technical }));
+  const p2 = join12(opts.out, `prd-${r2.date}.md`);
+  writeFileSync4(p2, renderAuditorBacklog(r2, opts.lang, opts.standard, { technical }));
   return [p2];
 }
 
@@ -51617,8 +51173,7 @@ var L6 = {
     sourceTemplate: (n, exts) => `Verdict source pr\xE9liminaire : ${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template). Les slots, snippets et liaisons dynamiques (:attr, {@render}) sont invisibles en analyse statique \u2014 auditez le rendu (\`render\` / \`scan\`) avant de conclure.`,
     sourceTemplateAudited: (n, exts, pages) => `${n} composant(s) ${exts} audit\xE9(s) en SOURCE (template) \u2014 slots et liaisons dynamiques invisibles en analyse statique. ${pages} page(s) ont \xE9t\xE9 captur\xE9es et audit\xE9es sur leur DOM r\xE9el ; ce qu'ils rendent sur une page non captur\xE9e reste un angle mort.`,
     captures: (n) => `${n} fichier(s) de capture rendus audit\xE9s \xE0 pleine fid\xE9lit\xE9 (DOM r\xE9el) \u2014 le vrai HTML produit, pas l'appel de composant.`,
-    unitSnapshots: (entries, files, skipped, inline = 0) => `${entries} rendu(s) de composant lus dans ${files} fichier(s) d'instantan\xE9s de tests unitaires (\`__snapshots__/*.snap\`${inline ? `, dont ${inline} instantan\xE9(s) en ligne \`toMatchInlineSnapshot\`` : ""})${skipped ? `, ${skipped} entr\xE9e(s) non balis\xE9es ignor\xE9es` : ""} \u2014 composants rendus par jsdom, jamais une page, sans styles calcul\xE9s : les crit\xE8res de rendu y restent \xE0 \xE9valuer.`,
-    blindSpots: (n) => `${n} composant(s) sans capture rendue (angles morts) \u2014 audit\xE9s sur source opaque uniquement ; auditez leur DOM rendu (\`render --setup\`).`,
+    blindSpots: (n) => `${n} composant(s) sans capture rendue (angles morts) \u2014 audit\xE9s sur source opaque uniquement ; rendez-les avec le moteur ultra11y (\`render\`), ou auditez la page qui les montre (\`scan\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
     partialAudit: (list) => `Audit partiel \u2014 les crit\xE8res \xAB \xE0 restituer \xBB (${list}) n'ont pas \xE9t\xE9 test\xE9s. Lancez \`ultra11y scan --sample\` (Playwright + axe + sondes) sur l'\xE9chantillon, puis fusionnez avec \`scan --merge\`.`,
@@ -51762,7 +51317,28 @@ var L6 = {
       "not-reached": "non atteinte"
     },
     routeWhy: (reason, detail) => reason === "redirect" ? `redirig\xE9e vers ${detail ?? "une autre adresse"}` : reason === "http-status" ? `a r\xE9pondu HTTP ${detail ?? "?"}` : reason === "error" ? `\xE9chec du navigateur${detail ? ` : ${detail}` : ""}` : `au-del\xE0 de --max-routes${detail ? ` ${detail}` : ""}`,
-    routesTodo: (n) => `${n} route(s) non atteinte(s). Pour les couvrir : \`ultra11y scan --sample --all-routes --merge <audit.json>\`, ou un test Playwright avec \`ultra11y/playwright\` pour celles qui exigent un \xE9tat (session, parcours).`
+    routesTodo: (n) => `${n} route(s) non atteinte(s). Pour les couvrir : \`ultra11y scan --sample --all-routes --merge <audit.json>\`, ou un test Playwright avec \`ultra11y/playwright\` pour celles qui exigent un \xE9tat (session, parcours).`,
+    annexRendersTitle: "G. Composants rendus par le moteur ultra11y",
+    rendersIntro: (n, rendered, skipped, notAttempted, tools) => `${n} unit\xE9(s) trouv\xE9e(s) dans le code (composants export\xE9s, pages du framework, stories) : ${rendered} rendue(s), ${skipped} en \xE9chec avec la raison, ${notAttempted} non tent\xE9e(s)${tools ? ` \u2014 ${tools}` : ""}. Le react-dom/server du projet rend, hors de ses tests, les composants qui ne prennent pas de props et les stories avec leurs args ; un composant qui prend des props n'est rendu que par ses stories. Aucun fichier de test ni instantan\xE9 n'est lu. Un rendu serveur ne calcule aucun style (\`styles="none"\`) : les crit\xE8res de rendu restent \xE0 \xE9valuer sur ces captures.`,
+    rendersHead: "| Unit\xE9 | Fichier | Type | Statut | Raison |",
+    renderKind: { component: "composant", page: "page", story: "story" },
+    renderStatus: { rendered: "rendue", skipped: "\xE9chec", "not-attempted": "non tent\xE9e" },
+    renderReason: {
+      provider: "fournisseur de contexte manquant (routeur, store, th\xE8me\u2026)",
+      props: "prend des props et n'a pas de story",
+      "browser-api": "API du navigateur au rendu",
+      data: "chargement de donn\xE9es (fetch, suspense, composant serveur asynchrone)",
+      transpile: "erreur de transpilation",
+      module: "import introuvable",
+      timeout: "d\xE9lai d\xE9pass\xE9",
+      empty: "ne rend rien",
+      error: "erreur",
+      "via-story": "rendu par ses stories",
+      "unsupported-renderer": "moteur de rendu non pris en charge (React seulement)",
+      "no-renderer": "react / react-dom introuvables",
+      "no-transpiler": "aucun transpileur (esbuild, typescript, sucrase)"
+    },
+    rendersTodo: (n) => `${n} unit\xE9(s) sans rendu. Pour les couvrir : une story avec ses args et ses d\xE9corateurs, ou la page qui les montre dans le navigateur (\`ultra11y/playwright\`, \`scan\`). Jusque-l\xE0, leur HTML rendu n'a pas \xE9t\xE9 audit\xE9.`
   },
   en: {
     title: (std) => `Accessibility audit report \u2014 ${std}`,
@@ -51839,8 +51415,7 @@ var L6 = {
     sourceTemplate: (n, exts) => `Preliminary source verdict: ${n} ${exts} component(s) audited as SOURCE (template). Slots, snippets and dynamic bindings (:attr, {@render}) are invisible to static analysis \u2014 audit the rendered output (\`render\` / \`scan\`) before concluding.`,
     sourceTemplateAudited: (n, exts, pages) => `${n} ${exts} component(s) audited as SOURCE (template) \u2014 slots and dynamic bindings invisible to static analysis. ${pages} page(s) were captured and audited on their real DOM; what they render on a page nobody captured remains a blind spot.`,
     captures: (n) => `${n} rendered capture file(s) audited at full fidelity (real DOM) \u2014 the true produced HTML, not the component call.`,
-    unitSnapshots: (entries, files, skipped, inline = 0) => `${entries} component render(s) read from ${files} unit-test snapshot file(s) (\`__snapshots__/*.snap\`${inline ? `, ${inline} of them \`toMatchInlineSnapshot\` inline snapshot(s)` : ""})${skipped ? `, ${skipped} non-markup entr(y/ies) skipped` : ""} \u2014 components rendered by jsdom, never a page, with no computed style: the rendering criteria stay to assess there.`,
-    blindSpots: (n) => `${n} component(s) without a rendered capture (blind spots) \u2014 audited from opaque source only; audit their rendered DOM (\`render --setup\`).`,
+    blindSpots: (n) => `${n} component(s) without a rendered capture (blind spots) \u2014 audited from opaque source only; render them with ultra11y's engine (\`render\`), or audit the page that shows them (\`scan\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
     partialAudit: (list) => `Partial audit \u2014 the needs-rendering criteria (${list}) were not tested. Run \`ultra11y scan --sample\` (Playwright + axe + probes) on the sample, then merge with \`scan --merge\`.`,
@@ -51976,7 +51551,28 @@ var L6 = {
       "not-reached": "not reached"
     },
     routeWhy: (reason, detail) => reason === "redirect" ? `redirected to ${detail ?? "another address"}` : reason === "http-status" ? `answered HTTP ${detail ?? "?"}` : reason === "error" ? `the browser failed${detail ? `: ${detail}` : ""}` : `beyond --max-routes${detail ? ` ${detail}` : ""}`,
-    routesTodo: (n) => `${n} route(s) not reached. To cover them: \`ultra11y scan --sample --all-routes --merge <audit.json>\`, or a Playwright test with \`ultra11y/playwright\` for those that need a state (a session, a funnel).`
+    routesTodo: (n) => `${n} route(s) not reached. To cover them: \`ultra11y scan --sample --all-routes --merge <audit.json>\`, or a Playwright test with \`ultra11y/playwright\` for those that need a state (a session, a funnel).`,
+    annexRendersTitle: "G. Components rendered by ultra11y's engine",
+    rendersIntro: (n, rendered, skipped, notAttempted, tools) => `${n} unit(s) found in the code (exported components, framework pages, stories): ${rendered} rendered, ${skipped} failed with the reason, ${notAttempted} not attempted${tools ? ` \u2014 ${tools}` : ""}. The project's own react-dom/server renders, outside its tests, the components that take no props and the stories with their args; a component that takes props is rendered through its stories only. No test file or snapshot is read. A server render computes no style (\`styles="none"\`): the rendering criteria stay to assess on these captures.`,
+    rendersHead: "| Unit | File | Kind | Status | Reason |",
+    renderKind: { component: "component", page: "page", story: "story" },
+    renderStatus: { rendered: "rendered", skipped: "failed", "not-attempted": "not attempted" },
+    renderReason: {
+      provider: "missing context provider (router, store, theme\u2026)",
+      props: "takes props and has no story",
+      "browser-api": "browser API at render time",
+      data: "data fetching (fetch, suspense, async server component)",
+      transpile: "transpile error",
+      module: "unresolved import",
+      timeout: "timed out",
+      empty: "renders nothing",
+      error: "error",
+      "via-story": "rendered through its stories",
+      "unsupported-renderer": "unsupported renderer (React only)",
+      "no-renderer": "react / react-dom not resolvable",
+      "no-transpiler": "no transpiler (esbuild, typescript, sucrase)"
+    },
+    rendersTodo: (n) => `${n} unit(s) without a render. To cover them: a story with its args and decorators, or the page that shows them in the browser (\`ultra11y/playwright\`, \`scan\`). Until then, their rendered HTML has not been audited.`
   }
 };
 var NEEDS_RENDERING = [
@@ -52021,7 +51617,8 @@ function partialAuditBanner(lang, untested = NEEDS_RENDERING.map((c) => c.sc), c
 }
 var RENDERED_TIER_SCS = /* @__PURE__ */ new Set(["1.3.4", "1.4.1", "1.4.3", "1.4.11", "2.4.7"]);
 function ranBrowser(r2) {
-  return (r2.scope.scan?.testedScs?.length ?? 0) > 0 || (r2.scope.captures?.files ?? 0) > 0 || (r2.scope.pagesAudited?.length ?? 0) > 0;
+  const captured = (r2.scope.captures?.files ?? 0) - (r2.scope.renders?.rendered ?? 0);
+  return (r2.scope.scan?.testedScs?.length ?? 0) > 0 || captured > 0 || (r2.scope.pagesAudited?.length ?? 0) > 0;
 }
 function packPartialAudit(r2, standard) {
   return untestedNeedsRendering(r2, establishedScs(derivePackResults(r2, standard)));
@@ -52338,7 +51935,7 @@ function withReportAnnexes(md, reportPath, read) {
   let out = md;
   for (const name of names) {
     if (md.includes(annexMarker(name))) continue;
-    const path = join15(dirname11(reportPath), name);
+    const path = join13(dirname10(reportPath), name);
     let annex;
     try {
       annex = read(path);
@@ -52597,13 +52194,13 @@ function render(r2, lang, opts) {
       out.push(`- ${s2.pageNcCriteria(failing.length)}${adv.length ? ` \xB7 ${adv.length} ${s2.advCount}` : ""}`);
       const notes = pageScope.find((x2) => x2.id === pg.id)?.notes;
       if (notes) out.push(`- _${notes}_`);
-      const shot = pageScreenshot(PAGES_DIR, pg.id) ?? join15(PAGES_DIR, pg.id, "screen.png");
-      if (existsSync13(shot)) {
+      const shot = pageScreenshot(PAGES_DIR, pg.id) ?? join13(PAGES_DIR, pg.id, "screen.png");
+      if (existsSync12(shot)) {
         let href = relative6(opts.outDir ?? ".", shot).split("\\").join("/");
         if (opts.outDir) {
           try {
-            mkdirSync6(join15(opts.outDir, "assets"), { recursive: true });
-            copyFileSync(shot, join15(opts.outDir, "assets", `${pg.id}.png`));
+            mkdirSync5(join13(opts.outDir, "assets"), { recursive: true });
+            copyFileSync(shot, join13(opts.outDir, "assets", `${pg.id}.png`));
             href = `./assets/${pg.id}.png`;
           } catch {
           }
@@ -52727,10 +52324,6 @@ function render(r2, lang, opts) {
     ax.push(`> \u{1F9E9} ${pagesRead > 0 ? s2.sourceTemplateAudited(files, extensions.join(", "), pagesRead) : s2.sourceTemplate(files, extensions.join(", "))}`, "");
   }
   if (r2.scope.captures) ax.push(`> \u2705 ${s2.captures(r2.scope.captures.files)}`, "");
-  if (r2.scope.unitSnapshots) {
-    const { entries, files, skipped, inline } = r2.scope.unitSnapshots;
-    ax.push(`> \u{1F9EA} ${s2.unitSnapshots(entries, files, skipped, inline)}`, "");
-  }
   if (r2.scope.captureCoverage?.blindSpots.length) ax.push(`> \u26A0\uFE0F ${s2.blindSpots(r2.scope.captureCoverage.blindSpots.length)}`, "");
   if (new Set((r2.scope.axe ?? []).map((e) => e.version)).size > 1) ax.push(`> \u26A0\uFE0F ${s2.axeMixed}`, "");
   ax.push(`## ${s2.annexNcTitle}`, "");
@@ -52794,6 +52387,7 @@ function render(r2, lang, opts) {
   }
   ax.push(...exhaustiveGrid(opts.groups, opts.standard, lang, s2.annexGridTitle));
   if (r2.scope.routes?.length) ax.push("", ...renderRoutes(r2.scope.routes, lang));
+  if (r2.scope.renders?.units.length) ax.push("", ...renderRenderUnits(r2.scope.renders, lang));
   return { report: out.join("\n"), annex: ax.join("\n"), reportFile, annexFile };
 }
 function renderRoutes(routes, lang) {
@@ -52807,6 +52401,33 @@ function renderRoutes(routes, lang) {
   const missing = routes.filter((r2) => r2.observed === "not-reached").length;
   out.push("");
   if (missing) out.push(`> ${s2.routesTodo(missing)}`, "");
+  return out;
+}
+function renderReasonLabel(reason, lang) {
+  return L6[lang].renderReason[reason] ?? reason;
+}
+function renderRenderUnits(renders, lang) {
+  const s2 = L6[lang];
+  const cell2 = (t3) => t3.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const tools = [renders.renderer, renders.transpiler].filter(Boolean).join(", ");
+  const out = [
+    `## ${s2.annexRendersTitle}`,
+    "",
+    s2.rendersIntro(renders.units.length, renders.rendered, renders.skipped, renders.notAttempted, tools),
+    "",
+    s2.rendersHead,
+    "|---|---|---|---|---|"
+  ];
+  const rank = { skipped: 0, "not-attempted": 1, rendered: 2 };
+  const units = [...renders.units].sort((a2, b) => rank[a2.status] - rank[b.status] || a2.file.localeCompare(b.file) || a2.export.localeCompare(b.export));
+  for (const u2 of units) {
+    const unit = u2.kind === "story" ? `${u2.component} \xB7 ${u2.export}` : u2.route !== void 0 ? `${u2.component} (\`${u2.route}\`)` : u2.component;
+    const why = u2.reason ? `${s2.renderReason[u2.reason] ?? u2.reason}${u2.detail ? ` \u2014 ${u2.detail}` : ""}` : "";
+    out.push(`| ${cell2(unit)} | \`${cell2(u2.file)}\` | ${s2.renderKind[u2.kind] ?? u2.kind} | ${s2.renderStatus[u2.status] ?? u2.status} | ${cell2(why)} |`);
+  }
+  const missing = renders.units.filter((u2) => u2.status !== "rendered" && u2.reason !== "via-story").length;
+  out.push("");
+  if (missing) out.push(`> ${s2.rendersTodo(missing)}`, "");
   return out;
 }
 function renderReportDocuments(r2, lang = "en", outDir, cropFor) {
@@ -52895,11 +52516,11 @@ function renderPackReportDocuments(r2, pack, lang = "en", outDir, cropFor) {
 }
 function writeReportFiles(r2, opts) {
   const docs = isCore(opts.standard) ? renderReportDocuments(r2, opts.lang, opts.out, opts.cropFor) : renderPackReportDocuments(r2, loadPack(opts.standard), opts.lang, opts.out, opts.cropFor);
-  mkdirSync6(opts.out, { recursive: true });
-  const path = join15(opts.out, docs.reportFile);
-  const annexPath = join15(opts.out, docs.annexFile);
-  writeFileSync6(annexPath, docs.annex);
-  writeFileSync6(path, docs.report);
+  mkdirSync5(opts.out, { recursive: true });
+  const path = join13(opts.out, docs.reportFile);
+  const annexPath = join13(opts.out, docs.annexFile);
+  writeFileSync5(annexPath, docs.annex);
+  writeFileSync5(path, docs.report);
   return { path, annexPath };
 }
 
@@ -53276,7 +52897,7 @@ async function requestJson(url, opts = {}) {
     ...opts.body !== void 0 ? { "Content-Type": "application/json" } : {},
     ...opts.headers
   };
-  for (let attempt = 0; ; attempt++) {
+  for (let attempt2 = 0; ; attempt2++) {
     const res = await doFetch(url, {
       method: opts.method ?? "GET",
       headers,
@@ -53288,9 +52909,9 @@ async function requestJson(url, opts = {}) {
     }
     const detail = scrub(await res.text().catch(() => ""), headers);
     const retryable = res.status === 429 || res.status === 503;
-    if (!retryable || attempt >= retries) throw new HttpError(res.status, detail, url);
+    if (!retryable || attempt2 >= retries) throw new HttpError(res.status, detail, url);
     const after = Number.parseInt(res.headers.get("retry-after") ?? "", 10);
-    await sleep(Math.min(Number.isFinite(after) ? after * 1e3 : 1e3 * 2 ** attempt, 3e4));
+    await sleep(Math.min(Number.isFinite(after) ? after * 1e3 : 1e3 * 2 ** attempt2, 3e4));
   }
 }
 
@@ -53685,30 +53306,26 @@ var L8 = {
   fr: {
     title: "Obtenir du HTML rendu \xE0 auditer (render)",
     why: "Auditer les sources JSX d'une biblioth\xE8que de composants donne des faux n\xE9gatifs : il faut auditer le HTML r\xE9ellement produit.",
-    libNote: (libs) => `Biblioth\xE8que(s) d\xE9tect\xE9e(s) : ${libs}. Leur sortie n'est PAS visible en analyse de source \u2014 auditez le build ou un snapshot SSR.`,
+    libNote: (libs) => `Biblioth\xE8que(s) d\xE9tect\xE9e(s) : ${libs}. Leur sortie n'est PAS visible en analyse de source \u2014 auditez le build ou le rendu (\`render\`).`,
     detected: "Frameworks d\xE9tect\xE9s",
     none: "Aucun framework d\xE9tect\xE9.",
     build: "Build",
     then: "puis auditer",
     sbReco: "Le plus simple pour un design-system : un build Storybook statique, puis auditer chaque story rendue.",
-    ssr: "Sinon, snapshot SSR : `render --scaffold` \xE9crit un harnais react-dom/server \xE0 compl\xE9ter.",
-    dyn: "Pour les crit\xE8res de rendu (contraste calcul\xE9, focus, reflow) : `scan <url>` (tier navigateur).",
-    scaffoldWrote: (p2) => `Harnais SSR \xE9crit : ${p2}`,
-    scaffoldRun: "Compl\xE9tez COMPONENTS, ex\xE9cutez-le avec votre toolchain (ex. `npx tsx`), puis auditez le dossier produit."
+    ssr: "Composants : `render [<dir>]` les rend avec le react-dom/server du projet, sans lire ses tests, vers .ultra11y/captures.",
+    dyn: "Pour les crit\xE8res de rendu (contraste calcul\xE9, focus, reflow) : `scan <url>` (tier navigateur)."
   },
   en: {
     title: "Get rendered HTML to audit (render)",
     why: "Auditing the JSX sources of a component library yields false negatives: audit the HTML it actually produces.",
-    libNote: (libs) => `Detected library(ies): ${libs}. Their output is NOT visible to source analysis \u2014 audit the build or an SSR snapshot.`,
+    libNote: (libs) => `Detected library(ies): ${libs}. Their output is NOT visible to source analysis \u2014 audit the build or the render (\`render\`).`,
     detected: "Detected frameworks",
     none: "No framework detected.",
     build: "Build",
     then: "then audit",
     sbReco: "Easiest for a design system: a static Storybook build, then audit each rendered story.",
-    ssr: "Otherwise, SSR snapshot: `render --scaffold` writes a react-dom/server harness to fill in.",
-    dyn: "For rendering criteria (computed contrast, focus, reflow): `scan <url>` (browser tier).",
-    scaffoldWrote: (p2) => `SSR harness written: ${p2}`,
-    scaffoldRun: "Fill in COMPONENTS, run it with your toolchain (e.g. `npx tsx`), then audit the produced folder."
+    ssr: "Components: `render [<dir>]` renders them with the project's own react-dom/server, without reading its tests, into .ultra11y/captures.",
+    dyn: "For rendering criteria (computed contrast, focus, reflow): `scan <url>` (browser tier)."
   }
 };
 function renderPlan(d2, lang = "fr") {
@@ -53724,117 +53341,6 @@ function renderPlan(d2, lang = "fr") {
     }
   out.push("", `- ${s2.sbReco}`, `- ${s2.ssr}`, `- ${s2.dyn}`, "");
   return out.join("\n");
-}
-function ssrHarness() {
-  return `// ultra11y SSR snapshot harness \u2014 render your components to static HTML for audit.
-// 1. Fill in COMPONENTS with your real components (DSFR, design-system, pages\u2026).
-// 2. Run it with your project's toolchain, e.g.:  npx tsx ultra11y-render.tsx
-// 3. Audit the produced HTML:  node scripts/ultra11y.mjs audit "audits/rendered/**/*.html"
-import { mkdirSync, writeFileSync } from "node:fs";
-import { renderToStaticMarkup } from "react-dom/server";
-// import { Button } from "@codegouvfr/react-dsfr/Button";
-
-const COMPONENTS: { name: string; element: JSX.Element }[] = [
-  // { name: "button-icon", element: <Button iconId="fr-icon-add-line" title="Ajouter" /> },
-];
-
-const OUT = "audits/rendered";
-mkdirSync(OUT, { recursive: true });
-for (const { name, element } of COMPONENTS) {
-  const body = renderToStaticMarkup(element);
-  const html = \`<!doctype html>
-<html lang="fr">
-<head><meta charset="utf-8"><title>\${name}</title></head>
-<body>
-\${body}
-</body>
-</html>
-\`;
-  writeFileSync(\`\${OUT}/\${name}.html\`, html);
-  console.log(\`ultra11y-render: wrote \${OUT}/\${name}.html\`);
-}
-if (COMPONENTS.length === 0) console.error("ultra11y-render: COMPONENTS is empty \u2014 add your components, then re-run.");
-`;
-}
-function detectTestRunner(deps, has2) {
-  const dep = (n) => Object.hasOwn(deps, n);
-  const runner = dep("vitest") || has2("vitest.config.ts") || has2("vitest.config.js") || has2("vitest.config.mjs") ? "vitest" : dep("jest") || has2("jest.config.ts") || has2("jest.config.js") || has2("jest.config.cjs") || has2("jest.config.mjs") ? "jest" : null;
-  const dom = dep("jsdom") ? "jsdom" : dep("happy-dom") ? "happy-dom" : null;
-  return { runner, dom };
-}
-function captureSetup() {
-  return `// ultra11y capture harvester \u2014 zero-touch rendered-DOM snapshots for accessibility audit.
-// Add this ONCE to your test runner's setup; every component your tests render is then
-// serialized to .ultra11y/captures/*.html and audited by \`ultra11y audit\`. No per-test code.
-//   Vitest: test: { environment: "jsdom", globals: true, setupFiles: [".ultra11y/capture-setup.mjs"] }
-//   Jest:   testEnvironment: "jsdom", setupFilesAfterEnv: ["<rootDir>/.ultra11y/capture-setup.mjs"]
-// List it LAST so its afterEach runs BEFORE Testing-Library cleanup empties the DOM.
-// Off: ULTRA11Y_CAPTURES=off. Custom dir: ULTRA11Y_CAPTURES=path/to/dir.
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
-import { dirname, relative, basename } from "node:path";
-
-const OUT = process.env.ULTRA11Y_CAPTURES || ".ultra11y/captures";
-const afterEachFn = typeof globalThis.afterEach === "function" ? globalThis.afterEach : null;
-const hasDom = typeof document !== "undefined";
-
-// Optional per-test override, consumed by the NEXT capture \u2014 for a test file whose name
-// doesn't match the component, or a single test rendering several distinct components.
-//   import { captureAs } from ".ultra11y/capture-setup.mjs"; captureAs("Button", "src/Button.tsx")
-//   (or globalThis.ultra11yCaptureAs("Button")).
-let __override = null;
-export function captureAs(component, source) { __override = { component: component, source: source }; }
-if (typeof globalThis !== "undefined") globalThis.ultra11yCaptureAs = captureAs;
-
-if (OUT !== "off" && OUT !== "0") {
-  if (!hasDom) {
-    // Not a DOM test environment \u2014 nothing to serialize. Set environment: "jsdom".
-  } else if (!afterEachFn) {
-    process.stderr.write("ultra11y capture: afterEach is not global \u2014 enable Vitest \\\`globals: true\\\` (or use Jest setupFilesAfterEnv) so captures can register.\\n");
-  } else {
-    let written = 0;
-    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/--/g, "&#45;&#45;");
-    afterEachFn(() => {
-      try {
-        if (typeof document === "undefined" || !document.body) return;
-        const html = document.body.innerHTML;
-        if (!html || !html.trim()) return;
-        const st = (globalThis.expect && globalThis.expect.getState && globalThis.expect.getState()) || {};
-        const testPath = typeof st.testPath === "string" ? st.testPath : "";
-        const name = typeof st.currentTestName === "string" ? st.currentTestName : "";
-        const rel = testPath ? relative(process.cwd(), testPath).split("\\\\").join("/") : "";
-        let source = rel ? rel.replace(/\\.(test|spec)\\.([jt]sx?)$/i, ".$2") : "";
-        let component = source ? basename(source).replace(/\\.[jt]sx?$/i, "") : "";
-        if (__override) {
-          if (__override.component) component = __override.component;
-          if (__override.source) source = __override.source;
-          __override = null;
-        }
-        const attrs = ['v="1"'];
-        if (source) attrs.push('source="' + esc(source) + '"');
-        if (component) attrs.push('component="' + esc(component) + '"');
-        if (rel) attrs.push('test="' + esc(rel) + '"');
-        if (name) attrs.push('name="' + esc(name) + '"');
-        const content = "<!-- ultra11y:capture " + attrs.join(" ") + " -->\\n" + html + "\\n";
-        let h = 5381;
-        const keyStr = testPath + "::" + name;
-        for (let i = 0; i < keyStr.length; i++) h = ((h << 5) + h + keyStr.charCodeAt(i)) >>> 0;
-        const file = OUT + "/" + (component || "capture") + "__" + h.toString(36) + ".html";
-        mkdirSync(dirname(file), { recursive: true });
-        if (existsSync(file) && readFileSync(file, "utf8") === content) return; // unchanged \u2014 keep byte-stable
-        writeFileSync(file, content);
-        written++;
-      } catch {
-        // never fail a user's test because a capture could not be written
-      }
-    });
-    if (typeof process.on === "function")
-      process.on("exit", () => {
-        if (written === 0)
-          process.stderr.write("ultra11y capture: 0 captures written \u2014 ensure a DOM env (jsdom) and that this setup runs before Testing-Library cleanup (list it LAST in setupFiles).\\n");
-      });
-  }
-}
-`;
 }
 function parseStorybookIndex(json) {
   let data2;
@@ -53863,34 +53369,655 @@ function storyProvenance(story) {
   const component = fromTitle || sourceFile.replace(/^.*\//, "").replace(/\.[jt]sx?$/i, "");
   return { v: 1, sourceFile, ...component ? { component } : {}, ...story.name ? { name: story.name } : {} };
 }
-function captureSetupPlan(tr, path, lang = "en") {
-  const fr = lang === "fr";
-  const out = [];
-  out.push(fr ? `Harnais de capture \xE9crit : ${path}` : `Capture harvester written: ${path}`);
-  out.push("");
-  if (tr.runner === "jest") {
-    out.push(fr ? "Jest \u2014 ajoutez \xE0 votre config :" : "Jest \u2014 add to your config:");
-    out.push(`  testEnvironment: "jsdom",`);
-    out.push(`  setupFilesAfterEnv: ["<rootDir>/${path}"]   // ${fr ? "PAS setupFiles (afterEach doit exister)" : "NOT setupFiles (afterEach must exist)"}`);
-  } else {
-    out.push(fr ? "Vitest \u2014 ajoutez \xE0 vitest.config.ts (test:) :" : "Vitest \u2014 add to vitest.config.ts (test:):");
-    out.push(`  environment: "jsdom",`);
-    out.push(
-      `  globals: true,   // ${fr ? "requis : sans \xE7a, afterEach n'est pas global et rien n'est captur\xE9" : "required: without it afterEach is not global and nothing is captured"}`
-    );
-    out.push(`  setupFiles: ["${path}"],   // ${fr ? "en DERNIER (avant le cleanup Testing-Library)" : "list LAST (before Testing-Library cleanup)"}`);
+
+// src/render-engine.ts
+import { spawn } from "child_process";
+import { existsSync as existsSync13, mkdirSync as mkdirSync6, mkdtempSync, readFileSync as readFileSync10, rmSync, unlinkSync, writeFileSync as writeFileSync6 } from "fs";
+import { createRequire as createRequire3 } from "module";
+import { availableParallelism, tmpdir as tmpdir2 } from "os";
+import { dirname as dirname11, join as join14, relative as relative7, resolve as resolve7 } from "path";
+var RENDER_MANIFEST = ".ultra11y/render.json";
+var DEFAULT_RENDER_TIMEOUT_MS = 1e4;
+var TEST_DIRS = /* @__PURE__ */ new Set(["test", "tests", "__snapshots__", "__fixtures__", "fixtures", "e2e", "cypress", "playwright"]);
+var TEST_HELPER = /(^|\/)(setupTests|test-utils|testUtils|jest\.setup|vitest\.setup|[^/]*\.test-utils)\.[cm]?[jt]sx?$/i;
+var STORIES = /\.stories\.[cm]?[jt]sx?$/i;
+var MODULE = /\.[jt]sx$/i;
+var SFC = /\.(vue|svelte|astro)$/i;
+var CONFIG = /(^|\/)[^/]+\.config\.[cm]?[jt]sx?$/i;
+function isTestPath(rel) {
+  if (/\.snap$/i.test(rel) || TEST_HELPER.test(rel)) return true;
+  if (rel.split("/").some((seg) => TEST_DIRS.has(seg))) return true;
+  return isTestArtifact(STORIES.test(rel) ? rel.replace(STORIES, ".tsx") : rel);
+}
+function nextRoute(rel) {
+  const m3 = /^(?:src\/)?(app|pages)\/(.*)\.[jt]sx$/i.exec(rel);
+  if (!m3) return void 0;
+  const [, router, rest = ""] = m3;
+  const segs = rest.split("/");
+  if (router === "app") {
+    if (segs.pop() !== "page") return void 0;
+    const kept = segs.filter((s2) => !/^\(.*\)$/.test(s2) && !s2.startsWith("@"));
+    return `/${kept.join("/")}`;
   }
-  out.push("");
-  if (!tr.dom)
-    out.push(
-      fr ? "\u26A0\uFE0F Aucun jsdom/happy-dom d\xE9tect\xE9 \u2014 installez-en un et activez l'environnement DOM." : "\u26A0\uFE0F No jsdom/happy-dom detected \u2014 install one and enable the DOM environment."
-    );
-  out.push(fr ? "Puis : lancez vos tests, committez .ultra11y/captures, et auditez :" : "Then: run your tests, commit .ultra11y/captures, and audit:");
-  out.push(`  node scripts/ultra11y.mjs audit --require-captures        # ${fr ? "gate : composants sans capture" : "gate: components lacking a capture"}`);
-  out.push(
-    `  git add .ultra11y .gitattributes   # ${fr ? "committez les captures (+ .gitattributes g\xE9n\xE9r\xE9)" : "commit the captures (+ generated .gitattributes)"}`
-  );
-  return out.join("\n");
+  if (segs[0] === "api" || segs.some((s2) => s2.startsWith("_"))) return void 0;
+  if (segs[segs.length - 1] === "index") segs.pop();
+  return `/${segs.join("/")}`;
+}
+function projectDeps(root) {
+  try {
+    const pkg = JSON.parse(readFileSync10(join14(root, "package.json"), "utf8"));
+    return { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
+  } catch {
+    return {};
+  }
+}
+function discoverRenderTargets(root, opts = {}) {
+  const include = compileGlobs(opts.include);
+  const exclude = compileGlobs(opts.exclude);
+  const next = Object.hasOwn(projectDeps(root), "next");
+  const targets = [];
+  let testFilesIgnored = 0;
+  for (const { rel } of walk(root).files) {
+    const candidate = MODULE.test(rel) || SFC.test(rel) || STORIES.test(rel);
+    if (!candidate || /\.d\.[cm]?ts$/i.test(rel) || CONFIG.test(rel)) continue;
+    if (include && !include(rel)) continue;
+    if (exclude?.(rel)) continue;
+    if (isTestPath(rel)) {
+      testFilesIgnored++;
+      continue;
+    }
+    if (STORIES.test(rel)) {
+      if (opts.stories !== false) targets.push({ file: rel, kind: "stories" });
+      continue;
+    }
+    if (SFC.test(rel)) {
+      targets.push({ file: rel, kind: "sfc" });
+      continue;
+    }
+    const route = next ? nextRoute(rel) : void 0;
+    targets.push({ file: rel, kind: "module", ...route !== void 0 ? { route } : {} });
+  }
+  return { targets, testFilesIgnored };
+}
+var TRANSPILERS = ["esbuild", "typescript", "sucrase"];
+function resolveFrom(root, spec) {
+  const req = createRequire3(join14(resolve7(root), "package.json"));
+  try {
+    const path = req.resolve(spec);
+    let version = "?";
+    try {
+      version = JSON.parse(readFileSync10(req.resolve(`${spec.split("/")[0]}/package.json`), "utf8")).version ?? "?";
+    } catch {
+    }
+    return { name: spec, version, path };
+  } catch {
+    return void 0;
+  }
+}
+function resolveTranspiler(root, prefer) {
+  for (const name of prefer ? [prefer] : TRANSPILERS) {
+    const hit = resolveFrom(root, name);
+    if (hit) return hit;
+  }
+  return void 0;
+}
+function resolveRenderer(root) {
+  const server = resolveFrom(root, "react-dom/server");
+  if (!server || !resolveFrom(root, "react")) return void 0;
+  return { ...server, name: "react-dom/server" };
+}
+function aliasesOf(root) {
+  for (const name of ["tsconfig.json", "jsconfig.json"]) {
+    if (!existsSync13(join14(root, name))) continue;
+    try {
+      const found = sn(root, name);
+      if (!found) continue;
+      const dir = dirname11(resolve7(found.path));
+      const co = found.config.compilerOptions ?? {};
+      const base = resolve7(dir, co.baseUrl ?? ".");
+      const paths = Object.entries(co.paths ?? {}).map(([pattern, targets]) => ({ pattern, targets: targets.map((t3) => resolve7(base, t3)) }));
+      return { paths, ...co.baseUrl ? { baseUrl: base } : {}, ...co.jsxImportSource ? { jsxImportSource: co.jsxImportSource } : {} };
+    } catch {
+    }
+  }
+  return { paths: [] };
+}
+var REASONS = /* @__PURE__ */ new Set(["provider", "props", "browser-api", "data", "transpile", "module", "timeout", "empty", "error", "no-renderer"]);
+var BROWSER_GLOBALS = /\b(window|document|localStorage|sessionStorage|self|HTMLElement|Element|matchMedia|IntersectionObserver|ResizeObserver|MutationObserver|requestAnimationFrame|cancelAnimationFrame|getComputedStyle|customElements|location|history|indexedDB|DOMParser|Image|Audio) is not defined\b/;
+var PROVIDER = /must be (used|wrapped|rendered) (with)?in|(used|rendered) (with)?in(side)? (a|an|the) <?[A-Z]\w*|outside (of )?(a|an|the) <?[A-Z]|\bProvider\b|\bcontext\b|app router to be mounted|NextRouter was not mounted|react-redux context|may be used only in the context of|No QueryClient set|<Router>/i;
+var DATA = /network access is disabled|fetch failed|ECONNREFUSED|ENOTFOUND|async\/await is not yet supported|suspended|uncached promise|async server component/i;
+var PROPS = /Cannot read propert(y|ies) of (undefined|null)|Cannot destructure property|is not iterable|undefined is not an object|null is not an object/;
+function classifyRenderFailure(f2) {
+  if (f2.ultra11y && REASONS.has(f2.ultra11y)) return f2.ultra11y;
+  const m3 = f2.message ?? "";
+  if (f2.code === "MODULE_NOT_FOUND" || f2.code === "ERR_MODULE_NOT_FOUND" || /Cannot find (module|package)/.test(m3)) return "module";
+  if (BROWSER_GLOBALS.test(m3)) return "browser-api";
+  if (DATA.test(m3)) return "data";
+  if (PROVIDER.test(m3)) return "provider";
+  if (PROPS.test(m3) || f2.name === "TypeError" && /is not a function/.test(m3)) return "props";
+  return "error";
+}
+var firstLine = (s2) => {
+  const line = s2?.split("\n").find((l) => l.trim())?.trim();
+  return line ? line.length > 240 ? `${line.slice(0, 237)}\u2026` : line : void 0;
+};
+function rendererRunner() {
+  return String.raw`"use strict";
+const Module = require("node:module");
+const path = require("node:path");
+const fs = require("node:fs");
+const job = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+// Node hands the hooks real paths (a temp dir behind a symlink, a linked workspace).
+const ROOT = fs.realpathSync(job.root);
+const rel = (f) => path.relative(ROOT, f).split(path.sep).join("/");
+const exit = process.exit.bind(process);
+function emit(o) { fs.writeSync(3, JSON.stringify(o) + "\n"); }
+function describe(e) {
+  const err = e && typeof e === "object" ? e : { message: String(e) };
+  return { name: err.name, message: String(err.message || err).slice(0, 2000), code: typeof err.code === "string" ? err.code : undefined, ultra11y: err.ultra11y };
+}
+// The project's console chatter must not reach the parent, and its process must not end ours.
+for (const k of ["log", "info", "debug", "warn", "error", "trace", "dir", "table"]) console[k] = function () {};
+process.exit = function () { throw new Error("ultra11y render: the module called process.exit"); };
+process.on("unhandledRejection", function () {});
+// A server render has no browser: Node's own Web Storage must not pass for one.
+for (const k of ["localStorage", "sessionStorage"]) { try { delete globalThis[k]; } catch (e) {} }
+// No network while rendering: data fetching is reported, never performed.
+globalThis.fetch = function () {
+  const e = new Error("ultra11y render: network access is disabled while rendering (fetch)");
+  e.ultra11y = "data";
+  return Promise.reject(e);
+};
+
+const T = job.transpiler;
+const tx = require(T.path);
+const SEP = path.sep;
+const inProject = (f) => !f.includes(SEP + "node_modules" + SEP);
+function transform(code, filename) {
+  const ext = path.extname(filename).toLowerCase();
+  const ts = ext === ".ts" || ext === ".mts" || ext === ".cts";
+  if (T.name === "esbuild") {
+    const loader = ts ? "ts" : ext === ".tsx" ? "tsx" : "jsx";
+    return tx.transformSync(code, { loader, format: "cjs", jsx: "automatic", jsxImportSource: job.jsxImportSource || "react", target: "node22", sourcefile: filename, logLevel: "silent" }).code;
+  }
+  if (T.name === "typescript") {
+    const fileName = /\.[cm]?js$/.test(ext) ? filename.replace(/\.[cm]?js$/, ".jsx") : filename;
+    const out = tx.transpileModule(code, {
+      fileName,
+      reportDiagnostics: true,
+      compilerOptions: { module: tx.ModuleKind.CommonJS, target: tx.ScriptTarget.ES2022, jsx: tx.JsxEmit.ReactJSX, jsxImportSource: job.jsxImportSource || undefined, esModuleInterop: true, allowJs: true, isolatedModules: true, sourceMap: false, ignoreDeprecations: "6.0" },
+    });
+    const errs = (out.diagnostics || []).filter((d) => d.file && d.category === tx.DiagnosticCategory.Error);
+    if (errs.length) throw new Error(tx.flattenDiagnosticMessageText(errs[0].messageText, "\n"));
+    return out.outputText;
+  }
+  const transforms = ts ? ["typescript", "imports"] : ext === ".tsx" ? ["typescript", "jsx", "imports"] : ["jsx", "imports"];
+  return tx.transform(code, { transforms, jsxRuntime: "automatic", production: true, filePath: filename, jsxImportSource: job.jsxImportSource || undefined }).code;
+}
+function compile(module, filename) {
+  let out;
+  try {
+    out = transform(fs.readFileSync(filename, "utf8"), filename);
+  } catch (e) {
+    // esbuild reports "Transform failed with N errors" and puts each error in "errors".
+    const first = e && Array.isArray(e.errors) && e.errors[0];
+    const why = first ? first.text + (first.location ? " (line " + first.location.line + ")" : "") : String((e && e.message) || e);
+    const err = new Error(rel(filename) + ": " + why);
+    err.ultra11y = "transpile";
+    throw err;
+  }
+  module._compile(out, filename);
+}
+const nodeJs = Module._extensions[".js"];
+for (const e of [".tsx", ".ts", ".jsx", ".mts", ".cts"]) Module._extensions[e] = compile;
+Module._extensions[".js"] = function (module, filename) { return inProject(filename) ? compile(module, filename) : nodeJs(module, filename); };
+// Styles: plain sheets are nothing to a server render; CSS modules map each class to its own name.
+const cssModule = new Proxy({}, { get: (_, k) => (k === "__esModule" ? false : typeof k === "string" ? k : undefined) });
+for (const e of [".css", ".scss", ".sass", ".less", ".styl", ".pcss"]) Module._extensions[e] = function (module, filename) { module.exports = /\.module\.[a-z]+$/i.test(filename) ? cssModule : {}; };
+// Static assets: their public path, the shape a bundler hands a component. An SVG is also a
+// component (SVGR), rendering a bare <svg> with the props it is given.
+for (const e of [".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".ico", ".bmp", ".svg", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".mp4", ".webm", ".mp3", ".wav", ".pdf"]) {
+  Module._extensions[e] = function (module, filename) {
+    const url = "/" + rel(filename);
+    if (e === ".svg") {
+      const React = Module.createRequire(filename)("react");
+      const Svg = function Svg(props) { return React.createElement("svg", props); };
+      Object.assign(Svg, { src: url, width: 24, height: 24, ReactComponent: Svg, toString: () => url });
+      module.exports = Svg;
+    } else module.exports = { src: url, width: 1, height: 1, blurDataURL: "", toString: () => url };
+  };
+}
+// Framework modules that only work inside their own compiler or server.
+const font = function () { return { className: "", variable: "", style: { fontFamily: "" } }; };
+const fontStub = new Proxy({ __esModule: true, default: font }, { get: (t, k) => (k in t ? t[k] : font) });
+const loadNode = Module._load;
+Module._load = function (request) {
+  if (request === "server-only" || request === "client-only") return {};
+  if (/^(next\/font\/|@next\/font\/)/.test(request)) return fontStub;
+  return loadNode.apply(this, arguments);
+};
+// Resolution: bundler query strings, TS-style ".js" specifiers for ".ts" files, tsconfig paths.
+const resolveNode = Module._resolveFilename;
+function aliasCandidates(req) {
+  const out = [];
+  for (const p of job.paths) {
+    const star = p.pattern.indexOf("*");
+    if (star < 0) { if (req === p.pattern) out.push(...p.targets); continue; }
+    const pre = p.pattern.slice(0, star), suf = p.pattern.slice(star + 1);
+    if (req.length >= pre.length + suf.length && req.startsWith(pre) && req.endsWith(suf)) {
+      const mid = req.slice(pre.length, req.length - suf.length);
+      for (const t of p.targets) out.push(t.replace("*", mid));
+    }
+  }
+  if (job.baseUrl && !req.startsWith(".") && !path.isAbsolute(req)) out.push(path.join(job.baseUrl, req));
+  return out;
+}
+Module._resolveFilename = function (request, parent, isMain, options) {
+  let req = request;
+  const q = req.indexOf("?");
+  if (q > 0 && !req.startsWith("node:")) req = req.slice(0, q);
+  try {
+    return resolveNode.call(this, req, parent, isMain, options);
+  } catch (err) {
+    if (parent && parent.filename && inProject(parent.filename)) {
+      const m = /\.[cm]?jsx?$/.exec(req);
+      if (m && (req.startsWith(".") || path.isAbsolute(req)))
+        for (const e of [".ts", ".tsx", ".mts", ".cts"]) { try { return resolveNode.call(this, req.slice(0, -m[0].length) + e, parent, isMain, options); } catch (e2) {} }
+      for (const c of aliasCandidates(req)) { try { return resolveNode.call(this, c, parent, isMain, options); } catch (e2) {} }
+    }
+    throw err;
+  }
+};
+
+let mod, React, server;
+try {
+  mod = require(job.file);
+} catch (e) {
+  emit(Object.assign({ type: "load-error" }, describe(e)));
+  exit(0);
+}
+try {
+  const req = Module.createRequire(job.file);
+  React = req("react");
+  server = req("react-dom/server");
+} catch (e) {
+  emit(Object.assign({ type: "load-error" }, describe(e), { ultra11y: "no-renderer" }));
+  exit(0);
+}
+
+const typeOf = (v) => (v && typeof v.$$typeof === "symbol" ? v.$$typeof.description || "" : "");
+function isComponent(v) {
+  if (typeof v === "function") {
+    if (v.prototype && v.prototype.isReactComponent) return true;
+    return !/^class[\s{]/.test(Function.prototype.toString.call(v));
+  }
+  return /^react\.(memo|forward_ref)$/.test(typeOf(v));
+}
+function isAsync(v) {
+  const fn = typeOf(v) === "react.memo" ? v.type : v;
+  return typeof fn === "function" && fn.constructor && fn.constructor.name === "AsyncFunction";
+}
+// Does the component declare props? A function with no parameter (or only defaulted ones)
+// renders faithfully with none; one that takes props would render a state no user meets
+// (an empty label, an image without its alt), so it is left to its stories.
+function takesProps(v) {
+  const t = typeOf(v);
+  if (t === "react.memo") return takesProps(v.type);
+  if (t === "react.forward_ref" || typeof v !== "function") return true;
+  if (v.prototype && v.prototype.isReactComponent) return !v.defaultProps;
+  return v.length > 0;
+}
+const displayName = (v, fallback) => (v && (v.displayName || v.name || (v.type && (v.type.displayName || v.type.name)) || (v.render && v.render.name))) || fallback;
+const exp = mod && (typeof mod === "object" || typeof mod === "function") ? mod : {};
+const units = [];
+if (job.kind === "stories") {
+  const meta = exp.default && typeof exp.default === "object" ? exp.default : {};
+  const title = typeof meta.title === "string" ? meta.title.split("/").pop().trim() : "";
+  const names = Array.isArray(exp.__namedExportsOrder) ? exp.__namedExportsOrder : Object.keys(exp).filter((k) => k !== "default" && k !== "__esModule" && k !== "__namedExportsOrder");
+  for (const k of names) {
+    const story = exp[k];
+    if (typeof story !== "function" && !(story && typeof story === "object")) continue;
+    if (Array.isArray(meta.excludeStories) && meta.excludeStories.includes(k)) continue;
+    if (Array.isArray(meta.includeStories) && !meta.includeStories.includes(k)) continue;
+    const comp = (story && story.component) || meta.component;
+    const args = Object.assign({}, meta.args, story && story.args);
+    const render = typeof story === "function" ? story : (story && story.render) || meta.render;
+    units.push({
+      name: k,
+      component: title || displayName(comp, k),
+      of: comp ? displayName(comp, "") : "",
+      props: false,
+      target: render || comp,
+      element: () => (render ? React.createElement(function Story() { return render(args, { args, component: comp }); }) : comp ? React.createElement(comp, args) : null),
+    });
+  }
+} else {
+  const seen = new Set();
+  const named = Object.keys(exp).filter((k) => k !== "default" && k !== "__esModule" && /^[A-Z]/.test(k));
+  const take = (k, v) => {
+    if (!isComponent(v) || seen.has(v)) return;
+    seen.add(v);
+    units.push({ name: k, component: k === "default" ? displayName(v, job.fallbackName) : k, props: takesProps(v), target: v, element: () => React.createElement(v, {}) });
+  };
+  for (const k of named) { let v; try { v = exp[k]; } catch (e) { continue; } take(k, v); }
+  if (typeof mod === "function") take("default", mod);
+  else { let v; try { v = exp.default; } catch (e) {} if (v !== undefined) take("default", v); }
+}
+emit({ type: "units", units: units.map((u) => ({ export: u.name, component: u.component, props: u.props, ...(u.of ? { of: u.of } : {}) })) });
+for (const u of units) {
+  if (u.props || job.skip.includes(u.name)) continue;
+  emit({ type: "start", export: u.name });
+  if (isAsync(u.target)) {
+    emit({ type: "result", export: u.name, ok: false, ultra11y: "data", message: "async server component" });
+    continue;
+  }
+  try {
+    const el = u.element();
+    if (!el) { emit({ type: "result", export: u.name, ok: false, ultra11y: "props", message: "story with neither a component nor a render function" }); continue; }
+    emit({ type: "result", export: u.name, ok: true, html: server.renderToStaticMarkup(el) });
+  } catch (e) {
+    emit(Object.assign({ type: "result", export: u.name, ok: false }, describe(e)));
+  }
+}
+emit({ type: "done" });
+exit(0);
+`;
+}
+function attempt(runner, jobFile, cwd, unitMs, loadMs) {
+  return new Promise((resolveAttempt) => {
+    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", runner, jobFile], {
+      cwd,
+      stdio: ["ignore", "ignore", "pipe", "pipe"],
+      env: { ...process.env, NODE_ENV: "production", ULTRA11Y_RENDER: "1" }
+    });
+    const a2 = { results: /* @__PURE__ */ new Map(), done: false, exitCode: null, stderr: "" };
+    let buf = "";
+    let timer;
+    const arm = (ms) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        a2.hung = a2.current ?? "load";
+        child.kill("SIGKILL");
+      }, ms);
+    };
+    arm(loadMs);
+    const onLine = (line) => {
+      if (!line.trim()) return;
+      let msg;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        return;
+      }
+      if (msg.type === "units") a2.units = msg.units ?? [];
+      else if (msg.type === "start" && msg.export) {
+        a2.current = msg.export;
+        arm(unitMs);
+      } else if (msg.type === "result" && msg.export) {
+        a2.results.set(
+          msg.export,
+          msg.ok ? { ok: true, html: msg.html ?? "" } : { ok: false, failure: { name: msg.name, message: msg.message, code: msg.code, ultra11y: msg.ultra11y } }
+        );
+        a2.current = void 0;
+      } else if (msg.type === "load-error") a2.loadError = { name: msg.name, message: msg.message, code: msg.code, ultra11y: msg.ultra11y };
+      else if (msg.type === "done") a2.done = true;
+    };
+    const fd3 = child.stdio[3];
+    fd3?.setEncoding("utf8");
+    fd3?.on("data", (chunk2) => {
+      buf += chunk2;
+      let nl = buf.indexOf("\n");
+      while (nl >= 0) {
+        onLine(buf.slice(0, nl));
+        buf = buf.slice(nl + 1);
+        nl = buf.indexOf("\n");
+      }
+    });
+    child.stderr?.setEncoding("utf8");
+    child.stderr?.on("data", (c) => {
+      if (a2.stderr.length < 4e3) a2.stderr += c;
+    });
+    child.on("error", (e) => {
+      a2.loadError = { message: e.message };
+    });
+    child.on("close", (code2) => {
+      if (timer) clearTimeout(timer);
+      if (buf) onLine(buf);
+      a2.exitCode = code2;
+      resolveAttempt(a2);
+    });
+  });
+}
+async function renderFile(runner, tmp, job, unitMs) {
+  const out = { units: [], results: /* @__PURE__ */ new Map() };
+  const loadMs = Math.max(3e4, unitMs);
+  const skip = /* @__PURE__ */ new Set();
+  const jobFile = join14(tmp, `job-${Math.random().toString(36).slice(2)}.json`);
+  try {
+    for (let round = 0; round < 200; round++) {
+      writeFileSync6(jobFile, JSON.stringify({ ...job, skip: [...skip] }));
+      const a2 = await attempt(runner, jobFile, job.root, unitMs, loadMs);
+      if (a2.units && !out.units.length) out.units = a2.units;
+      for (const [k, v2] of a2.results) {
+        out.results.set(k, v2);
+        skip.add(k);
+      }
+      if (a2.loadError) {
+        out.fileFailure = a2.loadError;
+        break;
+      }
+      if (a2.done) break;
+      if (a2.hung === "load" || !a2.units && !a2.hung) {
+        out.fileFailure = a2.hung === "load" ? { message: `loading the module did not finish within ${loadMs} ms`, timeout: true } : { message: firstLine(a2.stderr) ?? `the render process exited with code ${a2.exitCode}` };
+        break;
+      }
+      const stuck = a2.hung ?? a2.current ?? (a2.units ?? []).find((u2) => !u2.props && !skip.has(u2.export))?.export;
+      if (!stuck) break;
+      out.results.set(
+        stuck,
+        a2.hung ? { ok: false, timeout: true } : { ok: false, failure: { message: firstLine(a2.stderr) ?? `the render process exited with code ${a2.exitCode}` } }
+      );
+      skip.add(stuck);
+    }
+  } finally {
+    rmSync(jobFile, { force: true });
+  }
+  return out;
+}
+var slug = (s2) => s2.replace(/\.[^./]+$/, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "unit";
+function componentFallback(rel) {
+  const base = rel.split("/").pop() ?? rel;
+  const stem = base.replace(/\.[^.]+$/, "").replace(/\.stories$/i, "");
+  if (/^(index|page|layout)$/i.test(stem)) return rel.split("/").slice(-2, -1)[0] ?? stem;
+  return stem;
+}
+function storySource(root, rel) {
+  for (const e of [".tsx", ".jsx", ".ts", ".js"]) {
+    const sib = rel.replace(STORIES, e);
+    if (sib !== rel && existsSync13(join14(root, sib))) return sib;
+  }
+  return rel;
+}
+async function runRenderEngine(opts) {
+  const root = resolve7(opts.root);
+  const unitMs = opts.timeoutMs && opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_RENDER_TIMEOUT_MS;
+  const { targets, testFilesIgnored } = discoverRenderTargets(root, opts);
+  const renderer = resolveRenderer(root);
+  const transpiler = typeof opts.transpiler === "object" ? opts.transpiler : resolveTranspiler(root, opts.transpiler);
+  const rendererLabel = renderer ? `${renderer.name} ${renderer.version}` : void 0;
+  const units = [];
+  const usedIds = /* @__PURE__ */ new Set();
+  const idFor = (file, exp) => {
+    const base = `${slug(file)}__${exp === "*" ? "file" : slug(exp)}`;
+    let id = base;
+    for (let n = 2; usedIds.has(id); n++) id = `${base}-${n}`;
+    usedIds.add(id);
+    return id;
+  };
+  const kindOf = (t3) => t3.kind === "stories" ? "story" : t3.route !== void 0 ? "page" : "component";
+  const fileLevel = (t3, status, reason, detail) => ({
+    id: idFor(t3.file, "*"),
+    file: t3.file,
+    export: "*",
+    component: componentFallback(t3.file),
+    kind: kindOf(t3),
+    ...t3.route !== void 0 ? { route: t3.route } : {},
+    status,
+    reason,
+    ...detail ? { detail } : {}
+  });
+  const runnable = targets.filter((t3) => t3.kind !== "sfc");
+  for (const t3 of targets.filter((x2) => x2.kind === "sfc")) units.push(fileLevel(t3, "not-attempted", "unsupported-renderer"));
+  const blocker = !renderer ? "no-renderer" : !transpiler ? "no-transpiler" : void 0;
+  const written = /* @__PURE__ */ new Map();
+  if (blocker) for (const t3 of runnable) units.push(fileLevel(t3, "not-attempted", blocker));
+  else if (runnable.length) {
+    const tmp = mkdtempSync(join14(tmpdir2(), "ultra11y-render-"));
+    const runner = join14(tmp, "runner.cjs");
+    writeFileSync6(runner, rendererRunner());
+    const aliases = aliasesOf(root);
+    const tool = transpiler;
+    const transpilerName = TRANSPILERS.find((n) => tool.name === n || tool.name.startsWith(`${n}@`)) ?? tool.name;
+    const outcomes = /* @__PURE__ */ new Map();
+    let next = 0;
+    let done = 0;
+    const workers = Math.max(1, Math.min(opts.concurrency ?? Math.min(4, availableParallelism()), runnable.length));
+    try {
+      await Promise.all(
+        Array.from({ length: workers }, async () => {
+          while (next < runnable.length) {
+            const t3 = runnable[next++];
+            const job = {
+              root,
+              file: join14(root, t3.file),
+              kind: t3.kind === "stories" ? "stories" : "module",
+              fallbackName: componentFallback(t3.file),
+              transpiler: { name: transpilerName, path: tool.path },
+              paths: aliases.paths,
+              ...aliases.baseUrl ? { baseUrl: aliases.baseUrl } : {},
+              ...aliases.jsxImportSource ? { jsxImportSource: aliases.jsxImportSource } : {}
+            };
+            outcomes.set(t3, await renderFile(runner, tmp, job, unitMs));
+            opts.onProgress?.(++done, runnable.length, t3.file);
+          }
+        })
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+    const storied = /* @__PURE__ */ new Set();
+    for (const t3 of runnable) {
+      if (t3.kind !== "stories") continue;
+      const src = storySource(root, t3.file);
+      for (const u2 of outcomes.get(t3)?.units ?? []) if (u2.of) storied.add(`${src}#${u2.of}`);
+    }
+    for (const t3 of runnable) {
+      const o = outcomes.get(t3);
+      if (o.fileFailure && !o.units.length) {
+        units.push(fileLevel(t3, "skipped", o.fileFailure.timeout ? "timeout" : classifyRenderFailure(o.fileFailure), firstLine(o.fileFailure.message)));
+        continue;
+      }
+      const source = t3.kind === "stories" ? storySource(root, t3.file) : t3.file;
+      for (const u2 of o.units) {
+        const r2 = o.results.get(u2.export);
+        const id = idFor(t3.file, u2.export);
+        const base = {
+          id,
+          file: t3.file,
+          export: u2.export,
+          component: u2.component,
+          kind: kindOf(t3),
+          ...t3.route !== void 0 && u2.export === "default" ? { route: t3.route } : {},
+          status: "skipped"
+        };
+        if (u2.props)
+          units.push(
+            storied.has(`${t3.file}#${u2.component}`) ? { ...base, status: "not-attempted", reason: "via-story" } : { ...base, status: "not-attempted", reason: "props" }
+          );
+        else if (!r2) units.push({ ...base, reason: "error", detail: "the render process ended before this unit was tried" });
+        else if (r2.timeout) units.push({ ...base, reason: "timeout", detail: `${unitMs} ms` });
+        else if (!r2.ok)
+          units.push({
+            ...base,
+            reason: classifyRenderFailure(r2.failure ?? {}),
+            ...firstLine(r2.failure?.message) ? { detail: firstLine(r2.failure?.message) } : {}
+          });
+        else if (!r2.html?.trim()) units.push({ ...base, reason: "empty" });
+        else {
+          const comment = formatCaptureComment({
+            v: 1,
+            sourceFile: source,
+            component: u2.component,
+            name: t3.kind === "stories" ? `story ${u2.export} (args)` : `${u2.export === "default" ? "default export" : u2.export} (no props)`,
+            ...rendererLabel ? { renderer: rendererLabel } : {},
+            styles: "none"
+          });
+          written.set(id, `${comment}
+${r2.html.trim()}
+`);
+          units.push({ ...base, status: "rendered", capture: `${CAPTURES_DIR}/${id}.html` });
+        }
+      }
+      if (o.fileFailure) units.push(fileLevel(t3, "skipped", classifyRenderFailure(o.fileFailure), firstLine(o.fileFailure.message)));
+    }
+  }
+  const capDir = join14(root, CAPTURES_DIR);
+  const previous = readRenderManifest(join14(root, RENDER_MANIFEST));
+  for (const u2 of previous?.units ?? []) {
+    if (!u2.capture || written.has(u2.id)) continue;
+    const f2 = join14(root, u2.capture);
+    if (existsSync13(f2)) unlinkSync(f2);
+  }
+  if (written.size) mkdirSync6(capDir, { recursive: true });
+  for (const [id, content] of written) {
+    const f2 = join14(capDir, `${id}.html`);
+    if (!existsSync13(f2) || readFileSync10(f2, "utf8") !== content) writeFileSync6(f2, content);
+  }
+  units.sort((a2, b) => a2.file.localeCompare(b.file) || a2.export.localeCompare(b.export));
+  const manifest = {
+    v: 1,
+    ...rendererLabel ? { renderer: rendererLabel } : {},
+    ...transpiler ? { transpiler: `${transpiler.name} ${transpiler.version}` } : {},
+    testFilesIgnored,
+    units
+  };
+  const manifestPath = join14(root, RENDER_MANIFEST);
+  mkdirSync6(dirname11(manifestPath), { recursive: true });
+  const text = `${JSON.stringify(manifest, null, 2)}
+`;
+  if (!existsSync13(manifestPath) || readFileSync10(manifestPath, "utf8") !== text) writeFileSync6(manifestPath, text);
+  return manifest;
+}
+function readRenderManifest(path) {
+  try {
+    const m3 = JSON.parse(readFileSync10(path, "utf8"));
+    return m3 && m3.v === 1 && Array.isArray(m3.units) ? m3 : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function renderCounts(units) {
+  let rendered = 0;
+  let skipped = 0;
+  let notAttempted = 0;
+  for (const u2 of units) {
+    if (u2.status === "rendered") rendered++;
+    else if (u2.status === "skipped") skipped++;
+    else notAttempted++;
+  }
+  return { rendered, skipped, notAttempted };
+}
+function renderScopeFor(capturesDir) {
+  const manifestPath = join14(dirname11(capturesDir.replace(/[/\\]+$/, "")), "render.json");
+  const m3 = readRenderManifest(manifestPath);
+  if (!m3) return void 0;
+  return {
+    manifest: toPosix2(relative7(process.cwd(), resolve7(manifestPath))) || toPosix2(manifestPath),
+    ...m3.renderer ? { renderer: m3.renderer } : {},
+    ...m3.transpiler ? { transpiler: m3.transpiler } : {},
+    ...renderCounts(m3.units),
+    units: m3.units
+  };
 }
 
 // src/criteria.ts
@@ -53918,7 +54045,7 @@ function formatSC(c, lang = "en") {
   const glossary = coreGlossary(lang);
   out.push(
     ...definedTerms(
-      ((lang === "fr" ? c.termsFr : c.terms) ?? []).map((slug) => [slug, glossary[slug]]),
+      ((lang === "fr" ? c.termsFr : c.terms) ?? []).map((slug2) => [slug2, glossary[slug2]]),
       lang
     )
   );
@@ -54138,11 +54265,11 @@ function renderCriteriaReference() {
 
 // src/check.ts
 import { existsSync as existsSync16, readFileSync as readFileSync13, readdirSync as readdirSync3 } from "fs";
-import { dirname as dirname12, join as join17 } from "path";
+import { dirname as dirname12, join as join16 } from "path";
 
 // src/verify.ts
 import { existsSync as existsSync14, mkdirSync as mkdirSync7, readFileSync as readFileSync11, writeFileSync as writeFileSync7 } from "fs";
-import { join as join16 } from "path";
+import { join as join15 } from "path";
 var VERIFY_MAX = 40;
 var plain = (s2) => s2.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
 function auditorCriterionLine(standard) {
@@ -54434,13 +54561,13 @@ function applyVerdicts(items, expected) {
 var VERIFY_CONTEXT_FILE = "VERIFY.context.json";
 function writeVerifyContext(outDir, ctx) {
   mkdirSync7(outDir, { recursive: true });
-  const p2 = join16(outDir, VERIFY_CONTEXT_FILE);
+  const p2 = join15(outDir, VERIFY_CONTEXT_FILE);
   writeFileSync7(p2, JSON.stringify(ctx, null, 2) + "\n");
   return p2;
 }
 function readVerifyContext(dir) {
   try {
-    const c = JSON.parse(readFileSync11(join16(dir, VERIFY_CONTEXT_FILE), "utf8"));
+    const c = JSON.parse(readFileSync11(join15(dir, VERIFY_CONTEXT_FILE), "utf8"));
     return c && c.kind === "verify-context" && c.conformities && c.capped ? c : void 0;
   } catch {
     return void 0;
@@ -54448,8 +54575,8 @@ function readVerifyContext(dir) {
 }
 function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") {
   mkdirSync7(outDir, { recursive: true });
-  const todoPath = join16(outDir, "VERIFY.todo.json");
-  const mdPath = join16(outDir, "VERIFY.md");
+  const todoPath = join15(outDir, "VERIFY.todo.json");
+  const mdPath = join15(outDir, "VERIFY.md");
   let carried = items;
   if (existsSync14(todoPath)) {
     try {
@@ -54473,7 +54600,7 @@ function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") 
 
 // src/grounding.ts
 import { existsSync as existsSync15, readFileSync as readFileSync12 } from "fs";
-import { resolve as resolve7 } from "path";
+import { resolve as resolve8 } from "path";
 var WINDOW = 10;
 var norm2 = (s2) => s2.normalize("NFKC").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").replace(/>\s+/g, ">").replace(/\s+</g, "<").trim();
 var isUnresolvable = (file) => !file || file === "-" || file === "<stdin>" || file === "stdin" || /^[a-z][a-z0-9+.-]*:\/\//.test(file);
@@ -54492,7 +54619,7 @@ function selectorProbes(selector) {
 }
 function groundFinding(g, opts = {}) {
   if (isUnresolvable(g.file)) return { ok: true, moved: false };
-  const path = resolve7(opts.cwd ?? process.cwd(), g.file);
+  const path = resolve8(opts.cwd ?? process.cwd(), g.file);
   if (!existsSync15(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
   let text;
   try {
@@ -54717,7 +54844,7 @@ function checkSemantic(md, opts) {
   const standard = opts.standard ?? "wcag";
   const s2 = M[lang];
   const empty2 = { total: 0, grounded: 0, moved: 0, failed: 0 };
-  const artifact = opts.verdictsPath ?? join17(dirname12(opts.reportPath), "VERIFY.todo.json");
+  const artifact = opts.verdictsPath ?? join16(dirname12(opts.reportPath), "VERIFY.todo.json");
   if (!existsSync16(artifact)) return { ok: false, issues: [s2.semanticMissing(artifact)], ...empty2 };
   let items;
   try {
@@ -54787,7 +54914,7 @@ function sectionBody(md, n) {
 function checkSampleCaptured(root = ".", lang = "en") {
   const fr = lang === "fr";
   let declared = [];
-  const rc = join17(root, ".ultra11yrc.json");
+  const rc = join16(root, ".ultra11yrc.json");
   let raw;
   try {
     raw = readFileSync13(rc, "utf8");
@@ -54812,7 +54939,7 @@ function checkSampleCaptured(root = ".", lang = "en") {
   let captured = /* @__PURE__ */ new Set();
   try {
     captured = new Set(
-      readdirSync3(join17(root, PAGES_DIR), { withFileTypes: true }).filter((d2) => d2.isDirectory()).map((d2) => d2.name).filter((id) => existsSync16(join17(root, PAGES_DIR, id, "dom.html")))
+      readdirSync3(join16(root, PAGES_DIR), { withFileTypes: true }).filter((d2) => d2.isDirectory()).map((d2) => d2.name).filter((id) => existsSync16(join16(root, PAGES_DIR, id, "dom.html")))
     );
   } catch {
   }
@@ -54959,12 +55086,12 @@ function openPerPage(audit, standard, lang) {
 
 // src/adjudicate.ts
 import { existsSync as existsSync18, mkdirSync as mkdirSync8, statSync as statSync7, writeFileSync as writeFileSync8 } from "fs";
-import { isAbsolute as isAbsolute4, join as join19, relative as relative7, resolve as resolve9 } from "path";
+import { isAbsolute as isAbsolute3, join as join18, relative as relative8, resolve as resolve10 } from "path";
 
 // src/verapdf.ts
 import { spawnSync } from "child_process";
 import { existsSync as existsSync17, statSync as statSync6 } from "fs";
-import { delimiter, join as join18, resolve as resolve8 } from "path";
+import { delimiter, join as join17, resolve as resolve9 } from "path";
 var OFF = /^(?:off|0|false|no)$/i;
 function veraPdfCommand(env = process.env) {
   const pinned = env.ULTRA11Y_VERAPDF?.trim();
@@ -54973,7 +55100,7 @@ function veraPdfCommand(env = process.env) {
   for (const dir of (env.PATH ?? "").split(delimiter)) {
     if (!dir) continue;
     for (const n of names) {
-      const p2 = join18(dir, n);
+      const p2 = join17(dir, n);
       try {
         if (existsSync17(p2) && statSync6(p2).isFile()) return p2;
       } catch {
@@ -54995,7 +55122,7 @@ function parseVeraPdfJson(stdout, files, absolute) {
   const version = arr(obj(report2?.buildInformation)?.releaseDetails).map(obj).find((d2) => d2?.id === "apps")?.version;
   for (const job of arr(report2?.jobs).map(obj)) {
     const name = obj(job?.itemDetails)?.name;
-    const i = typeof name === "string" ? absolute.indexOf(resolve8(name)) : -1;
+    const i = typeof name === "string" ? absolute.indexOf(resolve9(name)) : -1;
     if (i < 0) continue;
     const file = files[i];
     const v2 = arr(job?.validationResult).map(obj)[0] ?? obj(job?.validationResult);
@@ -55023,7 +55150,7 @@ var cache = /* @__PURE__ */ new Map();
 function runVeraPdf(files, opts = {}) {
   const command = veraPdfCommand(opts.env);
   if (!command || !files.length) return void 0;
-  const absolute = files.map((f2) => resolve8(opts.cwd ?? process.cwd(), f2));
+  const absolute = files.map((f2) => resolve9(opts.cwd ?? process.cwd(), f2));
   const key2 = JSON.stringify([
     command,
     absolute.map((p2) => {
@@ -55868,23 +55995,13 @@ function adjudicationContract() {
 function docsForAudit(audit, cwd) {
   const inputs = audit.scope.inputs.filter((i) => i !== "-" && i !== "<stdin>");
   if (!inputs.length) return [];
-  const { files, inlineSnapshotHosts: inlineSnapshotHosts2 } = discover(inputs, { inlineSnapshots: true });
+  const { files } = discover(inputs, {});
   const docs = [];
-  for (const f2 of inlineSnapshotHosts2) {
-    try {
-      docs.push(...parseInlineSnapshotFile(readText(cwd ? resolve9(cwd, f2) : f2), f2).docs);
-    } catch {
-    }
-  }
   for (const f2 of files) {
     try {
-      const path = cwd ? resolve9(cwd, f2) : f2;
+      const path = cwd ? resolve10(cwd, f2) : f2;
       if (isPdfPath(f2)) {
         docs.push(loadPdfDoc(path, f2));
-        continue;
-      }
-      if (isUnitSnapshotFile(f2)) {
-        docs.push(...parseUnitSnapshotFile(readText(path), f2).docs);
         continue;
       }
       const doc = parseSource(readText(path), f2);
@@ -56102,8 +56219,7 @@ function auditFiles(audit, cwd) {
   if (!inputs.length) return /* @__PURE__ */ new Set();
   try {
     void cwd;
-    const d2 = discover(inputs, { inlineSnapshots: true });
-    return /* @__PURE__ */ new Set([...d2.files, ...d2.inlineSnapshotHosts]);
+    return new Set(discover(inputs, {}).files);
   } catch {
     return /* @__PURE__ */ new Set();
   }
@@ -56113,12 +56229,12 @@ function canonicalEvidenceFile(file) {
   const marker = `${PAGES_DIR}/`;
   const at = posix3.lastIndexOf(marker);
   if (at >= 0) return posix3.slice(at);
-  return /^https?:\/\//i.test(posix3) ? posix3 : resolve9(posix3).replace(/\\/g, "/");
+  return /^https?:\/\//i.test(posix3) ? posix3 : resolve10(posix3).replace(/\\/g, "/");
 }
 function worklistPath(file) {
-  if (!isAbsolute4(file)) return file;
-  const rel = relative7(process.cwd(), file);
-  return rel && !rel.startsWith("..") && !isAbsolute4(rel) ? rel.replace(/\\/g, "/") : file;
+  if (!isAbsolute3(file)) return file;
+  const rel = relative8(process.cwd(), file);
+  return rel && !rel.startsWith("..") && !isAbsolute3(rel) ? rel.replace(/\\/g, "/") : file;
 }
 function relativizeItem(it) {
   const at = (a2) => {
@@ -56132,14 +56248,14 @@ function relativizeItem(it) {
   };
 }
 function withinAuditInput(file, audit, cwd) {
-  const target = resolve9(cwd ?? process.cwd(), file);
+  const target = resolve10(cwd ?? process.cwd(), file);
   for (const input of audit.scope.inputs) {
     if (input === "-" || input === "<stdin>") continue;
-    const root = resolve9(cwd ?? process.cwd(), input);
+    const root = resolve10(cwd ?? process.cwd(), input);
     try {
       if (statSync7(root).isDirectory()) {
-        const rel = relative7(root, target);
-        if (rel === "" || rel !== ".." && !rel.startsWith("../") && !isAbsolute4(rel)) return true;
+        const rel = relative8(root, target);
+        if (rel === "" || rel !== ".." && !rel.startsWith("../") && !isAbsolute3(rel)) return true;
       } else if (root === target) return true;
     } catch {
     }
@@ -56735,9 +56851,9 @@ function captureFilesPresent(files, cwd) {
   const dirs = /* @__PURE__ */ new Set();
   for (const f2 of files) {
     const m3 = /^(.*(?:^|\/)\.ultra11y\/pages\/[^/]+)\//.exec(f2.replace(/\\/g, "/"));
-    if (m3?.[1]) dirs.add(resolve9(cwd ?? process.cwd(), m3[1]));
+    if (m3?.[1]) dirs.add(resolve10(cwd ?? process.cwd(), m3[1]));
   }
-  const present = CAPTURE_FILES.filter((name) => [...dirs].some((d2) => existsSync18(join19(d2, name))));
+  const present = CAPTURE_FILES.filter((name) => [...dirs].some((d2) => existsSync18(join18(d2, name))));
   return present.length ? present : ["dom.html"];
 }
 var VERAPDF_RULES_SHOWN = 6;
@@ -57078,8 +57194,8 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
 function writeAdjudication(items, outDir, opts) {
   mkdirSync8(outDir, { recursive: true });
   items = items.map(relativizeItem);
-  const todoPath = join19(outDir, "ADJUDICATE.todo.json");
-  const mdPath = join19(outDir, "ADJUDICATE.md");
+  const todoPath = join18(outDir, "ADJUDICATE.todo.json");
+  const mdPath = join18(outDir, "ADJUDICATE.md");
   const file = {
     tool: "ultra11y",
     kind: "adjudication",
@@ -57097,15 +57213,15 @@ function writeAdjudication(items, outDir, opts) {
       ...opts.web ? { web: true } : {}
     })
   );
-  const verdictsPath = join19(outDir, "ADJUDICATE.verdicts.json");
+  const verdictsPath = join18(outDir, "ADJUDICATE.verdicts.json");
   writeFileSync8(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
-  const itemsDir = join19(outDir, "adjudicate");
+  const itemsDir = join18(outDir, "adjudicate");
   mkdirSync8(itemsDir, { recursive: true });
   const unrendered = new Set(opts.unrendered ?? []);
   for (const it of items) {
     const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
     writeFileSync8(
-      join19(itemsDir, `${it.criteriaId}.md`),
+      join18(itemsDir, `${it.criteriaId}.md`),
       formatAdjudication([it], opts.lang ?? "en", opts.standard, {
         preamble: false,
         ...mine.length ? { unrendered: mine } : {},
@@ -57271,10 +57387,10 @@ function pruneRefuted(audit, standard, items, lang = "en", untried = []) {
 // src/ledger.ts
 import { createHash as createHash4 } from "crypto";
 import { existsSync as existsSync19, mkdirSync as mkdirSync9, readFileSync as readFileSync14, writeFileSync as writeFileSync9 } from "fs";
-import { dirname as dirname13, isAbsolute as isAbsolute5, join as join20, resolve as resolve10 } from "path";
+import { dirname as dirname13, isAbsolute as isAbsolute4, join as join19, resolve as resolve11 } from "path";
 var LEDGER_DIR = ".ultra11y/verdicts";
 function ledgerPath(standard, root = ".") {
-  return join20(root, LEDGER_DIR, `${standard}.json`);
+  return join19(root, LEDGER_DIR, `${standard}.json`);
 }
 var norm3 = (s2) => s2.replace(/\s+/g, " ").trim();
 var canonicalFile2 = (file) => {
@@ -57285,8 +57401,8 @@ var canonicalFile2 = (file) => {
 };
 function identityFile(file, root) {
   const canonical = canonicalFile2(file);
-  if (root === void 0 || canonical.startsWith(`${PAGES_DIR}/`) || !isAbsolute5(canonical)) return canonical;
-  return repoRelative(canonical, resolve10(root));
+  if (root === void 0 || canonical.startsWith(`${PAGES_DIR}/`) || !isAbsolute4(canonical)) return canonical;
+  return repoRelative(canonical, resolve11(root));
 }
 function portableFile(file, root) {
   return identityFile(file, root);
@@ -57392,7 +57508,7 @@ function readLedger(path) {
   }
 }
 function unreadableCaptures(audit, cwd = ".") {
-  return (audit.scope.pagesAudited ?? []).filter((id) => !existsSync19(join20(cwd, PAGES_DIR, id, "dom.html")));
+  return (audit.scope.pagesAudited ?? []).filter((id) => !existsSync19(join19(cwd, PAGES_DIR, id, "dom.html")));
 }
 function writeLedger(path, ledger) {
   mkdirSync9(dirname13(path), { recursive: true });
@@ -57490,7 +57606,7 @@ function replayLedger(audit, ledger, opts = {}) {
   const unreadable2 = (audit.scope.pagesAudited ?? []).filter((id) => {
     const canonical = `${PAGES_DIR}/${id}/dom.html`;
     const fromInputs = currentFiles.get(canonical);
-    return !(fromInputs && existsSync19(fromInputs)) && !existsSync19(join20(root, canonical));
+    return !(fromInputs && existsSync19(fromInputs)) && !existsSync19(join19(root, canonical));
   });
   const harvestComplete = unreadable2.length === 0;
   for (const e of ledger.entries) if (!open.has(e.criteriaId)) obsolete.push(e.criteriaId);
@@ -57503,7 +57619,7 @@ function replayLedger(audit, ledger, opts = {}) {
     }
     const held = verdictStillHolds(e, it.evidence, {
       harvestComplete,
-      fileExists: (f2) => existsSync19(join20(root, f2)),
+      fileExists: (f2) => existsSync19(join19(root, f2)),
       root
     });
     if (!held.holds) {
@@ -58097,7 +58213,7 @@ function mergeSnapshotAudit(base, snap) {
 
 // src/routes.ts
 import { existsSync as existsSync21, mkdirSync as mkdirSync10, readFileSync as readFileSync16, writeFileSync as writeFileSync10 } from "fs";
-import { dirname as dirname14, join as join21 } from "path";
+import { dirname as dirname14, join as join20 } from "path";
 var ROUTES_FILE = ".ultra11y/routes.json";
 var ALL_ROUTES_MAX = 50;
 function routePath(url) {
@@ -58115,7 +58231,7 @@ function routePath(url) {
   return q2 ? `${base}?${q2}` : base;
 }
 function readRoutes(root) {
-  const file = join21(root, ROUTES_FILE);
+  const file = join20(root, ROUTES_FILE);
   if (!existsSync21(file)) return void 0;
   try {
     const raw = JSON.parse(readFileSync16(file, "utf8"));
@@ -58127,7 +58243,7 @@ function readRoutes(root) {
   }
 }
 function writeRoutes(root, urls, via) {
-  const file = join21(root, ROUTES_FILE);
+  const file = join20(root, ROUTES_FILE);
   const inv = readRoutes(root) ?? { v: 1, routes: [] };
   const byPath = new Map(inv.routes.map((r2) => [routePath(r2.url), r2]));
   let added = 0;
@@ -58209,8 +58325,8 @@ function routesToScan(inventory, opts) {
 
 // src/scan-local.ts
 import { existsSync as existsSync23, realpathSync as realpathSync3, statSync as statSync8 } from "fs";
-import { createRequire as createRequire3 } from "module";
-import { dirname as dirname15, join as join22, resolve as resolve11 } from "path";
+import { createRequire as createRequire4 } from "module";
+import { dirname as dirname15, join as join21, resolve as resolve12 } from "path";
 
 // src/sample.ts
 import { existsSync as existsSync22 } from "fs";
@@ -58428,13 +58544,13 @@ function axeInfo(outs, axe) {
 var PW_SPEC = "@playwright/test";
 var AXE_SPEC = "@axe-core/playwright";
 function resolveAnchors(cwd) {
-  return [resolve11(cwd, "package.json"), import.meta.url];
+  return [resolve12(cwd, "package.json"), import.meta.url];
 }
 function requireRuntime(cwd, spec) {
   let last;
   for (const from of resolveAnchors(cwd)) {
     try {
-      return createRequire3(from)(spec);
+      return createRequire4(from)(spec);
     } catch (e) {
       last = e;
     }
@@ -58444,7 +58560,7 @@ function requireRuntime(cwd, spec) {
 function resolvesRuntime(cwd, spec) {
   return resolveAnchors(cwd).some((from) => {
     try {
-      createRequire3(from).resolve(spec);
+      createRequire4(from).resolve(spec);
       return true;
     } catch {
       return false;
@@ -58480,7 +58596,7 @@ function localTierStatus(cwd, choice = {}) {
     const bin = pw.chromium?.executablePath?.();
     if (typeof bin === "string" && bin.length > 0 && !existsSync23(bin)) {
       const pw2 = resolvedPlaywright(cwd);
-      const cliJs = pw2 ? join22(dirname15(pw2.path), "cli.js") : void 0;
+      const cliJs = pw2 ? join21(dirname15(pw2.path), "cli.js") : void 0;
       return {
         ok: false,
         reason: `no browser binary at ${bin} for ${PW_SPEC}${pw2?.version ? `@${pw2.version}` : ""}${pw2 ? ` (${pw2.path})` : ""} \u2014 run \`${cliJs ? `node ${cliJs}` : "npx playwright"} install chromium\`, or install Google Chrome (\`scan\` falls back on it)`
@@ -58517,7 +58633,7 @@ var notedAxe = /* @__PURE__ */ new Set();
 function resolvedPlaywright(cwd) {
   for (const from of resolveAnchors(cwd)) {
     try {
-      const req = createRequire3(from);
+      const req = createRequire4(from);
       const path = req.resolve(PW_SPEC);
       let version;
       try {
@@ -58534,7 +58650,7 @@ var realDir = (dir) => {
   try {
     return realpathSync3(dir);
   } catch {
-    return resolve11(dir);
+    return resolve12(dir);
   }
 };
 var MISSING_BROWSER = /Executable doesn'?t exist|playwright install|browserType\.launch/i;
@@ -58570,8 +58686,8 @@ async function launchChromium(chromium, cwd = ".", warn = (m3) => console.error(
   const msg = first instanceof Error ? first.message : String(first);
   const pw = resolvedPlaywright(cwd);
   const which = pw ? `${PW_SPEC}${pw.version ? `@${pw.version}` : ""} resolved at ${pw.path}` : `${PW_SPEC} (resolution path unknown)`;
-  const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve11(cwd)) : false;
-  const cliJs = pw ? join22(dirname15(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
+  const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve12(cwd)) : false;
+  const cliJs = pw ? join21(dirname15(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
   throw new Error(
     `Could not launch Chromium: the browser for ${which} is not installed, and no installed Google Chrome was found either. Install the browser for THAT Playwright \u2014 \`node ${cliJs} install chromium\`${own ? " (this is ultra11y's own Playwright, not the audited project's)" : ""} \u2014 or install Google Chrome. (${msg.split("\n")[0]})`
   );
@@ -58756,7 +58872,7 @@ async function runOnPage(browser, axe, target, isFile, opts) {
   const page = await context.newPage();
   const empty2 = [];
   try {
-    const url = isFile ? "file://" + resolve11(target) : target;
+    const url = isFile ? "file://" + resolve12(target) : target;
     const response = await page.goto(url, { waitUntil: "load", timeout: 45e3 });
     await page.waitForLoadState("networkidle", { timeout: 8e3 }).catch(() => {
     });
@@ -59045,7 +59161,7 @@ async function runSampleScanLocal(pages, opts) {
         });
         continue;
       }
-      const requestedUrl = isFile ? "file://" + resolve11(page.url) : page.url;
+      const requestedUrl = isFile ? "file://" + resolve12(page.url) : page.url;
       const landedUrl = out.landedUrl ?? out.url;
       if (!landedOnRequestedPage(requestedUrl, landedUrl)) {
         redirected.push({ id: page.id, name: page.name, requested: page.url, landed: landedUrl, reason: "redirect" });
@@ -59279,7 +59395,6 @@ function itemOf(f2, standard) {
   };
 }
 function fixOne(file, source, opts, canWrite = true) {
-  if (isUnitSnapshotFile(file)) return { file, lossy: true, items: [], diff: "", applied: 0, written: false, regression: false };
   const doc = parseSource(source, file, { forceJsx: opts.forceJsx });
   if (doc.capture) return { file, lossy: doc.lossy, items: [], diff: "", applied: 0, written: false, regression: false };
   const findings = runRules(doc);
@@ -59400,7 +59515,7 @@ function fixSummary(r2, lang = "fr", write = false, standard = CORE2) {
 // src/init.ts
 import { writeFileSync as writeFileSync12, mkdirSync as mkdirSync11, chmodSync, realpathSync as realpathSync4 } from "fs";
 import { execFileSync as execFileSync6 } from "child_process";
-import { join as join23, relative as relative8, sep as sep4 } from "path";
+import { join as join22, relative as relative9, sep as sep4 } from "path";
 var EN_SEV = { bloquant: "blocking", majeur: "major", mineur: "minor" };
 function repoRoot() {
   try {
@@ -59413,7 +59528,7 @@ function resolveEnginePath(root) {
   const argv1 = process.argv[1] ?? "scripts/ultra11y.mjs";
   try {
     const abs = realpathSync4(argv1);
-    return abs.startsWith(root + sep4) ? relative8(root, abs) : abs;
+    return abs.startsWith(root + sep4) ? relative9(root, abs) : abs;
   } catch {
     return argv1;
   }
@@ -59446,16 +59561,16 @@ exit 1
 `;
 }
 function writeHook(root, enginePath, failOn) {
-  const dir = join23(root, ".git", "hooks");
+  const dir = join22(root, ".git", "hooks");
   mkdirSync11(dir, { recursive: true });
-  const path = join23(dir, "pre-commit");
+  const path = join22(dir, "pre-commit");
   writeFileSync12(path, stagedHookScript(enginePath, failOn));
   chmodSync(path, 493);
   return path;
 }
 
 // src/install/json-edit.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync24, mkdirSync as mkdirSync12, readFileSync as readFileSync17, renameSync, rmSync, writeFileSync as writeFileSync13 } from "fs";
+import { copyFileSync as copyFileSync2, existsSync as existsSync24, mkdirSync as mkdirSync12, readFileSync as readFileSync17, renameSync, rmSync as rmSync2, writeFileSync as writeFileSync13 } from "fs";
 import { dirname as dirname16 } from "path";
 var SettingsParseError = class extends Error {
   constructor(path, cause) {
@@ -59481,7 +59596,7 @@ function writeTextWithBackup(path, content, marker = "ultra11y") {
     writeFileSync13(tmp, content, { mode: 420 });
     renameSync(tmp, path);
   } catch (e) {
-    rmSync(tmp, { force: true });
+    rmSync2(tmp, { force: true });
     throw e;
   }
   return { path, changed: true, backup };
@@ -59552,7 +59667,7 @@ function claudeCodeWired(settingsPath) {
 }
 
 // src/install/text-edit.ts
-import { existsSync as existsSync25, readFileSync as readFileSync18, rmSync as rmSync2 } from "fs";
+import { existsSync as existsSync25, readFileSync as readFileSync18, rmSync as rmSync3 } from "fs";
 var BLOCK_BEGIN = "<!-- BEGIN ultra11y (managed by `ultra11y install --agents-md`; edit outside this block) -->";
 var BLOCK_END = "<!-- END ultra11y -->";
 var blockRe = () => new RegExp(`${escapeRe2(BLOCK_BEGIN)}[\\s\\S]*?${escapeRe2(BLOCK_END)}\\n?`);
@@ -59576,7 +59691,7 @@ function removeManagedBlock(path) {
   if (!blockRe().test(current)) return { path, changed: false };
   const rest = current.replace(blockRe(), "");
   if (rest.trim() === "") {
-    rmSync2(path, { force: true });
+    rmSync3(path, { force: true });
     return { path, changed: true };
   }
   return writeTextWithBackup(path, rest.replace(/\n+$/, "\n"));
@@ -59586,9 +59701,9 @@ function hasManagedBlock(path) {
 }
 
 // src/install/agents-md.ts
-import { join as join24 } from "path";
+import { join as join23 } from "path";
 function agentsMdPath(root) {
-  return join24(root, "AGENTS.md");
+  return join23(root, "AGENTS.md");
 }
 function agentsMdBlock(root) {
   const e = engineInvocation(root);
@@ -59643,24 +59758,24 @@ function agentsMdWired(root) {
 
 // src/install/codex.ts
 import { existsSync as existsSync27, readFileSync as readFileSync20 } from "fs";
-import { join as join26 } from "path";
+import { join as join25 } from "path";
 
 // src/install/paths.ts
 import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync26, mkdirSync as mkdirSync13, readFileSync as readFileSync19, realpathSync as realpathSync5, statSync as statSync9 } from "fs";
 import { homedir } from "os";
-import { dirname as dirname17, join as join25 } from "path";
+import { dirname as dirname17, join as join24 } from "path";
 function codexHome() {
-  return process.env.CODEX_HOME || join25(homedir(), ".codex");
+  return process.env.CODEX_HOME || join24(homedir(), ".codex");
 }
 function opencodeConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join25(xdg && xdg !== "" ? xdg : join25(homedir(), ".config"), "opencode");
+  return join24(xdg && xdg !== "" ? xdg : join24(homedir(), ".config"), "opencode");
 }
 function claudeSettingsPath(project, cwd = process.cwd()) {
-  return project ? join25(cwd, ".claude", "settings.json") : join25(homedir(), ".claude", "settings.json");
+  return project ? join24(cwd, ".claude", "settings.json") : join24(homedir(), ".claude", "settings.json");
 }
 function pinnedEnginePath() {
-  return join25(homedir(), ".ultra11y", "bin", "ultra11y.mjs");
+  return join24(homedir(), ".ultra11y", "bin", "ultra11y.mjs");
 }
 function installedCliCommand() {
   const override = process.env.ULTRA11Y_BIN;
@@ -59675,7 +59790,7 @@ function installedCliCommand() {
   if (source && !ephemeral) return `node ${JSON.stringify(source)}`;
   const pin = pinnedEnginePath();
   if (source) {
-    mkdirSync13(join25(pin, ".."), { recursive: true });
+    mkdirSync13(join24(pin, ".."), { recursive: true });
     copyFileSync3(source, pin);
   }
   return `node ${JSON.stringify(pin)}`;
@@ -59688,30 +59803,30 @@ function packageRoot() {
     return null;
   }
   for (let i = 0; i < 6 && dir && dir !== "/"; i++) {
-    if (existsSync26(join25(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
+    if (existsSync26(join24(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
     dir = dirname17(dir);
   }
   return null;
 }
 function bundledSkillsDir() {
   const root = packageRoot();
-  const p2 = root ? join25(root, "skills") : null;
+  const p2 = root ? join24(root, "skills") : null;
   return p2 && existsSync26(p2) ? p2 : null;
 }
 function bundledOpencodePlugin() {
   const root = packageRoot();
-  const p2 = root ? join25(root, ".opencode", "plugins", "ultra11y.js") : null;
+  const p2 = root ? join24(root, ".opencode", "plugins", "ultra11y.js") : null;
   return p2 && existsSync26(p2) ? p2 : null;
 }
 function copySkillsInto(source, dest) {
   const out = [];
   for (const name of ["ultra11y", "review-a11y"]) {
-    const from = join25(source, name);
+    const from = join24(source, name);
     if (!existsSync26(from)) continue;
-    const to = join25(dest, name);
-    const same = ["SKILL.md", join25("scripts", "ultra11y.mjs")].every((f2) => {
-      const a2 = join25(from, f2);
-      const b = join25(to, f2);
+    const to = join24(dest, name);
+    const same = ["SKILL.md", join24("scripts", "ultra11y.mjs")].every((f2) => {
+      const a2 = join24(from, f2);
+      const b = join24(to, f2);
       try {
         return existsSync26(b) && statSync9(a2).size === statSync9(b).size && readFileSync19(a2).equals(readFileSync19(b));
       } catch {
@@ -59763,7 +59878,7 @@ function featuresBody(content) {
 function installCodex({ codexDir, command, skillsSource }) {
   const reports = [];
   reports.push(
-    editJsonFile(join26(codexDir, "hooks.json"), (root) => {
+    editJsonFile(join25(codexDir, "hooks.json"), (root) => {
       const hooks = root.hooks ??= {};
       hooks.PreToolUse = [
         ...withoutOurs2(hooks.PreToolUse),
@@ -59771,11 +59886,11 @@ function installCodex({ codexDir, command, skillsSource }) {
       ];
     })
   );
-  const configPath = join26(codexDir, "config.toml");
+  const configPath = join25(codexDir, "config.toml");
   const current = existsSync27(configPath) ? readFileSync20(configPath, "utf8") : "";
   const edit = enableHooksFeature(current);
   if (edit.changed) reports.push(writeTextWithBackup(configPath, edit.content));
-  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join26(codexDir, "skills")));
+  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join25(codexDir, "skills")));
   return {
     reports,
     guidance: [
@@ -59790,7 +59905,7 @@ function installCodex({ codexDir, command, skillsSource }) {
 }
 function uninstallCodex({ codexDir }) {
   const reports = [];
-  const hooksPath = join26(codexDir, "hooks.json");
+  const hooksPath = join25(codexDir, "hooks.json");
   if (existsSync27(hooksPath)) {
     reports.push(
       editJsonFile(hooksPath, (root) => {
@@ -59806,20 +59921,20 @@ function uninstallCodex({ codexDir }) {
   return { reports, guidance: ["codex: `[features] hooks = true` was left enabled \u2014 other hooks may depend on it."] };
 }
 function codexWired(codexDir) {
-  const root = readJsonSafe(join26(codexDir, "hooks.json"));
+  const root = readJsonSafe(join25(codexDir, "hooks.json"));
   const groups = root?.hooks?.PreToolUse;
   if (!Array.isArray(groups)) return 0;
   return groups.reduce((n, g) => n + (g.hooks ?? []).filter((h3) => String(h3.command ?? "").includes(CODEX_MARKER)).length, 0);
 }
 function codexHooksEnabled(codexDir) {
-  const p2 = join26(codexDir, "config.toml");
+  const p2 = join25(codexDir, "config.toml");
   return existsSync27(p2) && HOOKS_ON.test(featuresBody(readFileSync20(p2, "utf8")));
 }
 
 // src/install/opencode.ts
 import { spawnSync as spawnSync2 } from "child_process";
-import { existsSync as existsSync28, readFileSync as readFileSync21, rmSync as rmSync3 } from "fs";
-import { join as join27 } from "path";
+import { existsSync as existsSync28, readFileSync as readFileSync21, rmSync as rmSync4 } from "fs";
+import { join as join26 } from "path";
 var OPENCODE_MARKER = "ULTRA11Y_OPENCODE_PLUGIN";
 var PLUGIN_DIRS = ["plugin", "plugins"];
 function dirFor(major) {
@@ -59828,7 +59943,7 @@ function dirFor(major) {
 function opencodePinKey(major) {
   return major === 2 ? "plugins" : "plugin";
 }
-var pluginFile = (configDir, dir) => join27(configDir, dir, "ultra11y.js");
+var pluginFile = (configDir, dir) => join26(configDir, dir, "ultra11y.js");
 var ours = (path) => existsSync28(path) && readFileSync21(path, "utf8").includes(OPENCODE_MARKER);
 function parseOpencodeVersion(text) {
   const m3 = /\bv?(\d+)\.\d+\.\d+/.exec(text);
@@ -59868,7 +59983,7 @@ function isUltra11yPin(entry2) {
 }
 function pinnedKeys(configDir) {
   try {
-    const cfg = JSON.parse(readFileSync21(join27(configDir, "opencode.json"), "utf8"));
+    const cfg = JSON.parse(readFileSync21(join26(configDir, "opencode.json"), "utf8"));
     return ["plugin", "plugins"].filter((k) => Array.isArray(cfg?.[k]) && cfg[k].some(isUltra11yPin));
   } catch {
     return [];
@@ -59883,22 +59998,22 @@ function installOpencode({ configDir, pluginSource, skillsSource, enginePath, ma
   const reports = [writeTextWithBackup(target, readFileSync21(pluginSource, "utf8"))];
   const guidance = [];
   if (enginePath && existsSync28(enginePath)) {
-    reports.push(writeTextWithBackup(join27(configDir, dir, "ultra11y.mjs"), readFileSync21(enginePath, "utf8")));
+    reports.push(writeTextWithBackup(join26(configDir, dir, "ultra11y.mjs"), readFileSync21(enginePath, "utf8")));
   }
-  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join27(configDir, "skills")));
+  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join26(configDir, "skills")));
   for (const other of PLUGIN_DIRS) {
     if (other === dir) continue;
     const stale = pluginFile(configDir, other);
     if (!ours(stale)) continue;
-    rmSync3(stale, { force: true });
-    rmSync3(join27(configDir, other, "ultra11y.mjs"), { force: true });
+    rmSync4(stale, { force: true });
+    rmSync4(join26(configDir, other, "ultra11y.mjs"), { force: true });
     guidance.push(`opencode: moved the plugin from ${other}/ to ${dir}/ \u2014 it is loaded from one place only.`);
   }
   const key2 = opencodePinKey(major);
   guidance.push(
     major === null ? "opencode: no `opencode` on PATH to ask its version \u2014 wired plugin/, which OpenCode 1 and 2 both read (pass --opencode-version 1|2 to choose)." : `opencode: wired for OpenCode ${major}.`,
     "opencode: restart the session \u2014 plugins load at startup.",
-    `opencode: the alternative is an npm pin \u2014 add "${key2}": ["ultra11y@latest"] to ${join27(configDir, "opencode.json")} and drop this file.`,
+    `opencode: the alternative is an npm pin \u2014 add "${key2}": ["ultra11y@latest"] to ${join26(configDir, "opencode.json")} and drop this file.`,
     "opencode: the gate surfaces as a blocked tool call whose error message carries the findings (OpenCode has no permission-decision channel)."
   );
   const pins = pinnedKeys(configDir);
@@ -59912,11 +60027,11 @@ function uninstallOpencode({ configDir }) {
   for (const dir of PLUGIN_DIRS) {
     const target = pluginFile(configDir, dir);
     if (!ours(target)) continue;
-    rmSync3(target, { force: true });
-    rmSync3(join27(configDir, dir, "ultra11y.mjs"), { force: true });
+    rmSync4(target, { force: true });
+    rmSync4(join26(configDir, dir, "ultra11y.mjs"), { force: true });
     reports.push({ path: target, changed: true });
   }
-  const configPath = join27(configDir, "opencode.json");
+  const configPath = join26(configDir, "opencode.json");
   if (existsSync28(configPath)) {
     reports.push(
       editJsonFile(configPath, (root) => {
@@ -59944,7 +60059,7 @@ function opencodeWired(configDir) {
 
 // src/install/index.ts
 import { existsSync as existsSync29 } from "fs";
-import { join as join28 } from "path";
+import { join as join27 } from "path";
 var ALL_TARGETS = ["claude-code", "codex", "opencode"];
 function parseTargets(flags) {
   const picked = /* @__PURE__ */ new Set();
@@ -59983,7 +60098,7 @@ function installForTargets(opts) {
             const out2 = installCodex({ codexDir: codexHome(), command: cmd(), skillsSource: opts.skills === false ? null : bundledSkillsDir() });
             r2.reports.push(...out2.reports);
             r2.guidance.push(...out2.guidance);
-          } else r2.reports.push({ path: join28(codexHome(), "hooks.json"), changed: false });
+          } else r2.reports.push({ path: join27(codexHome(), "hooks.json"), changed: false });
           break;
         }
         case "opencode": {
@@ -59992,10 +60107,10 @@ function installForTargets(opts) {
             r2.error = "opencode: this engine was not run from a package carrying .opencode/plugins/ultra11y.js \u2014 install ultra11y from npm and retry.";
             break;
           }
-          const configDir = opts.project === true ? join28(cwd, ".opencode") : opencodeConfigDir();
+          const configDir = opts.project === true ? join27(cwd, ".opencode") : opencodeConfigDir();
           const major = opts.opencodeVersion ?? detectOpencodeMajor();
           if (!opts.dryRun) {
-            const engine = existsSync29(pinnedEnginePath()) ? pinnedEnginePath() : join28(packageRoot() ?? "", "scripts", "ultra11y.mjs");
+            const engine = existsSync29(pinnedEnginePath()) ? pinnedEnginePath() : join27(packageRoot() ?? "", "scripts", "ultra11y.mjs");
             const out2 = installOpencode({
               configDir,
               pluginSource: source,
@@ -60043,7 +60158,7 @@ function uninstallForTargets(opts) {
           break;
         }
         case "opencode": {
-          const out2 = uninstallOpencode({ configDir: opts.project === true ? join28(cwd, ".opencode") : opencodeConfigDir() });
+          const out2 = uninstallOpencode({ configDir: opts.project === true ? join27(cwd, ".opencode") : opencodeConfigDir() });
           r2.reports.push(...out2.reports);
           r2.guidance.push(...out2.guidance);
           break;
@@ -60064,14 +60179,14 @@ function statusReport(opts = {}) {
   const claudePath = claudeSettingsPath(opts.project === true, cwd);
   const root = projectRoot(cwd);
   const codexDir = codexHome();
-  const ocDir = opts.project === true ? join28(cwd, ".opencode") : opencodeConfigDir();
+  const ocDir = opts.project === true ? join27(cwd, ".opencode") : opencodeConfigDir();
   const codexOn = codexWired(codexDir) > 0;
   return [
     { target: "claude-code", wired: claudeCodeWired(claudePath) > 0, path: claudePath, note: "the plugin route wires this separately and does not show here" },
     {
       target: "codex",
       wired: codexOn,
-      path: join28(codexDir, "hooks.json"),
+      path: join27(codexDir, "hooks.json"),
       // A wired hook behind a disabled feature flag never fires and looks fine. Say so.
       note: codexOn && !codexHooksEnabled(codexDir) ? "WIRED BUT INERT: `[features] hooks = true` is not set in config.toml" : void 0
     },
@@ -60179,7 +60294,7 @@ var STR = {
     renderedNote: "fichier(s) rendent des composants de biblioth\xE8que non analys\xE9s en source \u2014 auditez le build (render) ou scan",
     sfcNote: "composant(s) .vue/.svelte/.astro audit\xE9(s) en SOURCE (template) \u2014 slots et liaisons dynamiques invisibles : verdict pr\xE9liminaire, auditez le rendu (render/scan)",
     capturesNote: "fichier(s) de capture rendus audit\xE9s \xE0 pleine fid\xE9lit\xE9 (DOM r\xE9el) \u2014 le vrai HTML produit",
-    unitSnapshotsNote: "rendu(s) de composant lus dans les instantan\xE9s de tests unitaires (.snap) \u2014 jsdom, sans styles calcul\xE9s"
+    rendersNote: "unit\xE9(s) trouv\xE9e(s) par le moteur de rendu ultra11y (.ultra11y/render.json)"
   },
   en: {
     summaryTitle: "WCAG 2.2 AA audit (ultra11y static engine)",
@@ -60196,7 +60311,7 @@ var STR = {
     renderedNote: "file(s) render component-library output not analysed from source \u2014 audit the build (render) or scan",
     sfcNote: ".vue/.svelte/.astro file(s) audited as SOURCE (template) \u2014 slots and dynamic bindings are invisible: preliminary verdict, audit the rendered output (render/scan)",
     capturesNote: "rendered capture file(s) audited at full fidelity (real DOM) \u2014 the true produced HTML",
-    unitSnapshotsNote: "component render(s) read from unit-test snapshots (.snap) \u2014 jsdom, no computed styles"
+    rendersNote: "unit(s) found by ultra11y's render engine (.ultra11y/render.json)"
   }
 };
 function t2(lang, key2) {
@@ -60248,7 +60363,11 @@ function auditSummary(r2, lang, standard = CORE2) {
   if (r2.scope.rendered) lines.push(`\u{1F9E9} ${r2.scope.rendered.files} ${t2(lang, "renderedNote")} (${r2.scope.rendered.opaqueLibraries.join(", ")}).`);
   if (r2.scope.sourceTemplate) lines.push(`\u{1F9E9} ${r2.scope.sourceTemplate.files} ${t2(lang, "sfcNote")} (${r2.scope.sourceTemplate.extensions.join(", ")}).`);
   if (r2.scope.captures) lines.push(`\u2705 ${r2.scope.captures.files} ${t2(lang, "capturesNote")}.`);
-  if (r2.scope.unitSnapshots) lines.push(`\u{1F9EA} ${r2.scope.unitSnapshots.entries} ${t2(lang, "unitSnapshotsNote")}.`);
+  if (r2.scope.renders) {
+    const { units, rendered, skipped, notAttempted } = r2.scope.renders;
+    const counts = lang === "fr" ? `${rendered} rendue(s), ${skipped} en \xE9chec, ${notAttempted} non tent\xE9e(s)` : `${rendered} rendered, ${skipped} failed, ${notAttempted} not attempted`;
+    lines.push(`\u{1F9E9} ${units.length} ${t2(lang, "rendersNote")}${lang === "fr" ? " : " : ": "}${counts}.`);
+  }
   return lines.join("\n");
 }
 function captureCoverageSummary(cov, lang) {
@@ -60273,7 +60392,7 @@ function captureCoverageSummary(cov, lang) {
 // src/evidence.ts
 import { createHash as createHash5 } from "crypto";
 import { existsSync as existsSync30, mkdirSync as mkdirSync14, readFileSync as readFileSync22, writeFileSync as writeFileSync14 } from "fs";
-import { join as join29 } from "path";
+import { join as join28 } from "path";
 var DEFAULT_GEOMETRY = { pad: 24, minWidth: 320, minHeight: 120, maxWidth: 960, maxHeight: 540 };
 var DEFAULT_CAPS = { perRule: 6, perPage: 12, total: 200 };
 var HALO = { r: 255, g: 255, b: 255, a: 0.92 };
@@ -60306,8 +60425,8 @@ function resolveScale(img, viewport, boxes) {
 }
 function loadPageEvidence(root, pageId) {
   const dir = snapshotDir(root, pageId);
-  const domFile = join29(dir, "dom.html");
-  const shotFile = join29(dir, "screen.png");
+  const domFile = join28(dir, "dom.html");
+  const shotFile = join28(dir, "screen.png");
   if (!existsSync30(domFile)) return { skip: "no-snapshot" };
   if (!existsSync30(shotFile)) return { skip: "no-screenshot" };
   let dom;
@@ -60320,7 +60439,7 @@ function loadPageEvidence(root, pageId) {
   }
   const img = decodePng(shot);
   if (!img) return { skip: "unreadable-image" };
-  const digest = readJson2(join29(dir, "boxes.json"));
+  const digest = readJson2(join28(dir, "boxes.json"));
   if (!digest) return { skip: "no-boxes" };
   const doc = parseHtml(dom, domFile);
   const boxes = alignedBoxes(dom, digest, doc);
@@ -60336,7 +60455,7 @@ function loadPageEvidence(root, pageId) {
   return { pageId, img, scale, viewport, ordinalOf, boxes, truncated: Boolean(digest.truncated) };
 }
 function metaOf(dir) {
-  const raw = readJson2(join29(dir, "meta.json"));
+  const raw = readJson2(join28(dir, "meta.json"));
   if (raw === void 0) return void 0;
   const v2 = validateSnapshotMeta(raw);
   return v2.ok && v2.meta ? v2.meta : void 0;
@@ -60501,7 +60620,7 @@ function writeEvidence(result, opts) {
       }
       continue;
     }
-    const dir = join29(opts.outDir, "assets", pageId);
+    const dir = join28(opts.outDir, "assets", pageId);
     let wrote = false;
     const perRule = /* @__PURE__ */ new Map();
     const seen = /* @__PURE__ */ new Set();
@@ -60526,7 +60645,7 @@ function writeEvidence(result, opts) {
         continue;
       }
       const name = cropName(f2);
-      const path = join29(dir, name);
+      const path = join28(dir, name);
       try {
         if (!wrote) {
           mkdirSync14(dir, { recursive: true });
@@ -60565,7 +60684,7 @@ function writeEvidence(result, opts) {
 
 // src/html-emit.ts
 import { mkdirSync as mkdirSync15, readFileSync as readFileSync23, statSync as statSync10, writeFileSync as writeFileSync15 } from "fs";
-import { join as join30 } from "path";
+import { join as join29 } from "path";
 
 // src/html.ts
 var MARK4 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
@@ -61386,7 +61505,7 @@ function writeHtml(result, opts) {
     return drawn;
   };
   const flat = opts.layout === "pages";
-  const sheetDir = flat ? opts.outDir : join30(opts.outDir, "pages");
+  const sheetDir = flat ? opts.outDir : join29(opts.outDir, "pages");
   const up = flat ? "./" : "../";
   const compositeName = `ultra11y-${stdKey}-${result.date}.html`;
   const nav = flat ? [{ href: "./index.html", text: t3.pagesTitle }] : [
@@ -61405,13 +61524,13 @@ function writeHtml(result, opts) {
       nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` }))
     });
     if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
-    compositePath = join30(opts.outDir, compositeName);
+    compositePath = join29(opts.outDir, compositeName);
     writeFileSync15(compositePath, renderHtmlDocument(composite));
   }
   const fileCrops = cropLookup(opts.evidence, lang, (_p, href) => href.replace(/^\.\//, up));
   const indexNav = nav.map((n) => ({ ...n, current: n.href === "./index.html" }));
   const index = flat ? pagesIndexDoc(result, { standard, lang, nav: indexNav, sheetHref: (id) => `./page-${id}.html` }) : indexDoc(result, { standard, lang, nav: indexNav, links: nav.filter((n) => n.href !== "./index.html") });
-  const indexPath = join30(opts.outDir, "index.html");
+  const indexPath = join29(opts.outDir, "index.html");
   writeFileSync15(indexPath, renderHtmlDocument(index));
   const sheets = [];
   if (opts.pages) {
@@ -61424,7 +61543,7 @@ function writeHtml(result, opts) {
     ];
     if (!flat) {
       writeFileSync15(
-        join30(sheetDir, "index.html"),
+        join29(sheetDir, "index.html"),
         renderHtmlDocument(
           pagesIndexDoc(result, {
             standard,
@@ -61434,7 +61553,7 @@ function writeHtml(result, opts) {
           })
         )
       );
-      sheets.push(join30(sheetDir, "index.html"));
+      sheets.push(join29(sheetDir, "index.html"));
     }
     for (const p2 of derived) {
       const doc = pageDoc(result, p2, {
@@ -61447,7 +61566,7 @@ function writeHtml(result, opts) {
         // beside the entry point, seen from wherever this sheet sits.
         ...opts.screenshots?.has(p2.id) ? { screenshot: `${up}assets/${p2.id}.png` } : {}
       });
-      const path = join30(sheetDir, `page-${p2.id}.html`);
+      const path = join29(sheetDir, `page-${p2.id}.html`);
       writeFileSync15(path, renderHtmlDocument(doc));
       sheets.push(path);
     }
@@ -61467,11 +61586,11 @@ function noticeRuns(notices) {
 }
 
 // src/orchestrate.ts
-import { existsSync as existsSync31, mkdirSync as mkdirSync16, readFileSync as readFileSync24, rmSync as rmSync4, writeFileSync as writeFileSync16 } from "fs";
-import { join as join32, resolve as resolve12 } from "path";
+import { existsSync as existsSync31, mkdirSync as mkdirSync16, readFileSync as readFileSync24, rmSync as rmSync5, writeFileSync as writeFileSync16 } from "fs";
+import { join as join31, resolve as resolve13 } from "path";
 
 // src/orchestrate-templates.ts
-import { basename as basename5, join as join31 } from "path";
+import { basename as basename3, join as join30 } from "path";
 
 // src/verdict-rules.ts
 var VERDICT_KINDS = `Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold, and its criterion goes back to \xAB to assess \xBB carrying the refusal):
@@ -61600,7 +61719,7 @@ function toBatches(ids2, batchSize) {
 }
 function phaseWorkflowScript(pb) {
   const spec = phaseSpec(pb.phase);
-  const scriptPath = join31(pb.run, "orchestration", `${pb.phase}.workflow.mjs`);
+  const scriptPath = join30(pb.run, "orchestration", `${pb.phase}.workflow.mjs`);
   const meta2 = { name: `ultra11y-${pb.phase}`, description: spec.description(pb.items), phases: [{ title: spec.title }] };
   return [
     `export const meta = ${JSON.stringify(meta2)}`,
@@ -61608,7 +61727,7 @@ function phaseWorkflowScript(pb) {
     `// NOT a plain Node script: launch via the Workflow tool \u2014 Workflow({ scriptPath: ${JSON.stringify(scriptPath)} }).`,
     `// Emitted by \`ultra11y orchestrate\` from the CURRENT worklist. The worklist is the source`,
     `// of truth: if it changes, re-run \`orchestrate --phase ${pb.phase}\` before launching.`,
-    `// One adapter of ${join31(pb.run, "orchestration", `${pb.phase}.batches.json`)} \u2014 the harness-neutral batches.`,
+    `// One adapter of ${join30(pb.run, "orchestration", `${pb.phase}.batches.json`)} \u2014 the harness-neutral batches.`,
     ``,
     `// Constants for THIS run (injected at emit time; no Date.now/Math.random in this harness).`,
     `const RUN = ${JSON.stringify(pb.run)}`,
@@ -61643,7 +61762,7 @@ function batchPromptMd(pb, b, contract) {
   const briefs = pb.phase === "adjudicate" ? `
 Each criterion's brief \u2014 its official wording, numbered tests and methodology \u2014 is beside the worklist; read it before ruling:
 
-${b.ids.map((id) => `- \`${join31(pb.run, "adjudicate", `${id}.md`)}\``).join("\n")}
+${b.ids.map((id) => `- \`${join30(pb.run, "adjudicate", `${id}.md`)}\``).join("\n")}
 ` : "";
   return `# ultra11y ${pb.phase} \u2014 batch ${b.id} (${b.role})
 
@@ -61692,8 +61811,8 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 
 ## Which files \u2014 your prompt decides, and it wins over this document
 
-- **With a shell.** Read \`${join31(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join31(runAbs, "ADJUDICATE.todo.json")} --in ${join31(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
-- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join31(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join31(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
+- **With a shell.** Read \`${join30(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join30(runAbs, "ADJUDICATE.todo.json")} --in ${join30(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
+- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join30(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join30(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
 
 ## For EACH criterion
 
@@ -61710,7 +61829,7 @@ function ecoRefuterContract(runAbs, verify) {
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
 
-There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join31(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
+There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join30(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
 
 For EACH entry:
 
@@ -61723,24 +61842,24 @@ For EACH entry:
    When unsure, choose the HARSHER verdict \u2014 a false pass is worse than a false fail.
 3. \`note\` is REQUIRED \u2014 one line grounded in what you read (quote or paraphrase the decisive code).
 
-Then fold: \`ultra11y verify --apply ${join31(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
+Then fold: \`ultra11y verify --apply ${join30(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
 `;
 }
 function agentContracts(runAbs, opts = {}) {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
-  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join31(runAbs, "audit-latest.json")}` };
+  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join30(runAbs, "audit-latest.json")}` };
   if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs, verify) };
   return {
     adjudicator: `# Contract: adjudicator
 
 You adjudicate the residual judgment criteria of an ultra11y audit \u2014 the ones the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order\u2026). The ACTIVE STANDARD is recorded in the worklist's \`standard\` field: under a country standard (e.g. \`rgaa\`) the items are that standard's OWN criteria, each carrying its numbered tests \u2014 not WCAG success criteria.
 
-Worklist: \`${join31(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,\u2026>\`).
+Worklist: \`${join30(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,\u2026>\`).
 
 For EACH of your criteria:
 
 1. Read its worklist entry for the EVIDENCE: \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide.
-1b. Read \`${join31(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF \u2014 its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
+1b. Read \`${join30(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF \u2014 its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
 2. Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold):
    - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this item's own \`evidence[]\`; an anchor that is not in that list is treated as fabricated). A criterion whose \`evidence[]\` is empty cannot be \`C\` at all \u2014 it is \`manual\` (\`undecidable\`), or \`NA\` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate \u2014 an uncited NA is put on trial by \`verify\`.
    - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the item's OWN tests, which its brief lists for you under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
@@ -61754,7 +61873,7 @@ ${footer}`,
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
 
-Worklist: \`${join31(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`). Handle ONLY the entries whose \`n\` is named in your prompt (\`ITEMS=<n,\u2026>\`).
+Worklist: \`${join30(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`). Handle ONLY the entries whose \`n\` is named in your prompt (\`ITEMS=<n,\u2026>\`).
 
 For EACH of your entries:
 
@@ -61783,8 +61902,8 @@ function runbookMd(manifest, unrendered = []) {
 > no model in the loop \u2014 then re-emit this runbook:
 >
 > \`\`\`
-> ${engine} scan <url> --runtime local --merge ${join31(runAbs, "audit-latest.json")} --out ${runAbs}
-> ${engine} verify --manual --in ${join31(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} scan <url> --runtime local --merge ${join30(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} verify --manual --in ${join30(runAbs, "audit-latest.json")} --out ${runAbs}
 > ${engine} orchestrate --run ${runAbs}
 > \`\`\`
 >
@@ -61806,20 +61925,20 @@ ${status}
 
 ## The loop (play every role yourself, one item at a time)
 
-1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join31(runAbs, "audit-latest.json")}\`.
-2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join31(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join31(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
+1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join30(runAbs, "audit-latest.json")}\`.
+2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join30(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join30(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`${cmd("report")}\`.
-4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join31(runAbs, "VERIFY.todo.json")}\` (and \`${join31(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join31(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
+4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join30(runAbs, "VERIFY.todo.json")}\` (and \`${join30(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join30(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
 5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
 6. **Fix & re-audit**: \`${cmd("fix")}\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
 ## With subagents \u2014 the same phases, fanned out
 
-\`orchestrate --run ${runAbs} --phase <p>\` writes \`${join31(runAbs, "orchestration", "<p>.batches.json")}\` (every batch as data: its items, the schema its answer must match, its output path and the fold) and one self-contained prompt per batch under \`${join31(runAbs, "orchestration", "<p>")}/<batch-id>.md\`. On any harness: hand each prompt file VERBATIM to one subagent, save each returned JSON at that batch's \`output\` (\`${join31(runAbs, "orchestration", "out", "<p>")}/<batch-id>.json\`), fill the worklist from those answers yourself, then run the phase's fold above. On Claude Code, \`Workflow({ scriptPath: "${join31(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` dispatches the same batches in one call. You stay the sole writer either way.
+\`orchestrate --run ${runAbs} --phase <p>\` writes \`${join30(runAbs, "orchestration", "<p>.batches.json")}\` (every batch as data: its items, the schema its answer must match, its output path and the fold) and one self-contained prompt per batch under \`${join30(runAbs, "orchestration", "<p>")}/<batch-id>.md\`. On any harness: hand each prompt file VERBATIM to one subagent, save each returned JSON at that batch's \`output\` (\`${join30(runAbs, "orchestration", "out", "<p>")}/<batch-id>.json\`), fill the worklist from those answers yourself, then run the phase's fold above. On Claude Code, \`Workflow({ scriptPath: "${join30(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` dispatches the same batches in one call. You stay the sole writer either way.
 ${batchList(manifest)}`;
 }
 function batchList(manifest) {
-  const lines = manifest.steps.filter((st) => st.kind === "judgment" && st.ready && st.batchFile).map((st) => `- **${basename5(st.batchFile, ".batches.json")}** \u2014 ${st.batchIds?.length ?? 0} batch(es): \`${st.batchFile}\``);
+  const lines = manifest.steps.filter((st) => st.kind === "judgment" && st.ready && st.batchFile).map((st) => `- **${basename3(st.batchFile, ".batches.json")}** \u2014 ${st.batchIds?.length ?? 0} batch(es): \`${st.batchFile}\``);
   return lines.length ? `
 The batches of the current worklists, as \`orchestrate\` without \`--eco\` writes them:
 
@@ -61836,7 +61955,7 @@ function runStandard(run) {
   if (ctx?.standard) return ctx.standard;
   for (const f2 of ["ADJUDICATE.todo.json", "audit-latest.json"]) {
     try {
-      const std = JSON.parse(readFileSync24(join32(run, f2), "utf8")).standard;
+      const std = JSON.parse(readFileSync24(join31(run, f2), "utf8")).standard;
       if (typeof std === "string" && std) return std;
     } catch {
     }
@@ -61844,10 +61963,10 @@ function runStandard(run) {
   return void 0;
 }
 function verifyRunContext(runDir) {
-  const run = resolve12(runDir);
+  const run = resolve13(runDir);
   const ctx = readVerifyContext(run);
   const standard = runStandard(run);
-  const flagArgs = ["--in", ctx?.in ?? join32(run, "audit-latest.json")];
+  const flagArgs = ["--in", ctx?.in ?? join31(run, "audit-latest.json")];
   if (standard) flagArgs.push("--standard", standard);
   if (ctx?.conformities.source === "file") flagArgs.push("--conformities", ctx.conformities.path);
   if (ctx?.conformities.source === "disabled") flagArgs.push("--no-conformities");
@@ -61861,16 +61980,16 @@ function verifyRunContext(runDir) {
 var GLOBS_PLACEHOLDER = "<globs>";
 var REPORT_PLACEHOLDER = "<report.md>";
 function engineArgs(run) {
-  const audit = join32(run, "audit-latest.json");
+  const audit = join31(run, "audit-latest.json");
   const v2 = verifyRunContext(run);
   return {
     audit: ["audit", GLOBS_PLACEHOLDER, "--graph", "--out", run],
     "adjudicate-worklist": ["verify", "--manual", "--in", audit, "--out", run],
-    "adjudicate-fold": ["verify", "--apply", join32(run, "ADJUDICATE.todo.json"), "--in", audit, "--out", run],
+    "adjudicate-fold": ["verify", "--apply", join31(run, "ADJUDICATE.todo.json"), "--in", audit, "--out", run],
     report: ["report", "--in", audit, "--out", run],
     "verify-worklist": ["verify", "--report", v2.report, ...v2.flagArgs, "--out", run],
-    "verify-fold": ["verify", "--apply", join32(run, "VERIFY.todo.json"), "--report", v2.report, ...v2.flagArgs],
-    gate: ["check", "--report", v2.report, ...v2.standard ? ["--standard", v2.standard] : [], "--semantic", "--verdicts", join32(run, "VERIFY.todo.json")],
+    "verify-fold": ["verify", "--apply", join31(run, "VERIFY.todo.json"), "--report", v2.report, ...v2.flagArgs],
+    gate: ["check", "--report", v2.report, ...v2.standard ? ["--standard", v2.standard] : [], "--semantic", "--verdicts", join31(run, "VERIFY.todo.json")],
     fix: ["fix", GLOBS_PLACEHOLDER, "--write", "--iterate"]
   };
 }
@@ -61878,8 +61997,8 @@ function renderCommand(engineAbs, args) {
   return `node ${engineAbs} ${args.map((a2) => a2 === GLOBS_PLACEHOLDER ? `"${a2}"` : a2).join(" ")}`;
 }
 function listPhases(runDir, engineAbs) {
-  const run = resolve12(runDir);
-  const adjPath = join32(run, "ADJUDICATE.todo.json");
+  const run = resolve13(runDir);
+  const adjPath = join31(run, "ADJUDICATE.todo.json");
   let adjIds = [];
   let adjReady = false;
   if (existsSync31(adjPath)) {
@@ -61892,7 +62011,7 @@ function listPhases(runDir, engineAbs) {
     } catch {
     }
   }
-  const verPath = join32(run, "VERIFY.todo.json");
+  const verPath = join31(run, "VERIFY.todo.json");
   let verIds = [];
   let verReady = false;
   if (existsSync31(verPath)) {
@@ -61928,8 +62047,8 @@ function listPhases(runDir, engineAbs) {
   ];
 }
 function batchPaths(runDir, phase) {
-  const orch = join32(resolve12(runDir), "orchestration");
-  return { file: join32(orch, `${phase}.batches.json`), promptDir: join32(orch, phase), outDir: join32(orch, "out", phase) };
+  const orch = join31(resolve13(runDir), "orchestration");
+  return { file: join31(orch, `${phase}.batches.json`), promptDir: join31(orch, phase), outDir: join31(orch, "out", phase) };
 }
 function worklistItems(ph) {
   if (!ph.ready) return [];
@@ -61942,14 +62061,14 @@ function worklistItems(ph) {
   }
 }
 function phaseBatches(ph, runDir, engineAbs, batchSize = BATCH_SIZE) {
-  const run = resolve12(runDir);
+  const run = resolve13(runDir);
   const spec = phaseSpec(ph.name);
   const role = spec.role;
   const items = worklistItems(ph);
   const chunks = toBatches(ph.ids, batchSize);
   const width = Math.max(2, String(chunks.length).length);
   const { promptDir, outDir } = batchPaths(run, ph.name);
-  const contract = join32(run, "orchestration", "agents", `${role}.md`);
+  const contract = join31(run, "orchestration", "agents", `${role}.md`);
   return {
     kind: "ultra11y-orchestration-batches",
     schemaVersion: 1,
@@ -61972,8 +62091,8 @@ function phaseBatches(ph, runDir, engineAbs, batchSize = BATCH_SIZE) {
         ids: ids2,
         items: items.slice(i * batchSize, i * batchSize + ids2.length),
         contract,
-        prompt: join32(promptDir, `${id}.md`),
-        output: join32(outDir, `${id}.json`),
+        prompt: join31(promptDir, `${id}.md`),
+        output: join31(outDir, `${id}.json`),
         schema: spec.schema,
         fold: ph.apply
       };
@@ -61982,13 +62101,13 @@ function phaseBatches(ph, runDir, engineAbs, batchSize = BATCH_SIZE) {
 }
 var EXIT_USAGE = "usage / bad input (missing or unreadable file, unknown flag value)";
 function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
-  const run = resolve12(runDir);
+  const run = resolve13(runDir);
   const args = engineArgs(run);
   const phases = listPhases(run, engineAbs);
   const v2 = verifyRunContext(run);
-  const audit = join32(run, "audit-latest.json");
-  const adjTodo = join32(run, "ADJUDICATE.todo.json");
-  const verTodo = join32(run, "VERIFY.todo.json");
+  const audit = join31(run, "audit-latest.json");
+  const adjTodo = join31(run, "ADJUDICATE.todo.json");
+  const verTodo = join31(run, "VERIFY.todo.json");
   const placeholder = (f2) => f2 === GLOBS_PLACEHOLDER || f2 === REPORT_PLACEHOLDER;
   const ready = (inputs) => inputs.every((f2) => placeholder(f2) || existsSync31(f2));
   const engine = (id, title, inputs, outputs, exit, next) => ({
@@ -62010,7 +62129,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
       kind: "judgment",
       title,
       role,
-      contract: join32(run, "orchestration", "agents", `${role}.md`),
+      contract: join31(run, "orchestration", "agents", `${role}.md`),
       worklist: ph.worklist,
       items: ph.items,
       batches: pb.batches.map((b) => b.ids),
@@ -62051,7 +62170,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
         "adjudicate-worklist",
         "Adjudication worklist \u2014 the criteria the engine could not decide",
         [audit],
-        [adjTodo, join32(run, "ADJUDICATE.md"), join32(run, "ADJUDICATE.verdicts.json"), join32(run, "adjudicate")],
+        [adjTodo, join31(run, "ADJUDICATE.md"), join31(run, "ADJUDICATE.verdicts.json"), join31(run, "adjudicate")],
         { "0": "worklist written (possibly empty: nothing to adjudicate)", "2": EXIT_USAGE },
         "adjudicate"
       ),
@@ -62060,7 +62179,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
         adj,
         "adjudicator",
         "Adjudicate \u2014 fill every item's verdict (C/NC/NA/manual)",
-        [adjTodo, join32(run, "adjudicate")],
+        [adjTodo, join31(run, "adjudicate")],
         "adjudicate-fold"
       ),
       engine(
@@ -62087,7 +62206,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
         "verify-worklist",
         "Trial worklist \u2014 the report's non-conformities and the audit's claimed conformities",
         [v2.report, verAudit],
-        [verTodo, join32(run, "VERIFY.md"), join32(run, "VERIFY.context.json")],
+        [verTodo, join31(run, "VERIFY.md"), join31(run, "VERIFY.context.json")],
         { "0": "worklist written", "2": EXIT_USAGE },
         "verify"
       ),
@@ -62121,15 +62240,15 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
 }
 function unrenderedInRun(run) {
   try {
-    const audit = JSON.parse(readFileSync24(join32(run, "audit-latest.json"), "utf8"));
-    const todo = JSON.parse(readFileSync24(join32(run, "ADJUDICATE.todo.json"), "utf8"));
+    const audit = JSON.parse(readFileSync24(join31(run, "audit-latest.json"), "utf8"));
+    const todo = JSON.parse(readFileSync24(join31(run, "ADJUDICATE.todo.json"), "utf8"));
     return unrenderedResidual(audit, todo.items ?? []);
   } catch {
     return [];
   }
 }
 function orchestrateRun(runDir, engineAbs, opts = {}) {
-  const run = resolve12(runDir);
+  const run = resolve13(runDir);
   if (!existsSync31(run)) {
     return { exitCode: 2, written: [], notices: [], errors: [`run dir not found: ${run}`], phases: [] };
   }
@@ -62157,14 +62276,14 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
     }
     selected = [ph];
   }
-  const orchDir = join32(run, "orchestration");
-  const agentsDir = join32(orchDir, "agents");
-  mkdirSync16(join32(orchDir, "out"), { recursive: true });
+  const orchDir = join31(run, "orchestration");
+  const agentsDir = join31(orchDir, "agents");
+  mkdirSync16(join31(orchDir, "out"), { recursive: true });
   mkdirSync16(agentsDir, { recursive: true });
   const written = [];
   const notices = [];
   for (const [name, content] of Object.entries(agentContracts(run, { eco: opts.eco === true, verify: verifyRunContext(run) }))) {
-    const p2 = join32(agentsDir, `${name}.md`);
+    const p2 = join31(agentsDir, `${name}.md`);
     writeFileSync16(p2, content);
     written.push(p2);
   }
@@ -62172,9 +62291,9 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
   for (const ph of phases) {
     if (emitted.has(ph.name)) continue;
     const { file, promptDir } = batchPaths(run, ph.name);
-    const stale = [join32(orchDir, `${ph.name}.workflow.mjs`), file, promptDir].filter((f2) => existsSync31(f2));
+    const stale = [join31(orchDir, `${ph.name}.workflow.mjs`), file, promptDir].filter((f2) => existsSync31(f2));
     if (stale.length) {
-      for (const f2 of stale) rmSync4(f2, { recursive: true, force: true });
+      for (const f2 of stale) rmSync5(f2, { recursive: true, force: true });
       const why = opts.eco ? "--eco takes the sequential path" : !ph.ready ? "its worklist no longer exists" : ph.items === 0 ? "its worklist is now empty" : `--phase ${opts.phase} emits that phase only`;
       notices.push(`phase "${ph.name}": stale workflow and batches removed \u2014 ${why}.`);
     }
@@ -62191,7 +62310,7 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
       }
       const pb = phaseBatches(ph, run, engineAbs, BATCH_SIZE);
       const paths = batchPaths(run, ph.name);
-      rmSync4(paths.promptDir, { recursive: true, force: true });
+      rmSync5(paths.promptDir, { recursive: true, force: true });
       mkdirSync16(paths.promptDir, { recursive: true });
       mkdirSync16(paths.outDir, { recursive: true });
       writeFileSync16(paths.file, `${JSON.stringify(pb, null, 2)}
@@ -62201,12 +62320,12 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
         writeFileSync16(b.prompt, batchPromptMd(pb, b, contracts[pb.role] ?? ""));
         written.push(b.prompt);
       }
-      const p2 = join32(orchDir, `${ph.name}.workflow.mjs`);
+      const p2 = join31(orchDir, `${ph.name}.workflow.mjs`);
       writeFileSync16(p2, phaseWorkflowScript(pb));
       written.push(p2);
     }
   }
-  const rb = join32(orchDir, "RUNBOOK.md");
+  const rb = join31(orchDir, "RUNBOOK.md");
   writeFileSync16(rb, runbookMd(buildManifest(run, engineAbs), unrenderedInRun(run)));
   written.push(rb);
   return { exitCode: 0, written, notices, errors: [], phases };
@@ -62482,7 +62601,8 @@ Usage:
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--no-technical] [--lang auto|en|fr]
-  ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
+  ultra11y render   [<dir>] [--transpiler esbuild|typescript|sucrase] [--timeout <ms>] [--include <glob>] [--exclude <glob>] [--no-stories] [--json]   (ultra11y's render engine: components, pages, stories \u2192 .ultra11y/captures + .ultra11y/render.json)
+  ultra11y render   [<dir>] --detect | --coverage | --storybook [--captures <dir>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES \u2014 its tests depend on them)
   ultra11y criteria [--standard <pack>] --plan [--json]   (the work plan: which criteria the engine settles from source, which need a page, a browser, or judgment)
@@ -62505,7 +62625,6 @@ Usage:
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin \u2192 .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
-  ultra11y capture write  [--root <dir>] [--fail-on blocking|major|minor] [--json]   (component payload on stdin \u2192 .ultra11y/captures/<id>.html + audit it)
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
@@ -62541,20 +62660,26 @@ Commands:
              per criterion (default), per page, per page+criterion, per file, or one
              consolidated. De-dupe is by exact title, so re-running never duplicates.
              --dry-run prints the plan without creating anything.
-  render     Get RENDERED HTML to audit (so component libraries like DSFR are
-             checked as the HTML they emit, not their JSX sources): detect the
-             framework and print the build\u2192audit recipe, or --scaffold a
-             react-dom/server SSR snapshot harness to fill in. --setup installs the
-             zero-touch test-render capture harvester (one setupFiles line \u2192 every
-             component your tests render is snapshotted to .ultra11y/captures and
-             audited). --setup captures COMPONENTS from unit tests; to check a PAGE
-             during an existing Playwright/Cypress run, use the ultra11y/playwright or
-             ultra11y/cypress package exports instead \u2014 each checked page is persisted
-             to .ultra11y/pages/<id>/ and can be re-audited later, offline.
+  render     ultra11y's own render engine: get the RENDERED HTML of a project's
+             components, so component libraries like DSFR are checked as the HTML
+             they emit, not their JSX sources. It finds the .tsx/.jsx modules (their
+             default and PascalCase component exports), the framework pages (Next.js
+             app/ and pages/) and the Storybook stories (rendered with their args),
+             and renders each with the PROJECT'S OWN react-dom/server, no props, in a
+             throwaway harness: a child process per file, TSX transpiled in memory by
+             the project's esbuild/typescript/sucrase, no project file written, a
+             --timeout per unit (default 10000 ms). It never reads or runs the
+             project's tests or snapshots. Each render lands in .ultra11y/captures
+             (provenance: source, component, renderer, styles="none"); every unit,
+             rendered, skipped with the reason, or not attempted, is listed in
+             .ultra11y/render.json, which 'audit' reads into the report's annex.
+             --detect prints the framework's build\u2192audit recipe instead.
              --coverage reports which components have a rendered capture vs
              which are still opaque-source-only blind spots. --storybook attributes
              per-story HTML (via a storybook-static index) back to source components.
-             Then audit the produced HTML, and use scan for the needs-rendering criteria.
+             To check a PAGE during an existing Playwright/Cypress run, use the
+             ultra11y/playwright or ultra11y/cypress package exports. Then audit, and
+             use scan for the needs-rendering criteria.
   criteria   Look up the reference offline. Core: one WCAG success criterion
              (criteria 1.4.3) or the full list grouped by guideline (--list).
              --standard <pack>: a pack criterion, a pack theme (--theme N), or its
@@ -62646,13 +62771,6 @@ Commands:
              has been captured. Because a snapshot is a FULL document (a component
              capture is a fragment), the page-scoped rules run on it: that is where
              html lang (RGAA 8.3) and page title (8.5/8.6) become decidable.
-  capture    Persist a rendered COMPONENT (.ultra11y/captures/<id>.html, provenance
-             comment included) and audit it. 'capture write' reads {meta, html} on
-             stdin \u2014 what the ultra11y/vitest and ultra11y/jest helpers send from a
-             unit test. A fragment, so the page-scoped rules stay off; rendered by a
-             DOM implementation, so it is marked styles="none" and the rendering
-             criteria stay to assess. Unit-test snapshot files (__snapshots__/*.snap)
-             need no command: 'audit' reads them wherever they are in scope.
   hook       INTERNAL \u2014 the decision half of the Claude Code plugin's PreToolUse
              hook. Reads the payload on stdin; when a pending 'git commit', 'git
              push' or 'gh pr create' carries findings >= the threshold, prints the
@@ -62719,13 +62837,15 @@ Options:
   --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
                      tickets --out <dir> also writes the tracker-agnostic set to
                      <dir>/issues-<date>.json, for a workflow engine to file itself
-  --scaffold         render: write an SSR-snapshot harness (default: ultra11y-render.tsx)
-  --setup            render: install the zero-touch test-render capture harvester (.ultra11y/capture-setup.mjs) + print the runner wiring
+  --detect           render: detect the framework and print the build\u2192audit recipe (renders nothing)
+  --timeout <ms>     render: per-unit render budget (default 10000); a unit past it is recorded as a timeout
+  --transpiler <t>   render: esbuild|typescript|sucrase \u2014 the project's transpiler to load TSX/JSX with (default: the first resolvable)
+  --no-stories       render: leave the Storybook stories out
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
-  --root <dir>       snapshot, capture, scan: project root holding
+  --root <dir>       snapshot, scan: project root holding
                      .ultra11y/pages and .ultra11yrc.json (default: . \u2014 scan writes the
                      snapshots it collects under it)
   --glossary [<t>]   criteria: look up a term the country standard defines (or list all)
@@ -62735,7 +62855,7 @@ Options:
   --dry-run          fix: preview only \u2014 never write (this is the default)
   --safe             fix: apply only genuinely-automatic codemods (skip TODO placeholders / judgment proposals)
   --only <ids>       fix: limit auto-fixes to these rule ids (comma-separated)
-  --fail-on <sev>    audit/init/snapshot/capture: gate severity \u2014 blocking|major|minor (fr aliases accepted)  (default: blocking)
+  --fail-on <sev>    audit/init/snapshot: gate severity \u2014 blocking|major|minor (fr aliases accepted)  (default: blocking)
   --hook             init: write a git pre-commit accessibility gate (staged snapshot + auto-fix by default)
   --report <file>    check/verify: the report markdown to gate
   --theme <N>        criteria: with --standard <pack>, list the pack's theme N
@@ -62911,7 +63031,6 @@ var COMMANDS = [
   "scan",
   "sample",
   "snapshot",
-  "capture",
   "pages",
   "fix",
   "init",
@@ -62985,6 +63104,9 @@ var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "browser-path",
   "storage-state",
   "captures",
+  // `render`: per-unit budget and the project's transpiler to use.
+  "timeout",
+  "transpiler",
   "run",
   "phase",
   "root",
@@ -63012,10 +63134,11 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "no-default-excludes",
   "no-captures",
   "require-captures",
-  "scaffold",
   "storybook",
-  "setup",
   "coverage",
+  // `render`: print the framework recipe instead of rendering; leave the stories out.
+  "detect",
+  "no-stories",
   "write",
   // `pages discover`: build the sample from the snapshots the E2E producer already wrote,
   // instead of crawling — the only route that can see a state-reached page.
@@ -63301,11 +63424,15 @@ async function cmdAudit(p2) {
     }
   }
   stampRoutes(result, ".", lang, { recorded: pagesInScope });
+  if (useCaptures || inputs.includes(capturesDir)) {
+    const renders = renderScopeFor(capturesDir);
+    if (renders) result.scope.renders = renders;
+  }
   const document = isCore(standard) ? result : packAuditDocument(result, standard, lang);
   if (typeof p2.flags.out === "string") {
     const out = p2.flags.out;
     const asFile = out.toLowerCase().endsWith(".json");
-    const target = asFile ? out : join33(out, "audit-latest.json");
+    const target = asFile ? out : join32(out, "audit-latest.json");
     try {
       mkdirSync17(asFile ? dirname18(out) : out, { recursive: true });
       writeFileSync17(target, JSON.stringify(document, null, 2) + "\n");
@@ -63346,7 +63473,7 @@ async function cmdPagesDiscover(p2) {
     const snaps = sampleFromSnapshots(readSnapshots(root));
     if (!snaps.length) {
       console.error(
-        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join33(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join33(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
+        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join32(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join32(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
       );
       return 1;
     }
@@ -63467,7 +63594,7 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
     }
     return 0;
   }
-  const file = join33(process.cwd(), ".ultra11yrc.json");
+  const file = join32(process.cwd(), ".ultra11yrc.json");
   let doc = {};
   if (existsSync32(file)) {
     try {
@@ -63531,7 +63658,7 @@ async function cmdPages(p2) {
     const outDir2 = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : "";
     if (outDir2) {
       mkdirSync17(outDir2, { recursive: true });
-      writeFileSync17(join33(outDir2, "pages.json"), `${json}
+      writeFileSync17(join32(outDir2, "pages.json"), `${json}
 `);
     }
     return 0;
@@ -63557,11 +63684,11 @@ async function cmdPages(p2) {
   const derived = derivePages(result, scope);
   const split = p2.flags.split === "page";
   const outDir = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : void 0;
-  const shotOf = (id) => pageScreenshot(PAGES_DIR, id) ?? join33(PAGES_DIR, id, "screen.png");
+  const shotOf = (id) => pageScreenshot(PAGES_DIR, id) ?? join32(PAGES_DIR, id, "screen.png");
   const shotsRelative = (fileDir) => {
     const m3 = /* @__PURE__ */ new Map();
     for (const pg of derived) {
-      if (existsSync32(shotOf(pg.id))) m3.set(pg.id, relative9(fileDir, shotOf(pg.id)).split("\\").join("/"));
+      if (existsSync32(shotOf(pg.id))) m3.set(pg.id, relative10(fileDir, shotOf(pg.id)).split("\\").join("/"));
     }
     return m3;
   };
@@ -63572,12 +63699,12 @@ async function cmdPages(p2) {
   };
   const shotsCopiedInto = (dir) => {
     const m3 = /* @__PURE__ */ new Map();
-    const assets = join33(dir, "assets");
+    const assets = join32(dir, "assets");
     for (const pg of derived) {
       const src = shotOf(pg.id);
       if (!existsSync32(src)) continue;
       mkdirSync17(assets, { recursive: true });
-      copyFileSync4(src, join33(assets, `${pg.id}.png`));
+      copyFileSync4(src, join32(assets, `${pg.id}.png`));
       m3.set(pg.id, `./assets/${pg.id}.png`);
     }
     return m3;
@@ -63603,7 +63730,7 @@ async function cmdPages(p2) {
   if (manifest) {
     const total = evidenceNotice(manifest, null, lang);
     console.error(
-      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join33(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join33(outDir, "assets")}.`
+      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join32(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join32(outDir, "assets")}.`
     );
     for (const line of total) console.error(line);
   }
@@ -63612,7 +63739,7 @@ async function cmdPages(p2) {
     ...manifest ? { evidenceNotice: (id) => evidenceNotice(manifest, id, lang) } : {}
   };
   if (!split) {
-    const file = join33(outDir, `pages-${result.date}.md`);
+    const file = join32(outDir, `pages-${result.date}.md`);
     writeFileSync17(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
 `);
     const html2 = wantHtml ? emitHtml(result, {
@@ -63632,10 +63759,10 @@ async function cmdPages(p2) {
   const sheet = (id) => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    writeFileSync17(join33(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
+    writeFileSync17(join32(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
 `);
   }
-  const index = join33(outDir, "index.md");
+  const index = join32(outDir, "index.md");
   writeFileSync17(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
 `);
   const html = wantHtml ? emitHtml(result, {
@@ -63687,7 +63814,7 @@ async function cmdSnapshot(p2) {
           2
         )
       );
-    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join33(root, PAGES_DIR)}.` : `No snapshot in ${join33(root, PAGES_DIR)}.`);
+    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join32(root, PAGES_DIR)}.` : `No snapshot in ${join32(root, PAGES_DIR)}.`);
     else for (const s2 of snaps) console.log(`${s2.meta.id}	${s2.meta.name}	${s2.meta.url}${s2.meta.auth ? "	[auth]" : ""}`);
     return 0;
   }
@@ -63743,7 +63870,7 @@ async function cmdSnapshot(p2) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
-  const result = runAudit({ inputs: [join33(dir, "dom.html")], onWarn: (m3) => console.error(m3) });
+  const result = runAudit({ inputs: [join32(dir, "dom.html")], onWarn: (m3) => console.error(m3) });
   const failOnRaw = p2.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
@@ -63754,53 +63881,6 @@ async function cmdSnapshot(p2) {
   if (p2.flags.json) console.log(JSON.stringify(result, null, 2));
   else {
     console.log(lang === "fr" ? `\u2192 instantan\xE9 \xE9crit dans ${dir}` : `\u2192 snapshot written to ${dir}`);
-    console.log(auditSummary(result, lang));
-  }
-  return failing.length ? 1 : 0;
-}
-async function cmdCapture(p2) {
-  const sub = p2.positionals[0];
-  const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
-  const lang = resolveLang(p2.flags, {});
-  if (sub !== "write") {
-    console.error("ultra11y capture: expected `capture write` (payload on stdin).");
-    return 2;
-  }
-  const raw = await readStdin();
-  if (!raw.trim()) {
-    console.error("ultra11y capture write: no payload on stdin (expected {meta: {id, name?, component?, source?, test?, runner?, env?}, html}).");
-    return 2;
-  }
-  let payload;
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    console.error("ultra11y capture write: stdin is not valid JSON.");
-    return 2;
-  }
-  const issues = validateComponentCapture(payload);
-  if (issues.length) {
-    for (const i of issues) console.error(`ultra11y capture write: ${i}`);
-    return 2;
-  }
-  let file;
-  try {
-    file = writeComponentCapture(root, payload);
-  } catch (e) {
-    console.error(`ultra11y capture write: could not write the capture: ${e instanceof Error ? e.message : String(e)}`);
-    return 1;
-  }
-  const result = runAudit({ inputs: [file], captureDir: join33(root, CAPTURES_DIR), onWarn: (m3) => console.error(m3) });
-  const failOnRaw = p2.flags["fail-on"];
-  const failOnParsed = parseFailOn(failOnRaw);
-  if (failOnRaw !== void 0 && failOnParsed === null) {
-    console.error(`ultra11y capture write: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
-    return 2;
-  }
-  const failing = failOnRaw !== void 0 ? findingsAtOrAbove(result.findings, failOnParsed ?? "bloquant").filter((f2) => !f2.advisory) : [];
-  if (p2.flags.json) console.log(JSON.stringify(result, null, 2));
-  else {
-    console.log(lang === "fr" ? `\u2192 capture \xE9crite dans ${file}` : `\u2192 capture written to ${file}`);
     console.log(auditSummary(result, lang));
   }
   return failing.length ? 1 : 0;
@@ -64054,7 +64134,10 @@ var REMOVED_FLAGS = {
   e2e: "removed: use the ultra11y/playwright or ultra11y/cypress package exports to check pages during an E2E run.",
   diff: "removed with pages --diff (the comparison against an imported external audit).",
   docker: "removed with the Docker runtime: scan runs on the local Playwright (pass --cwd <dir> to resolve it from a project).",
-  clean: "removed with the Docker runtime: there is no image to clean."
+  clean: "removed with the Docker runtime: there is no image to clean.",
+  // The render paths that left the rendering to the project, replaced by ultra11y's own engine.
+  scaffold: "removed: ultra11y renders the components itself. Run `ultra11y render [<dir>]` \u2014 it finds the components, pages and stories and renders them with the project's own react-dom/server.",
+  setup: "removed with the test-render capture harvester: ultra11y no longer reads or runs the project's tests. Run `ultra11y render [<dir>]`, ultra11y's own render engine."
 };
 var REMOVED_FLAG_VALUES = {
   format: {
@@ -64068,7 +64151,8 @@ var REMOVED_COMMANDS = {
   dev: "the dev side-car was removed. Check pages during your tests with the ultra11y/playwright or ultra11y/cypress package exports.",
   judge: "the headless judge was removed. The agent adjudicates through `verify --manual` / `verify --apply` (fanned out with `orchestrate`); in CI, iterion's rgaa-audit bot does.",
   affected: `the diff-to-pages selector was removed. ${CI_NOTE}.`,
-  import: "importing an external audit (and pages --diff) was removed."
+  import: "importing an external audit (and pages --diff) was removed.",
+  capture: "`capture write` was removed with the ultra11y/vitest and ultra11y/jest helpers: ultra11y no longer reads or runs the project's tests. Run `ultra11y render [<dir>]`, ultra11y's own render engine."
 };
 var SECRET_CONFIG_KEYS = ["token", "apiToken", "api_token", "password", "secret"];
 async function cmdTickets(p2) {
@@ -64159,7 +64243,7 @@ async function cmdTickets(p2) {
   let setPath;
   if (ticketsOut) {
     mkdirSync17(ticketsOut, { recursive: true });
-    setPath = join33(ticketsOut, `issues-${result.date}.json`);
+    setPath = join32(ticketsOut, `issues-${result.date}.json`);
     const payload = {
       tool: "ultra11y",
       kind: "issues",
@@ -64259,68 +64343,12 @@ async function cmdTickets(p2) {
   }
   return pushed.failed > 0 ? 1 : 0;
 }
-function cmdRender(p2) {
+async function cmdRender(p2) {
   const root = p2.positionals[0] ?? ".";
   const lang = resolveLang(p2.flags, {});
-  if (p2.flags.scaffold === true) {
-    const out = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : "ultra11y-render.tsx";
-    try {
-      writeFileSync17(out, ssrHarness());
-    } catch (e) {
-      console.error(`ultra11y render: could not write ${out}: ${e instanceof Error ? e.message : String(e)}`);
-      return 1;
-    }
-    console.log(
-      lang === "fr" ? `Harnais SSR \xE9crit : ${out} (INERTE tant que COMPONENTS est vide \u2014 l'ex\xE9cuter tel quel ne produit aucun HTML).
-Compl\xE9tez COMPONENTS, ex\xE9cutez-le (ex. npx tsx ${out}), puis : node scripts/ultra11y.mjs audit "audits/rendered/**/*.html"` : `SSR harness written: ${out} (INERT while COMPONENTS is empty \u2014 running it as-is produces no HTML).
-Fill in COMPONENTS, run it (e.g. npx tsx ${out}), then: node scripts/ultra11y.mjs audit "audits/rendered/**/*.html"`
-    );
-    return 0;
-  }
-  if (p2.flags.setup === true) {
-    const rel = ".ultra11y/capture-setup.mjs";
-    const out = join33(root, rel);
-    try {
-      mkdirSync17(dirname18(out), { recursive: true });
-      writeFileSync17(out, captureSetup());
-    } catch (e) {
-      console.error(`ultra11y render: could not write ${out}: ${e instanceof Error ? e.message : String(e)}`);
-      return 1;
-    }
-    let setupDeps = {};
-    const setupPkg = join33(root, "package.json");
-    if (existsSync32(setupPkg)) {
-      try {
-        const pkg = JSON.parse(readText(setupPkg));
-        setupDeps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
-      } catch {
-      }
-    }
-    const tr = detectTestRunner(setupDeps, (f2) => existsSync32(join33(root, f2)));
-    console.log(captureSetupPlan(tr, rel, lang));
-    const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
-    const gaPath = join33(root, ".gitattributes");
-    try {
-      const existing = existsSync32(gaPath) ? readFileSync26(gaPath, "utf8") : "";
-      if (!existing.includes(".ultra11y/captures/")) {
-        appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
-        console.log(lang === "fr" ? `.gitattributes : ajout\xE9 \xAB ${gaLine} \xBB` : `.gitattributes: added "${gaLine}"`);
-      }
-    } catch {
-    }
-    try {
-      const giPath = join33(root, ".gitignore");
-      if (existsSync32(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync26(giPath, "utf8")))
-        console.error(
-          lang === "fr" ? "\u26A0\uFE0F .ultra11y semble ignor\xE9 par .gitignore \u2014 les captures doivent \xEAtre committ\xE9es pour le gate (ajoutez \xAB !.ultra11y/captures/ \xBB)." : '\u26A0\uFE0F .ultra11y appears gitignored \u2014 captures must be committed for the gate (add "!.ultra11y/captures/").'
-        );
-    } catch {
-    }
-    return 0;
-  }
   if (p2.flags.storybook === true || typeof p2.flags.storybook === "string") {
     const sbDir = p2.positionals[0] ?? "storybook-static";
-    const indexPath = existsSync32(join33(sbDir, "index.json")) ? join33(sbDir, "index.json") : join33(sbDir, "stories.json");
+    const indexPath = existsSync32(join32(sbDir, "index.json")) ? join32(sbDir, "index.json") : join32(sbDir, "stories.json");
     if (!existsSync32(indexPath)) {
       console.error(
         lang === "fr" ? `ultra11y render : aucun index Storybook (index.json/stories.json) dans ${sbDir}.` : `ultra11y render: no Storybook index (index.json/stories.json) in ${sbDir}.`
@@ -64354,14 +64382,14 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out}), then: node scripts/ultra11y.mj
       }
       try {
         mkdirSync17(outDir, { recursive: true });
-        writeFileSync17(join33(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
+        writeFileSync17(join32(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
 ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
         attributed++;
       } catch {
         skipped++;
       }
     }
-    const remedy = lang === "fr" ? `Aucun HTML de story attribuable dans ${htmlDir}. Produisez le HTML par story (@storybook/test-runner, ou portable stories + le harvester \`render --setup\`), ou pointez --captures <dir>.` : `No attributable per-story HTML in ${htmlDir}. Produce per-story HTML (@storybook/test-runner, or portable stories + the \`render --setup\` harvester), or point --captures <dir>.`;
+    const remedy = lang === "fr" ? `Aucun HTML de story attribuable dans ${htmlDir}. Rendez les stories avec le moteur ultra11y (\`render\`), ou produisez le HTML par story (@storybook/test-runner) et pointez --captures <dir>.` : `No attributable per-story HTML in ${htmlDir}. Render the stories with ultra11y's engine (\`render\`), or produce per-story HTML (@storybook/test-runner) and point --captures <dir>.`;
     const failed = attributed === 0 && htmlFiles.length > 0;
     if (p2.flags.json) console.log(JSON.stringify({ attributed, skipped, stories: stories.length, outDir, ...failed ? { remedy } : {} }, null, 2));
     else
@@ -64376,7 +64404,7 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   }
   if (p2.flags.coverage === true) {
     const capturesFlag = typeof p2.flags.captures === "string" && p2.flags.captures ? p2.flags.captures : void 0;
-    const capturesDir = capturesFlag ?? join33(root, ".ultra11y/captures");
+    const capturesDir = capturesFlag ?? join32(root, ".ultra11y/captures");
     const graphExt = [...GRAPH_ONLY_EXT, ...asList(p2.flags.ext) ?? []];
     const sourceFiles = discover([root], { include: asList(p2.flags.include), exclude: asList(p2.flags.exclude), ext: graphExt }).files;
     const graph = buildGraphStreaming(sourceFiles);
@@ -64387,8 +64415,9 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
     else console.log(captureCoverageSummary(cov, lang));
     return 0;
   }
+  if (p2.flags.detect !== true) return cmdRenderEngine(p2, root, lang);
   let deps = {};
-  const pkgPath = join33(root, "package.json");
+  const pkgPath = join32(root, "package.json");
   if (existsSync32(pkgPath)) {
     try {
       const pkg = JSON.parse(readText(pkgPath));
@@ -64396,10 +64425,63 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
     } catch {
     }
   }
-  const detection = detectFrameworks(deps, (f2) => existsSync32(join33(root, f2)));
+  const detection = detectFrameworks(deps, (f2) => existsSync32(join32(root, f2)));
   if (p2.flags.json) console.log(JSON.stringify(detection, null, 2));
   else console.log(renderPlan(detection, lang));
   return 0;
+}
+async function cmdRenderEngine(p2, root, lang) {
+  const fr = lang === "fr";
+  if (!existsSync32(root)) {
+    console.error(fr ? `ultra11y render : dossier introuvable : ${root}.` : `ultra11y render: no such directory: ${root}.`);
+    return 2;
+  }
+  const tFlag = p2.flags.transpiler;
+  if (tFlag !== void 0 && !(typeof tFlag === "string" && TRANSPILERS.includes(tFlag))) {
+    console.error(`ultra11y render: --transpiler must be ${TRANSPILERS.join("|")} (got "${String(tFlag)}").`);
+    return 2;
+  }
+  const timeoutRaw = p2.flags.timeout;
+  const timeoutMs = typeof timeoutRaw === "string" ? Number(timeoutRaw) : DEFAULT_RENDER_TIMEOUT_MS;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    console.error(`ultra11y render: --timeout must be a positive number of milliseconds (got "${String(timeoutRaw)}").`);
+    return 2;
+  }
+  const manifest = await runRenderEngine({
+    root,
+    timeoutMs,
+    ...typeof tFlag === "string" ? { transpiler: tFlag } : {},
+    include: asList(p2.flags.include),
+    exclude: asList(p2.flags.exclude),
+    stories: p2.flags["no-stories"] !== true,
+    onProgress: p2.flags.json ? void 0 : (done, total, file) => console.error(`ultra11y render: [${done}/${total}] ${file}`)
+  });
+  if (p2.flags.json) {
+    console.log(JSON.stringify(manifest, null, 2));
+    return 0;
+  }
+  const n = renderCounts(manifest.units);
+  const out = [];
+  out.push(
+    fr ? `ultra11y render : ${n.rendered} rendu(s), ${n.skipped} \xE9chec(s) avec la raison, ${n.notAttempted} non tent\xE9(s) \u2014 ${manifest.renderer ?? "aucun moteur de rendu React"}, ${manifest.transpiler ?? "aucun transpileur"}.` : `ultra11y render: ${n.rendered} rendered, ${n.skipped} failed with the reason, ${n.notAttempted} not attempted \u2014 ${manifest.renderer ?? "no React renderer"}, ${manifest.transpiler ?? "no transpiler"}.`
+  );
+  const statusWord = fr ? { skipped: "\xE9chec", "not-attempted": "non tent\xE9" } : { skipped: "failed", "not-attempted": "not attempted" };
+  for (const u2 of manifest.units) {
+    if (u2.status === "rendered") continue;
+    out.push(
+      `  - ${u2.file}${u2.export === "*" ? "" : `#${u2.export}`} \u2014 ${statusWord[u2.status] ?? u2.status}: ${u2.reason ? renderReasonLabel(u2.reason, lang) : "?"}${u2.detail ? ` \u2014 ${u2.detail}` : ""}`
+    );
+  }
+  if (manifest.testFilesIgnored)
+    out.push(
+      fr ? `  ${manifest.testFilesIgnored} fichier(s) de test, de mock ou d'instantan\xE9 laiss\xE9(s) de c\xF4t\xE9 sans \xEAtre lus.` : `  ${manifest.testFilesIgnored} test, mock or snapshot file(s) left out, unread.`
+    );
+  out.push(
+    fr ? `\u2192 captures dans ${join32(root, CAPTURES_DIR)}, manifeste ${join32(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).` : `\u2192 captures in ${join32(root, CAPTURES_DIR)}, manifest ${join32(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`
+  );
+  console.log(out.join("\n"));
+  if (!manifest.units.length) return 0;
+  return n.rendered === 0 && n.skipped === 0 ? 1 : 0;
 }
 function cmdCheck(p2) {
   const standard = stdOf(p2, "check");
@@ -64566,7 +64648,7 @@ function cmdVerify(p2) {
     const trial = conformityTrial(p2, standard, lang);
     const expected = [...expectedNc, ...buildConformityWorklist(trial.claims, expectedNc.length, Number.POSITIVE_INFINITY)];
     const r2 = applyVerdicts(items, expected);
-    const ctx = readVerifyContext(dirname18(resolve13(apply)));
+    const ctx = readVerifyContext(dirname18(resolve14(apply)));
     const absentItems = r2.failures.filter((f2) => !items.includes(f2));
     const absentC = absentItems.filter((f2) => f2.kind === "c").length;
     const sourceDiffers = ctx ? !sameConformitySource(ctx.conformities, trial.source) : absentC > 0 && !items.some((it) => it.kind === "c");
@@ -64662,7 +64744,7 @@ function cmdVerifySummary(p2) {
   if (typeof prunedFlag === "string" && prunedFlag) {
     const raw = readJson3(prunedFlag, "pruned");
     if (raw === void 0) return 2;
-    pruned = { audit: unwrapAudit(raw), path: resolve13(prunedFlag) };
+    pruned = { audit: unwrapAudit(raw), path: resolve14(prunedFlag) };
   }
   const reportMd = readReportInput(reportPath, "verify");
   if (reportMd === null) return 2;
@@ -64671,11 +64753,11 @@ function cmdVerifySummary(p2) {
     standard,
     lang,
     audit,
-    auditPath: resolve13(auditPath),
+    auditPath: resolve14(auditPath),
     verdicts,
-    verdictsPath: resolve13(verdictsPath),
+    verdictsPath: resolve14(verdictsPath),
     reportMd,
-    reportPath: resolve13(reportPath),
+    reportPath: resolve14(reportPath),
     ...pruned ? { pruned } : {},
     gate
   });
@@ -64685,7 +64767,7 @@ function cmdVerifySummary(p2) {
   }
   const out = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : ".";
   mkdirSync17(out, { recursive: true });
-  const mdPath = join33(out, "TRIAL.md");
+  const mdPath = join32(out, "TRIAL.md");
   writeFileSync17(mdPath, formatTrialSummary(summary, lang));
   console.log(
     summary.validated ? lang === "fr" ? `\u2713 Bilan de contre-expertise \u2192 ${mdPath} \u2014 gate s\xE9mantique vert.` : `\u2713 Counter-review summary \u2192 ${mdPath} \u2014 semantic gate green.` : lang === "fr" ? `Bilan de contre-expertise \u2192 ${mdPath} \u2014 audit NON valid\xE9 (gate ${summary.gate.ok ? "vert" : "en \xE9chec"}, ${summary.contestedEngine.length} d\xE9cision(s) moteur contest\xE9e(s), ${summary.untried.length} jamais mise(s) \xE0 l'\xE9preuve, ${summary.foreign.length} \xE9trang\xE8re(s)).` : `Counter-review summary \u2192 ${mdPath} \u2014 audit NOT validated (gate ${summary.gate.ok ? "green" : "failing"}, ${summary.contestedEngine.length} contested engine decision(s), ${summary.untried.length} never tried, ${summary.foreign.length} foreign).`
@@ -64729,7 +64811,7 @@ function applyPrune(p2, standard, items, lang, untried = []) {
   }
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
   mkdirSync17(out, { recursive: true });
-  writeFileSync17(join33(out, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
+  writeFileSync17(join32(out, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
   if (ledgerFile && ledgerRepair) {
     writeLedger(ledgerFile, ledgerRepair.ledger);
     if (!p2.flags.json)
@@ -64848,8 +64930,8 @@ function cmdVerifyWorklist(p2, langIn) {
   const contextPath = writeVerifyContext(out, {
     kind: "verify-context",
     standard,
-    report: rep === "-" ? rep : resolve13(rep),
-    ...typeof inFlag === "string" && inFlag && inFlag !== "-" ? { in: resolve13(inFlag) } : {},
+    report: rep === "-" ? rep : resolve14(rep),
+    ...typeof inFlag === "string" && inFlag && inFlag !== "-" ? { in: resolve14(inFlag) } : {},
     conformities: trial.source,
     capped: { nc: droppedNc, c: droppedC }
   });
@@ -64883,13 +64965,13 @@ function conformityTrial(p2, standard, lang) {
     if (typeof inFlag === "string" && inFlag && inFlag !== "-") {
       try {
         const audit = unwrapAudit(JSON.parse(readText(inFlag)));
-        if (Array.isArray(audit.criteria)) return { claims: conformityClaimsFromAudit(audit, standard), source: { source: "in", path: resolve13(inFlag) } };
+        if (Array.isArray(audit.criteria)) return { claims: conformityClaimsFromAudit(audit, standard), source: { source: "in", path: resolve14(inFlag) } };
       } catch {
       }
     }
   }
   const path = named3 ?? ledgerPath(standard);
-  const source = { source: named3 ? "file" : "ledger", path: resolve13(path) };
+  const source = { source: named3 ? "file" : "ledger", path: resolve14(path) };
   if (!existsSync32(path)) {
     if (named3) {
       console.error(
@@ -64971,7 +65053,7 @@ function replayLedgerFile(p2, ledger, lang) {
   }
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
   mkdirSync17(out, { recursive: true });
-  const auditPath = join33(out, "audit-latest.json");
+  const auditPath = join32(out, "audit-latest.json");
   writeFileSync17(auditPath, `${JSON.stringify(auditDocumentFor(r2.audit, standard, lang), null, 2)}
 `);
   if (p2.flags.json)
@@ -65061,7 +65143,7 @@ function applyAdjudicationFile(p2, adj, lang) {
   if (!p2.flags.json) reportNotInWorklist(r2.notInWorklist, lang);
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
   mkdirSync17(out, { recursive: true });
-  const auditPath = join33(out, "audit-latest.json");
+  const auditPath = join32(out, "audit-latest.json");
   writeFileSync17(auditPath, JSON.stringify(auditDocumentFor(r2.audit, adj.standard, lang), null, 2) + "\n");
   const ledgerOut = ledgerTarget(p2, adj.standard);
   if (ledgerOut) {
@@ -65162,7 +65244,7 @@ Iterated over ${rounds} round(s) to a fixpoint \u2014 ${totalWritten} file(s) wr
 }
 function scanSnapshotRoot(flags) {
   if (flags["no-snapshot"] === true) return void 0;
-  return typeof flags.root === "string" && flags.root ? resolve13(flags.root) : process.cwd();
+  return typeof flags.root === "string" && flags.root ? resolve14(flags.root) : process.cwd();
 }
 async function cmdScan(p2) {
   const standard = stdOf(p2, "scan");
@@ -65215,7 +65297,7 @@ async function cmdScan(p2) {
     sampleConfig = v2.sample;
   }
   const allRoutes = p2.flags["all-routes"] === true;
-  const routesRoot = typeof p2.flags.root === "string" && p2.flags.root ? resolve13(p2.flags.root) : process.cwd();
+  const routesRoot = typeof p2.flags.root === "string" && p2.flags.root ? resolve14(p2.flags.root) : process.cwd();
   let maxRoutes = ALL_ROUTES_MAX;
   let routePlan;
   if (allRoutes) {
@@ -65349,7 +65431,7 @@ async function cmdScan(p2) {
     }
     let merged = mergeDynamic(audit, dynamic, lang);
     if (dynamic.snapshots?.length) {
-      const doms = dynamic.snapshots.map((id) => join33(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f2) => existsSync32(f2));
+      const doms = dynamic.snapshots.map((id) => join32(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f2) => existsSync32(f2));
       if (doms.length) {
         const snapAudit = runAudit({ inputs: [...doms, ...documentFiles], onWarn: (m3) => console.error(m3) });
         merged = mergeSnapshotAudit(merged, snapAudit);
@@ -65369,7 +65451,7 @@ async function cmdScan(p2) {
     });
     mkdirSync17(out, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);
-    writeFileSync17(join33(out, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
+    writeFileSync17(join32(out, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
     if (p2.flags.json)
       console.log(
         JSON.stringify(
@@ -65385,7 +65467,7 @@ async function cmdScan(p2) {
       );
     else {
       console.log(
-        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join33(out, "audit-latest.json")} (${merged.conformancePct}% de r\xE9ussite automatique, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join33(out, "audit-latest.json")} (${merged.conformancePct}% automatic pass rate, ${merged.findings.length} findings).`
+        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join32(out, "audit-latest.json")} (${merged.conformancePct}% de r\xE9ussite automatique, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join32(out, "audit-latest.json")} (${merged.conformancePct}% automatic pass rate, ${merged.findings.length} findings).`
       );
       if (dynamic.snapshots?.length)
         console.log(
@@ -65593,7 +65675,7 @@ function cmdOrchestrate(p2) {
     );
   } else {
     console.log(
-      lang === "fr" ? `Suivez ${join33(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join33(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
+      lang === "fr" ? `Suivez ${join32(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join32(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
     );
   }
   if (p2.flags.phase === void 0 && workflows.length === 0 && p2.flags.eco !== true) {
@@ -65688,8 +65770,6 @@ async function main(argv) {
       return cmdSample(p2);
     case "snapshot":
       return cmdSnapshot(p2);
-    case "capture":
-      return cmdCapture(p2);
     case "pages":
       return cmdPages(p2);
     case "fix":

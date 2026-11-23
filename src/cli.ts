@@ -1,4 +1,4 @@
-import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
+import { realpathSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from "node:fs";
 import { join, relative, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -25,33 +25,24 @@ import {
   partialAuditBanner,
   ranBrowser,
   withReportAnnexes,
+  renderReasonLabel,
 } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
 import { buildTickets } from "./tickets/grain.js";
 import { pushTickets } from "./tickets/push.js";
 import { autoProvider, createProvider, isProviderId } from "./tickets/registry.js";
 import { ALL_GRAINS, ALL_PROVIDERS, TICKET_SET_SCHEMA_VERSION, type TicketGrain, type TicketSetFile, type TransportMode } from "./tickets/types.js";
+import { detectFrameworks, renderPlan, parseStorybookIndex, storyProvenance, type Detection } from "./render.js";
 import {
-  detectFrameworks,
-  renderPlan,
-  ssrHarness,
-  captureSetup,
-  captureSetupPlan,
-  detectTestRunner,
-  parseStorybookIndex,
-  storyProvenance,
-  type Detection,
-} from "./render.js";
-import {
-  CAPTURES_DIR,
-  computeCaptureCoverage,
-  parseCaptureProvenance,
-  formatCaptureComment,
-  validateComponentCapture,
-  writeComponentCapture,
-  type CaptureEntry,
-  type ComponentCapturePayload,
-} from "./capture.js";
+  DEFAULT_RENDER_TIMEOUT_MS,
+  RENDER_MANIFEST,
+  TRANSPILERS,
+  renderCounts,
+  renderScopeFor,
+  runRenderEngine,
+  type TranspilerName,
+} from "./render-engine.js";
+import { CAPTURES_DIR, computeCaptureCoverage, parseCaptureProvenance, formatCaptureComment, type CaptureEntry } from "./capture.js";
 import { buildGraphStreaming } from "./graph/build.js";
 import { discover } from "./discover.js";
 import { toPosix, GRAPH_ONLY_EXT } from "./glob.js";
@@ -155,7 +146,8 @@ Usage:
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--no-technical] [--lang auto|en|fr]
-  ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
+  ultra11y render   [<dir>] [--transpiler esbuild|typescript|sucrase] [--timeout <ms>] [--include <glob>] [--exclude <glob>] [--no-stories] [--json]   (ultra11y's render engine: components, pages, stories → .ultra11y/captures + .ultra11y/render.json)
+  ultra11y render   [<dir>] --detect | --coverage | --storybook [--captures <dir>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES — its tests depend on them)
   ultra11y criteria [--standard <pack>] --plan [--json]   (the work plan: which criteria the engine settles from source, which need a page, a browser, or judgment)
@@ -178,7 +170,6 @@ Usage:
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
-  ultra11y capture write  [--root <dir>] [--fail-on blocking|major|minor] [--json]   (component payload on stdin → .ultra11y/captures/<id>.html + audit it)
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
@@ -214,20 +205,26 @@ Commands:
              per criterion (default), per page, per page+criterion, per file, or one
              consolidated. De-dupe is by exact title, so re-running never duplicates.
              --dry-run prints the plan without creating anything.
-  render     Get RENDERED HTML to audit (so component libraries like DSFR are
-             checked as the HTML they emit, not their JSX sources): detect the
-             framework and print the build→audit recipe, or --scaffold a
-             react-dom/server SSR snapshot harness to fill in. --setup installs the
-             zero-touch test-render capture harvester (one setupFiles line → every
-             component your tests render is snapshotted to .ultra11y/captures and
-             audited). --setup captures COMPONENTS from unit tests; to check a PAGE
-             during an existing Playwright/Cypress run, use the ultra11y/playwright or
-             ultra11y/cypress package exports instead — each checked page is persisted
-             to .ultra11y/pages/<id>/ and can be re-audited later, offline.
+  render     ultra11y's own render engine: get the RENDERED HTML of a project's
+             components, so component libraries like DSFR are checked as the HTML
+             they emit, not their JSX sources. It finds the .tsx/.jsx modules (their
+             default and PascalCase component exports), the framework pages (Next.js
+             app/ and pages/) and the Storybook stories (rendered with their args),
+             and renders each with the PROJECT'S OWN react-dom/server, no props, in a
+             throwaway harness: a child process per file, TSX transpiled in memory by
+             the project's esbuild/typescript/sucrase, no project file written, a
+             --timeout per unit (default 10000 ms). It never reads or runs the
+             project's tests or snapshots. Each render lands in .ultra11y/captures
+             (provenance: source, component, renderer, styles="none"); every unit,
+             rendered, skipped with the reason, or not attempted, is listed in
+             .ultra11y/render.json, which 'audit' reads into the report's annex.
+             --detect prints the framework's build→audit recipe instead.
              --coverage reports which components have a rendered capture vs
              which are still opaque-source-only blind spots. --storybook attributes
              per-story HTML (via a storybook-static index) back to source components.
-             Then audit the produced HTML, and use scan for the needs-rendering criteria.
+             To check a PAGE during an existing Playwright/Cypress run, use the
+             ultra11y/playwright or ultra11y/cypress package exports. Then audit, and
+             use scan for the needs-rendering criteria.
   criteria   Look up the reference offline. Core: one WCAG success criterion
              (criteria 1.4.3) or the full list grouped by guideline (--list).
              --standard <pack>: a pack criterion, a pack theme (--theme N), or its
@@ -319,13 +316,6 @@ Commands:
              has been captured. Because a snapshot is a FULL document (a component
              capture is a fragment), the page-scoped rules run on it: that is where
              html lang (RGAA 8.3) and page title (8.5/8.6) become decidable.
-  capture    Persist a rendered COMPONENT (.ultra11y/captures/<id>.html, provenance
-             comment included) and audit it. 'capture write' reads {meta, html} on
-             stdin — what the ultra11y/vitest and ultra11y/jest helpers send from a
-             unit test. A fragment, so the page-scoped rules stay off; rendered by a
-             DOM implementation, so it is marked styles="none" and the rendering
-             criteria stay to assess. Unit-test snapshot files (__snapshots__/*.snap)
-             need no command: 'audit' reads them wherever they are in scope.
   hook       INTERNAL — the decision half of the Claude Code plugin's PreToolUse
              hook. Reads the payload on stdin; when a pending 'git commit', 'git
              push' or 'gh pr create' carries findings >= the threshold, prints the
@@ -392,13 +382,15 @@ Options:
   --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
                      tickets --out <dir> also writes the tracker-agnostic set to
                      <dir>/issues-<date>.json, for a workflow engine to file itself
-  --scaffold         render: write an SSR-snapshot harness (default: ultra11y-render.tsx)
-  --setup            render: install the zero-touch test-render capture harvester (.ultra11y/capture-setup.mjs) + print the runner wiring
+  --detect           render: detect the framework and print the build→audit recipe (renders nothing)
+  --timeout <ms>     render: per-unit render budget (default 10000); a unit past it is recorded as a timeout
+  --transpiler <t>   render: esbuild|typescript|sucrase — the project's transpiler to load TSX/JSX with (default: the first resolvable)
+  --no-stories       render: leave the Storybook stories out
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
-  --root <dir>       snapshot, capture, scan: project root holding
+  --root <dir>       snapshot, scan: project root holding
                      .ultra11y/pages and .ultra11yrc.json (default: . — scan writes the
                      snapshots it collects under it)
   --glossary [<t>]   criteria: look up a term the country standard defines (or list all)
@@ -408,7 +400,7 @@ Options:
   --dry-run          fix: preview only — never write (this is the default)
   --safe             fix: apply only genuinely-automatic codemods (skip TODO placeholders / judgment proposals)
   --only <ids>       fix: limit auto-fixes to these rule ids (comma-separated)
-  --fail-on <sev>    audit/init/snapshot/capture: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
+  --fail-on <sev>    audit/init/snapshot: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
   --hook             init: write a git pre-commit accessibility gate (staged snapshot + auto-fix by default)
   --report <file>    check/verify: the report markdown to gate
   --theme <N>        criteria: with --standard <pack>, list the pack's theme N
@@ -585,7 +577,6 @@ export const COMMANDS = [
   "scan",
   "sample",
   "snapshot",
-  "capture",
   "pages",
   "fix",
   "init",
@@ -662,6 +653,9 @@ const VALUE_FLAGS = new Set([
   "browser-path",
   "storage-state",
   "captures",
+  // `render`: per-unit budget and the project's transpiler to use.
+  "timeout",
+  "transpiler",
   "run",
   "phase",
   "root",
@@ -692,10 +686,11 @@ const BOOLEAN_FLAGS = new Set([
   "no-default-excludes",
   "no-captures",
   "require-captures",
-  "scaffold",
   "storybook",
-  "setup",
   "coverage",
+  // `render`: print the framework recipe instead of rendering; leave the stories out.
+  "detect",
+  "no-stories",
   "write",
   // `pages discover`: build the sample from the snapshots the E2E producer already wrote,
   // instead of crawling — the only route that can see a state-reached page.
@@ -1128,6 +1123,11 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   // Only the snapshots this audit actually read count as observations: under --no-captures or a
   // diff scope they were left out, and a route must not read « capturée » / « scannée » then.
   stampRoutes(result, ".", lang, { recorded: pagesInScope });
+  // What ultra11y's render engine did, when the captures it wrote are part of this audit.
+  if (useCaptures || inputs.includes(capturesDir)) {
+    const renders = renderScopeFor(capturesDir);
+    if (renders) result.scope.renders = renders;
+  }
 
   // Only persist audit-latest.json when an output dir is explicitly requested. A plain
   // `audit` streams to stdout (--json / text summary) and must NOT litter the CWD with an
@@ -1795,61 +1795,6 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
   return failing.length ? 1 : 0;
 }
 
-/** `capture write` — the COMPONENT counterpart of `snapshot write`, for the unit-test helpers
- *  (`ultra11y/vitest`, `ultra11y/jest`). Payload on stdin → `.ultra11y/captures/<id>.html` with
- *  its provenance comment, then audited. A component capture, not a page snapshot: it is a
- *  fragment, so the page-scoped rules stay off, and it joins no page of the per-page grid. */
-async function cmdCapture(p: ParsedArgs): Promise<number> {
-  const sub = p.positionals[0];
-  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
-  const lang = resolveLang(p.flags, {});
-  if (sub !== "write") {
-    console.error("ultra11y capture: expected `capture write` (payload on stdin).");
-    return 2;
-  }
-  const raw = await readStdin();
-  if (!raw.trim()) {
-    console.error("ultra11y capture write: no payload on stdin (expected {meta: {id, name?, component?, source?, test?, runner?, env?}, html}).");
-    return 2;
-  }
-  let payload: unknown;
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    console.error("ultra11y capture write: stdin is not valid JSON.");
-    return 2;
-  }
-  const issues = validateComponentCapture(payload);
-  if (issues.length) {
-    for (const i of issues) console.error(`ultra11y capture write: ${i}`);
-    return 2;
-  }
-  let file: string;
-  try {
-    file = writeComponentCapture(root, payload as ComponentCapturePayload);
-  } catch (e) {
-    console.error(`ultra11y capture write: could not write the capture: ${e instanceof Error ? e.message : String(e)}`);
-    return 1;
-  }
-  // Exactly this capture, never the whole captures dir — a test checking one component must not
-  // be failed by another one's backlog.
-  const result = runAudit({ inputs: [file], captureDir: join(root, CAPTURES_DIR), onWarn: (m) => console.error(m) });
-  // Same presence-keyed gate as `snapshot write`: a producer that only records must not fail.
-  const failOnRaw = p.flags["fail-on"];
-  const failOnParsed = parseFailOn(failOnRaw);
-  if (failOnRaw !== undefined && failOnParsed === null) {
-    console.error(`ultra11y capture write: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
-    return 2;
-  }
-  const failing = failOnRaw !== undefined ? findingsAtOrAbove(result.findings, failOnParsed ?? "bloquant").filter((f) => !f.advisory) : [];
-  if (p.flags.json) console.log(JSON.stringify(result, null, 2));
-  else {
-    console.log(lang === "fr" ? `→ capture écrite dans ${file}` : `→ capture written to ${file}`);
-    console.log(auditSummary(result, lang));
-  }
-  return failing.length ? 1 : 0;
-}
-
 function cmdInit(p: ParsedArgs): number {
   const root = repoRoot() ?? process.cwd();
   const engineRel = resolveEnginePath(root);
@@ -2198,6 +2143,11 @@ export const REMOVED_FLAGS: Record<string, string> = {
   diff: "removed with pages --diff (the comparison against an imported external audit).",
   docker: "removed with the Docker runtime: scan runs on the local Playwright (pass --cwd <dir> to resolve it from a project).",
   clean: "removed with the Docker runtime: there is no image to clean.",
+  // The render paths that left the rendering to the project, replaced by ultra11y's own engine.
+  scaffold:
+    "removed: ultra11y renders the components itself. Run `ultra11y render [<dir>]` — it finds the components, pages and stories and renders them with the project's own react-dom/server.",
+  setup:
+    "removed with the test-render capture harvester: ultra11y no longer reads or runs the project's tests. Run `ultra11y render [<dir>]`, ultra11y's own render engine.",
 };
 
 /** Flag VALUES that used to exist, mapped to what replaces them — same reason as
@@ -2223,6 +2173,8 @@ export const REMOVED_COMMANDS: Record<string, string> = {
     "the headless judge was removed. The agent adjudicates through `verify --manual` / `verify --apply` (fanned out with `orchestrate`); in CI, iterion's rgaa-audit bot does.",
   affected: `the diff-to-pages selector was removed. ${CI_NOTE}.`,
   import: "importing an external audit (and pages --diff) was removed.",
+  capture:
+    "`capture write` was removed with the ultra11y/vitest and ultra11y/jest helpers: ultra11y no longer reads or runs the project's tests. Run `ultra11y render [<dir>]`, ultra11y's own render engine.",
 };
 
 /** Config keys that must NEVER appear in `.ultra11yrc.json` — a committed credential is a
@@ -2464,74 +2416,10 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
   return pushed.failed > 0 ? 1 : 0;
 }
 
-function cmdRender(p: ParsedArgs): number {
+async function cmdRender(p: ParsedArgs): Promise<number> {
   const root = p.positionals[0] ?? ".";
   const lang = resolveLang(p.flags, {}); // render has no --standard and no audit in hand
 
-  if (p.flags.scaffold === true) {
-    const out = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "ultra11y-render.tsx";
-    try {
-      writeFileSync(out, ssrHarness());
-    } catch (e) {
-      console.error(`ultra11y render: could not write ${out}: ${e instanceof Error ? e.message : String(e)}`);
-      return 1;
-    }
-    console.log(
-      lang === "fr"
-        ? `Harnais SSR écrit : ${out} (INERTE tant que COMPONENTS est vide — l'exécuter tel quel ne produit aucun HTML).\nComplétez COMPONENTS, exécutez-le (ex. npx tsx ${out}), puis : node scripts/ultra11y.mjs audit "audits/rendered/**/*.html"`
-        : `SSR harness written: ${out} (INERT while COMPONENTS is empty — running it as-is produces no HTML).\nFill in COMPONENTS, run it (e.g. npx tsx ${out}), then: node scripts/ultra11y.mjs audit "audits/rendered/**/*.html"`,
-    );
-    return 0;
-  }
-  if (p.flags.setup === true) {
-    const rel = ".ultra11y/capture-setup.mjs";
-    const out = join(root, rel);
-    try {
-      mkdirSync(dirname(out), { recursive: true });
-      writeFileSync(out, captureSetup());
-    } catch (e) {
-      console.error(`ultra11y render: could not write ${out}: ${e instanceof Error ? e.message : String(e)}`);
-      return 1;
-    }
-    let setupDeps: Record<string, string> = {};
-    const setupPkg = join(root, "package.json");
-    if (existsSync(setupPkg)) {
-      try {
-        const pkg = JSON.parse(readText(setupPkg)) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-        setupDeps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
-      } catch {
-        /* detection just sees no deps */
-      }
-    }
-    const tr = detectTestRunner(setupDeps, (f) => existsSync(join(root, f)));
-    console.log(captureSetupPlan(tr, rel, lang));
-
-    // Keep committed captures byte-stable cross-platform + marked generated.
-    const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
-    const gaPath = join(root, ".gitattributes");
-    try {
-      const existing = existsSync(gaPath) ? readFileSync(gaPath, "utf8") : "";
-      if (!existing.includes(".ultra11y/captures/")) {
-        appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
-        console.log(lang === "fr" ? `.gitattributes : ajouté « ${gaLine} »` : `.gitattributes: added "${gaLine}"`);
-      }
-    } catch {
-      /* non-fatal */
-    }
-    // Captures must be committed for the gate — warn if .ultra11y is gitignored.
-    try {
-      const giPath = join(root, ".gitignore");
-      if (existsSync(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync(giPath, "utf8")))
-        console.error(
-          lang === "fr"
-            ? "⚠️ .ultra11y semble ignoré par .gitignore — les captures doivent être committées pour le gate (ajoutez « !.ultra11y/captures/ »)."
-            : '⚠️ .ultra11y appears gitignored — captures must be committed for the gate (add "!.ultra11y/captures/").',
-        );
-    } catch {
-      /* non-fatal */
-    }
-    return 0;
-  }
   if (p.flags.storybook === true || typeof p.flags.storybook === "string") {
     const sbDir = p.positionals[0] ?? "storybook-static";
     const indexPath = existsSync(join(sbDir, "index.json")) ? join(sbDir, "index.json") : join(sbDir, "stories.json");
@@ -2589,8 +2477,8 @@ function cmdRender(p: ParsedArgs): number {
     // simply nothing to attribute, a different situation from "tried and failed".
     const remedy =
       lang === "fr"
-        ? `Aucun HTML de story attribuable dans ${htmlDir}. Produisez le HTML par story (@storybook/test-runner, ou portable stories + le harvester \`render --setup\`), ou pointez --captures <dir>.`
-        : `No attributable per-story HTML in ${htmlDir}. Produce per-story HTML (@storybook/test-runner, or portable stories + the \`render --setup\` harvester), or point --captures <dir>.`;
+        ? `Aucun HTML de story attribuable dans ${htmlDir}. Rendez les stories avec le moteur ultra11y (\`render\`), ou produisez le HTML par story (@storybook/test-runner) et pointez --captures <dir>.`
+        : `No attributable per-story HTML in ${htmlDir}. Render the stories with ultra11y's engine (\`render\`), or produce per-story HTML (@storybook/test-runner) and point --captures <dir>.`;
     const failed = attributed === 0 && htmlFiles.length > 0;
     if (p.flags.json) console.log(JSON.stringify({ attributed, skipped, stories: stories.length, outDir, ...(failed ? { remedy } : {}) }, null, 2));
     else
@@ -2620,6 +2508,7 @@ function cmdRender(p: ParsedArgs): number {
     else console.log(captureCoverageSummary(cov, lang));
     return 0;
   }
+  if (p.flags.detect !== true) return cmdRenderEngine(p, root, lang);
   let deps: Record<string, string> = {};
   const pkgPath = join(root, "package.json");
   if (existsSync(pkgPath)) {
@@ -2634,6 +2523,68 @@ function cmdRender(p: ParsedArgs): number {
   if (p.flags.json) console.log(JSON.stringify(detection, null, 2));
   else console.log(renderPlan(detection, lang));
   return 0;
+}
+
+/** `render [<dir>]` — ultra11y's own render engine (src/render-engine.ts). */
+async function cmdRenderEngine(p: ParsedArgs, root: string, lang: Lang): Promise<number> {
+  const fr = lang === "fr";
+  if (!existsSync(root)) {
+    console.error(fr ? `ultra11y render : dossier introuvable : ${root}.` : `ultra11y render: no such directory: ${root}.`);
+    return 2;
+  }
+  const tFlag = p.flags.transpiler;
+  if (tFlag !== undefined && !(typeof tFlag === "string" && (TRANSPILERS as readonly string[]).includes(tFlag))) {
+    console.error(`ultra11y render: --transpiler must be ${TRANSPILERS.join("|")} (got "${String(tFlag)}").`);
+    return 2;
+  }
+  const timeoutRaw = p.flags.timeout;
+  const timeoutMs = typeof timeoutRaw === "string" ? Number(timeoutRaw) : DEFAULT_RENDER_TIMEOUT_MS;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    console.error(`ultra11y render: --timeout must be a positive number of milliseconds (got "${String(timeoutRaw)}").`);
+    return 2;
+  }
+  const manifest = await runRenderEngine({
+    root,
+    timeoutMs,
+    ...(typeof tFlag === "string" ? { transpiler: tFlag as TranspilerName } : {}),
+    include: asList(p.flags.include),
+    exclude: asList(p.flags.exclude),
+    stories: p.flags["no-stories"] !== true,
+    onProgress: p.flags.json ? undefined : (done, total, file) => console.error(`ultra11y render: [${done}/${total}] ${file}`),
+  });
+  if (p.flags.json) {
+    console.log(JSON.stringify(manifest, null, 2));
+    return 0;
+  }
+  const n = renderCounts(manifest.units);
+  const out: string[] = [];
+  out.push(
+    fr
+      ? `ultra11y render : ${n.rendered} rendu(s), ${n.skipped} échec(s) avec la raison, ${n.notAttempted} non tenté(s) — ${manifest.renderer ?? "aucun moteur de rendu React"}, ${manifest.transpiler ?? "aucun transpileur"}.`
+      : `ultra11y render: ${n.rendered} rendered, ${n.skipped} failed with the reason, ${n.notAttempted} not attempted — ${manifest.renderer ?? "no React renderer"}, ${manifest.transpiler ?? "no transpiler"}.`,
+  );
+  const statusWord: Record<string, string> = fr ? { skipped: "échec", "not-attempted": "non tenté" } : { skipped: "failed", "not-attempted": "not attempted" };
+  for (const u of manifest.units) {
+    if (u.status === "rendered") continue;
+    out.push(
+      `  - ${u.file}${u.export === "*" ? "" : `#${u.export}`} — ${statusWord[u.status] ?? u.status}: ${u.reason ? renderReasonLabel(u.reason, lang) : "?"}${u.detail ? ` — ${u.detail}` : ""}`,
+    );
+  }
+  if (manifest.testFilesIgnored)
+    out.push(
+      fr
+        ? `  ${manifest.testFilesIgnored} fichier(s) de test, de mock ou d'instantané laissé(s) de côté sans être lus.`
+        : `  ${manifest.testFilesIgnored} test, mock or snapshot file(s) left out, unread.`,
+    );
+  out.push(
+    fr
+      ? `→ captures dans ${join(root, CAPTURES_DIR)}, manifeste ${join(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).`
+      : `→ captures in ${join(root, CAPTURES_DIR)}, manifest ${join(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`,
+  );
+  console.log(out.join("\n"));
+  if (!manifest.units.length) return 0;
+  // Nothing could be tried at all: say so with a failing exit, never a green no-op.
+  return n.rendered === 0 && n.skipped === 0 ? 1 : 0;
 }
 
 function cmdCheck(p: ParsedArgs): number {
@@ -4526,8 +4477,6 @@ export async function main(argv: string[]): Promise<number> {
       return cmdSample(p);
     case "snapshot":
       return cmdSnapshot(p);
-    case "capture":
-      return cmdCapture(p);
     case "pages":
       return cmdPages(p);
     case "fix":

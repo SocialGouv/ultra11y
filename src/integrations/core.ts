@@ -16,7 +16,7 @@
 // This module is the published implementation (`ultra11y/playwright`, `ultra11y/cypress`).
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import type { AuditLike, ComponentCapturePayload, SnapshotPayload } from "./payload.js";
+import type { AuditLike, SnapshotPayload } from "./payload.js";
 
 // Re-exported so a Node-side consumer needs one import, not two.
 export * from "./payload.js";
@@ -40,17 +40,7 @@ export function enginePath(): string {
  *  Spawning is deliberate: the engine writes files, which is not something a test process
  *  should be doing inline, and it keeps the plugin free of every engine dependency. */
 export function auditSnapshot(payload: SnapshotPayload, engine = enginePath()): AuditLike {
-  return pipeToEngine(["snapshot", "write", "--json"], payload, engine);
-}
-
-/** Persist a rendered COMPONENT as a capture (`.ultra11y/captures/<id>.html`) and audit it —
- *  the unit-test helpers' counterpart of `auditSnapshot`, through `capture write`. */
-export function auditCapture(payload: ComponentCapturePayload, opts: { root?: string } = {}, engine = enginePath()): AuditLike {
-  return pipeToEngine(["capture", "write", "--json", ...(opts.root ? ["--root", opts.root] : [])], payload, engine);
-}
-
-function pipeToEngine(args: string[], payload: unknown, engine: string): AuditLike {
-  const res = spawnSync(process.execPath, [engine, ...args], {
+  const res = spawnSync(process.execPath, [engine, "snapshot", "write", "--json"], {
     input: JSON.stringify(payload),
     encoding: "utf8",
     maxBuffer: 192 * 1024 * 1024,

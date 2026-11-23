@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectFrameworks, renderPlan, ssrHarness } from "../src/render.js";
+import { detectFrameworks, renderPlan } from "../src/render.js";
 
 describe("detectFrameworks", () => {
   const noFiles = () => false;
@@ -41,14 +41,5 @@ describe("renderPlan", () => {
 
   it("handles no detected framework", () => {
     expect(renderPlan({ frameworks: [], componentLibraries: [] }, "en")).toMatch(/No framework detected/);
-  });
-});
-
-describe("ssrHarness", () => {
-  it("is a runnable react-dom/server snapshot template writing to audits/rendered", () => {
-    const h = ssrHarness();
-    expect(h).toContain("renderToStaticMarkup");
-    expect(h).toContain("audits/rendered");
-    expect(h).toContain("react-dom/server");
   });
 });

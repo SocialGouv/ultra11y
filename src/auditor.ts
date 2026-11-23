@@ -41,7 +41,6 @@ const L = {
     files: "fichier(s)",
     none: "Aucune non-conformité relevée automatiquement par le moteur statique.",
     captureOf: (comp: string, src: string) => `capture rendue de \`${comp}\` — source \`${src}\``,
-    snapshotOf: (name: string) => `instantané de test unitaire « ${name} » (rendu jsdom, sans styles calculés)`,
     recommendationsTitle: "Recommandations (non normatives)",
     // Advisory (non-normative recommendation) vocabulary — deliberately NOT the NC wording.
     advisoryTag: "Recommandation (non normative)",
@@ -90,7 +89,6 @@ const L = {
     files: "file(s)",
     none: "No non-conformity found automatically by the static engine.",
     captureOf: (comp: string, src: string) => `rendered capture of \`${comp}\` — source \`${src}\``,
-    snapshotOf: (name: string) => `unit-test snapshot “${name}” (jsdom render, no computed styles)`,
     recommendationsTitle: "Recommendations (non-normative)",
     // Advisory (non-normative recommendation) vocabulary — deliberately NOT the NC wording.
     advisoryTag: "Recommendation (non-normative)",
@@ -216,8 +214,6 @@ function renderOccurrenceDetails(out: string[], f: Finding, lang: Lang, s: (type
     // attributed to, still says something and still renders. Suppressed HERE rather than by
     // dropping `origin` from the Finding — six other consumers read that field.
     if (comp !== src) out.push(`${indent}  - _${s.captureOf(comp, src)}_`);
-    // A unit-test snapshot file holds many renders: the entry's name is what tells them apart.
-    if (f.origin.snapshot) out.push(`${indent}  - _${s.snapshotOf(f.origin.snapshot)}_`);
   }
 }
 

@@ -5,7 +5,6 @@ import { readText, ext } from "../util.js";
 import { GRAPH_ONLY_EXT } from "../glob.js";
 import { detectKind, splitAstroFrontmatter, parseSource, parseSourceWithAst } from "../parse/source.js";
 import { parseJsxAst } from "../parse/jsx-ast.js";
-import { isUnitSnapshotFile } from "../parse/snap.js";
 import type { Doc } from "../parse/html.js";
 import { dirname } from "node:path";
 import { extractGraphNode, type FileGraphNode } from "./imports.js";
@@ -77,12 +76,7 @@ export function buildGraphAndDocs(files: string[], opts: { carryDocs?: boolean; 
     let doc: Doc;
     let sfc = false;
     let auditable = false;
-    if (isUnitSnapshotFile(file)) {
-      // A unit-test snapshot is test-runner output, not code: no import, no component
-      // definition. Many documents to the audit loop (src/parse/snap.ts), none to the graph —
-      // and never carried, since one Doc per file cannot hold its entries.
-      doc = emptyDoc(file, content);
-    } else if (GRAPH_ONLY.has(ext(file))) {
+    if (GRAPH_ONLY.has(ext(file))) {
       // Plain .ts/.js/.mjs/.cjs: never an audit target (see GRAPH_ONLY_EXT), but real
       // cross-file structure (barrel re-exports, plain-JS component definitions) the
       // graph needs. Babel's typescript+jsx plugins parse pure TS/JS fine.

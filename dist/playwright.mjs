@@ -1419,13 +1419,13 @@ function failingFindings(result, failOn) {
   if (max === void 0) throw new Error(`ultra11y: failOn must be blocking|major|minor (got "${failOn}")`);
   return (result.findings ?? []).filter((f) => !f.advisory && (RANK[f.severity] ?? 99) <= max);
 }
-function formatFailure(pageName, failing, where = ".ultra11y/pages/") {
+function formatFailure(pageName, failing) {
   const lines = [`ultra11y: ${failing.length} accessibility non-conformity(ies) on "${pageName}":`];
   for (const f of failing.slice(0, 20)) {
     lines.push(`  [${f.severity}] ${f.ruleId} (WCAG ${f.criteriaId}) \u2014 ${f.origin?.sourceFile ?? f.file} \u2014 ${f.message}`);
   }
   if (failing.length > 20) lines.push(`  \u2026 and ${failing.length - 20} more.`);
-  lines.push(`Full detail: ${where} \u2014 re-audit offline with \`ultra11y audit\`.`);
+  lines.push("Full detail: .ultra11y/pages/ \u2014 re-audit offline with `ultra11y audit`.");
   return lines.join("\n");
 }
 function slugify(url) {
@@ -1515,10 +1515,7 @@ function enginePath() {
   }
 }
 function auditSnapshot(payload, engine = enginePath()) {
-  return pipeToEngine(["snapshot", "write", "--json"], payload, engine);
-}
-function pipeToEngine(args, payload, engine) {
-  const res = spawnSync(process.execPath, [engine, ...args], {
+  const res = spawnSync(process.execPath, [engine, "snapshot", "write", "--json"], {
     input: JSON.stringify(payload),
     encoding: "utf8",
     maxBuffer: 192 * 1024 * 1024

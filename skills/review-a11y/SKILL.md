@@ -78,7 +78,7 @@ For each finding (`--json` gives `criteria`, `severity`, `file:line`, `message`,
 - **`preliminary: true` findings** (`.vue`/`.svelte`/`.astro` source, library components):
   the template parser cannot see slots, conditionals or provide/inject wiring. Confirm
   against the rendered DOM if captures exist (`.ultra11y/captures`, from the `ultra11y`
-  skill's `render --setup` harvester), otherwise report them as **provisional** with that
+  skill's render engine, `render`), otherwise report them as **provisional** with that
   caveat — or refute them with evidence from the code.
 - **Library-rendered JSX (DSFR, MUI…)**: a clean source review can still ship broken HTML
   (false negatives) — say so explicitly when the change touches such components, and

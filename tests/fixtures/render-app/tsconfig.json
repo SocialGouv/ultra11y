@@ -1,0 +1,8 @@
+{
+  // A Next.js-style config: JSX preserved for the framework, an "@/" alias.
+  "compilerOptions": {
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
+  }
+}

@@ -100,6 +100,8 @@ describe("removed commands and flags fail loudly, naming the replacement", () =>
     ["init", "--ci"],
     ["init", "--baseline"],
     ["render", "--e2e"],
+    ["render", "--scaffold"],
+    ["render", "--setup"],
     ["scan", "--docker"],
     ["scan", "--clean"],
     ["pages", "--diff", "x.json"],
@@ -251,17 +253,11 @@ describe("main — command wiring", () => {
     expect(f.flags.safe).toBe(true);
     expect(f.flags.write).toBe(true);
   });
-  it("render --json prints framework detection and exits 0", async () => {
-    const r = await run(["render", ".", "--json"]);
+  it("render --detect --json prints framework detection and exits 0", async () => {
+    const r = await run(["render", ".", "--detect", "--json"]);
     expect(r.code).toBe(0);
     expect(() => JSON.parse(r.out)).not.toThrow();
     expect(JSON.parse(r.out)).toHaveProperty("frameworks");
-  });
-  it("render --scaffold writes an SSR harness", async () => {
-    const f = join(tmpdir(), "u11y-render-harness.tsx");
-    const r = await run(["render", "--scaffold", "--out", f]);
-    expect(r.code).toBe(0);
-    expect(readFileSync(f, "utf8")).toContain("renderToStaticMarkup");
   });
   it("check without --report exits 2", async () => {
     expect((await run(["check"])).code).toBe(2);
@@ -429,7 +425,7 @@ describe("rendered captures — flags, coverage gate & render --coverage", () =>
     expect(a.flags["fail-on"]).toBe("blocking"); // --require-captures did not swallow it
     expect(parseArgs(["audit", "src", "--no-captures"]).flags["no-captures"]).toBe(true);
     expect(parseArgs(["render", ".", "--coverage"]).flags.coverage).toBe(true);
-    expect(parseArgs(["render", ".", "--setup"]).flags.setup).toBe(true);
+    expect(parseArgs(["render", ".", "--detect"]).flags.detect).toBe(true);
   });
 
   it("audit --require-captures exits 1 when a component lacks a capture", async () => {
@@ -470,23 +466,6 @@ describe("rendered captures — flags, coverage gate & render --coverage", () =>
       expect(off.scope.captures).toBeUndefined(); // suppressed (walk skips .ultra11y; no append)
     } finally {
       process.chdir(cwd);
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it("render --setup writes the harvester and prints runner wiring", async () => {
-    const tmp = mkdtempSync(join(tmpdir(), "u11y-setup-"));
-    try {
-      const r = await run(["render", tmp, "--setup"]);
-      expect(r.code).toBe(0);
-      const written = join(tmp, ".ultra11y/capture-setup.mjs");
-      expect(existsSync(written)).toBe(true);
-      expect(readFileSync(written, "utf8")).toContain("ultra11y:capture");
-      expect(r.out).toContain("capture-setup.mjs");
-      // also writes .gitattributes so committed captures stay byte-stable
-      expect(existsSync(join(tmp, ".gitattributes"))).toBe(true);
-      expect(readFileSync(join(tmp, ".gitattributes"), "utf8")).toContain(".ultra11y/captures/*.html");
-    } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
   });

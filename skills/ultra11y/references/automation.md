@@ -102,11 +102,11 @@ proof of an accessible result.
 
 **So make the produced semantic HTML the thing you gate — with rendered CAPTURES.** A
 capture is the *rendered* DOM serialized to `.html` and committed, so the gate audits the
-true markup, not the component call. Zero-touch setup (your tests do the rendering):
+true markup, not the component call. ultra11y's render engine produces them, without
+reading or running your tests (`references/rendered.md`):
 
 ```
-node scripts/ultra11y.mjs render --setup             # install the capture harvester into your test runner
-npm test                                              # every rendered component → .ultra11y/captures/*.html (provenance-tagged)
+node scripts/ultra11y.mjs render .                    # every component, page and story → .ultra11y/captures/*.html (provenance-tagged)
 node scripts/ultra11y.mjs audit --require-captures    # gate: every opaque/control component must have a capture
 ```
 
@@ -121,9 +121,9 @@ node scripts/ultra11y.mjs audit --require-captures    # gate: every opaque/contr
   provenance points at a diffed source file (a capture is rarely itself part of the diff —
   the SOURCE changed, its capture usually didn't), so the pre-commit gate audits the real
   `<button>`/`<nav>`/heading structure/labels for every touched component, catching
-  regressions the opaque source hides. After a component change, re-run your tests so its
+  regressions the opaque source hides. After a component change, re-run `render` so its
   capture refreshes, and stage the refreshed capture with the source. `fix` never rewrites
-  captures (generated output). Storybook/build HTML and manual Testing-Library dumps also
+  captures (generated output). Storybook/build HTML also
   work — anything under `.ultra11y/captures`, or point `--captures <dir>` (`--no-captures`
   opts out entirely).
 - In CI, audit the **built** output (`audit "dist/**/*.html"`), and use `scan` for the

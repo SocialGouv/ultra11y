@@ -7,13 +7,12 @@
 import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, relative } from "node:path";
-import { expandInputs, makeFilter, inScopeMatcher, inlineHostFilter, inlineSnapshotHosts, toPosix, type ExpandOpts } from "./glob.js";
+import { expandInputs, makeFilter, inScopeMatcher, toPosix, type ExpandOpts } from "./glob.js";
 
 export interface DiscoverOpts extends ExpandOpts {
   changed?: boolean; // audit only files changed vs `since` (default HEAD)
   since?: string; // git ref to diff against (implies changed)
   staged?: boolean; // audit exactly the staged index snapshot (strict pre-commit scope)
-  inlineSnapshots?: boolean; // also list the test files whose inline snapshots are read
   onWarn?: (msg: string) => void;
 }
 
@@ -22,10 +21,6 @@ export interface Discovery {
   changedMode: boolean;
   gitUnavailable: boolean; // changed mode requested but not a git repo / no git
   stagedContent?: Map<string, string>; // staged mode only: file → index blob content
-  // With `inlineSnapshots`: the test files kept out of `files` as test artifacts, of which only
-  // the inline snapshots are read (`inlineSnapshotHosts`, src/glob.ts). Sorted by path; their
-  // staged blobs, in staged mode, are in `stagedContent` beside the others. Empty otherwise.
-  inlineSnapshotHosts: string[];
 }
 
 function git(args: string[], maxBuffer?: number): string | null {
@@ -170,7 +165,6 @@ export function discover(inputs: string[], opts: DiscoverOpts = {}): Discovery {
   let files: string[];
   let gitUnavailable = false;
   let staged: Map<string, string> | undefined;
-  let hosts: string[] | undefined;
 
   if (opts.staged) {
     // Strict staged snapshot: audit exactly the index blobs (what a commit records),
@@ -186,11 +180,8 @@ export function discover(inputs: string[], opts: DiscoverOpts = {}): Discovery {
       // No existsSync: a staged-added file may be edited/removed on disk, yet its index
       // blob is exactly what the commit would record — audit that.
       const scoped = stagedFiles.filter((f) => filter(f) && (!inScope || inScope(f)));
-      const hostFilter = inlineHostFilter(opts);
-      hosts = opts.inlineSnapshots ? stagedFiles.filter((f) => !filter(f) && hostFilter(f) && (!inScope || inScope(f))) : [];
-      staged = stagedContents([...scoped, ...hosts]);
-      files = scoped.filter((f) => staged!.has(f));
-      hosts = hosts.filter((f) => staged!.has(f));
+      staged = stagedContents(scoped);
+      files = [...staged.keys()];
     }
   } else if (changedMode) {
     const changed = gitChangedFiles(opts.since);
@@ -202,14 +193,11 @@ export function discover(inputs: string[], opts: DiscoverOpts = {}): Discovery {
       const filter = makeFilter(opts);
       const inScope = inScopeMatcher(inputs);
       files = changed.filter((f) => existsSync(f) && filter(f) && (!inScope || inScope(f)));
-      const hostFilter = inlineHostFilter(opts);
-      hosts = opts.inlineSnapshots ? changed.filter((f) => existsSync(f) && !filter(f) && hostFilter(f) && (!inScope || inScope(f))) : [];
     }
   } else {
     files = expandInputs(inputs, opts);
   }
 
   files = sortByPriorityThenPath([...new Set(files)]);
-  const inlineHosts = opts.inlineSnapshots ? (hosts ?? inlineSnapshotHosts(inputs, files, opts)).sort() : [];
-  return { files, changedMode, gitUnavailable, ...(staged ? { stagedContent: staged } : {}), inlineSnapshotHosts: inlineHosts };
+  return { files, changedMode, gitUnavailable, ...(staged ? { stagedContent: staged } : {}) };
 }

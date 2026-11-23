@@ -90,10 +90,11 @@ describe("tickets.md teaches filing into a tracker", () => {
 
 describe("rendered.md teaches auditing rendered output", () => {
   const t = read("rendered.md");
-  it("covers the render command, build-output, SSR snapshot and scan", () => {
+  it("covers the render engine, build-output and scan", () => {
     expect(t).toMatch(/ultra11y\.mjs render/);
     expect(t).toMatch(/ultra11y\.mjs audit/);
-    expect(t).toContain("--scaffold");
+    expect(t).toContain("react-dom/server");
+    expect(t).toContain(".ultra11y/render.json");
     expect(t).toMatch(/DSFR/);
     expect(t).toMatch(/scan/);
   });
