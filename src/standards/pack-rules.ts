@@ -7,7 +7,7 @@
 // validatePack) and can never run arbitrary logic.
 import type { El, Doc } from "../parse/html.js";
 import { descendants, visibleText, snippet as sourceSnippet } from "../parse/html.js";
-import { isFullDocument, selectorOf } from "../rules/rule.js";
+import { captureOrigin, isFullDocument, selectorOf } from "../rules/rule.js";
 import type { Finding } from "../types.js";
 import type { StandardPack, PackRule, MatchDoc, MatchNode, MatchAttr, MatchText } from "./types.js";
 
@@ -93,7 +93,7 @@ function toFinding(doc: Doc, el: El, rule: PackRule, packKey: string): Finding {
     // step. A pack finding that skips this stays unattributed, so `pageView`'s
     // `packFindings.filter(f => f.page === page.id)` (src/pages.ts) yields nothing and a pack rule
     // can be NC in the report while reaching no cell of the per-page grid.
-    ...(doc.capture ? { origin: { capture: doc.file, sourceFile: doc.capture.sourceFile, component: doc.capture.component } } : {}),
+    ...captureOrigin(doc),
     ...(doc.capture?.page ? { page: doc.capture.page } : {}),
     ...(rule.advisory ? { advisory: true } : {}),
   };

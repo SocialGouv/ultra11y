@@ -7,7 +7,7 @@
 import type { Doc, El } from "../parse/html.js";
 import type { Finding, Severity } from "../types.js";
 import { snippet } from "../parse/html.js";
-import { selectorOf } from "./rule.js";
+import { captureOrigin, selectorOf } from "./rule.js";
 import { MSG_CATALOG, type MsgParams } from "../messages.js";
 import type { DepGraph } from "../graph/graph.js";
 
@@ -83,7 +83,7 @@ export function crossToFinding(doc: Doc, ruleId: string, def: Severity, cf: Cros
     // serialized DOM has no node in it), so this changes no current output — it is here so the
     // three Finding constructors stay in step, and a cross rule that later does become reachable
     // on a full document is attributed like everything else instead of silently orphaned.
-    ...(doc.capture ? { origin: { capture: doc.file, sourceFile: doc.capture.sourceFile, component: doc.capture.component } } : {}),
+    ...captureOrigin(doc),
     ...(doc.capture?.page ? { page: doc.capture.page } : {}),
     ...(cf.related ? { related: cf.related } : {}),
   };

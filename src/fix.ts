@@ -10,6 +10,7 @@ import { writeFileSync } from "node:fs";
 import type { Finding, Lang } from "./types.js";
 import { discover, hasUnstagedChanges, gitAdd } from "./discover.js";
 import { parseSource } from "./parse/source.js";
+import { isUnitSnapshotFile } from "./parse/snap.js";
 import { runRules } from "./rules/registry.js";
 import { readText } from "./util.js";
 import { applyEdits, type Edit } from "./fix/edits.js";
@@ -94,6 +95,9 @@ function itemOf(f: Finding, standard: StandardId): FixItem {
 }
 
 function fixOne(file: string, source: string, opts: FixInput, canWrite = true): FileFix {
+  // A unit-test snapshot is the test runner's output: the fix belongs in the component, and the
+  // runner rewrites the `.snap` (`-u`). Never parsed as one HTML document either — it is many.
+  if (isUnitSnapshotFile(file)) return { file, lossy: true, items: [], diff: "", applied: 0, written: false, regression: false };
   const doc = parseSource(source, file, { forceJsx: opts.forceJsx });
   // Rendered captures are GENERATED output (serialized DOM). A codemod on them is
   // meaningless and would be clobbered on the next test run — and in --staged mode we

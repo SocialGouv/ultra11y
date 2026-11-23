@@ -26,6 +26,17 @@
       "import": "./dist/cypress-plugin.mjs",
       "default": "./dist/cypress-plugin.mjs"
     },
+    "./vitest": {
+      "types": "./dist/vitest.d.ts",
+      "import": "./dist/vitest.mjs",
+      "default": "./dist/vitest.mjs"
+    },
+    "./jest": {
+      "types": "./dist/jest.d.ts",
+      "import": "./dist/jest.mjs",
+      "require": "./dist/jest.cjs",
+      "default": "./dist/jest.cjs"
+    },
     "./scripts/ultra11y.mjs": "./scripts/ultra11y.mjs",
     "./package.json": "./package.json"
   },

@@ -266,7 +266,7 @@ export interface Finding {
   // and re-attributed to the source component that produced it. `file`/`sourceStart`
   // still index the capture bytes (so `fix` and finding identity stay stable); origin
   // points back to the source. Optional/additive (no schemaVersion bump).
-  origin?: { capture: string; sourceFile?: string; component?: string; sourceLine?: number };
+  origin?: { capture: string; sourceFile?: string; component?: string; sourceLine?: number; snapshot?: string };
   // PAGE IDENTITY — the stable id of the page snapshot this finding was raised on
   // (src/snapshot.ts). Set from the capture provenance for a snapshot-borne finding, and by
   // the per-page attribution pass (src/pages.ts) for a source finding it can attribute. It
@@ -694,6 +694,14 @@ export interface AuditResult {
     // Set when RENDERED capture files (real serialized DOM) were audited at full
     // fidelity — the true markup a component library / SFC emits, not its source call.
     captures?: { files: number; components: string[] };
+    // UNIT-TEST SNAPSHOTS read in this run (`__snapshots__/*.snap` and the
+    // `toMatchInlineSnapshot(`…`)` literals of test files, src/parse/snap.ts): how many files
+    // (`.snap` or test file) contributed at least one markup entry, how many entries were
+    // audited, and how many entries were skipped as not markup (objects, prose, shallow
+    // component trees). `inline` is how many of the audited `entries` were inline snapshots
+    // (absent when none). Each audited entry is a COMPONENT render by jsdom/happy-dom — no
+    // page, no computed style. Optional/additive; absent when no snapshot entry was audited.
+    unitSnapshots?: { files: number; entries: number; skipped: number; inline?: number };
     // Set by the coverage pass (`--require-captures` / `render --coverage`): which
     // components have a rendered capture vs which are still opaque-source-only blind
     // spots. Keys are "posix/path#Component". `unattributed` = capture files with no

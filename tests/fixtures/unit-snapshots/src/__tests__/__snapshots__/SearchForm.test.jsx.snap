@@ -1,0 +1,46 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SearchForm renders an unlabelled field 1`] = `
+<form
+  className="fr-search-bar"
+  onSubmit={[Function]}
+  role="search"
+>
+  <input
+    className="fr-input"
+    name="q"
+    onChange={[Function]}
+    placeholder="Rechercher"
+    type="search"
+    value=""
+  />
+  <button
+    aria-hidden={false}
+    className="fr-btn"
+    disabled={false}
+    style={
+      Object {
+        "marginLeft": 8,
+      }
+    }
+    title="Rechercher"
+    type="submit"
+  >
+    Rechercher
+  </button>
+</form>
+`;
+
+exports[`SearchForm shallow render 1`] = `
+<SearchBar
+  onSearch={[MockFunction]}
+>
+  <Input
+    label="Rechercher"
+  />
+</SearchBar>
+`;
+
+exports[`SearchForm keeps the query 1`] = `"tarte \`aux\` pommes \${x}"`;
+
+exports[`SearchForm count 1`] = `3`;

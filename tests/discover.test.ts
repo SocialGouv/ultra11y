@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { discover, priority, gitChangedFiles } from "../src/discover.js";
 import { runAudit, buildAudit } from "../src/audit.js";
-import { parseSource } from "../src/parse/source.js";
+import { parseSourceDocs } from "../src/parse/source.js";
+import { parseInlineSnapshotFile } from "../src/parse/snap.js";
 import { readText } from "../src/util.js";
 
 const FIX = new URL("./fixtures/", import.meta.url).pathname;
@@ -84,8 +85,12 @@ describe("--max-files cap", () => {
 describe("streaming ≡ eager (golden equivalence)", () => {
   it("runAudit (streaming) matches buildAudit (all docs in memory), byte-for-byte", () => {
     const inputs = [FIX];
-    const { files } = discover(inputs);
-    const docs = files.map((f) => parseSource(readText(f), f));
+    const { files, inlineSnapshotHosts } = discover(inputs, { inlineSnapshots: true });
+    // The test files whose inline snapshots alone the audit reads come after everything else.
+    const docs = [
+      ...files.flatMap((f) => parseSourceDocs(readText(f), f)),
+      ...inlineSnapshotHosts.flatMap((f) => parseInlineSnapshotFile(readText(f), f).docs),
+    ];
     const eager = buildAudit(docs, inputs);
     const streamed = runAudit({ inputs, dedup: "off" });
     expect(JSON.stringify(streamed)).toBe(JSON.stringify(eager));
