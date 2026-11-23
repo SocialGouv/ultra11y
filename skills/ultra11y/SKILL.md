@@ -226,8 +226,9 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   (with a groundable finding), or `manual` (with a `reason`) — then `verify --apply … --in
   audit.json` folds them back FAIL-CLOSED; read **`references/judgment.md`**.
 - **"Many items to adjudicate/verify (fan the judgment out to subagents)"** →
-  `orchestrate --run <dir>` emits, from the run's CURRENT worklists, one launchable
-  multi-agent workflow per ready phase + the `agents/<role>.md` dispatch contracts +
+  `orchestrate --run <dir>` emits, from the run's CURRENT worklists, per ready phase a
+  `<phase>.batches.json` + one self-contained prompt per batch (any harness's subagents) +
+  the Claude Code workflow rendered from them + the `agents/<role>.md` dispatch contracts +
   a sequential `RUNBOOK.md` — the default execution path on a subagent-capable harness;
   see **Orchestration — route by harness** below.
 - **"Focus, keyboard & interaction logic (the interaction-logic part)"** → the engine marks
@@ -346,8 +347,10 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 The judgment phases fan out: `ADJUDICATE.todo.json` (one item per residual criterion) and
 `VERIFY.todo.json` (one entry per claim on trial — each non-conformity, and each agent
 `C`/`NA`) are independent per-item worklists, and
-`orchestrate --run <dir>` emits a launchable workflow, per-role dispatch contracts and a
-sequential RUNBOOK from whichever worklists currently exist. Fan-out is an optimization,
+`orchestrate --run <dir>` emits harness-neutral batches (one prompt file per batch, handed
+verbatim to a Claude Code, Codex or OpenCode subagent), the Claude Code workflow rendered from
+them, per-role dispatch contracts and a sequential RUNBOOK from whichever worklists currently
+exist. Fan-out is an optimization,
 never a requirement: the gates are harness-independent, every phase has a sequential
 fallback with identical artifacts, and the fail-closed `verify --apply` fold always stays
 with you. Read **`references/orchestration.md`** for the routing table and the rules.

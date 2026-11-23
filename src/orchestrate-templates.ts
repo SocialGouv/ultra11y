@@ -1,11 +1,12 @@
-import { join } from "node:path";
-import type { OrchestrationManifest, PhaseInfo } from "./orchestrate.js";
+import { basename, join } from "node:path";
+import type { OrchestrationBatch, OrchestrationManifest, PhaseBatches } from "./orchestrate.js";
 import { verdictRulesMd } from "./verdict-rules.js";
 
 // ---------------------------------------------------------------------------
 // Templates for `ultra11y orchestrate` — the generator that turns the run's
-// CURRENT worklists into a launchable multi-agent Workflow per phase, the
-// dispatch contracts it references, and a sequential RUNBOOK fallback.
+// CURRENT worklists into one self-contained prompt per batch (any harness), a
+// launchable Claude Code Workflow per phase rendered from the same batch data,
+// the dispatch contracts they reference, and a sequential RUNBOOK fallback.
 // Everything here is emitted by string concatenation with the run's constants
 // injected as JSON literals, so the workflow runs as-is under the Workflow
 // tool: `export const meta` stays a pure literal, and no emitted line ever
@@ -16,7 +17,7 @@ import { verdictRulesMd } from "./verdict-rules.js";
 const ONE_WRITER_FOOTER = `
 ## Return, don't write
 
-Return ONLY the structured output specified above. Do NOT write, edit, or delete any file; do NOT run any engine command that writes (\`verify --apply\`, \`fix --write\`, \`audit --out\`, \`init\`). The orchestrator is the sole writer — it folds your verdicts into the worklist itself and runs the apply gate. Exception: if a justification is prose too large to return, write ONLY to \`<RUN>/orchestration/out/<role>-<batch>.md\` (a file namespaced to you alone) and return its path.
+Return ONLY the structured output specified above. Do NOT write, edit, or delete any file; do NOT run any engine command that writes (\`verify --apply\`, \`fix --write\`, \`audit --out\`, \`init\`). The orchestrator is the sole writer — it folds your verdicts into the worklist itself and runs the apply gate. Exceptions: if your harness gives you no way to return structured output, write that JSON ONLY to the output path your batch prompt names (\`<RUN>/orchestration/out/<phase>/<batch-id>.json\`); if a justification is prose too large to return, write ONLY to \`<RUN>/orchestration/out/<role>-<batch>.md\` (a file namespaced to you alone) and return its path.
 `;
 
 // Structured-output schemas the emitted workflows pass to agent(..., { schema }).
@@ -135,24 +136,28 @@ export function toBatches(ids: string[], batchSize: number): string[][] {
   return out;
 }
 
-export function phaseWorkflowScript(ph: PhaseInfo, runAbs: string, engineAbs: string, batchSize: number): string {
-  const spec = phaseSpec(ph.name);
-  const scriptPath = join(runAbs, "orchestration", `${ph.name}.workflow.mjs`);
-  const meta = { name: `ultra11y-${ph.name}`, description: spec.description(ph.items), phases: [{ title: spec.title }] };
+/** THE CLAUDE CODE ADAPTER (#158): the Workflow-tool script, rendered from the phase's
+ *  harness-neutral batch data — the same record `<phase>.batches.json` and the prompt files are
+ *  written from — so its BATCHES can never disagree with what another harness dispatches. */
+export function phaseWorkflowScript(pb: PhaseBatches): string {
+  const spec = phaseSpec(pb.phase);
+  const scriptPath = join(pb.run, "orchestration", `${pb.phase}.workflow.mjs`);
+  const meta = { name: `ultra11y-${pb.phase}`, description: spec.description(pb.items), phases: [{ title: spec.title }] };
   return [
     `export const meta = ${JSON.stringify(meta)}`,
     ``,
     `// NOT a plain Node script: launch via the Workflow tool — Workflow({ scriptPath: ${JSON.stringify(scriptPath)} }).`,
     `// Emitted by \`ultra11y orchestrate\` from the CURRENT worklist. The worklist is the source`,
-    `// of truth: if it changes, re-run \`orchestrate --phase ${ph.name}\` before launching.`,
+    `// of truth: if it changes, re-run \`orchestrate --phase ${pb.phase}\` before launching.`,
+    `// One adapter of ${join(pb.run, "orchestration", `${pb.phase}.batches.json`)} — the harness-neutral batches.`,
     ``,
     `// Constants for THIS run (injected at emit time; no Date.now/Math.random in this harness).`,
-    `const RUN = ${JSON.stringify(runAbs)}`,
-    `const ENGINE = ${JSON.stringify(engineAbs)}`,
-    `const WORKLIST = ${JSON.stringify(ph.worklist)}`,
+    `const RUN = ${JSON.stringify(pb.run)}`,
+    `const ENGINE = ${JSON.stringify(pb.engine)}`,
+    `const WORKLIST = ${JSON.stringify(pb.worklist)}`,
     `const AGENTS = RUN + '/orchestration/agents'`,
-    `const BATCHES = ${JSON.stringify(toBatches(ph.ids, batchSize))}`,
-    `const SCHEMA = ${JSON.stringify(spec.schema)}`,
+    `const BATCHES = ${JSON.stringify(pb.batches.map((b) => b.ids))}`,
+    `const SCHEMA = ${JSON.stringify(pb.schema)}`,
     ``,
     `function contract(name, extra) {`,
     `  return 'Read and follow the dispatch contract at ' + AGENTS + '/' + name + '.md VERBATIM.\\n'`,
@@ -161,18 +166,67 @@ export function phaseWorkflowScript(ph: PhaseInfo, runAbs: string, engineAbs: st
     `    + (extra ? '\\n' + extra : '')`,
     `}`,
     ``,
-    `log('ultra11y ${ph.name}: ' + ${JSON.stringify(String(ph.items))} + ' item(s) across ' + BATCHES.length + ' agent(s)')`,
+    `log('ultra11y ${pb.phase}: ' + ${JSON.stringify(String(pb.items))} + ' item(s) across ' + BATCHES.length + ' agent(s)')`,
     ``,
     `phase(${JSON.stringify(spec.title)})`,
     `const results = await pipeline(BATCHES, (batch, _item, i) =>`,
-    `  agent(contract('${spec.role}', 'ITEMS=' + batch.join(',')), { label: '${ph.name}:' + (i + 1), phase: ${JSON.stringify(spec.title)}, agentType: 'general-purpose', schema: SCHEMA }))`,
+    `  agent(contract('${pb.role}', 'ITEMS=' + batch.join(',')), { label: '${pb.phase}:' + (i + 1), phase: ${JSON.stringify(spec.title)}, agentType: 'general-purpose', schema: SCHEMA }))`,
     ``,
     `// One-writer rule: this workflow only COLLECTS verdict fragments. The main agent folds`,
     `// them into WORKLIST (fill each item's fields from the matching fragment), then runs:`,
-    `//   ${ph.apply}`,
-    `return { phase: ${JSON.stringify(ph.name)}, worklist: WORKLIST, results: results.filter(Boolean) }`,
+    `//   ${pb.fold}`,
+    `return { phase: ${JSON.stringify(pb.phase)}, worklist: WORKLIST, results: results.filter(Boolean) }`,
     ``,
   ].join("\n");
+}
+
+/** ONE SELF-CONTAINED PROMPT PER BATCH (#158) — the file any harness hands a subagent verbatim
+ *  (Claude Code's Agent tool, Codex subagents, OpenCode's Task tool, or the main agent itself on
+ *  a harness with none). Nothing in it needs a harness API: the items to rule on, the contract,
+ *  the schema the answer must validate against and the file it is saved at are all inline. */
+export function batchPromptMd(pb: PhaseBatches, b: OrchestrationBatch, contract: string): string {
+  const spec = phaseSpec(pb.phase);
+  const briefs =
+    pb.phase === "adjudicate"
+      ? `\nEach criterion's brief — its official wording, numbered tests and methodology — is beside the worklist; read it before ruling:\n\n${b.ids.map((id) => `- \`${join(pb.run, "adjudicate", `${id}.md`)}\``).join("\n")}\n`
+      : "";
+  return `# ultra11y ${pb.phase} — batch ${b.id} (${b.role})
+
+You are one subagent of an ultra11y fan-out: batch ${b.index} of ${pb.batches.length} of the « ${spec.title} » phase. This file is your whole brief — nothing else needs to be passed to you.
+
+ITEMS=${b.ids.join(",")}
+
+Constants: RUN=${pb.run}  ENGINE=${pb.engine}  WORKLIST=${pb.worklist}.
+Invoke the engine only by its ABSOLUTE path: \`node ${pb.engine} <cmd>\` — read-only commands only.
+
+## Your items
+
+The ${b.ids.length} worklist entr${b.ids.length === 1 ? "y" : "ies"} you rule on, copied from \`${pb.worklist}\`. Handle these and no others.
+${briefs}
+\`\`\`json
+${JSON.stringify(b.items, null, 2)}
+\`\`\`
+
+## What you return
+
+Exactly ONE JSON object that validates against the schema below, covering your ITEMS only — as your structured output if your harness has one, otherwise as your final message with nothing before or after it.
+
+The orchestrator saves that object at \`${b.output}\` and folds it. If your harness gives you no way to return it, write it to that path yourself: the file is namespaced to this batch, and it is the ONLY file you may write.
+
+\`\`\`json
+${JSON.stringify(b.schema, null, 2)}
+\`\`\`
+
+## Your contract (\`${b.contract}\`, inline)
+
+${contract.trim()}
+
+## After you — the orchestrator's step, not yours
+
+The main agent is the sole writer. Once every batch of this phase has answered, it fills each worklist item from the matching answer and runs the fail-closed fold:
+
+\`${b.fold}\`
+`;
 }
 
 /** ECO IS A DIFFERENT HARNESS, AND THE CONTRACT HAS TO SAY SO.
@@ -352,6 +406,16 @@ ${status}
 5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
 6. **Fix & re-audit**: \`${cmd("fix")}\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
-With subagents available, prefer the emitted workflows instead: \`orchestrate --run ${runAbs} --phase <p>\` then \`Workflow({ scriptPath: "${join(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` — you stay the sole writer either way.
-`;
+## With subagents — the same phases, fanned out
+
+\`orchestrate --run ${runAbs} --phase <p>\` writes \`${join(runAbs, "orchestration", "<p>.batches.json")}\` (every batch as data: its items, the schema its answer must match, its output path and the fold) and one self-contained prompt per batch under \`${join(runAbs, "orchestration", "<p>")}/<batch-id>.md\`. On any harness: hand each prompt file VERBATIM to one subagent, save each returned JSON at that batch's \`output\` (\`${join(runAbs, "orchestration", "out", "<p>")}/<batch-id>.json\`), fill the worklist from those answers yourself, then run the phase's fold above. On Claude Code, \`Workflow({ scriptPath: "${join(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` dispatches the same batches in one call. You stay the sole writer either way.
+${batchList(manifest)}`;
+}
+
+/** The batches the manifest names, per judgment step — so the RUNBOOK points at the real files. */
+function batchList(manifest: OrchestrationManifest): string {
+  const lines = manifest.steps
+    .filter((st) => st.kind === "judgment" && st.ready && st.batchFile)
+    .map((st) => `- **${basename(st.batchFile!, ".batches.json")}** — ${st.batchIds?.length ?? 0} batch(es): \`${st.batchFile}\``);
+  return lines.length ? `\nThe batches of the current worklists, as \`orchestrate\` without \`--eco\` writes them:\n\n${lines.join("\n")}\n` : "";
 }
