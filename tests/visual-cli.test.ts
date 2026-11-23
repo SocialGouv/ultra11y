@@ -228,14 +228,13 @@ describe("--html", () => {
     expect(readFileSync(join(dir, "index.html"), "utf8")).not.toContain("data:image");
   });
 
-  // `--format` on `report` names a CI CHANNEL; `--html` names a DOCUMENT. Resolving that by
-  // precedence would silently drop one of the two deliverables.
-  it("refuses --html together with a CI format, by name", async () => {
+  // The CI formats are gone: `--html --format sarif` must not quietly write the HTML and drop
+  // the channel the caller asked for — the removed value is refused, by name.
+  it("refuses --html together with a removed CI format, by name", async () => {
     const root = await tmpProject();
     const r = await run(["report", "--in", "out/audit-latest.json", "--html", "--format", "sarif"], root);
     expect(r.code).toBe(2);
-    expect(r.err).toContain("--html");
-    expect(r.err).toContain("sarif");
+    expect(r.err).toContain("--format sarif was removed");
   });
 
   it("emits nothing that points outside the artifact", async () => {

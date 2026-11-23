@@ -63145,6 +63145,13 @@ var REMOVED_FLAGS = {
   docker: "removed with the Docker runtime: scan runs on the local Playwright (pass --cwd <dir> to resolve it from a project).",
   clean: "removed with the Docker runtime: there is no image to clean."
 };
+var REMOVED_FLAG_VALUES = {
+  format: {
+    sarif: `removed with the CI renderings (audit/report --format sarif|github). ${CI_NOTE}, which reads the JSON \u2014 get it with audit --json.`,
+    github: `removed with the CI renderings (audit/report --format sarif|github). ${CI_NOTE}, which reads the JSON \u2014 get it with audit --json.`,
+    remediation: "removed with the remediation backlog. Write the backlog with `ultra11y prd --in <audit.json>` (--format audit|doc), and file tickets with `ultra11y tickets --in <audit.json>`."
+  }
+};
 var REMOVED_COMMANDS = {
   mcp: "the MCP server was removed. Look criteria up with `ultra11y criteria`, and drive the engine through the CLI or the skill.",
   dev: "the dev side-car was removed. Check pages during your tests with the ultra11y/playwright or ultra11y/cypress package exports.",
@@ -64673,6 +64680,14 @@ async function main(argv) {
       return 2;
     }
   }
+  for (const [flag, values] of Object.entries(REMOVED_FLAG_VALUES)) {
+    const v2 = p2.flags[flag];
+    const replacement = typeof v2 === "string" && Object.hasOwn(values, v2) ? values[v2] : void 0;
+    if (replacement) {
+      console.error(`ultra11y: --${flag} ${v2} was ${replacement}`);
+      return 2;
+    }
+  }
   for (const f2 of p2.unknown) console.error(`ultra11y: unknown flag --${f2} (ignored). Run \`ultra11y --help\`.`);
   const ENUM_FLAGS = {
     lang: ["auto", "en", "fr"],
@@ -64766,6 +64781,7 @@ export {
   COMMANDS,
   REMOVED_COMMANDS,
   REMOVED_FLAGS,
+  REMOVED_FLAG_VALUES,
   browserPathOf,
   main,
   parseArgs,

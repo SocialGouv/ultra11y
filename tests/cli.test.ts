@@ -114,6 +114,49 @@ describe("removed commands and flags fail loudly, naming the replacement", () =>
     expect(r.code).toBe(2);
     expect(r.err).toContain("--format");
   });
+
+  // A removed VALUE of a still-valid flag must fail just as loudly: otherwise it only earned
+  // the generic "using the default" warning and exit 0, so a CI job kept passing on nothing.
+  it.each([
+    ["audit", ".", "--format", "sarif"],
+    ["audit", ".", "--format", "github"],
+    ["audit", "--in", join(FIX, "judge-audit.json"), "--format", "sarif"],
+    ["audit", "--in", join(FIX, "judge-audit.json"), "--format=github"],
+    ["report", "--in", join(FIX, "judge-audit.json"), "--format", "github"],
+  ])("`%s %s %s %s` (a removed CI format) exits 2 and names iterion and --json", async (...argv) => {
+    const r = await run(argv);
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/--format (sarif|github) was removed/);
+    expect(r.err).toContain("rgaa-audit");
+    expect(r.err).toContain("--json");
+    expect(r.err).not.toContain("using the default");
+  });
+
+  it.each(["prd", "tickets"])("`%s --format remediation` exits 2 and points at prd / tickets", async (cmd) => {
+    const r = await run([cmd, "--in", join(FIX, "judge-audit.json"), "--format", "remediation"]);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("--format remediation was removed");
+    expect(r.err).toContain("ultra11y prd");
+    expect(r.err).toContain("ultra11y tickets");
+  });
+
+  it.each(["audit", "doc"])("`prd --format %s` still works", async (format) => {
+    const tmpd = mkdtempSync(join(tmpdir(), "u11y-prd-format-"));
+    try {
+      const r = await run(["prd", "--in", join(FIX, "judge-audit.json"), "--out", tmpd, "--format", format]);
+      expect(r.code, r.err).toBe(0);
+      expect(r.err).not.toContain("was removed");
+    } finally {
+      rmSync(tmpd, { recursive: true, force: true });
+    }
+  });
+
+  it("`pages --format grid` still works", async () => {
+    const r = await run(["pages", "--in", join(FIX, "judge-audit.json"), "--format", "grid"]);
+    // This fixture has no pages in scope (exit 1): what matters is that --format got through.
+    expect(r.code, r.err).not.toBe(2);
+    expect(r.err).not.toContain("--format");
+  });
 });
 
 describe("main — help / version / unknown", () => {

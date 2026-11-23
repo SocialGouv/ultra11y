@@ -2012,6 +2012,20 @@ export const REMOVED_FLAGS: Record<string, string> = {
   clean: "removed with the Docker runtime: there is no image to clean.",
 };
 
+/** Flag VALUES that used to exist, mapped to what replaces them — same reason as
+ *  REMOVED_FLAGS: the flag itself is still valid on some command, so a removed value would
+ *  otherwise only earn the generic "using the default" warning and a green exit. Keyed by
+ *  flag, then value. Checked before dispatch, so a value listed here must be valid on NO
+ *  command any more. */
+export const REMOVED_FLAG_VALUES: Record<string, Record<string, string>> = {
+  format: {
+    sarif: `removed with the CI renderings (audit/report --format sarif|github). ${CI_NOTE}, which reads the JSON — get it with audit --json.`,
+    github: `removed with the CI renderings (audit/report --format sarif|github). ${CI_NOTE}, which reads the JSON — get it with audit --json.`,
+    remediation:
+      "removed with the remediation backlog. Write the backlog with `ultra11y prd --in <audit.json>` (--format audit|doc), and file tickets with `ultra11y tickets --in <audit.json>`.",
+  },
+};
+
 /** Commands that USED to exist, mapped to what replaces them — same reason as REMOVED_FLAGS:
  *  a script calling one must fail with a pointer, not a bare "unknown command". */
 export const REMOVED_COMMANDS: Record<string, string> = {
@@ -4182,6 +4196,14 @@ export async function main(argv: string[]): Promise<number> {
     const replacement = REMOVED_FLAGS[f];
     if (replacement) {
       console.error(`ultra11y: --${f} was ${replacement}`);
+      return 2;
+    }
+  }
+  for (const [flag, values] of Object.entries(REMOVED_FLAG_VALUES)) {
+    const v = p.flags[flag];
+    const replacement = typeof v === "string" && Object.hasOwn(values, v) ? values[v] : undefined;
+    if (replacement) {
+      console.error(`ultra11y: --${flag} ${v} was ${replacement}`);
       return 2;
     }
   }
