@@ -1,13 +1,11 @@
-// `scan --runtime local` — the dynamic tier WITHOUT Docker. Resolves Playwright +
+// `scan` — the dynamic tier, on the host/target Playwright. Resolves Playwright +
 // @axe-core/playwright AT RUNTIME (createRequire, a node: builtin) from `--cwd` first and
 // from this package second, so the zero-dep static engine bundle never gains a static
 // browser import while a project that installed ultra11y alone still gets the tier.
-// It runs the SAME axe-core pass as the Docker RUNNER, then the residual-criteria
-// probes axe cannot decide (focus visibility, 200% zoom, text spacing, content on
-// hover, target size). The Docker RUNNER / docker/* files are untouched (docker-sync).
+// It runs an axe-core pass, then the residual-criteria probes axe cannot decide (focus
+// visibility, 200% zoom, text spacing, content on hover, target size).
 //
-// Browser-context code is passed to page.evaluate AS STRINGS — like the Docker RUNNER —
-// because the engine's tsconfig ships no DOM lib (it is a Node program); a typed
+// Browser-context code is passed to page.evaluate AS STRINGS because the engine's tsconfig ships no DOM lib (it is a Node program); a typed
 // arrow body referencing document/window would not type-check.
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -56,8 +54,7 @@ export const LOCAL_ENGINE = "axe-core@playwright (local)";
 // focus not obscured (2.4.11 — the same walk of the tab ring as 2.4.7),
 // content on hover (1.4.13). Live regions (4.1.3) are measured only when the STATEFUL
 // interactions are on (`--no-interact` skips that probe). Stamped on every local
-// DynamicResult so the partial-audit advisory reflects real coverage — the Docker subset
-// lives in scan.ts (DOCKER_TESTED_SCS).
+// DynamicResult so the partial-audit advisory reflects real coverage.
 // 2.1.2 joined the list the day `probeKeyboardTrap` landed. It is load-bearing: this is the
 // array `renderedProvesOn` reads to decide whether an empty probe result may be read as
 // conformity, so a probe that runs without saying so here measures a criterion and then leaves
@@ -143,9 +140,8 @@ function resolvesRuntime(cwd: string, spec: string): boolean {
   });
 }
 
-/** Why the LOCAL tier is (un)usable from `cwd` — the one line a reader of a
- *  `runtime: auto` log gets before the Docker fallback takes over. A silent degrade is
- *  indistinguishable from a working fallback, so the reason must NAME what to install. */
+/** Why the LOCAL tier is (un)usable from `cwd` — the one line `status --browser` prints.
+ *  The reason must NAME what to install. */
 export type LocalTierStatus = { ok: true; executable?: string } | { ok: false; reason: string; executable?: string };
 
 /** An explicit browser executable for the local tier — `scan --browser-path`,
@@ -164,8 +160,7 @@ export interface BrowserChoice {
 const BROWSER_PATH_SOURCES = "--browser-path / ULTRA11Y_BROWSER_PATH";
 
 /** The same probe as `localAvailable`, keeping the reason instead of collapsing it to a
- *  boolean. Drives the `runtime: auto` decision AND the message printed when it degrades
- *  to Docker. */
+ *  boolean. Drives `status --browser`. */
 export function localTierStatus(cwd: string, choice: BrowserChoice = {}): LocalTierStatus {
   for (const spec of [PW_SPEC, AXE_SPEC]) {
     if (!resolvesRuntime(cwd, spec)) {
@@ -200,13 +195,13 @@ export function localTierStatus(cwd: string, choice: BrowserChoice = {}): LocalT
     if (typeof bin === "string" && bin.length > 0 && !existsSync(bin)) {
       // Name WHICH Playwright wanted it: the engine's own copy is the usual one, and `npx` run
       // from the audited project would install a browser for a different revision. Not
-      // counting an installed Google Chrome as available is deliberate — `auto` (and the
-      // action's `status --browser`) keep their behaviour; `--runtime local` tries it.
+      // counting an installed Google Chrome as available is deliberate — `status --browser`
+      // keeps its behaviour; `scan` itself still tries it.
       const pw = resolvedPlaywright(cwd);
       const cliJs = pw ? join(dirname(pw.path), "cli.js") : undefined;
       return {
         ok: false,
-        reason: `no browser binary at ${bin} for ${PW_SPEC}${pw?.version ? `@${pw.version}` : ""}${pw ? ` (${pw.path})` : ""} — run \`${cliJs ? `node ${cliJs}` : "npx playwright"} install chromium\`, or pass --runtime local to fall back on an installed Google Chrome`,
+        reason: `no browser binary at ${bin} for ${PW_SPEC}${pw?.version ? `@${pw.version}` : ""}${pw ? ` (${pw.path})` : ""} — run \`${cliJs ? `node ${cliJs}` : "npx playwright"} install chromium\`, or install Google Chrome (\`scan\` falls back on it)`,
       };
     }
     return { ok: true };
@@ -215,14 +210,13 @@ export function localTierStatus(cwd: string, choice: BrowserChoice = {}): LocalT
   }
 }
 
-/** Is the LOCAL tier actually usable from `cwd`? Drives `runtime: auto`.
+/** Is the LOCAL tier actually usable from `cwd`? Drives `status --browser`.
  *
  *  Both packages must resolve — and the browser BINARY must be on disk. The second half is not
  *  belt-and-braces: `npm i @playwright/test` installs the package, `npx playwright install`
  *  installs the browsers, and the two are separate steps that CI images routinely do only one
  *  of. Resolution alone therefore says "local is available" on a machine that cannot launch
- *  anything, and `auto` — whose whole contract is to degrade to Docker when the local tier is
- *  not there — instead picks it and dies on the launch.
+ *  anything.
  *
  *  Measured on this repository the day Playwright became a devDependency: three `--runtime
  *  local` tests and the action's own crawl job switched themselves on in jobs that install no
@@ -244,13 +238,11 @@ export function resolveLocalDeps(cwd: string): LocalDeps {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(
-      `Playwright resolves neither from "${cwd}" nor from ultra11y itself. Both are dependencies of this package, so the usual cause is the standalone engine bundle running with no node_modules beside it: pass --cwd <dir> at a project that has @playwright/test + @axe-core/playwright (e.g. --cwd packages/app), or use --runtime docker. (${msg})`,
+      `Playwright resolves neither from "${cwd}" nor from ultra11y itself. Both are dependencies of this package, so the usual cause is the standalone engine bundle running with no node_modules beside it: pass --cwd <dir> at a project that has @playwright/test + @axe-core/playwright (e.g. --cwd packages/app). (${msg})`,
     );
   }
   if (!chromium || typeof AxeBuilder !== "function") {
-    throw new Error(
-      `Resolved Playwright/@axe-core/playwright from "${cwd}" but they did not expose chromium / AxeBuilder. Check the installed versions, or use --runtime docker.`,
-    );
+    throw new Error(`Resolved Playwright/@axe-core/playwright from "${cwd}" but they did not expose chromium / AxeBuilder. Check the installed versions.`);
   }
   return { chromium, AxeBuilder };
 }
@@ -346,7 +338,7 @@ export async function launchChromium(
   const cliJs = pw ? join(dirname(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
   throw new Error(
     `Could not launch Chromium: the browser for ${which} is not installed, and no installed Google Chrome was found either. ` +
-      `Install the browser for THAT Playwright — \`node ${cliJs} install chromium\`${own ? " (this is ultra11y's own Playwright, not the audited project's)" : ""} — or install Google Chrome, or use --runtime docker. (${msg.split("\n")[0]})`,
+      `Install the browser for THAT Playwright — \`node ${cliJs} install chromium\`${own ? " (this is ultra11y's own Playwright, not the audited project's)" : ""} — or install Google Chrome. (${msg.split("\n")[0]})`,
   );
 }
 
@@ -636,7 +628,7 @@ export function probeSources(): Record<string, string> {
     "liveRegionExpr(clicks)": liveRegionExpr(LIVE_REGION_DETAIL.en, true),
     "liveRegionExpr(noClicks)": liveRegionExpr(LIVE_REGION_DETAIL.fr, false),
     // Page-snapshot collector (src/snapshot.ts) — evaluated in the browser by every snapshot
-    // producer (E2E fixtures, the dev sidecar), so it is syntax-gated here like the probes.
+    // producer (`scan`, the E2E integrations), so it is syntax-gated here like the probes.
     COLLECT_SNAPSHOT,
     LOADING_STATE,
   };
@@ -940,7 +932,7 @@ export interface LocalScanOpts {
   browserPath?: string;
 }
 
-/** Run the dynamic tier locally over a single URL/file (no Docker). */
+/** Run the dynamic tier locally over a single URL/file. */
 export async function runScanLocal(opts: LocalScanOpts): Promise<DynamicResult> {
   const isUrl = /^https?:\/\//i.test(opts.target);
   if (!isUrl && !existsSync(opts.target)) {

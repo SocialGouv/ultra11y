@@ -8,9 +8,7 @@ import type { Lang, PageResult, Severity } from "../types.js";
 import type { PrdUnit } from "../prd.js";
 import { type StandardId, isCore, loadPack } from "../standards/index.js";
 import { renderAuditorUnit } from "../auditor.js";
-import { resolveMessage, resolveRemediation } from "../messages.js";
 import { UNATTRIBUTED_ID } from "./types.js";
-import { mdText } from "../md.js";
 
 /** Stable, language-neutral suffix marking a non-normative recommendation apart from a
  *  non-conformity. Part of the de-dupe grain, so it must never drift. */
@@ -100,29 +98,8 @@ const L = {
   },
 } as const;
 
-/** The legacy dev body (`--format remediation`): WCAG refs / Fix / Occurrences. Moved
- *  verbatim from the pre-v3 `issueBody`, so `--format remediation` output is unchanged. */
-export function renderRemediationBody(unit: PrdUnit, lang: Lang): string {
-  const t = L[lang];
-  const lines: string[] = [];
-  if (unit.refs.length) lines.push(`**WCAG** : ${unit.refs.join(", ")}`, "");
-  for (const fx of [...new Set(unit.findings.map((f) => resolveRemediation(f, lang)))]) lines.push(`**${t.fix}** : ${mdText(fx)}`);
-  lines.push("", `**${t.occ} (${unit.findings.length})**`, "");
-  for (const f of unit.findings) {
-    lines.push(`- [ ] \`${f.file}:${f.line}\` (\`${f.selectorHint}\`) — ${mdText(resolveMessage(f, lang))}`);
-    if (f.related) lines.push(`  - ${t.def} : \`${f.related.file}:${f.related.line}\` (\`${f.related.selectorHint}\`)`);
-  }
-  return lines.join("\n");
-}
-
 /** One criterion's body — the shared auditor block, exactly as the report and the PRD emit it. */
-export function renderCriterionBody(
-  unit: PrdUnit,
-  standard: StandardId,
-  lang: Lang,
-  opts: { format?: "audit" | "remediation"; technical?: boolean } = {},
-): string {
-  if (opts.format === "remediation") return renderRemediationBody(unit, lang);
+export function renderCriterionBody(unit: PrdUnit, standard: StandardId, lang: Lang, opts: { technical?: boolean } = {}): string {
   return renderAuditorUnit(unit, standard, lang, { ...(opts.technical !== undefined ? { technical: opts.technical } : {}) })
     .join("\n")
     .trimEnd();

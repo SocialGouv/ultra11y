@@ -13,7 +13,7 @@ Copier-coller dans une session fraîche, au racine du dépôt. Le moteur tourne 
 > Cette matrice est désormais **automatisée** dans `tests/e2e/` (`cli.e2e.test.ts`,
 > `artifacts.e2e.test.ts`) : elle pilote le bundle `scripts/ultra11y.mjs` en sous-processus
 > et vérifie codes de sortie / forme JSON / artefacts sur disque. Ce prompt reste utile pour
-> l'exploration manuelle et le palier Docker de `scan` (opt-in via `U11Y_E2E_DOCKER=1`).
+> l'exploration manuelle et le palier navigateur de `scan` (opt-in via `U11Y_E2E_SCAN=1`).
 
 ---
 
@@ -26,7 +26,7 @@ Copier-coller dans une session fraîche, au racine du dépôt. Le moteur tourne 
 > `tests/` → corrige la plus petite cause dans `src/` → `pnpm build` → relance**.
 > Ne bumpe pas la version. Garde `ALL_RULES` à 53 (asserté par `tests/registry.test.ts` ;
 > +7 règles cross-file sous `--graph`). Garde les 2 miroirs de bundle
-> byte-identiques (`pnpm check:build`) et les fichiers `docker/` synchronisés.
+> byte-identiques (`pnpm check:build`).
 > Mets tous les fichiers temporaires dans `/tmp`, ne modifie jamais les fixtures en
 > place, et n'exécute jamais `init` (sans `--help`) ni `fix --write` dans le dépôt réel
 > (utilise un dépôt git jetable dans `/tmp` ou une copie).
@@ -37,15 +37,15 @@ Copier-coller dans une session fraîche, au racine du dépôt. Le moteur tourne 
 >    stdin (`audit - < f.html`) ; `--json` (JSON valide : findings/criteria/scope) ;
 >    `--jsx` sur un `.tsx` ; `--changed` / `--since HEAD~1` (vide = ok sur arbre propre) ;
 >    `--max-files 1` (log de troncature + `scope.truncated`, pas de drop silencieux) ;
->    `--dedup exact|normalized|off` ; `--include`/`--exclude`/`--ext` ; `--baseline <file>`
->    (gate vs baseline) ; **`--fail-on bloquant|majeur|mineur` doit gater l'audit seul
->    (exit≠0) même sans `--baseline`** ; `--lang en`.
+>    `--dedup exact|normalized|off` ; `--include`/`--exclude`/`--ext` ;
+>    **`--fail-on bloquant|majeur|mineur` doit gater l'audit seul (exit≠0)** ; `--lang en`.
 > 2. **report** — `--in audit.json` et `--in -` (stdin) ; `--out` ; défaut = WCAG
 >    (`wcag-YYYY-MM-DD.md`) ; `--standard rgaa` (vue dérivée, doit différer,
 >    `rgaa-YYYY-MM-DD.md`) ; `--standard nope` → exit 2 ; `--lang fr` ; 5 sections.
 > 3. **criteria** — `criteria 1.4.3` (SC WCAG) ; `--list` (par règle) ; core `--theme 1`
 >    → erreur (exit 2) ; `--standard rgaa --theme 1` / `--standard rgaa 8.3` ; `--json` ;
->    `--lang fr` ; `criteria 9.9.9` → erreur propre.
+>    `--lang fr` ; `criteria 9.9.9` → erreur propre ; `--standard rgaa --plan` (106 critères
+>    répartis par palier de preuve).
 > 4. **check** — rapport valide → exit 0 ; critère inventé (`9.9.9`) → exit 1 ;
 >    **taux de conformité hors [0..100] (ex. `999 %`) → exit 1** ; `--quiet` ; `--json`.
 > 5. **verify** — `--report` génère `VERIFY.md` + `VERIFY.todo.json` ; `--max-verify N`
@@ -59,8 +59,8 @@ Copier-coller dans une session fraîche, au racine du dépôt. Le moteur tourne 
 >    proposal ; `--only <ruleId>` ; `--json` ; JSX/TSX → `--write` applique les codemods
 >    `jsxSafe` (offsets réels, non-lossy) ; le lossy-JSX reste proposal-only.
 > 7. **init** — dépôt git jetable dans `/tmp` ; `init` (défaut = hook staged strict + auto-fix
->    sûr, SANS baseline) ; **`--baseline` seul → baseline UNIQUEMENT** ; **`--baseline --hook` → les deux** ;
->    **`--ci --baseline --fail-on majeur` → baseline + workflow gaté en `majeur`** ;
+>    sûr) ; `--fail-on majeur` → hook gaté en `majeur` ; **`--ci` / `--baseline` → exit 2
+>    nommant le remplacement** ;
 >    hook = `.git/hooks/pre-commit` (sh POSIX, bypass `SKIP_A11Y`, chemin moteur quoté) ;
 >    **`init --help` n'écrit RIEN (pas d'effet de bord)**.
 > 8. **tickets** — **toujours `--dry-run` d'abord ; ne dépose JAMAIS sur un vrai dépôt
@@ -73,10 +73,9 @@ Copier-coller dans une session fraîche, au racine du dépôt. Le moteur tourne 
 >    **relatif au dépôt** dans le titre (sinon la clé de dé-dup serait propre à la machine) ;
 >    **`prd --gh-issues` / `--gh-single` → exit 2 nommant le remplacement**.
 > 9. **scan** — statique : `scan` sans args / **fichier inexistant → erreur propre
->    "File not found", SANS build Docker** ; `--clean` idempotent ; sync des fichiers
->    embarqués (`pnpm test -- docker-sync`). Docker : `scan low-contrast.html` (NC
->    contraste), `scan <url>`, `--merge` dans un audit statique, `--sitemap`, `--crawl
->    --depth --max`.
+>    "File not found", sans lancer de navigateur** ; **`--runtime docker` → exit 2**.
+>    Navigateur (Playwright local) : `scan low-contrast.html` (NC contraste), `scan <url>`,
+>    `--merge` dans un audit statique, `--sitemap`, `--crawl --depth --max`.
 >
 > **Transverse** : `-h/--help` ; **`<cmd> --help` / `<cmd> -h` affiche l'aide sans rien
 > exécuter** ; `-v/--version` (= version de `package.json`) ; commande inconnue + flag requis manquant → erreur

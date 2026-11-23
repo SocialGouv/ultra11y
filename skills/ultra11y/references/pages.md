@@ -89,7 +89,7 @@ recorded so the tail reads as *unmeasured*, never as *clean*.
 ## The rendered tier — criteria only a browser can answer, decided offline
 
 A snapshot carries what a browser knows and source does not. Six rules read it, and they
-run inside the ordinary `audit` — **no browser, no Docker, no running server**, from a
+run inside the ordinary `audit` — **no browser, no running server**, from a
 committed artefact. That is the point: CI decides these without booting the app.
 
 | Rule | WCAG | RGAA | Reads |
@@ -443,38 +443,6 @@ the same upload, so `pages --html` deliberately writes none.
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --html --evidence --out audits
 ```
 
-See `references/ci.md` for the artifact layout and the inline-size budget.
-
-## Holding an external audit against the grid
-
-A human auditor's verdict is evidence, not a measurement this engine can redo. `import` reads one
-into a tool-neutral (page, criterion, status) model, and `pages --diff` compares it with the grid.
-
-```
-node scripts/ultra11y.mjs import --from file audit-rgaa.json --out audits
-node scripts/ultra11y.mjs import --from ara <report-id> --out audits    # writes the raw response too
-node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --diff audits/external-latest.json
-```
-
-A file is the primary route and the network a convenience: the engine is install-free and
-keyless, so a reproducible audit must not depend on a third party being up. `--from ara` writes
-the raw response to disk **before** parsing it, so what was imported is committable.
-
-The adapter refuses rather than guesses — an unrecognised status token, a criterion the pack does
-not define, a result naming an undeclared page are each reported, and nothing is written on a
-partial parse, because a partial import looks complete.
-
-The diff sorts each (page, criterion) pair into five buckets: **corrigé · inchangé ·
-partiellement corrigé · régressé · non retesté**. The last one is the one no report surfaces: a
-criterion that was non-conforming and was left untested in the counter-audit is neither confirmed
-fixed nor confirmed broken. Nothing is re-decided — both sides arrive decided — an undecided
-criterion is never read as agreement, and a page only one side ruled on is reported as a coverage
-gap, which is the check that says *"10.11 is NC on the funnel and your grid has nothing there"*
-on day one rather than after a ticket is filed against the wrong page.
-
-An imported audit is never merged into the engine's verdict and never written into
-`packAdjudication`. `src/external/` is a leaf.
-
 ## Producing snapshots
 
 Anything that drives a browser can write one — the format is the contract, not the producer.
@@ -482,13 +450,12 @@ The engine ships a browser-side collector (`COLLECT_SNAPSHOT`) that returns the 
 style digest and the boxes for the current page in a single `page.evaluate`; a producer
 writes that alongside a `meta.json`.
 
-Three producers ship with the engine, and they all evaluate that one collector:
+Two producers ship with the engine, and they both evaluate that one collector:
 
 | Producer | When it runs | Notes |
 |---|---|---|
 | `scan` | a URL, a sitemap, a crawl, or the declared sample | on by default (`--no-snapshot` opts out); collected on the **pristine** page, before axe and before any probe |
-| `render --e2e` fixtures | inside your Playwright/Cypress run | the page in the state your test built (logged in, modal open) |
-| `dev` side-car | as you browse in development | the overlay detaches itself before collecting |
+| the `ultra11y/playwright` · `ultra11y/cypress` exports | inside your Playwright/Cypress run | the page in the state your test built (logged in, modal open) |
 
 `scan` is the one that makes a **served site** auditable page by page: without a snapshot a
 scanned URL is `basis: "attributed"` and, by honesty rule 2 below, can never earn a

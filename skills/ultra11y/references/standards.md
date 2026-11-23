@@ -59,8 +59,11 @@ pages do not share definition slugs (the French page pluralizes many, and rename
 each language keeps its own term list and its own glossary keys; a build guard rejects any
 citation that does not resolve in its own language.
 
-Over MCP the same data is `ultra11y_criteria` and `std://wcag/criteria/1.4.3`; see
-`references/mcp.md`.
+`criteria [--standard <pack>] --plan` adds the work plan: for each evidence tier (source,
+cross-file, rendered page, browser, judgment, out of scope), how many of the standard's criteria
+it is the cheapest tier to prove conformant — read from the engine's own rule applicability, not
+from the wording. Under RGAA, 104 of 106 need more than source to earn C. `--json` gives the
+same plan as data.
 
 ## Auditor vocabulary
 

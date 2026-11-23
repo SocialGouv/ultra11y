@@ -14,7 +14,7 @@
 // then carried a « **WCAG** : 1.1.1 (A) » line beside every criterion, and their acceptance
 // criteria named success criteria rather than the numbered RGAA tests an auditor signs off.
 //
-// The sharpest symptom was in CI annotations, and it was not merely a wrong vocabulary but a
+// The sharpest symptom (in the since-removed CI annotations) was not merely a wrong vocabulary but a
 // false statement: an agent verdict recorded at the pack's own granularity carries
 // `criteriaId: "4.11"`, `packCriteriaForFinding` matches nothing for it (4.11 is not a success
 // criterion), and the fallback printed « WCAG 4.11 » — a criterion that exists in no version of
@@ -31,9 +31,8 @@ import { join } from "node:path";
 import { runAudit } from "../src/audit.js";
 import { auditSummary } from "../src/output.js";
 import { renderPackReport } from "../src/report.js";
-import { renderPrdDoc, renderBacklog, renderPerCriterion } from "../src/prd.js";
-import { annotations, stepSummary } from "../src/annotate.js";
-import { toSarif } from "../src/sarif.js";
+import { renderPrdDoc } from "../src/prd.js";
+import { renderAuditorBacklog, renderAuditorPerCriterion } from "../src/auditor.js";
 import { derivePackResults, isProvisionalJudgmentInapplicable, loadPack } from "../src/standards/index.js";
 import { packAuditDocument, packCriteriaOf, packCriterionLabel, isPackAudit, unwrapAudit } from "../src/standards/document.js";
 import type { AuditResult, Finding } from "../src/types.js";
@@ -57,13 +56,10 @@ const rgaaSurfaces = (r: AuditResult): Record<string, string> => ({
   "audit summary": auditSummary(r, "fr", "rgaa"),
   report: renderPackReport(r, loadPack("rgaa"), "fr"),
   "prd (doc)": renderPrdDoc(r, "fr", "rgaa"),
-  "prd (auditor backlog)": renderBacklog(r, "fr", "rgaa"),
-  "prd (per criterion)": renderPerCriterion(r, "fr", "rgaa")
+  "prd (auditor backlog)": renderAuditorBacklog(r, "fr", "rgaa"),
+  "prd (per criterion)": renderAuditorPerCriterion(r, "fr", "rgaa")
     .map((f) => f.content)
     .join("\n"),
-  annotations: annotations(r, { standard: "rgaa", lang: "fr" }).join("\n"),
-  "step summary": stepSummary(r, { standard: "rgaa", lang: "fr" }),
-  sarif: JSON.stringify(toSarif(r, { standard: "rgaa", lang: "fr" })),
 });
 
 describe("a run under --standard rgaa names RGAA and nothing else", () => {
@@ -74,7 +70,6 @@ describe("a run under --standard rgaa names RGAA and nothing else", () => {
   it("still names WCAG under the core, which is the whole point of the core", () => {
     const summary = auditSummary(audit(), "en");
     expect(summary).toMatch(/WCAG/);
-    expect(JSON.stringify(toSarif(audit(), { lang: "en" }))).toMatch(/wcag:/);
   });
 
   it("tags findings with the pack's criteria, not with success criteria", () => {
@@ -115,7 +110,7 @@ describe("a finding already keyed on a pack criterion", () => {
     expect(packCriterionLabel(pack, agentFinding)).toBe("RGAA 4.11");
   });
 
-  it("reaches CI annotations as RGAA 4.11, never as a WCAG criterion that does not exist", () => {
+  it("reaches the auditor backlog as RGAA 4.11, never as a WCAG criterion that does not exist", () => {
     const r = {
       ...audit(),
       findings: [agentFinding],
@@ -124,16 +119,16 @@ describe("a finding already keyed on a pack criterion", () => {
         criteria: [{ id: "4.11", status: "NC" as const, findings: [agentFinding], decidedBy: "agent" as const }],
       },
     };
-    const out = annotations(r, { standard: "rgaa", lang: "fr" }).join("\n");
-    expect(out).toContain("RGAA 4.11");
-    expect(out).not.toMatch(/WCAG/);
+    const out = renderAuditorBacklog(r, "fr", "rgaa");
+    expect(out).toContain("4.11");
+    expect(out).not.toMatch(/WCAG 4\.11/);
   });
 
   it("is dropped, not relabelled, when it belongs to no criterion of the standard", () => {
     const alien = { ...agentFinding, ruleId: "agent:99.99", criteriaId: "99.99" } as Finding;
     expect(packCriteriaOf(loadPack("rgaa"), alien)).toEqual([]);
     expect(packCriterionLabel(loadPack("rgaa"), alien)).toBeNull();
-    expect(annotations({ ...audit(), findings: [alien] }, { standard: "rgaa", lang: "fr" }).join("\n")).not.toContain("99.99");
+    expect(renderAuditorBacklog({ ...audit(), findings: [alien] }, "fr", "rgaa")).not.toContain("99.99");
   });
 });
 

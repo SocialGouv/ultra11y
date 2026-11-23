@@ -98,14 +98,15 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 >    run-wide status is already `NC`, because that failure did not decide the criterion on the
 >    other pages. Such an item is not redundant: return one grounded verdict for it (or an
 >    explicit `manual` reason), never leave it blank because the global tally looks decided.
-> 5. **Look the criterion up; never recall it.** `criteria [--standard <pack>] <id>` — or
->    `ultra11y_criteria` over MCP — returns the criterion's own wording, its **numbered
->    tests**, and the glossary definitions those tests cite. RGAA 8.3 is not "the page needs a
+> 5. **Look the criterion up; never recall it.** `criteria [--standard <pack>] <id>` returns
+>    the criterion's own wording, its **numbered tests** and their methodology, and
+>    `criteria --standard <pack> --glossary <term>` the definitions those tests cite. RGAA 8.3 is not "the page needs a
 >    `lang` attribute"; it is test `8.3.1` with two alternative conditions, and the glossary
 >    decides what its terms mean. An auditor block that cites `8.3.1` after reading it is
 >    grounded; one that cites it from memory is a guess wearing a reference. Before auditing
->    against a country standard, run the plan (`ultra11y_method`): it tells you how many of its
->    criteria that still need adjudication to earn C — for RGAA, **104 of 106**. See `references/mcp.md`.
+>    against a country standard, run the plan (`criteria --standard <pack> --plan`): it tells you
+>    how many of its criteria need more than source — adjudication, a rendered page or a
+>    browser — to earn C; for RGAA, **104 of 106**. See `references/standards.md`.
 > 6. **The FINAL rendered semantic HTML must be correct.** The engine sees only source; a
 >    component library (DSFR/MUI…) or `.vue`/`.svelte`/`.astro` SFC hides the real markup, so
 >    a green source audit is not proof. Verify the produced semantic HTML — install the
@@ -146,7 +147,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | Running the tool | |
 |---|---|
 | `references/runbook.md` | **The reliable run**: the one recipe, the transport to use and why, and what a pass costs. Read this before paying for an adjudication |
-| `references/full-audit.md` | **The full audit, on every harness**: rendered scope, adjudication (direct, fanned out or `judge`), adversarial verification, ledger, Markdown + HTML + per-page evidence, `check` gates |
+| `references/full-audit.md` | **The full audit, on every harness**: rendered scope, adjudication (direct or fanned out), adversarial verification, ledger, Markdown + HTML + per-page evidence, `check` gates |
 | `references/audit.md` | The quick audit (static pass → report → `check`), the normative page sample and PDF documents |
 | `references/judgment.md` | The adjudication + refutation worklists, verdict vocabulary, fail-closed fold |
 | `references/verify.md` | The `check`/`verify` gates |
@@ -154,17 +155,15 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
 | `references/harnesses.md` | Where this runs: Claude Code, Codex CLI, OpenCode 1.x and 2.x, and the AGENTS.md fallback |
 | `references/orchestrators.md` | Driving the engine from a workflow engine / non-GitHub CI: pinning, the six-step pipeline, exit codes, the ticket set as JSON for any tracker |
-| `references/ci.md` | CI: run iterion's `rgaa-audit` bot; the CLI contract it relies on; `--format sarif\|github` |
+| `references/ci.md` | CI: run iterion's `rgaa-audit` bot; the CLI contract it relies on |
 | `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |
-| `references/e2e.md` | `render --e2e`: auditing a page during your Playwright/Cypress run |
-| `references/devtools.md` | `dev`: the live overlay while you build, and the per-page dashboard |
+| `references/e2e.md` | `ultra11y/playwright` · `ultra11y/cypress`: auditing a page during your E2E run |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/scale.md` | Focusing an audit on a large repository |
 | `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
 | `references/prd.md` | The auditor block as a backlog (markdown) |
 | `references/tickets.md` | Filing that backlog as tickets: GitHub, GitLab, Jira, and at which granularity |
 | `references/standards.md` · `references/packs.md` · `references/guidance.md` | Country standards, authoring a pack, implementation guidance |
-| `references/mcp.md` | **The standards as a rule engine**: look a criterion up instead of recalling it — its numbered tests, the terms it defines, the fix, and the work plan. As MCP tools and `std://` resources, or the same data on the CLI |
 | `references/methodology.md` | Statuses, pass rate, severities, report format |
 | `references/cross-file.md` | `--graph`: imports and cross-file rules |
 | `references/orchestration.md` | Fanning the judgment phases out across subagents |
@@ -206,8 +205,8 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 - **"Generate the fix markdown / PRDs"** → `prd` (the SAME auditor
   conformance block `report`'s NC section renders — theme/criterion/test/WCAG+level/
   finding/expected/verification in the active standard's vocabulary — as a backlog);
-  `--split criterion`, `--format doc` for a product-requirements doc, `--format remediation`
-  for the legacy dev backlog). It writes markdown only; read
+  `--split criterion`, `--format doc` for a product-requirements doc). It writes markdown
+  only; read
   **`references/prd.md`**.
 - **"Open tickets / issues for this (GitHub · GitLab · Jira)"** → `tickets`, a separate
   command that reads the audit and files it, writing no markdown. `--grain` picks what one
@@ -242,19 +241,14 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   `--iterate`) + the `prd` backlog, blocking→major→minor; read **`references/correction.md`**.
 - **"Automatic repo gate (hook / CI)"** → `init --hook` writes a git pre-commit gate over
   the **strict staged snapshot** (audits the exact index blobs, auto-applies safe fixes and
-  re-stages them, blocks only on judgment issues); `init --baseline`/`--ci` is the opt-in
-  "block only NEW non-conformities" variant. Installed as a **Claude Code, Codex or OpenCode
+  re-stages them, blocks only on judgment issues); CI is iterion's `rgaa-audit` bot (below).
+  Installed as a **Claude Code, Codex or OpenCode
   plugin**, a third gate runs the `review-a11y` *skill* (not just the engine) on a pending
   commit/push/PR — that one is shipped by the plugin (or `ultra11y install`), not by `init`. For library/SFC code, commit rendered
   **captures** (`render --setup`) and stage them so the real semantic HTML is what's
   checked (`audit --require-captures`); read **`references/automation.md`**.
-- **"Show me the problems while I build the page"** → `dev --next` writes a one-line overlay
-  component and `dev` starts a loopback side-car: a floating panel lists the current page's
-  non-conformities, each opening its `file:line` in your editor, and `http://127.0.0.1:4111`
-  accumulates the per-page grid as you browse. Renders nothing outside development; read
-  **`references/devtools.md`**.
-- **"Check a page during our E2E tests"** → `render --e2e` writes Playwright/Cypress fixtures
-  that audit the page **as your test left it** (logged in, form filled, modal open) — state a
+- **"Check a page during our E2E tests"** → the `ultra11y/playwright` and `ultra11y/cypress`
+  package exports audit the page **as your test left it** (logged in, form filled, modal open) — state a
   separate `scan` run does not have — and persist each checked page as a snapshot. `failOn`
   gates the test; `failOn: false` records without failing, which is how you adopt it on an
   existing backlog; read **`references/e2e.md`**.
@@ -293,18 +287,6 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   (https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit). It installs this engine
   pinned, renders the page sample, adjudicates and refutes with read-only agents, gates with
   `check` and files one issue per non-conforming criterion. Read **`references/ci.md`**.
-- **"Nobody is here to rule on the judgment criteria"** → `judge --in audits/audit-latest.json
-  --standard rgaa [--apply]` adjudicates them with a model, for a run with no coding agent in
-  the loop (CI, an E2E run). It is a CALLER, not a second judge: same worklist,
-  same evidence, same prompt, and the verdicts pass the same fail-closed gate yours do. Use
-  `--runner api` with an API key, or `--runner claude|codex` with that local CLI's existing
-  subscription login (`--runner cli` still aliases Claude). Inside an agent, prefer
-  `verify --manual` and rule the worklist yourself; read **`references/judgment.md`**.
-- **"Show the findings ON the pull request, not just a red job"** → `--format sarif` (upload
-  to code scanning → inline annotations at the right file:line) or `--format github`
-  (`::error::` workflow commands + a `$GITHUB_STEP_SUMMARY` table) — from `report
-  --standard rgaa` when you want the pack's criteria rather than WCAG's; read
-  **`references/ci.md`**.
 - **"Make this code accessible / review it"** → audit the snippet
   (`audit - < component.html`) native-first; read **`references/authoring.md`** and
   **`references/forbidden-patterns.md`**.
@@ -365,7 +347,7 @@ node scripts/ultra11y.mjs audit --staged --fail-on blocking                  # g
 node scripts/ultra11y.mjs audit "dist/**/*.html"                             # the RENDERED HTML (reliable for DSFR/MUI…)
 node scripts/ultra11y.mjs render --setup                                     # install the capture harvester (tests → .ultra11y/captures)
 node scripts/ultra11y.mjs audit --require-captures                           # gate the components with no rendered capture
-node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd . --merge audits/audit-latest.json
+node scripts/ultra11y.mjs scan http://localhost:3000 --cwd . --merge audits/audit-latest.json
 node scripts/ultra11y.mjs check --in audits/audit-latest.json --require-rendered              # gate: a rendering criterion left open by a run that rendered nothing
 node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --json --out audits  # the per-page grid, for a machine (audits/pages.json)
 node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --in audits/audit-latest.json --manual --out audits
@@ -377,24 +359,25 @@ node scripts/ultra11y.mjs prd     --in audits/audit-latest.json              # t
 node scripts/ultra11y.mjs tickets --in audits/audit-latest.json --dry-run    # file it: GitHub/GitLab/Jira
 node scripts/ultra11y.mjs check  --report audits/wcag-YYYY-MM-DD.md          # integrity gate
 node scripts/ultra11y.mjs criteria 1.4.3                                     # one success criterion (--list for all)
+node scripts/ultra11y.mjs criteria --standard rgaa --plan                     # the work plan: what each evidence tier settles
 node scripts/ultra11y.mjs fix "src/**/*.html" --write --iterate               # apply the safe codemods to a fixpoint
-node scripts/ultra11y.mjs init --hook                                        # pre-commit gate (--baseline for the regression variant)
+node scripts/ultra11y.mjs init --hook                                        # pre-commit gate over the staged snapshot
 node scripts/ultra11y.mjs pack check ./packs/section508.json                  # gate an (AI-)authored standards pack
 ```
 **`--standard rgaa` goes on `audit` too, and then everything speaks RGAA.** It is honoured by
-`audit`/`scan`/`fix` as well as `report`/`prd`/`tickets`/`criteria`/`check`/`verify`/`judge`,
+`audit`/`scan`/`fix` as well as `report`/`prd`/`tickets`/`criteria`/`check`/`verify`,
 and `.ultra11yrc.json { "standard": "rgaa" }` makes it the default for all of them. Under it,
 `audit` prints an RGAA-titled summary tabulated by thématique with findings tagged `[8.4]`
 rather than `[3.1.1]`, in the pack's own language; `--json` and `--out` write a pack-keyed
 document (106 criteria, 13 themes) carrying the WCAG core inside `core` for the pipeline; and
-CI annotations, SARIF, the report, the PRD and the per-page sheets name RGAA criteria and
+the report, the PRD and the per-page sheets name RGAA criteria and
 nothing else — no WCAG cross-reference anywhere in a pack deliverable. The engine still keys
 on success criteria internally, because a pack criterion is DEFINED as a projection of them;
 that is plumbing, and no reader sees it. Add `--pack ./pack.json` to load a standard at
 runtime, and `--json` anywhere for machine output.
 `--lang` follows the conversation (pass it explicitly — Core rule 7).
 
-## The loop: audit → render → judge → fix → re-audit
+## The loop: audit → render → adjudicate → fix → re-audit
 
 To converge on conformance (not a single pass), chain the steps, letting the agent
 drive the judgment and content stages:
@@ -403,7 +386,7 @@ drive the judgment and content stages:
    **audit the render** (`render` → build/SSR → `audit`) for reliable verdicts (otherwise
    the scope-risk note reminds you).
 1b. **RENDER BEFORE YOU ADJUDICATE — this step is not optional when a rendering criterion is
-   open.** `scan <url|file> --runtime local --merge audits/audit-latest.json --out audits`
+   open.** `scan <url|file> --merge audits/audit-latest.json --out audits`
    (or `scan --sample`) drives a real browser, persists each page to `.ultra11y/pages/<id>/`
    **with what it measured** (`probes.json`, `axe.json`), and folds it in. Skipping it does not
    leave those criteria merely open — it makes them *undecidable by anyone*: no reading of the
@@ -524,7 +507,7 @@ promote one to the other — see **`references/false-positives.md`**.
 
 - Invent a non-conformity the engine did not find and you cannot see (contrast on
   **inline literal colours** is decided statically; **computed** contrast — external CSS,
-  variables — goes through `scan` (Docker tier) or is verified at render before being declared).
+  variables — goes through `scan` (browser tier) or is verified at render before being declared).
 - Add ARIA that duplicates native semantics.
 - Mark a rendering/judgment criterion "conforming" without a recorded, gated justification
   (agent adjudication via `verify --manual`, or `scan` evidence).
@@ -534,8 +517,8 @@ promote one to the other — see **`references/false-positives.md`**.
 
 Static engine: offline, deterministic, install-free; inputs are HTML + JSX/TSX (real AST,
 cross-file analysis via `--graph`) + stdin. The **rendering** criteria (computed contrast,
-reflow) are covered by the optional `scan` tier (axe-core, Docker **or** `--runtime local`).
-The local runtime additionally **probes** focus visibility (2.4.7), 200% text zoom (1.4.4),
+reflow) are covered by the optional `scan` tier (axe-core on the local Playwright).
+It additionally **probes** focus visibility (2.4.7), 200% text zoom (1.4.4),
 text spacing (1.4.12) and content-on-hover (1.4.13) — observed in the rendered page, raised
 as NC only when the failure is seen (a clean probe leaves the SC `manual`, never silently
 conforming); reading order and alt relevance are the AI agent's judgment, adjudicated from the

@@ -312,8 +312,8 @@ jobs:
   #
   # WHEN THIS GOES RED, the fix is not to regenerate the ledger until it passes. Read which
   # criteria went stale: their evidence changed, so their verdicts are about code that no longer
-  # exists. Re-adjudicate those criteria — `Adjudication (keyed)`, which records the ledger —
-  # and commit the result as the reviewable claim it is.
+  # exists. Re-adjudicate those criteria (`verify --manual`, then `verify --apply … --ledger`,
+  # which records the ledger) and commit the result as the reviewable claim it is.
   ledger-gate:
     # The double rendered audit is a certification check, not a fast feedback check. Keep it
     # available on demand without making every push and pull request wait for it.

@@ -36,66 +36,24 @@ exit codes and JSON documents — is the contract a release must keep. The bot r
 | Command | What the bot uses it for |
 |---|---|
 | `status --browser` | whether the rendered tier resolves on the runner |
-| `audit --standard rgaa --json` | THE finding set, written to `audits/audit-latest.json` |
-| `sample check` · `scan --sample` | lint the `.ultra11yrc.json` page sample, then render, snapshot and fold it (`--storage-state` for pages behind a login) |
+| `audit --standard rgaa --json` (+ `--graph`, `--jsx`, `--exclude`, `--max-files`, `--staged` / `--changed` / `--since <ref>`) | THE finding set, written to `audits/audit-latest.json` |
+| `sample check` | lint the `.ultra11yrc.json` page sample against the standard's required page kinds |
+| `scan --sample --merge <audit.json>` | render, snapshot and fold the page sample (`--storage-state` for pages behind a login) |
 | `verify --apply <ledger>` | replay the committed verdict ledger (`.ultra11y/verdicts/<standard>.json`) — a re-verification against fresh evidence, never a cache hit |
 | `verify --manual` | the adjudication worklist for the criteria still « à évaluer » |
 | `verify --apply <adjudication.json> --ledger <file>` | the fail-closed fold, recording the accepted verdicts |
 | `verify --report …` · `verify --apply <VERIFY.todo.json> --prune` | the refutation: every written claim on trial, refuted ones withdrawn |
-| `report` | the dated conformance report |
-| `check --report` · `check --in --require-decided=pages --allow-undecided <file>` | the integrity and completeness gates |
+| `report` · `report --html` | the dated conformance report, and its printable HTML |
+| `check --report <md>` | the integrity gate: every cited criterion resolves, every NA is justified |
+| `check --in … --require-decided=pages [--allow-undecided <file>] [--require-rendered]` | the completeness gates |
 | `pages --in … --json --out <dir>` | the per-page criterion grid (`pages.json`) |
-| `tickets --in … --grain criterion` | one issue per non-conforming criterion |
+| `tickets --in … --dry-run --transport rest` | the issue plan, one per non-conforming criterion |
 
 A change to any of these is a breaking change for the bot. `orchestrate --manifest` describes the
 same loop as data for any orchestrator; see `references/orchestrators.md`.
 
-## Machine outputs: `--format sarif` and `--format github`
-
-Two CI renderings of the same `AuditResult`, from `audit` or from `report --in`. Nothing new is
-measured; both project from the active standard's grid, so `--standard rgaa` gives RGAA
-criteria.
-
-```sh
-node scripts/ultra11y.mjs report --in audits/audit-latest.json --standard rgaa --format sarif > rgaa.sarif
-node scripts/ultra11y.mjs report --in audits/audit-latest.json --standard rgaa --format github
-```
-
-**`--format sarif`** is SARIF 2.1.0, what GitHub code scanning ingests
-(`github/codeql-action/upload-sarif`): each finding becomes an annotation on the right file and
-line. What the projection guarantees:
-
-- **Levels.** `bloquant → error`, `majeur → warning`, `mineur → note`. An **advisory**
-  (non-normative recommendation) is **never** an `error` — always a `note`.
-- **Stable alert identity.** `partialFingerprints` reuses `findingId()`, the identity the
-  baseline gate uses, so an alert survives line drift.
-- **Rules table.** One entry per `ruleId`, tagged `accessibility`, `wcag:<sc>` and, under
-  `--standard`, `<pack>:<criterion>` (e.g. `rgaa:1.1`).
-- **Repo-relative URIs**, and **no invented locations**: a finding keyed to a **URL** that the
-  host-anchor resolver could not map back to source is emitted with **no** physical location
-  and its URL in `properties.url`.
-- Each run carries a distinct `automationDetails.id` (`ultra11y/<standard>/`), so two uploads
-  in one workflow stay separate analyses.
-
-**`--format github`** writes `::error file=…,line=…::` workflow commands to stdout, which every
-GitHub plan renders inline on the diff, and appends a compact Markdown summary to
-`$GITHUB_STEP_SUMMARY` (stderr when unset). The summary prints **coverage, never a
-percentage** over the decided subset. URL-keyed findings are skipped for annotations and counted
-in the summary instead.
-
-In `--baseline` gate mode both renderings cover **exactly the new findings**.
-
-`ULTRA11Y_PR_COMMENT=1` additionally posts a sticky pull-request comment and **edits it in
-place** on every later run (`ULTRA11Y_PR_COMMENT_KIND`: `digest`, `pages` or `full`, each under
-its own marker). It is best-effort: off a pull request, or with no `gh`/auth, it reports
-`skipped` and the run carries on.
-
-## `audit --lite` and `affected`
-
-The rendered regression gate is engine behaviour too: `affected --since <ref>` names the sample
-pages a diff can change (sources and their imports, `sample.global`, the merge-base), and
-`audit --lite --pages <ids> --baseline <file>` audits their snapshots alone and fails only on
-NEW findings (`--write-baseline <file>` records one). See the README.
+The engine emits no CI-specific rendering (no SARIF, no workflow annotations, no pull-request
+comment): the bot reads the JSON documents above and posts what it decides to post.
 
 ## How this repo publishes itself (npm trusted publishing)
 

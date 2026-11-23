@@ -110,12 +110,6 @@ export function mkTmpRepo(): string {
   return d;
 }
 
-/** True when a working Docker daemon is reachable (the dynamic scan tier needs it). */
-export function hasDocker(): boolean {
-  const r = spawnSync("docker", ["info"], { encoding: "utf8", timeout: 10_000 });
-  return r.status === 0;
-}
-
 /** True when the LOCAL dynamic runtime can run from `cwd`: @playwright/test +
  *  @axe-core/playwright resolve AND a Chromium browser is installed. Gates the
  *  stateful probe smoke test, which needs a real browser (layout-dependent). */

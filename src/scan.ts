@@ -1,14 +1,4 @@
-// `scan` — OPTIONAL dynamic tier. Runs axe-core in a real headless browser
-// (Playwright) to decide the needs-rendering criteria the static engine can't:
-// computed contrast (3.2/3.3) above all, plus a 320px reflow check (10.11) and a
-// cross-check of the structural rules. Everything runs in a self-contained Docker
-// image built on first use (the runner + Dockerfile are embedded below, so the
-// skill stays a single distributable bundle). `--merge <audit.json>` folds the
-// dynamic findings back into a static AuditResult, upgrading "manual" criteria.
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, existsSync, statSync, readdirSync, rmSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { AuditResult, DynamicEngine, DynamicFinding, DynamicResult, Finding, Lang, SamplePage, ScanRedirect, Severity } from "./types.js";
 import { isAdjudicated } from "./types.js";
@@ -16,12 +6,7 @@ import { lineStartsOf, lineColAt } from "./parse/html.js";
 import { allGuidelines } from "./wcag.js";
 import { PROBE_SEVERITY, PROBE_WCAG, axeNodeTreatment, scForAxe } from "./axe-map.js";
 import { parseSitemapUrls, crawlUrls, crawlBound, nameFromUrl } from "./crawl.js";
-import { sampleScope } from "./sample.js";
 import {
-  COLLECT_SNAPSHOT,
-  FULL_SCREENSHOT_MAX_HEIGHT,
-  LOADING_STATE,
-  LOADING_TIMEOUT_MS,
   PAGES_DIR,
   SNAPSHOT_VERSION,
   slugifyPageId,
@@ -32,7 +17,7 @@ import {
   type SnapshotProbes,
 } from "./snapshot.js";
 import { resolveMessage } from "./messages.js";
-import { PROBES_VERSION, REFLOW_PROBE } from "./probes.js";
+import { PROBES_VERSION } from "./probes.js";
 import { today } from "./util.js";
 import { findingId } from "./baseline.js";
 
@@ -46,144 +31,6 @@ const portableFindingId = (finding: Finding): string => {
   return findingId(at >= 0 ? { ...finding, file: posix.slice(at) } : finding);
 };
 
-export const IMAGE_TAG = "ultra11y-dyn:1";
-const MOUNT = "/work/input.html";
-
-// The browser runner — lives INSIDE the Docker image (its own deps), never bundled
-// into the zero-dep engine. Injects axe.source, runs axe, then a 320px reflow probe.
-// Mirrored to docker/runner.mjs (kept byte-identical by docker-sync.test).
-export const RUNNER = `import { chromium } from "playwright";
-import axe from "axe-core";
-const target = process.argv[2];
-const isFile = target.startsWith("/work/");
-const SNAPSHOT = process.env.ULTRA11Y_SNAPSHOT !== "0";
-const COLLECT = ${JSON.stringify(COLLECT_SNAPSHOT)};
-const REFLOW = ${JSON.stringify(REFLOW_PROBE)};
-const LOADING = ${JSON.stringify(LOADING_STATE)};
-const browser = await chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
-try {
-  const page = await browser.newPage();
-  await page.goto(isFile ? "file://" + target : target, { waitUntil: "load", timeout: 45000 });
-  // Not while the page still declares itself loading (aria-busy, a spinner, « Chargement… »).
-  // Bounded: a page that never settles is collected anyway, and the collector marks it.
-  for (const end = Date.now() + ${LOADING_TIMEOUT_MS}; Date.now() < end; ) {
-    let markers = [];
-    try { markers = await page.evaluate(LOADING); } catch {}
-    if (!markers.length) break;
-    await page.waitForTimeout(150);
-  }
-  // Collected FIRST, on the pristine page: axe's injected source and the 320px reflow
-  // resize both come after, and a snapshot must be the page as the browser built it.
-  let snapshot;
-  if (SNAPSHOT) {
-    try {
-      snapshot = await page.evaluate(COLLECT);
-      try { snapshot.screenshot = (await page.screenshot({ fullPage: false })).toString("base64"); } catch {}
-      // The whole page beside it, height-bounded, for the report's reader.
-      try {
-        const vp = snapshot.viewport;
-        const height = Math.min(snapshot.docHeight || 0, ${FULL_SCREENSHOT_MAX_HEIGHT});
-        if (vp && height > vp.height) snapshot.screenshotFull = (await page.screenshot({ fullPage: true, clip: { x: 0, y: 0, width: vp.width, height } })).toString("base64");
-      } catch {}
-    } catch {}
-  }
-  await page.addScriptTag({ content: axe.source });
-  const axeRes = await page.evaluate(async () => await window.axe.run(document, { resultTypes: ["violations"] }));
-  await page.setViewportSize({ width: 320, height: 800 });
-  // The same probe the local runtime runs (src/probes.ts REFLOW_PROBE): it waits for the
-  // relayout and names the boxes that widen the page, instead of a bare yes/no.
-  const reflow = await page.evaluate(REFLOW);
-  const violations = axeRes.violations.map((v) => ({
-    id: v.id, impact: v.impact, help: v.help, tags: v.tags,
-    nodes: v.nodes.slice(0, 10).map((n) => ({ target: n.target, html: (n.html || "").slice(0, 200) })),
-  }));
-  console.log(JSON.stringify({ url: target, violations, reflow, snapshot }));
-} finally {
-  await browser.close();
-}
-`;
-
-export const PKG = JSON.stringify(
-  { name: "ultra11y-dynamic", private: true, type: "module", dependencies: { playwright: "^1.49.0", "axe-core": "4.12.1" } },
-  null,
-  2,
-);
-
-export const DOCKERFILE = `FROM node:22-bookworm-slim
-WORKDIR /app
-COPY package.json ./
-RUN npm install --omit=dev && npx playwright install --with-deps chromium
-COPY runner.mjs ./
-WORKDIR /work
-ENTRYPOINT ["node", "/app/runner.mjs"]
-`;
-
-export function dockerAvailable(): boolean {
-  try {
-    execFileSync("docker", ["info"], { stdio: "ignore", timeout: 10000 });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function imageExists(tag: string): boolean {
-  try {
-    execFileSync("docker", ["image", "inspect", tag], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-const CTX_PREFIX = "ultra11y-dyn-";
-
-/** Build the dynamic-tier image from the embedded context (first use only).
- *  The temp build context is always removed afterwards — the host stays clean. */
-export function buildImage(tag = IMAGE_TAG): void {
-  const ctx = mkdtempSync(join(tmpdir(), CTX_PREFIX));
-  try {
-    writeFileSync(join(ctx, "runner.mjs"), RUNNER);
-    writeFileSync(join(ctx, "package.json"), PKG);
-    writeFileSync(join(ctx, "Dockerfile"), DOCKERFILE);
-    execFileSync("docker", ["build", "-t", tag, ctx], { stdio: "inherit", timeout: 900000 });
-  } finally {
-    rmSync(ctx, { recursive: true, force: true });
-  }
-}
-
-/** Remove any leftover temp build contexts (pure fs; safe to call always). */
-export function cleanTempContexts(): number {
-  let removed = 0;
-  const dir = tmpdir();
-  for (const name of readdirSync(dir)) {
-    if (!name.startsWith(CTX_PREFIX)) continue;
-    rmSync(join(dir, name), { recursive: true, force: true });
-    removed++;
-  }
-  return removed;
-}
-
-export interface CleanResult {
-  imageRemoved: boolean;
-  tempContextsRemoved: number;
-}
-
-/** Tear down the dynamic tier: remove the image + any leftover build contexts.
- *  Answers "clean it up easily from the script" — nothing is left on the host. */
-export function cleanDynamic(tag = IMAGE_TAG): CleanResult {
-  let imageRemoved = false;
-  if (dockerAvailable() && imageExists(tag)) {
-    try {
-      execFileSync("docker", ["rmi", "-f", tag], { stdio: "ignore" });
-      imageRemoved = true;
-    } catch {
-      /* image in use or already gone */
-    }
-  }
-  return { imageRemoved, tempContextsRemoved: cleanTempContexts() };
-}
-
 /** One observation from a residual-criteria probe (local runtime only). */
 export interface ProbeHit {
   selector: string;
@@ -192,7 +39,7 @@ export interface ProbeHit {
 }
 
 /** The selectors of the boxes a 320px reflow probe found widening the page, as one phrase — or
- *  undefined when the producer did not look (an older Docker image or snapshot) or found no
+ *  undefined when the producer did not look (an older runner output or snapshot) or found no
  *  box to name. A cause is only ever stated when it was measured. */
 export function reflowWidening(reflow: { widening?: { selector: string }[] } | undefined): string | undefined {
   const sels = (reflow?.widening ?? []).map((w) => w.selector).filter(Boolean);
@@ -204,9 +51,8 @@ export interface RunnerOutput {
   violations: { id: string; impact: string | null; help: string; tags?: string[]; nodes: { target: string[]; html: string }[] }[];
   /** `widening`: the outermost boxes wider than the viewport, when the producer looked. */
   reflow: { horizontalScroll: boolean; widening?: ProbeHit[] };
-  // Residual-criteria probes — populated ONLY by the local runtime (scan-local.ts);
-  // the Docker RUNNER never sets them, so its RunnerOutput is unchanged. Optional so
-  // every existing caller/test (which omits them) stays valid.
+  // Residual-criteria probes — populated by the local runtime (scan-local.ts). Optional so
+  // every caller/test that omits them stays valid.
   focusVisible?: ProbeHit[];
   /** 2.4.11 — the component receiving focus entirely hidden behind author-created content. */
   focusObscured?: ProbeHit[];
@@ -215,8 +61,8 @@ export interface RunnerOutput {
   hover?: ProbeHit[];
   keyboardTrap?: ProbeHit[];
   // Stateful probes (local runtime, interactions ON) — a filled input clipped under each
-  // stress, and content updated by a safe interaction outside any live region. Optional +
-  // Docker-never-sets, exactly like the residual probes above.
+  // stress, and content updated by a safe interaction outside any live region. Optional,
+  // exactly like the residual probes above.
   inputOverflowReflow?: ProbeHit[];
   inputOverflowZoom?: ProbeHit[];
   inputOverflowSpacing?: ProbeHit[];
@@ -240,11 +86,11 @@ export interface RunnerOutput {
   // WHERE the browser was when the measurement started — read right after goto + settle,
   // before any probe could click something that routes. `url` above is read at the END and
   // is the address the run finished on; only this one is the identity of what was audited.
-  // Local runtime only; absent from a Docker RunnerOutput.
+  // Optional: absent from a RunnerOutput that predates it.
   landedUrl?: string;
   // The navigation's HTTP status. A framework can answer 404/500 with a full document at the
   // requested URL (Next's `notFound()`), which no URL comparison can detect. Absent for
-  // `file://` and for the Docker runner — absent is never treated as a failure.
+  // `file://` — absent is never treated as a failure.
   httpStatus?: number;
 }
 
@@ -394,8 +240,8 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
   return v.meta.id;
 }
 
-// RunnerOutput key ↔ probe engine, so a clean Docker output (no probe arrays) folds
-// exactly as before and the local output adds the residual-criteria findings.
+// RunnerOutput key ↔ probe engine, so an output with no probe arrays folds to axe +
+// reflow alone and each probe array adds its residual-criteria findings.
 const PROBE_FIELDS: { key: keyof RunnerOutput; engine: Exclude<DynamicEngine, "axe" | "reflow"> }[] = [
   { key: "focusVisible", engine: "focus-visible" },
   { key: "focusObscured", engine: "focus-obscured" },
@@ -409,77 +255,12 @@ const PROBE_FIELDS: { key: keyof RunnerOutput; engine: Exclude<DynamicEngine, "a
   { key: "liveRegion", engine: "live-region" },
 ];
 
-/** Rewrite a HOST loopback URL into one a container can reach. `docker run` gets no
- *  `--network host`, so the container's 127.0.0.1 is its own — a scan of
- *  `http://localhost:3000` (the action's `start:` + `urls:` shape) died on
- *  ERR_CONNECTION_REFUSED while the app ran the whole time, which is how this
- *  repository's CI stayed red for a day. `host.docker.internal` is natively resolved by
- *  Docker Desktop (macOS/Windows); on Linux the caller adds
- *  `--add-host host.docker.internal:host-gateway`. https:// loopback is deliberately NOT
- *  rewritten: the container would fail the self-signed certificate anyway. */
-export function loopbackToHostGateway(target: string): { url: string; addHost: boolean } {
-  const m = /^http:\/\/(localhost|127(?:\.\d{1,3}){3})(:\d+)?(\/.*)?$/i.exec(target);
-  if (!m) return { url: target, addHost: false };
-  return { url: `http://host.docker.internal${m[2] ?? ""}${m[3] ?? ""}`, addHost: true };
-}
-
-function runRunner(target: string, isFile: boolean, tag: string, snapshot = true): RunnerOutput {
-  const hostTarget = target;
-  const args = ["run", "--rm"];
-  if (!snapshot) args.push("-e", "ULTRA11Y_SNAPSHOT=0");
-  if (isFile) args.push("-v", `${resolve(target)}:${MOUNT}:ro`);
-  else {
-    // The container must reach the HOST's loopback through host.docker.internal; on
-    // Linux that name needs the host-gateway mapping Docker Desktop provides natively.
-    const gw = loopbackToHostGateway(target);
-    if (gw.addHost && process.platform === "linux") {
-      args.push("--add-host", "host.docker.internal:host-gateway");
-    }
-    target = gw.url;
-  }
-  args.push(tag, isFile ? MOUNT : target);
-  let stdout: string;
-  try {
-    // Pipe (not ignore) the container's stderr so a failed run surfaces the real
-    // cause (e.g. ERR_NAME_NOT_RESOLVED / a navigation timeout) instead of a bare
-    // "Command failed: docker run …".
-    // The buffer is sized for the SNAPSHOT, not the findings: one line now carries the
-    // serialized document, the computed-style digest, the boxes, the stylesheets and a
-    // base64 screenshot. Too small a buffer would kill the run with ENOBUFS on exactly the
-    // large pages that most need auditing.
-    stdout = execFileSync("docker", args, { encoding: "utf8", timeout: 240000, maxBuffer: 192 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
-  } catch (e) {
-    const err = e as { stderr?: Buffer | string; message?: string };
-    const detail = (err.stderr ? String(err.stderr).trim() : "") || err.message || String(e);
-    throw new Error(`docker run failed — ${detail}`);
-  }
-  const line = stdout.trim().split("\n").filter(Boolean).pop() ?? "{}";
-  const out = JSON.parse(line) as RunnerOutput;
-  // WHAT THIS RUNTIME ACTUALLY MEASURED, stated here rather than in the container. The Docker
-  // RUNNER is kept byte-identical to docker/runner.mjs (docker-sync test), so it does not get
-  // to grow fields; and it needs none — it runs axe and one 320px reflow check, which is
-  // exactly DOCKER_TESTED_SCS. Claiming any more would hand `renderedProvesOn` a conformity
-  // nothing on this path measured.
-  out.probed = [...DOCKER_TESTED_SCS];
-  // Report what a HOST reader can open: the runner finished on host.docker.internal, and
-  // every downstream citation (hostPageOf, snapshot identity) derives from out.url. Only
-  // the HOSTNAME is restored — the port stays from the container URL, which was copied
-  // from the target, so pasting a full origin would double it
-  // (`http://127.0.0.1:8931:8931/…`).
-  if (loopbackToHostGateway(hostTarget).addHost && out.url) {
-    const hostSchemeName = hostTarget.match(/^http:\/\/[^:/]+/)?.[0] ?? hostTarget;
-    out.url = out.url.replace(/^http:\/\/host\.docker\.internal(?=:\d+|\/|$)/i, hostSchemeName);
-  }
-  return out;
-}
-
 /** Map the runner's reported page back to a HOST-meaningful citation: the container mount
  *  (`/work/input.html`) and a `file://` URL both resolve to the host file we scanned; a
  *  real served URL (http/https) is kept as-is. This is what lets a dynamic finding cite a
  *  path a reader (and `verify --semantic`) can actually open, instead of `/work/input.html`. */
 function hostPageOf(url: string | undefined, target: string): string {
   if (!url) return target;
-  if (url === MOUNT) return target; // docker file mount → the host file we mounted read-only
   if (url.startsWith("file://")) {
     try {
       return fileURLToPath(url);
@@ -490,7 +271,7 @@ function hostPageOf(url: string | undefined, target: string): string {
   return url; // a real served URL — no host file to map to
 }
 
-export function toDynamicResult(out: RunnerOutput, target: string, lang: Lang = "en", engine = "axe-core@playwright (docker)"): DynamicResult {
+export function toDynamicResult(out: RunnerOutput, target: string, lang: Lang = "en", engine = "axe-core@playwright"): DynamicResult {
   const page = hostPageOf(out.url, target);
   const findings: DynamicFinding[] = [];
   for (const v of out.violations) {
@@ -555,41 +336,6 @@ export function toDynamicResult(out: RunnerOutput, target: string, lang: Lang = 
   return { tool: "ultra11y", engine, target, date: today(), findings };
 }
 
-// The needs-rendering SCs the DOCKER runner actually MEASURES: axe + the 320px reflow
-// probe only — the local-only probes (200% zoom, text spacing, focus visibility, content
-// on hover, live regions) never run in the container. Stamped on every Docker
-// DynamicResult so the partial-audit advisory (src/report.ts untestedNeedsRendering)
-// never claims a probe ran when it did not. The local superset: scan-local.ts
-// `localTestedScs`.
-export const DOCKER_TESTED_SCS: readonly string[] = ["1.4.10"];
-
-export interface ScanOpts {
-  target: string;
-  tag?: string;
-  /** Repo root under which to persist `.ultra11y/pages/<id>/`. Unset ⇒ no snapshot. */
-  snapshotRoot?: string;
-}
-
-/** Run the dynamic tier (builds the image on first use). Throws if Docker absent. */
-export function runScan(opts: ScanOpts): DynamicResult {
-  // A non-URL target must exist as a file BEFORE we spend a Docker build on a typo
-  // (otherwise a mistyped path silently falls through to URL mode and fails deep
-  // inside `docker run`, leaking the raw command).
-  const isUrl = /^https?:\/\//i.test(opts.target);
-  if (!isUrl && !existsSync(opts.target)) {
-    throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
-  }
-  if (!dockerAvailable()) {
-    throw new Error("Docker is not available. Start Docker, then re-run `scan --docker`.");
-  }
-  const tag = opts.tag ?? IMAGE_TAG;
-  if (!imageExists(tag)) buildImage(tag);
-  const isFile = !isUrl && existsSync(opts.target) && statSync(opts.target).isFile();
-  const out = runRunner(opts.target, isFile, tag, Boolean(opts.snapshotRoot));
-  const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, opts.target) : undefined;
-  return { ...toDynamicResult(out, opts.target), testedScs: [...DOCKER_TESTED_SCS], ...(id ? { snapshots: [id] } : {}) };
-}
-
 /** Fetch a URL's served HTML (zero-dep, Node global fetch). Empty string on error. */
 async function fetchHtml(url: string): Promise<string> {
   try {
@@ -629,81 +375,14 @@ export async function discoverUrls(opts: DiscoverOpts): Promise<string[]> {
   return [];
 }
 
-/** Run the dynamic tier over many URLs and aggregate into one DynamicResult.
- *  Each URL is one container run (browser per page); slow but reuses the proven
- *  single-page runner. Findings keep the page they came from. */
-export function runScanMany(urls: string[], tag = IMAGE_TAG, snapshotRoot?: string): DynamicResult {
-  if (!dockerAvailable()) {
-    throw new Error("Docker is not available. Start Docker, then re-run `scan`.");
-  }
-  if (!imageExists(tag)) buildImage(tag);
-  const findings: DynamicFinding[] = [];
-  const snapshots: string[] = [];
-  for (const url of urls) {
-    const out = runRunner(url, false, tag, Boolean(snapshotRoot));
-    findings.push(...toDynamicResult(out, url).findings);
-    const id = snapshotRoot ? writeRunnerSnapshot(snapshotRoot, out, url) : undefined;
-    if (id) snapshots.push(id);
-  }
-  return {
-    tool: "ultra11y",
-    engine: "axe-core@playwright (docker)",
-    target: `${urls.length} page(s)`,
-    date: today(),
-    findings,
-    testedScs: [...DOCKER_TESTED_SCS],
-    ...(snapshots.length ? { snapshots } : {}),
-  };
-}
-
 /** Stamp each dynamic finding with its originating sample page's provenance (id/name/auth/
  *  notes) so `mergeDynamic` can carry it onto the Finding for ticket rendering. Shared by
- *  the Docker and local sample runners. Mutates + returns the findings. */
+ *  the sample runners. Mutates + returns the findings. */
 export function tagSampleFindings(findings: DynamicFinding[], page: SamplePage): DynamicFinding[] {
   for (const f of findings) {
     f.sample = { id: page.id, name: page.name, ...(page.auth !== undefined ? { auth: page.auth } : {}), ...(page.notes ? { notes: page.notes } : {}) };
   }
   return findings;
-}
-
-/** Run the Docker dynamic tier over a NORMATIVE page SAMPLE and aggregate into one
- *  DynamicResult. No storageState support (the Docker runner has no session mechanism) — the
- *  CLI requires the local runtime whenever any sample page carries auth. Each finding keeps
- *  its sample-page provenance; the sample itself is recorded on the result. */
-export function runSampleScan(pages: SamplePage[], tag = IMAGE_TAG, snapshotRoot?: string): DynamicResult {
-  if (!dockerAvailable()) {
-    throw new Error("Docker is not available. Start Docker, then re-run `scan`.");
-  }
-  if (!imageExists(tag)) buildImage(tag);
-  const findings: DynamicFinding[] = [];
-  const snapshots: string[] = [];
-  for (const page of pages) {
-    const out = runRunner(page.url, false, tag, Boolean(snapshotRoot));
-    findings.push(...tagSampleFindings(toDynamicResult(out, page.url).findings, page));
-    // The sample page's declared id/name/auth/notes win over anything derived from the URL:
-    // that identity is what the report and the per-page grid speak.
-    const id = snapshotRoot ? writeRunnerSnapshot(snapshotRoot, out, page.url, page) : undefined;
-    if (id) snapshots.push(id);
-  }
-  return {
-    tool: "ultra11y",
-    engine: "axe-core@playwright (docker)",
-    target: `${pages.length} page(s) (échantillon)`,
-    date: today(),
-    findings,
-    sample: sampleScope({ pages }),
-    testedScs: [...DOCKER_TESTED_SCS],
-    ...(snapshots.length ? { snapshots } : {}),
-  };
-}
-
-/** Discover URLs (sitemap/crawl) then scan them all through the dynamic tier. */
-export async function runCrawlScan(opts: DiscoverOpts & { tag?: string; snapshotRoot?: string }): Promise<DynamicResult> {
-  const urls = await discoverUrls(opts);
-  if (urls.length === 0) {
-    throw new Error("No URL to scan (empty/unreachable sitemap, or entry page with no same-origin link).");
-  }
-  return runScanMany(urls, opts.tag ?? IMAGE_TAG, opts.snapshotRoot);
 }
 
 const sevRank: Record<Severity, number> = { bloquant: 3, majeur: 2, mineur: 1 };
@@ -798,8 +477,8 @@ export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: L
     else delete merged.scope.redirected;
   }
   // Record which needs-rendering SCs this scan actually MEASURED (union across merges) —
-  // the partial-audit advisory keys on this, so a Docker run (reflow only) never silently
-  // suppresses the banner for the local-only probes it did not run.
+  // the partial-audit advisory keys on this, so a run that skipped a probe never silently
+  // suppresses the banner for the criteria it did not measure.
   if (dynamic.testedScs?.length) {
     const tested = new Set([...(merged.scope.scan?.testedScs ?? []), ...dynamic.testedScs]);
     merged.scope.scan = { testedScs: [...tested].sort() };
@@ -969,7 +648,7 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
   // six rendered-* rules on both pages, the per-page grid decided RGAA 3.2, and the banner two
   // paragraphs above still said the text contrast had not been tested.
   //
-  // A union, never a replacement: a Docker scan merged earlier in the same run has its own
+  // A union, never a replacement: a scan merged earlier in the same run has its own
   // entry, and the snapshot half must add to it rather than speak over it.
   const scs = new Set([...(base.scope.scan?.testedScs ?? []), ...(snap.scope.scan?.testedScs ?? [])]);
   if (scs.size) merged.scope.scan = { testedScs: [...scs].sort() };

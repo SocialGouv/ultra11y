@@ -51,9 +51,8 @@ export interface InheritedProtocol {
  *
  *  `ADJUDICATION` is keyed by success criterion — three segments — and a country standard's
  *  ids have two, so a direct lookup on a pack criterion can only ever miss. This is the
- *  crosswalk, and it exists in one place because two surfaces need it and they must not
- *  disagree: the criterion lookup (src/criteria-view.ts) and the adjudication brief
- *  (src/adjudicate.ts).
+ *  crosswalk, kept in one place beside the protocols it reads; its consumer is the
+ *  adjudication brief (src/adjudicate.ts).
  *
  *  It is a FALLBACK, never a substitute. An SC often asks a broader question than the pack
  *  criterion mapped onto it, so whoever renders this must present it as inherited — see

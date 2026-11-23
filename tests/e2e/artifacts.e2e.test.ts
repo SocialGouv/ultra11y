@@ -1,10 +1,10 @@
-// End-to-end tests for the SIDE-EFFECTING commands: init (git hook / CI / baseline),
+// End-to-end tests for the SIDE-EFFECTING commands: init (git hook),
 // fix --write, and report/prd default output. Everything runs inside throwaway temp
 // dirs / git repos so the real repository and its fixtures are never touched.
 import { describe, it, expect, afterAll } from "vitest";
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
-import { runCli, FIX, mkTmp, mkTmpRepo, cleanupTmp, hasDocker } from "./helpers.js";
+import { runCli, FIX, mkTmp, mkTmpRepo, cleanupTmp, hasLocalPlaywright } from "./helpers.js";
 
 afterAll(cleanupTmp);
 
@@ -18,23 +18,6 @@ describe("e2e: init (throwaway repo)", () => {
     expect(statSync(hook).mode & 0o111, "hook must be executable").toBeGreaterThan(0);
     const body = readFileSync(hook, "utf8");
     expect(body).toContain("SKIP_A11Y");
-  });
-
-  it("--baseline alone writes ONLY a baseline (no hook)", () => {
-    const repo = mkTmpRepo();
-    const r = runCli(["init", "--baseline"], { cwd: repo });
-    expect(r.code).toBe(0);
-    expect(existsSync(join(repo, "audits", "baseline.json"))).toBe(true);
-    expect(existsSync(join(repo, ".git", "hooks", "pre-commit"))).toBe(false);
-  });
-
-  it("--ci --baseline --fail-on majeur writes a CI workflow + baseline", () => {
-    const repo = mkTmpRepo();
-    const r = runCli(["init", "--ci", "--baseline", "--fail-on", "majeur"], { cwd: repo });
-    expect(r.code).toBe(0);
-    expect(existsSync(join(repo, "audits", "baseline.json"))).toBe(true);
-    const wf = join(repo, ".github", "workflows");
-    expect(existsSync(wf) && readdirSync(wf).some((f) => f.endsWith(".yml"))).toBe(true);
   });
 
   it("--help writes nothing (no side effect)", () => {
@@ -88,15 +71,15 @@ describe("e2e: report/prd default output (temp cwd)", () => {
 });
 
 describe("e2e: scan (static / error path)", () => {
-  it("reports a clean 'File not found' error (exit 1) without a Docker build", () => {
+  it("reports a clean 'File not found' error (exit 1) before launching any browser", () => {
     const r = runCli(["scan", join(mkTmp(), "does-not-exist.html")]);
     expect(r.code).toBe(1);
     expect((r.stdout + r.stderr).toLowerCase()).toContain("file not found");
   });
 
-  // The real rendered/contrast tier needs Docker; opt-in (slow image build) via env.
-  const runDocker = Boolean(process.env.U11Y_E2E_DOCKER) && hasDocker();
-  it.skipIf(!runDocker)("scans a rendered page and flags low contrast", () => {
+  // The real rendered/contrast tier needs a browser; opt-in (slow) via env.
+  const runScan = Boolean(process.env.U11Y_E2E_SCAN) && hasLocalPlaywright();
+  it.skipIf(!runScan)("scans a rendered page and flags low contrast", () => {
     const r = runCli(["scan", FIX.lowContrast, "--json"]);
     expect(r.code).toBe(0);
     expect(() => JSON.parse(r.stdout)).not.toThrow();

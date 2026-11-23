@@ -4,16 +4,13 @@ The static engine leaves some criteria "to assess" because they need a **render*
 contrast (1.4.3), focus visible (2.4.7), focus not obscured (2.4.11), reflow/zoom
 (1.4.4/1.4.10), text spacing (1.4.12),
 content on hover (1.4.13), target size (2.5.8). The dynamic tier decides them by running
-**axe-core in a real headless browser** (Playwright). Two runtimes, same finding shape:
+**axe-core in a real headless browser** (Playwright), on one runtime:
 
-- **`--runtime local`** (recommended): resolves Playwright + `@axe-core/playwright`
-  **at runtime**, from `--cwd` first and from ultra11y's own install second (no Docker, no
-  global install). A project that pins its own Playwright keeps it, because `--cwd` is tried
-  first. Adds the residual-criteria **probes** (below).
-- **`--runtime docker`**: runs axe-core in a Docker image auto-built on first use (runner +
-  Dockerfile embedded in the bundle). No host deps beyond Docker. Axe + 320px reflow only.
-- **`--runtime auto`** (default): local if Playwright resolves **and** a browser binary is on
-  disk, else Docker, else an actionable error.
+- **The local Playwright**: `scan` resolves Playwright + `@axe-core/playwright` **at runtime**,
+  from `--cwd` first and from ultra11y's own install second (no global install). A project that
+  pins its own Playwright keeps it, because `--cwd` is tried first. It adds the
+  residual-criteria **probes** (below). `--runtime local` (or its alias `--local`) still names it
+  explicitly; there is no other runtime.
 - **`--browser-path <file>`** (or `ULTRA11Y_BROWSER_PATH`): launch **this** executable with the
   local runtime instead of the browser Playwright resolves — a distribution's Chromium
   (`/usr/bin/chromium` on Debian, what a sandboxed runner image ships), which Playwright's own
@@ -33,48 +30,42 @@ content on hover (1.4.13), target size (2.5.8). The dynamic tier decides them by
   | iterion's `rgaa-audit` bot (CI) | the bot installs the pinned engine package — dependencies included — and probes the tier with `status --browser` before it renders. |
 
   Which of those you are in is answerable: `status --browser [--cwd <dir>]` asks the very
-  function `scan --runtime local` acts on, and reports `ok` plus, when it is not, WHICH package
+  function `scan` acts on, and reports `ok` plus, when it is not, WHICH package
   or binary is missing. That is what a CI harness branches on, rather than re-deriving it.
 
   Either way, a project that installs them itself wins: `--cwd` is tried first, which is what a
-  repository with its own pinned Playwright wants. When neither anchor resolves, `auto` degrades
-  to Docker and says which package it could not find.
-- **docker**: Docker running.
+  repository with its own pinned Playwright wants. When neither anchor resolves, `scan` fails
+  and says which package it could not find.
 
 The rest of the skill (static audit) needs neither.
 
 ## Usage
 
 ```
-# auto runtime (local if available, else Docker)
+# resolving deps + browser from the current directory, then from ultra11y itself
 node scripts/ultra11y.mjs scan https://example.com --json
 
-# explicit local runtime, resolving deps + browser from a project (e.g. a monorepo package)
-node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd packages/app --json
+# resolving deps + browser from a project first (e.g. a monorepo package)
+node scripts/ultra11y.mjs scan http://localhost:3000 --cwd packages/app --json
 
 # a browser already on the machine (a distribution's Chromium), never downloaded by Playwright
 node scripts/ultra11y.mjs status --browser --cwd . --browser-path /usr/bin/chromium --json
-node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd . --browser-path /usr/bin/chromium --json
+node scripts/ultra11y.mjs scan http://localhost:3000 --cwd . --browser-path /usr/bin/chromium --json
 
 # authenticated pages: pass a Playwright storageState JSON (cookies/localStorage)
-node scripts/ultra11y.mjs scan http://localhost:3000/dashboard --runtime local \
+node scripts/ultra11y.mjs scan http://localhost:3000/dashboard \
   --cwd packages/app --storage-state packages/app/test-results/.auth/user.json --json
 
 # several explicit URLs at once (one browser, one context per page)
-node scripts/ultra11y.mjs scan http://localhost:3000/ http://localhost:3000/login --runtime local --cwd packages/app
+node scripts/ultra11y.mjs scan http://localhost:3000/ http://localhost:3000/login --cwd packages/app
 
 # merge with a static audit: the "to assess" criteria turn C/NC
 node scripts/ultra11y.mjs audit "src/**/*.tsx" --jsx --out audits --json > /dev/null
-node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd packages/app --merge audits/audit-latest.json --out audits
+node scripts/ultra11y.mjs scan http://localhost:3000 --cwd packages/app --merge audits/audit-latest.json --out audits
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --out audits
 ```
 
-`--storage-state` is **local-only**. Combining it with an **explicit** `--runtime docker` (or
-the `--docker` alias) is an unsupported combination and errors out (exit 2) — the Docker tier
-cannot use a Playwright storageState, and scanning unauthenticated would silently defeat the
-flag. Under `--runtime auto` that happens to fall back to Docker (no local Playwright
-resolved), it degrades with a warning instead — you didn't ask for Docker specifically.
-Produce the file with Playwright (e.g. an e2e auth setup that logs in and
+Produce the `--storage-state` file with Playwright (e.g. an e2e auth setup that logs in and
 `context.storageState({ path })`).
 
 ### Cover many pages (crawl)
@@ -94,8 +85,8 @@ URLs explicitly. The crawl fetch is unauthenticated — for authed pages pass ex
 
 ## What the dynamic tier adds
 
-- **Real contrast (1.4.3)** — axe computes the rendered colours (the main win, both runtimes).
-- **Reflow (1.4.10)** — no horizontal scroll at 320px wide (both runtimes).
+- **Real contrast (1.4.3)** — axe computes the rendered colours (the main win).
+- **Reflow (1.4.10)** — no horizontal scroll at 320px wide.
 - **Cross-check** — axe re-validates the structural criteria (alt, labels, ARIA, headings…) at
   render; a render finding is **authoritative** and turns the criterion NC.
 
@@ -103,9 +94,9 @@ axe findings map to WCAG success criteria via a curated table (`axe-rule → SC`
 axe's **native WCAG tags** (`wcag<abc>`). On merge (`--merge`), a `manual` criterion the tier
 decides leaves the residual risks and becomes `C`/`NC` (ruleId `axe:<rule>` for axe findings).
 
-### Residual-criteria probes (local runtime only)
+### Residual-criteria probes
 
-Beyond axe, the local runtime runs bespoke Playwright probes for the criteria axe alone cannot
+Beyond axe, the scan runs bespoke Playwright probes for the criteria axe alone cannot
 decide. Each raises a **definite NC only when the failure is observed** in the rendered page; a
 clean probe leaves the SC `manual` (never silently conforming). Merged findings get a
 `dyn-<engine>` ruleId.
@@ -122,10 +113,8 @@ Visually-hidden (`clip`/1px sr-only) elements are excluded from these probes. **
 (2.5.8)** is intentionally left to axe-core's own `target-size` rule, which applies the inline
 and 24px-spacing exceptions correctly (a hand-rolled probe was strictly noisier on real pages).
 
-These probes are heuristic (conservative severities: focus + zoom `majeur`, the rest `mineur`)
-and **local-only** — the Docker `RUNNER` is kept byte-identical to `docker/runner.mjs`
-(`docker-sync` test), so mirroring the probes into the Docker path is deferred. Adversarially
-verify probe findings (a `verify` pass) before filing them.
+These probes are heuristic (conservative severities: focus + zoom `majeur`, the rest `mineur`).
+Adversarially verify probe findings (a `verify` pass) before filing them.
 
 ### Stateful interaction probes (local runtime, interactions ON by default)
 
@@ -188,7 +177,7 @@ URL. Declare it by hand, or let `pages discover` above write it. Then:
 
 ```
 node scripts/ultra11y.mjs sample check                                   # lint the sample's coverage vs the standard's required kinds
-node scripts/ultra11y.mjs scan --sample --runtime local --cwd packages/app --merge audits/audit-latest.json --out audits
+node scripts/ultra11y.mjs scan --sample --cwd packages/app --merge audits/audit-latest.json --out audits
 ```
 
 `scan --sample` iterates every configured sample page (per-page `--storage-state` supported
@@ -298,7 +287,7 @@ zoomed, reflowed and tabbed through.
 that would not resize, a text-spacing override that would not apply — none of them reach it.
 The 320 px resize and the spacing override are part of their own measurement, so a probe read
 at the wrong viewport is not recorded (and never raises a reflow non-conformity measured at
-1280 px). The Docker runtime records `["1.4.10"]`, which is exactly what it measures.
+1280 px).
 
 Measured on a two-file fixture: **80 criteria to adjudicate from source alone, 41 once a single
 page was scanned.**
@@ -315,8 +304,8 @@ That artefact is not a convenience — it is what makes a URL a real per-page ve
   document shell.
 - **It captures what JavaScript built.** A link, a dialog or a nav injected at runtime exists
   in no source file; it exists in the snapshot, and the ordinary static rules see it.
-- **It re-audits offline.** `audit` ingests `.ultra11y/pages` automatically, with no browser,
-  no Docker and no running server — which is how CI decides these without booting the app.
+- **It re-audits offline.** `audit` ingests `.ultra11y/pages` automatically, with no browser
+  and no running server — which is how CI decides these without booting the app.
 
 The collection happens on the **pristine** page: before axe injects its source, before any
 probe fills an input, resizes the viewport to 320px or bolts on the text-spacing stylesheet.

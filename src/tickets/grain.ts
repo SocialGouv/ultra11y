@@ -69,11 +69,8 @@ export function buildTickets(result: AuditResult, opts: GrainOptions): TicketPla
   const { grain, standard, lang } = opts;
   const { label, tag } = standardTag(standard);
   const limit = opts.bodyLimit ?? Number.POSITIVE_INFINITY;
-  const bodyOpts = {
-    ...(opts.format !== undefined ? { format: opts.format } : {}),
-    ...(opts.technical !== undefined ? { technical: opts.technical } : {}),
-  };
-  const backlogOpts = opts.technical !== undefined ? { technical: opts.technical } : {};
+  const bodyOpts = opts.technical !== undefined ? { technical: opts.technical } : {};
+  const backlogOpts = bodyOpts;
   const baseDir = opts.baseDir ?? "";
   const clamp = (body: string): string => clampBody(body, limit, lang);
 

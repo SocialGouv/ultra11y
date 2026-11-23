@@ -1,6 +1,5 @@
-// Repository walk shared by `audit` input expansion (src/glob.ts) and `affected`
-// (src/affected.ts): every regular file under a root, minus what a source-level
-// tool must never read.
+// Repository walk behind `audit` input expansion (src/glob.ts): every regular file
+// under a root, minus what a source-level tool must never read.
 //
 //   - .gitignore files at every level (rules scoped to their own directory and
 //     inherited by its children, a deeper file overriding a shallower one), plus

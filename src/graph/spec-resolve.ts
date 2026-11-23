@@ -1,4 +1,4 @@
-// Import resolution for the component graph and `affected`. Resolves relative
+// Import resolution for the component graph. Resolves relative
 // specifiers, ESM/NodeNext ".js"-for-".ts" specifiers and tsconfig path aliases
 // against a BOUNDED universe: only the files the audit discovered. Nothing is
 // probed on disk, so the graph stays deterministic. Bare node_modules

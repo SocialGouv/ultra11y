@@ -1,8 +1,7 @@
 // `scan --merge` resolves its output language from the MERGED audit's scope.langs
 // (a French repo audited without --lang must not get English dyn-* text baked with
-// no way back — see src/cli.ts cmdScan/peekMergeAudit). Mocks the Docker runtime
-// tier (dockerAvailable/runScan) so this exercises the real CLI merge path without
-// needing an actual Docker/Playwright install.
+// no way back — see src/cli.ts cmdScan/peekMergeAudit). Mocks the local runtime
+// (runScanLocal) so this exercises the real CLI merge path without needing a browser.
 import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,7 +12,7 @@ const FIX = new URL("./fixtures/", import.meta.url).pathname;
 
 const dynamicResult: DynamicResult = {
   tool: "ultra11y",
-  engine: "axe-core@playwright (docker)",
+  engine: "axe-core@playwright (local)",
   target: "https://exemple.fr",
   date: "2026-07-06",
   findings: [
@@ -31,12 +30,11 @@ const dynamicResult: DynamicResult = {
   ],
 };
 
-vi.mock("../src/scan.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/scan.js")>();
+vi.mock("../src/scan-local.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/scan-local.js")>();
   return {
     ...actual,
-    dockerAvailable: () => true,
-    runScan: () => dynamicResult,
+    runScanLocal: async () => dynamicResult,
   };
 });
 
@@ -49,14 +47,13 @@ describe("scan --merge — language resolved from the merged audit BEFORE baking
       const auditCode = await main(["audit", `${FIX}conforming/good.html`, "--out", tmp, "--json"]); // <html lang="fr">
       expect(auditCode).toBe(0);
       const auditPath = join(tmp, "audit-latest.json");
-      const code = await main(["scan", "https://exemple.fr", "--runtime", "docker", "--merge", auditPath, "--out", tmp]);
+      const code = await main(["scan", "https://exemple.fr", "--merge", auditPath, "--out", tmp]);
       expect(code).toBe(0);
       const merged = JSON.parse(readFileSync(join(tmp, "audit-latest.json"), "utf8"));
       const reflow = merged.findings.find((f: { ruleId: string }) => f.ruleId === "dyn-reflow");
       expect(reflow).toBeTruthy();
-      // The mocked Docker runner always returns an English-baked DynamicFinding.message
-      // (the real Docker ScanOpts has no --lang wiring, unlike the local runtime — out
-      // of scope here); what THIS fix controls is mergeDynamic's own remediation bake.
+      // The mocked runner always returns an English-baked DynamicFinding.message; what THIS
+      // fix controls is mergeDynamic's own remediation bake.
       expect(reflow.remediation).toBe("Vérifié au rendu par axe-core ; corrigez l'élément cité.");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
@@ -68,7 +65,7 @@ describe("scan --merge — language resolved from the merged audit BEFORE baking
     try {
       await main(["audit", `${FIX}conforming/good.html`, "--out", tmp, "--json"]);
       const auditPath = join(tmp, "audit-latest.json");
-      const code = await main(["scan", "https://exemple.fr", "--runtime", "docker", "--merge", auditPath, "--out", tmp, "--lang", "en"]);
+      const code = await main(["scan", "https://exemple.fr", "--merge", auditPath, "--out", tmp, "--lang", "en"]);
       expect(code).toBe(0);
       const merged = JSON.parse(readFileSync(join(tmp, "audit-latest.json"), "utf8"));
       const reflow = merged.findings.find((f: { ruleId: string }) => f.ruleId === "dyn-reflow");
@@ -83,7 +80,7 @@ describe("scan --merge — language resolved from the merged audit BEFORE baking
     try {
       await main(["audit", `${FIX}non-conforming/bad.html`, "--out", tmp, "--json"]);
       const auditPath = join(tmp, "audit-latest.json");
-      const code = await main(["scan", "https://exemple.fr", "--runtime", "docker", "--merge", auditPath, "--out", tmp]);
+      const code = await main(["scan", "https://exemple.fr", "--merge", auditPath, "--out", tmp]);
       expect(code).toBe(0);
       const merged = JSON.parse(readFileSync(join(tmp, "audit-latest.json"), "utf8"));
       const reflow = merged.findings.find((f: { ruleId: string }) => f.ruleId === "dyn-reflow");

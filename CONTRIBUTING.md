@@ -165,10 +165,9 @@ entries are marked `inherited: true` / `via: "wcag:<sc>"` wherever they surface,
 example borrowed through the crosswalk is never presented as your standard's own doctrine.
 Write your own entries only where your standard genuinely differs.
 
-Your pack also reaches the **MCP reference surface** for free: `ultra11y_criteria`,
-`ultra11y_glossary`, `ultra11y_guidance`, `ultra11y_method` and the `std://<key>/…`
-resources all resolve it, with no extra registration. See
-`skills/ultra11y/references/mcp.md`.
+Your pack also reaches the **reference lookup** for free: `criteria --standard <key> <id>`,
+`criteria --standard <key> --glossary [<term>]` and the work plan
+`criteria --standard <key> --plan` all resolve it, with no extra registration.
 
 ## PR checklist
 

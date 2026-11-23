@@ -5,9 +5,7 @@ none of the state your tests just built: no login, no filled form, no opened mod
 integration inverts it — the audit runs **inside the run you already have**, on the page as
 your test left it.
 
-It ships **two ways**, with one behaviour.
-
-**As published entry points** — when your repo already has `ultra11y` as a devDependency:
+It ships as **published package entry points** — add `ultra11y` as a devDependency:
 
 ```js
 import { test, checkA11y } from "ultra11y/playwright";
@@ -17,23 +15,6 @@ import "ultra11y/cypress";                         // cypress/support/e2e.js
 
 Versioned, typed, and they resolve the engine that ships inside the very package you
 installed, so a project can never pipe to a different build than the one it depends on.
-
-**As install-free fixtures** — when it does not:
-
-```
-node scripts/ultra11y.mjs render --e2e            # detects Playwright / Cypress, writes the fixtures
-node scripts/ultra11y.mjs render --e2e --runner cypress   # or force one
-```
-
-Fixtures land in `.ultra11y/e2e/`. They are **generated files**: no install, and they target
-the engine build that produced them (`ULTRA11Y=<path>` overrides).
-
-The two cannot drift: the fixtures interpolate the published module's severity tables rather
-than restating them, and a test evaluates the generated `failingFindings` alongside the real
-one over the same findings. A fixture that gated differently from the published plugin would
-fail two projects differently while claiming to be the same tool.
-
-
 
 ## Sweeping the declared sample (`sweepSample`)
 
@@ -120,14 +101,13 @@ patienter », « Loading… », « Please wait »).
 A page still loading when the bound runs out is recorded anyway, **marked**: `meta.json`
 carries `loading` (the markers it still showed), a warning is printed, and the page's basis is
 `loading` — « capture en état de chargement » in every report. Its findings count; its silence
-concludes nothing. `loadingTimeoutMs: 0` checks without waiting. `scan --runtime local` and the
-Docker runner wait the same way; Cypress records the markers but leaves the waiting to the
+concludes nothing. `loadingTimeoutMs: 0` checks without waiting. `scan` waits the same way; Cypress records the markers but leaves the waiting to the
 test's own `should`.
 
 ## Playwright
 
 ```js
-import { test, checkA11y } from "../.ultra11y/e2e/playwright.mjs";
+import { test, checkA11y } from "ultra11y/playwright";
 
 test("home page is accessible", async ({ page, ultra11y }) => {
   await page.goto("/");
@@ -145,11 +125,11 @@ round-trips through a Node task. Two files, two wiring points:
 
 ```js
 // cypress.config.js
-import ultra11y from "./.ultra11y/e2e/cypress-plugin.mjs";
+import ultra11y from "ultra11y/cypress/plugin";
 export default defineConfig({ e2e: { setupNodeEvents(on, config) { ultra11y(on); return config; } } });
 
 // cypress/support/e2e.js  (the supportFile)
-import "../../.ultra11y/e2e/cypress-commands.mjs";
+import "ultra11y/cypress";
 ```
 
 ```js

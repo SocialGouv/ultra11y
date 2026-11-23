@@ -17,7 +17,6 @@ node scripts/ultra11y.mjs prd --in audit.json                      # auditor bac
 node scripts/ultra11y.mjs prd --in audit.json --split criterion    # one file per criterion
 node scripts/ultra11y.mjs prd --in audit.json --standard rgaa --lang fr   # rendered with the RGAA (fr) vocabulary
 node scripts/ultra11y.mjs prd --in audit.json --format doc         # product-requirements doc (epics/stories/AC)
-node scripts/ultra11y.mjs prd --in audit.json --format remediation # legacy dev fix-backlog
 ```
 
 ## Output
@@ -53,9 +52,6 @@ node scripts/ultra11y.mjs prd --in audit.json --format remediation # legacy dev 
   captures it as an NC claim. An advisory finding riding along in an otherwise-NC criterion is
   split out under « Recommandations associées ». It never enters the occurrence checklist,
   never flips a criterion to NC, and never counts toward `conformancePct`.
-- **`--format remediation` (legacy dev backlog)**: the previous developer-oriented block —
-  fix(es), an **effort estimate** (S/M/L), a **before/after example** from the implementation
-  guidance (`references/guidance.md`), and the occurrence checklist.
 - **`--format doc` (product-requirements doc)**: `audits/prd-doc-YYYY-MM-DD.md` — epics
   grouped by theme, one **user story** per criterion, **Given/When/Then** acceptance criteria
   templated from the real SC title/techniques (anchored to W3C text), and the task list.

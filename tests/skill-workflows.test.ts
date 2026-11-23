@@ -121,8 +121,8 @@ describe("correction.md teaches the correction phase", () => {
 
 describe("e2e.md teaches the Playwright/Cypress integration", () => {
   const t = read("e2e.md");
-  it("covers the command, both runners and their wiring points", () => {
-    expect(t).toContain("render --e2e");
+  it("covers the package exports, both runners and their wiring points", () => {
+    expect(t).toContain("ultra11y/playwright");
     expect(t).toContain("checkA11y");
     expect(t).toContain("cy.ultra11y");
     expect(t).toContain("setupNodeEvents");
@@ -171,19 +171,8 @@ describe("pages.md teaches page snapshots", () => {
   });
 });
 
-describe("ci.md teaches the CI output formats", () => {
+describe("ci.md sends CI to iterion and pins the CLI contract", () => {
   const t = read("ci.md");
-  it("covers both formats, the upload step and the pack-keyed route", () => {
-    expect(t).toContain("--format sarif");
-    expect(t).toContain("--format github");
-    expect(t).toContain("upload-sarif");
-    expect(t).toContain("GITHUB_STEP_SUMMARY");
-    expect(t).toMatch(/--standard rgaa/);
-  });
-  it("states the two honesty guarantees: advisory is never an error, URL findings get no location", () => {
-    expect(t).toMatch(/advisory/i);
-    expect(t).toMatch(/no\s+\*\*?physical\*\*?\s*location|no\*\*? physical location|\*\*no\*\* physical location/i);
-  });
   it("sends CI to iterion's rgaa-audit bot and ships no integration of its own", () => {
     expect(t).toContain("https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit");
     expect(t).not.toMatch(/uses:\s*SocialGouv\/ultra11y@/);
@@ -212,11 +201,6 @@ describe("ci.md teaches the CI output formats", () => {
     expect(t).toMatch(/trusted publish/i);
     expect(t).toMatch(/11\.5\.1/);
     expect(t).toMatch(/first.*publish is manual|manual/i);
-  });
-  it("documents the sticky PR comment and its best-effort posture", () => {
-    expect(t).toContain("ULTRA11Y_PR_COMMENT");
-    expect(t).toMatch(/edits it in place|sticky/i);
-    expect(t).toMatch(/best-effort/i);
   });
 });
 
@@ -249,24 +233,6 @@ describe("verify.md teaches the verify gate", () => {
     expect(t).toMatch(/supported/);
     expect(t).toMatch(/refuted/);
     expect(t).toMatch(/unsupported/);
-  });
-});
-
-describe("devtools.md teaches the dev side-car", () => {
-  const t = read("devtools.md");
-  it("covers both commands and the one-line wiring", () => {
-    expect(t).toMatch(/ultra11y\.mjs dev/);
-    expect(t).toContain("--next");
-    expect(t).toContain("Ultra11yOverlay");
-    expect(t).toContain("127.0.0.1:4111");
-  });
-  it("states the two safety properties: self-detachment and the loopback bind", () => {
-    expect(t).toMatch(/removes itself/i);
-    expect(t).toContain("loopback");
-    expect(t).toContain("0.0.0.0");
-  });
-  it("says what it does NOT decide, so a clean panel is not read as a pass", () => {
-    expect(t).toMatch(/does not adjudicate|never "this page is accessible"/i);
   });
 });
 

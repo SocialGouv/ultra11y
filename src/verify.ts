@@ -110,46 +110,11 @@ function buildWorklistFromAuditorBlocks(reportMd: string, standard: StandardId, 
   return items;
 }
 
-// ---- LEGACY shape (pre-Phase-4 reports): report.ts §2 used to render one FLAT
-// bullet per finding, "- **<id> — <title>** — `file:line` (`sel`)" followed by a
-// plain-message sub-bullet. Kept as a fallback ONLY — a report produced by an older
-// ultra11y version (or re-rendered from an old on-disk report.md) must still verify,
-// never silently produce a 0-item (un-gated) worklist. ----
-function legacyNcHeader(standard: StandardId): RegExp {
-  const id = isCore(standard) ? "\\d{1,2}(?:\\.\\d{1,2}){2}" : idCaptureSource(loadPack(standard));
-  return new RegExp(`^- \\*\\*(?:[A-Za-z]+ )?(${id}) — (.*?)\\*\\* — \`([^\`]+):(\\d+)\` \\(\`([^\`]*)\`\\)`);
-}
-
-function buildWorklistLegacy(reportMd: string, standard: StandardId, max: number): VerifyItem[] {
-  const items: VerifyItem[] = [];
-  const header = legacyNcHeader(standard);
-  const lines = reportMd.split("\n");
-  for (let i = 0; i < lines.length && items.length < max; i++) {
-    const h = header.exec(lines[i]!);
-    if (!h) continue;
-    let claim = h[2] ?? "";
-    for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
-      const sub = /^\s+-\s+(.*)$/.exec(lines[j]!);
-      if (sub && !sub[1]!.startsWith("_")) {
-        claim = sub[1]!;
-        break;
-      }
-    }
-    items.push({ n: items.length + 1, criteriaId: h[1]!, file: h[3]!, line: Number(h[4]), selector: h[5]!, claim, verdict: null, note: "" });
-  }
-  return items;
-}
-
 /** Turn a report's non-conformities into a claim↔criterion↔element worklist for
- *  adversarial support-checking. Parses the CURRENT auditor-block NC shape first
- *  (see `buildWorklistFromAuditorBlocks`); if that finds nothing, falls back to the
- *  LEGACY flat-bullet shape (`buildWorklistLegacy`) so an older report still verifies.
- *  The two shapes are structurally disjoint (legacy bullets start with "- **", the
- *  new checklist items with "- [ ] "), so there is no ambiguity about which parsed. */
+ *  adversarial support-checking. Parses the auditor-block NC shape
+ *  (see `buildWorklistFromAuditorBlocks`). */
 export function buildWorklist(reportMd: string, standard: StandardId = "wcag", max = VERIFY_MAX): VerifyItem[] {
-  const items = buildWorklistFromAuditorBlocks(reportMd, standard, max);
-  if (items.length) return items;
-  return buildWorklistLegacy(reportMd, standard, max);
+  return buildWorklistFromAuditorBlocks(reportMd, standard, max);
 }
 
 /** One adjudicated conformity, as the ledger and the adjudication file both store it. Kept
@@ -182,7 +147,7 @@ export interface ConformityClaim {
  * needs no opt-in.
  *
  * The ledger and the adjudication file both hold these, and both are optional artefacts: a
- * `judge --apply` without `--ledger`, run in a directory nobody kept, left an audit whose every
+ * fold without `--ledger`, run in a directory nobody kept, left an audit whose every
  * `C` was beyond reach of a second reader. Since the fold now persists `citations[]` on the
  * criterion itself, the audit under `--in` answers the question directly.
  *
@@ -193,68 +158,6 @@ export interface ConformityClaim {
  * RGAA "11.2" and a WCAG SC id share a shape, and reading one as the other is the exact
  * confusion the anti-fabrication gate exists to prevent.
  */
-/** The refutation verdict vocabulary, as a JSON schema the CLI validates its own output
- *  against. `n` is pinned to the items actually handed over, for the reason the adjudication
- *  schema pins `criteriaId`: a verdict that matches no item is silently dropped, and a paid-for
- *  answer thrown away without a word is worse than a refusal. */
-export function refuteSchema(items: VerifyItem[]): Record<string, unknown> {
-  return {
-    type: "object",
-    additionalProperties: false,
-    required: ["verdicts"],
-    properties: {
-      verdicts: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["n", "verdict", "note"],
-          properties: {
-            n: { type: "integer", enum: items.map((it) => it.n), description: "The item number EXACTLY as given." },
-            verdict: { type: "string", enum: ["supported", "partial", "refuted", "unsupported"] },
-            note: { type: "string", description: "One sentence: what you opened, and what it showed." },
-          },
-        },
-      },
-    },
-  };
-}
-
-/** The system prompt for the refutation pass.
- *
- *  ADVERSARIAL BY CONSTRUCTION, and that is the whole reason this pass exists: an adjudicator
- *  asked « is this criterion met? » and a reviewer asked « does the cited evidence establish
- *  what was claimed? » fail in different directions, and only the second catches an
- *  over-accusing first. The instruction to prefer refutation when the evidence is thin is
- *  deliberate — an unfounded claim withdrawn costs a criterion a second look, an unfounded
- *  claim kept ships as a conformance statement about a site nobody checked. */
-export function refuteSystemPrompt(lang: Lang = "en"): string {
-  const s = T[lang];
-  const setRule =
-    lang === "fr"
-      ? "Pour une conformité qui porte `citations`, ouvrez et jugez le faisceau COMPLET : un critère transversal n'a pas à être prouvé par chaque ancre isolément."
-      : "For a conformity carrying `citations`, open and judge the COMPLETE evidence set: a cross-cutting criterion need not be proved by each anchor in isolation.";
-  const uncitedRule =
-    lang === "fr"
-      ? "Une conformité marquée `uncited` ne cite rien : c'est un « non applicable » déclaré sur un critère dont rien n'a été collecté. Ouvrez les pages auditées et demandez-vous s'il n'y a VRAIMENT rien de ce dont parle le critère ; l'absence de collecte n'est jamais une preuve à elle seule."
-      : "A conformity marked `uncited` cites nothing: it is a « not applicable » declared on a criterion nothing was harvested for. Open the audited pages and ask whether there is REALLY nothing the criterion is about; an empty harvest is never proof on its own.";
-  return [
-    s.refuteRole,
-    "",
-    s.supported,
-    s.partial,
-    s.refuted,
-    s.unsupported,
-    "",
-    s.refuteInverted,
-    setRule,
-    uncitedRule,
-    s.refuteAttach,
-    s.refuteDoubt,
-    s.refuteNever,
-  ].join("\n");
-}
-
 export function conformityClaimsFromAudit(audit: AuditResult, standard: StandardId): ConformityClaim[] {
   const claim = (c: { id: string; justification?: string; citations?: CriterionCitation[] }): ConformityClaim => ({
     criteriaId: c.id,
@@ -360,14 +263,6 @@ const T = {
     uncitedScope: "_périmètre audité (aucune évidence citée)_",
     uncitedQuestion:
       "Rien n'a été collecté pour ce critère et l'agent l'a déclaré non applicable. Ouvrez les pages auditées : n'y a-t-il VRAIMENT rien de ce dont parle le critère ? L'absence de collecte n'est pas une preuve — une page avec du contenu a toujours un ordre de lecture, un ordre de tabulation, du texte à espacer, une mise en page à redistribuer ou à pivoter. `supported` seulement si l'absence est vérifiable sur les pages.",
-    refuteRole:
-      "Vous êtes le SECOND lecteur d'un audit d'accessibilité. Vous n'auditez pas : vous mettez à l'épreuve des constats déjà écrits. Pour chaque entrée, ouvrez le fichier à la ligne citée, lisez l'élément, et dites si l'évidence citée étaye la revendication :",
-    refuteInverted:
-      "Les entrées marquées « conformité revendiquée » posent la question INVERSE : l'évidence ÉTABLIT-elle le critère, ou constate-t-elle seulement que son sujet EXISTE ? Un `alt` présent n'est pas un `alt` pertinent ; un `<title>` présent n'est pas un titre qui décrit la page.",
-    refuteAttach:
-      "Vérifiez aussi le RATTACHEMENT : le référentiel sépare l'existence d'une chose et sa pertinence en deux critères distincts. Un constat d'absence rangé sous le critère de pertinence est `refuted` — il est réel, mais il appartient au critère voisin.",
-    refuteDoubt: "Dans le doute, réfutez. Un constat retiré à tort coûte une relecture ; un constat gardé à tort part dans un document opposable.",
-    refuteNever: "Ne réécrivez rien, ne corrigez rien, n'auditez aucun critère absent de la liste. Répondez uniquement par les verdicts demandés.",
     conformityCheck:
       "- [ ] Aucune conformité inventée : un `C` réfuté ou non étayé retourne « à évaluer » — il ne devient PAS une non-conformité, car réfuter une conformité ne prouve rien contre le critère.",
     then: "Puis : `ultra11y verify --apply VERIFY.todo.json` (échoue si un verdict est refuted/unsupported).",
@@ -401,14 +296,6 @@ const T = {
     uncitedScope: "_audited scope (no evidence cited)_",
     uncitedQuestion:
       "Nothing was harvested for this criterion and the agent declared it not applicable. Open the audited pages: is there REALLY nothing here the criterion is about? An empty harvest is not proof — a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate. `supported` only if the absence can be checked on the pages.",
-    refuteRole:
-      "You are the SECOND reader of an accessibility audit. You are not auditing: you are putting already-written observations on trial. For each entry, open the file at the cited line, read the element, and say whether the cited evidence supports the claim:",
-    refuteInverted:
-      "Entries marked “claimed conformity” ask the INVERTED question: does the evidence ESTABLISH the criterion, or does it only show that its subject EXISTS? A present `alt` is not a relevant `alt`; a present `<title>` is not a title that describes the page.",
-    refuteAttach:
-      "Check the ATTACHMENT too: the standard splits the existence of a thing and its relevance into two separate criteria. An observation of absence filed under the relevance criterion is `refuted` — it is real, but it belongs to the neighbouring criterion.",
-    refuteDoubt: "When in doubt, refute. An observation wrongly withdrawn costs a second look; an observation wrongly kept ships in a legal deliverable.",
-    refuteNever: "Rewrite nothing, fix nothing, audit no criterion absent from the list. Answer only with the verdicts asked for.",
     conformityCheck:
       "- [ ] No invented conformity: a refuted or unsupported `C` goes back to “to assess” — it does NOT become a non-conformity, because refuting a conformity proves nothing against the criterion.",
     then: "Then: `ultra11y verify --apply VERIFY.todo.json` (fails if any verdict is refuted/unsupported).",
@@ -539,9 +426,6 @@ export const claimKey = itemKey;
 const resumableItemKey = (it: VerifyItem): string => {
   return `${it.kind ?? "nc"}|${it.criteriaId}|${canonicalFile(it.file)}|${it.line}|${it.selector}|${it.claim}|${citationSetKey(it)}`;
 };
-const legacyConformityKey = (criteriaId: string, file: string, line: number, selector: string, claim: string): string =>
-  `${criteriaId}|${canonicalFile(file)}|${line}|${selector}|${claim}`;
-
 /** Every source anchor a passing claim asks the grounding gate to re-open. `fallbackFor`
  *  optionally attaches, per cited conformity, the harvested anchor that may stand in when the
  *  literal check fails — the fold's evidence-anchor fallback (src/adjudicate.ts), so a claim
@@ -683,27 +567,11 @@ export function writeWorklist(items: VerifyItem[], outDir: string, semantic: boo
     try {
       const previous = JSON.parse(readFileSync(todoPath, "utf8")) as VerifyItem[];
       const byClaim = new Map(previous.map((it) => [resumableItemKey(it), it]));
-      const legacyConformities = new Map(
-        previous
-          .filter((it) => it.kind === "c" && !it.citations?.length)
-          .map((it) => [legacyConformityKey(it.criteriaId, it.file, it.line, it.selector, it.claim), it]),
-      );
       carried = items.map((it) => {
         const old = byClaim.get(resumableItemKey(it));
         const verdict = normalizeVerdict(old?.verdict);
         if (old && verdict && ["supported", "partial", "refuted", "unsupported"].includes(verdict)) {
           return { ...it, verdict: verdict as Exclude<Verdict, null>, note: typeof old.note === "string" ? old.note : "" };
-        }
-        // Safe one-time migration from the historical one-item-per-citation shape: only carry
-        // when EVERY citation was independently upheld. Any refuted/unsupported/missing anchor
-        // leaves the new evidence-set claim open so the reviewer can assess the combination.
-        if (it.kind === "c" && it.citations?.length) {
-          const oldSet = it.citations.map((cite) => legacyConformities.get(legacyConformityKey(it.criteriaId, cite.file, cite.line, cite.selector, it.claim)));
-          const verdicts = oldSet.map((candidate) => normalizeVerdict(candidate?.verdict));
-          if (oldSet.every(Boolean) && verdicts.every((candidate) => candidate === "supported" || candidate === "partial")) {
-            const notes = [...new Set(oldSet.map((candidate) => candidate?.note?.trim()).filter(Boolean))];
-            return { ...it, verdict: verdicts.includes("partial") ? "partial" : "supported", note: notes.join(" ") };
-          }
         }
         return it;
       });

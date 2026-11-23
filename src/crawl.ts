@@ -2,7 +2,7 @@
 // the set of URLs to scan, either from a sitemap.xml or by breadth-first crawling
 // the same-origin links found in the SERVED HTML. The latter sees links present in
 // the response body (SSR/MPA); pure client-rendered SPA routes should come from a
-// sitemap instead. The actual axe run per URL stays in the Docker tier (scan.ts).
+// sitemap instead. The actual axe run per URL stays in the scan runtime (scan-local.ts).
 
 /** Pull every `<loc>` value out of a sitemap.xml (urlset or sitemapindex). */
 export function parseSitemapUrls(xml: string): string[] {

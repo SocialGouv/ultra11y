@@ -88,13 +88,13 @@ export interface SampleConfig {
   // Element descriptions audited on EVERY page (header, nav, footer, modals…).
   transverse?: string[];
   // Globs (relative to the project root) whose change reaches EVERY page: the root layout,
-  // global styles, the design-system setup, the config. `affected` selects the whole sample
-  // when one of them is touched, because no import edge says so — a Next.js root layout wraps
-  // every page without any page importing it.
+  // global styles, the design-system setup, the config. Validated and preserved by `sample` /
+  // `pages discover`; no command selects pages from it any more (the `affected` diff selector
+  // was removed), but a config carrying it stays valid.
   global?: string[];
   // Routes deliberately LEFT OUT of the sample (a page expected to answer 404, a step behind MFA),
-  // each with the reason. `affected` reports a changed route that no page declares and nothing
-  // exempts — a reason is required, so an exemption says why it was granted.
+  // each with the reason — a reason is required, so an exemption says why it was granted.
+  // Validated and preserved, like `global`.
   exempt?: SampleExempt[];
 }
 export interface SampleExempt {
@@ -245,8 +245,8 @@ export interface Finding {
   snippet: string;
   // Source byte range of the anchoring element (htmlparser2 [start, end), open+close
   // tag). Optional so older AuditResult JSON still parses. Used by `fix` (codemods
-  // edit by range) and by `init` baseline diffing (stable finding identity that
-  // survives line drift). Absent for stdin/JSX findings where it would be unusable.
+  // edit by range) and by the stable finding identity (src/baseline.ts `findingId`) that
+  // survives line drift. Absent for stdin/JSX findings where it would be unusable.
   sourceStart?: number;
   sourceEnd?: number;
   // Cross-file context: the OTHER site that explains this finding — e.g. the
@@ -264,7 +264,7 @@ export interface Finding {
   preliminary?: boolean;
   // Set when this finding was raised on a RENDERED capture file (real serialized DOM)
   // and re-attributed to the source component that produced it. `file`/`sourceStart`
-  // still index the capture bytes (so `fix` and baseline diffing stay stable); origin
+  // still index the capture bytes (so `fix` and finding identity stay stable); origin
   // points back to the source. Optional/additive (no schemaVersion bump).
   origin?: { capture: string; sourceFile?: string; component?: string; sourceLine?: number };
   // PAGE IDENTITY — the stable id of the page snapshot this finding was raised on
@@ -728,7 +728,7 @@ export interface AuditResult {
     pageCoverage?: Record<string, PageCoverage>;
     // Set when dynamic scan results were merged in: which needs-rendering SCs the scan's
     // engines/probes actually MEASURED (verdict coverage — independent of whether anything
-    // was found). Docker runner: 320px reflow only; the local runtime adds zoom / text
+    // was found). The local runtime: the 320px reflow, plus zoom / text
     // spacing / focus / hover (+ live regions when interactions are on). Union across
     // merges. Drives the partial-audit advisory (src/report.ts untestedNeedsRendering) so
     // the banner never claims a probe ran when it did not. Optional/additive.
@@ -790,8 +790,8 @@ export interface AuditResult {
   packAdjudication?: { standard: string; criteria: PackCriterionAdjudication[] };
 }
 
-// ---- optional dynamic tier (axe-core in a headless browser): Docker image, or a
-// host/target Playwright resolved at runtime (`scan --local`). `engine` widens from
+// ---- optional dynamic tier (axe-core in a headless browser): a host/target
+// Playwright resolved at runtime (src/scan-local.ts). `engine` widens from
 // the axe + 320px-reflow pair to the bespoke residual-criteria probes the local
 // runtime adds (focus visibility, 200% zoom reflow, text spacing, content-on-hover)
 // — the criteria axe alone cannot decide. (Target size 2.5.8 is left to axe's own rule.)
@@ -842,7 +842,7 @@ export interface DynamicFinding {
 
 export interface DynamicResult {
   tool: "ultra11y";
-  engine: string; // e.g. "axe-core@playwright (docker)"
+  engine: string; // e.g. "axe-core@playwright (local)"
   target: string;
   date: string;
   findings: DynamicFinding[];
@@ -850,8 +850,8 @@ export interface DynamicResult {
   // merged AuditResult's scope.sample). Optional/additive — absent for a plain scan.
   sample?: SampleScope;
   // Which needs-rendering SCs this run's engines/probes actually MEASURED (verdict
-  // coverage — independent of whether anything was found). Docker: 320px reflow only;
-  // local: + zoom / text spacing / focus / hover (+ live regions when interactions are
+  // coverage — independent of whether anything was found): the 320px reflow,
+  // plus zoom / text spacing / focus / hover (+ live regions when interactions are
   // on). Merged into AuditResult.scope.scan by mergeDynamic. Optional/additive.
   testedScs?: string[];
   // Page ids of the SNAPSHOTS this run persisted under `.ultra11y/pages/<id>/`. A scan
@@ -873,8 +873,8 @@ export interface DynamicResult {
 // The engine keys on WCAG success criteria because that is what its rules are tied to, and a
 // pack criterion is DEFINED as a projection of them (rgaa.json maps each of its 106 criteria
 // onto SCs). The derivation is therefore not a rendering choice that could be moved earlier —
-// without the core results there is nothing to project FROM, and report/prd/check/verify/
-// judge and the ledger all read them.
+// without the core results there is nothing to project FROM, and report/prd/check/verify
+// and the ledger all read them.
 //
 // So selecting a standard re-keys the DOCUMENT rather than the engine: the criteria, the
 // findings, the tallies and the pass rate are the pack's own, and the canonical core travels

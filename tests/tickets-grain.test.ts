@@ -234,12 +234,6 @@ describe("bodies", () => {
     expect(t?.body).toContain("- [ ] `src/a.html:1`");
   });
 
-  it("honours --format remediation", () => {
-    const [t] = buildTickets(r, { ...opts("criterion"), format: "remediation" }).tickets;
-    expect(t?.body).toContain("**Correction**");
-    expect(t?.body).not.toContain("**Critère de succès**");
-  });
-
   it("clamps an oversized body and points at the PRD instead of blowing the tracker limit", () => {
     const many = Array.from({ length: 400 }, (_, i) => F({ line: i + 1 }));
     const big = audit({ findings: many, criteria: [C("1.1.1", "NC", many)] });

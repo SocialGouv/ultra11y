@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AuditResult } from "../src/types.js";
-import { prdUnits, partitionUnits, renderBacklog, renderPerCriterion, renderPrdDoc, toRuleOnSection, writePrd } from "../src/prd.js";
+import { prdUnits, partitionUnits, renderPrdDoc, toRuleOnSection, writePrd } from "../src/prd.js";
 import { runAudit } from "../src/audit.js";
 import { derivePackResults, isProvisionalJudgmentInapplicable, packConformancePct } from "../src/standards/index.js";
 
@@ -113,33 +113,7 @@ describe("prdUnits", () => {
   });
 });
 
-describe("renderBacklog", () => {
-  const md = renderBacklog(AUDIT, "fr");
-  it("is a single doc sectioned by priority with occurrences and remediation", () => {
-    expect(md).toContain("# Plan de correction");
-    expect(md).toContain("WCAG 2.2 AA");
-    expect(md).toContain("## 🔴 Bloquant (2)");
-    expect(md).toContain("## 🟠 Majeur (1)");
-    expect(md).toContain("`src/a.html:3`");
-    expect(md).toContain("Ajoutez alt");
-  });
-  it("renders the cross-file definition site for a related finding", () => {
-    expect(md).toContain("`src/IconButton.tsx:2`");
-    expect(md).toContain("↳");
-  });
-  it("handles an empty audit gracefully", () => {
-    const empty = renderBacklog({ ...AUDIT, findings: [] }, "fr");
-    expect(empty).toContain("Aucune correction");
-  });
-});
-
-describe("renderPerCriterion + writePrd", () => {
-  it("produces one PRD doc per SC", () => {
-    const files = renderPerCriterion(AUDIT, "fr");
-    expect(files.map((f) => f.name)).toEqual(["prd-1.1.1-2026-06-29.md", "prd-4.1.2-2026-06-29.md", "prd-2.4.3-2026-06-29.md"]);
-    expect(files[0]!.content).toContain("# PRD — 1.1.1");
-  });
-
+describe("writePrd", () => {
   it("writes a single AUDITOR backlog file by default", () => {
     const out = tmp();
     const paths = writePrd(AUDIT, { out, lang: "fr", standard: "wcag" });
@@ -147,12 +121,6 @@ describe("renderPerCriterion + writePrd", () => {
     const md = readFileSync(paths[0]!, "utf8");
     expect(md).toContain("Critère d'accessibilité"); // auditor doc title (core fr vocabulary)
     expect(md).toContain("Constat"); // auditor finding line, not the dev "Correction"
-  });
-
-  it("writes the legacy dev backlog with --format remediation", () => {
-    const out = tmp();
-    const paths = writePrd(AUDIT, { out, lang: "fr", format: "remediation", standard: "wcag" });
-    expect(readFileSync(paths[0]!, "utf8")).toContain("Plan de correction");
   });
 
   it("the default audit backlog carries the technical ticket sections; --no-technical suppresses them", () => {
@@ -215,22 +183,11 @@ describe("renderPrdDoc (--format doc)", () => {
   });
 });
 
-// Task #9: PRD headers (remediation backlog / per-criterion / doc format) must show the
+// Task #9: PRD headers (doc format) must show the
 // pack's OWN projection rate for a pack standard, never the core WCAG `conformancePct` —
 // consistent with the pack report's header (src/report.ts). Core headers stay unchanged.
 describe("PRD header rate uses the pack projection tally, not core conformancePct (Task #9)", () => {
   const bad = runAudit({ inputs: [`${FIXTURES}non-conforming/bad.html`] });
-
-  it("renderBacklog (pack) shows packConformancePct over the pack's derived criteria", () => {
-    const expected = packConformancePct(derivePackResults(bad, "rgaa"));
-    const md = renderBacklog(bad, "fr", "rgaa");
-    expect(md).toMatch(new RegExp(`Taux de réussite automatique\\*\\* : ${expected}%`));
-  });
-
-  it("renderBacklog (core) is UNCHANGED — shows r.conformancePct", () => {
-    const md = renderBacklog(bad, "fr", "wcag");
-    expect(md).toMatch(new RegExp(`Taux de réussite automatique\\*\\* : ${bad.conformancePct}%`));
-  });
 
   it("renderPrdDoc (pack) shows packConformancePct in its header", () => {
     const expected = packConformancePct(derivePackResults(bad, "rgaa"));
@@ -248,18 +205,5 @@ describe("PRD header rate uses the pack projection tally, not core conformancePc
   it("renderPrdDoc (core) is UNCHANGED — shows r.conformancePct", () => {
     const doc = renderPrdDoc(bad, "fr", "wcag");
     expect(doc).toMatch(new RegExp(`Taux de réussite automatique\\*\\* : ${bad.conformancePct}%`));
-  });
-
-  it("renderPerCriterion (pack, --split criterion) stamps the same pack rate on every generated file", () => {
-    const expected = packConformancePct(derivePackResults(bad, "rgaa"));
-    const files = renderPerCriterion(bad, "fr", "rgaa");
-    expect(files.length).toBeGreaterThan(0);
-    for (const f of files) expect(f.content).toContain(`Taux de réussite automatique** : ${expected}%`);
-  });
-
-  it("renderPerCriterion (core, --split criterion) is UNCHANGED — every file shows r.conformancePct", () => {
-    const files = renderPerCriterion(AUDIT, "fr", "wcag");
-    expect(files.length).toBeGreaterThan(0);
-    for (const f of files) expect(f.content).toContain(`Taux de réussite automatique** : ${AUDIT.conformancePct}%`);
   });
 });

@@ -8,7 +8,7 @@
 // Two rules govern this file:
 //   • A token NEVER appears in anything it returns or throws. Errors name the header, never
 //     its value: an error message ends up in a log, and a log ends up somewhere public.
-//   • It never sleeps in tests. The delay function is injected, exactly as src/llm.ts does.
+//   • It never sleeps in tests. The delay function is injected.
 import { VERSION } from "../types.js";
 
 export const USER_AGENT = `ultra11y/${VERSION}`;

@@ -93,7 +93,7 @@ simplest to most faithful:
    write-time message says so. Fill in the list, run it with your toolchain (`npx tsx
    ultra11y-render.tsx`), then audit `audits/rendered`. ultra11y does not embed React — your
    project renders.
-3. **Headless browser**: `scan <url>` (Docker tier, axe-core) against the running app — the
+3. **Headless browser**: `scan <url>` (browser tier, axe-core) against the running app — the
    most faithful, and required for the **rendering** criteria (computed contrast 1.4.3, reflow
    1.4.10). `--merge` folds the result into a static AuditResult.
 

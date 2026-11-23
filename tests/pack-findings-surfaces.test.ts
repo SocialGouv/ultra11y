@@ -10,9 +10,7 @@ import { join } from "node:path";
 import { runAudit } from "../src/audit.js";
 import { PAGES_DIR } from "../src/snapshot.js";
 import { attributePages, derivePages, renderPageGrid } from "../src/pages.js";
-import { toSarif } from "../src/sarif.js";
-import { annotations, stepSummary } from "../src/annotate.js";
-import { derivePackResults } from "../src/standards/index.js";
+import { derivePackResults, findingsForStandard } from "../src/standards/index.js";
 import { renderPackReport } from "../src/report.js";
 import { loadPack } from "../src/standards/index.js";
 import { renderPrdDoc, prdUnits, partitionUnits } from "../src/prd.js";
@@ -62,37 +60,14 @@ describe("it reaches the per-page grid", () => {
   });
 });
 
-describe("it reaches the standard-keyed CI surfaces", () => {
-  const withPages = () => {
+describe("it reaches the standard-keyed gate", () => {
+  // `audit --fail-on` and `audit --in … --fail-on` gate on findingsForStandard: the pack's
+  // own declarative findings belong to its verdict, and never to the WCAG core's.
+  it("is in the RGAA-keyed findings, and ABSENT from the WCAG-keyed ones", () => {
     const r = audit();
     attributePages(r, SCOPE);
-    return r;
-  };
-
-  it("appears in an RGAA-keyed SARIF", () => {
-    const ids = toSarif(withPages(), { standard: "rgaa" }).runs[0]?.results.map((x) => x.ruleId) ?? [];
-    expect(ids).toContain("pack:rgaa:download-link-format");
-  });
-
-  it("is ABSENT from a WCAG-keyed SARIF — a pack rule is not a WCAG non-conformity", () => {
-    const ids = toSarif(withPages()).runs[0]?.results.map((x) => x.ruleId) ?? [];
-    expect(ids).not.toContain("pack:rgaa:download-link-format");
-  });
-
-  it("appears in the RGAA job summary and not the WCAG one", () => {
-    expect(stepSummary(withPages(), { standard: "rgaa", lang: "fr" })).toContain("RGAA 6.1");
-    expect(stepSummary(withPages(), { lang: "en" })).not.toContain("download-link-format");
-  });
-
-  it("annotates under RGAA, never under WCAG", () => {
-    const rgaa = annotations(withPages(), { standard: "rgaa" }).join("\n");
-    expect(rgaa).toContain("download-link-format");
-    expect(annotations(withPages()).join("\n")).not.toContain("download-link-format");
-  });
-
-  it("stays a NOTICE — the shipped rule is advisory, and an advisory never fails a build", () => {
-    const rgaa = annotations(withPages(), { standard: "rgaa" }).find((l) => l.includes("download-link-format")) ?? "";
-    expect(rgaa.startsWith("::notice ")).toBe(true);
+    expect(findingsForStandard(r, "rgaa").map((f) => f.ruleId)).toContain("pack:rgaa:download-link-format");
+    expect(findingsForStandard(r, "wcag").map((f) => f.ruleId)).not.toContain("pack:rgaa:download-link-format");
   });
 });
 

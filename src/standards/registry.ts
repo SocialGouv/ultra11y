@@ -21,8 +21,8 @@ const registry = new Map<string, Registered>();
 // ---- project scopes -------------------------------------------------------
 //
 // The registry above is process-wide, which is right for a CLI run: one process,
-// one project, packs resolved once at startup. A long-lived MCP server is the
-// other shape — it takes a `cwd` PER CALL, so two projects can each declare a
+// one project, packs resolved once at startup. A long-lived host serving several
+// projects is the other shape — it takes a `cwd` PER CALL, so two projects can each declare a
 // pack under the same key, and the second must not overwrite the first.
 //
 // So a scope is an OVERLAY: packs registered for one project root, consulted
@@ -30,11 +30,8 @@ const registry = new Map<string, Registered>();
 // runs outside a scope changes behaviour.
 //
 // The ambient scope travels in an AsyncLocalStorage rather than a module-level
-// variable, and that is load-bearing. The `audit()` helper in src/mcp/handlers.ts
-// gets away with a process-global `process.chdir` only because `runAudit` is
-// synchronous — no await point between the chdir and its `finally`, so the event
-// loop cannot interleave another project. The MCP dispatch IS async: a plain
-// "current scope" variable would race across concurrent project roots.
+// variable, and that is load-bearing: a host that dispatches calls asynchronously
+// would make a plain "current scope" variable race across concurrent project roots.
 const overlays = new Map<string, Map<string, Registered>>();
 const scopeStore = new AsyncLocalStorage<string>();
 
@@ -82,7 +79,7 @@ export function registerScoped(scope: string, raw: unknown, glossary: Glossary =
  * Inside a project scope, a built-in resolves from the shared global registry, and
  * `enableSecondaryMapping` edits its `secondaryMappings` in place. One project's
  * `.ultra11yrc.json` would then re-key the built-in RGAA pack for every OTHER project the
- * same server is serving — a silently different projection, which is precisely the failure
+ * same process is serving — a silently different projection, which is precisely the failure
  * this tool must never produce. So a global pack is cloned into the overlay first, and the
  * project edits its own copy.
  */
@@ -108,7 +105,7 @@ export function ensureScope(scope: string): Map<string, Registered> {
   return overlay;
 }
 
-/** Whether this scope's packs have already been resolved — the memo the MCP server reads. */
+/** Whether this scope's packs have already been resolved — a memo for a long-lived host. */
 export function scopeLoaded(scope: string): boolean {
   return overlays.has(scope);
 }

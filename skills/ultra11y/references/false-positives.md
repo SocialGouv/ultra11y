@@ -50,7 +50,7 @@ rendered output (rendering criteria go to `scan`), recording a verdict either wa
 | Any finding on library-rendered JSX (DSFR/MUI…) | The component's produced HTML lives in `node_modules` | `render` → build/SSR → `audit` the output, or `scan` |
 | `control-label-missing` in an SFC | The label may be wired via provide/inject or a sibling `<Label>` component the parser can't link | Read the form component + its field wrapper; refute if a programmatic label exists at render |
 | `heading-order-skip` via `{#if}`/`v-if` in SFCs (no AST) | SFC conditionals are opaque text, so arms can't be separated like in JSX | Reason about each render path; flag only a skip that occurs in a single path |
-| `contrast` (1.4.3), focus, zoom, reflow | Needs computed styles | `scan` (Docker tier) — never decide from source |
+| `contrast` (1.4.3), focus, zoom, reflow | Needs computed styles | `scan` (browser tier) — never decide from source |
 | `aria-*` referencing a runtime-built id (`id={`\`x-${i}\``}`) | The id is dynamic; cross-file resolution only handles `const` string ids | Read the component; refute if the id is generated and wired correctly |
 
 ## Normativity false positives — a "problem" with no failing normative test

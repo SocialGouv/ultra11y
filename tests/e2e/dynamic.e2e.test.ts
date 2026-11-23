@@ -4,12 +4,12 @@
 // those to NC, additively (no other criterion flips, no new false positive), with the
 // axe-only finding carrying a real host file:line anchor (R3 synergy).
 //
-// The static assertions run always (no Docker). The merge assertions need the rendered
-// tier and are opt-in via U11Y_E2E_DOCKER (slow image build) — skipped otherwise.
+// The static assertions run always (no browser). The merge assertions need the rendered
+// tier and are opt-in via U11Y_E2E_SCAN (a real browser run) — skipped otherwise.
 import { describe, it, expect, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { runCli, FIX, mkTmp, cleanupTmp, hasDocker, hasLocalPlaywright, REPO_ROOT } from "./helpers.js";
+import { runCli, FIX, mkTmp, cleanupTmp, hasLocalPlaywright, REPO_ROOT } from "./helpers.js";
 
 afterAll(cleanupTmp);
 
@@ -38,10 +38,10 @@ describe("e2e: dynamic-tier delta — the static engine leaves the rendered-only
   });
 });
 
-const runDocker = Boolean(process.env.U11Y_E2E_DOCKER) && hasDocker();
+const runScan = Boolean(process.env.U11Y_E2E_SCAN) && hasLocalPlaywright();
 
-describe("e2e: dynamic-tier delta — scan --merge upgrades the residual criteria (Docker)", () => {
-  it.skipIf(!runDocker)("contrast-over-gradient: merge upgrades 1.4.3 to NC additively, anchored to the host file:line", () => {
+describe("e2e: dynamic-tier delta — scan --merge upgrades the residual criteria (browser)", () => {
+  it.skipIf(!runScan)("contrast-over-gradient: merge upgrades 1.4.3 to NC additively, anchored to the host file:line", () => {
     const dir = mkTmp();
     // static base
     expect(runCli(["audit", FIX.contrastOverGradient, "--out", dir, "--json"]).code).toBe(0);
@@ -68,7 +68,7 @@ describe("e2e: dynamic-tier delta — scan --merge upgrades the residual criteri
     expect(contrastF.snippet.length).toBeGreaterThan(0);
   });
 
-  it.skipIf(!runDocker)("fixed-width-reflow: merge upgrades 1.4.10 to NC", () => {
+  it.skipIf(!runScan)("fixed-width-reflow: merge upgrades 1.4.10 to NC", () => {
     const dir = mkTmp();
     expect(runCli(["audit", FIX.fixedWidthReflow, "--out", dir, "--json"]).code).toBe(0);
     const auditPath = join(dir, "audit-latest.json");

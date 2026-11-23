@@ -568,7 +568,7 @@ const L = {
 //
 //   - the SNAPSHOT tier (src/rules/rendered.ts), offline from a recorded page: 1.3.4, 1.4.1,
 //     1.4.3, 1.4.11, 2.4.7;
-//   - the LIVE-BROWSER tier (src/scan.ts Docker measures 1.4.10 only; src/scan-local.ts adds
+//   - the LIVE-BROWSER tier (src/scan-local.ts: the 1.4.10 reflow, plus
 //     zoom / spacing / focus / hover, and live regions when interactions are on).
 //
 // This listed six, all from the live-browser tier, and that was wrong in both directions at
@@ -2069,7 +2069,7 @@ export function packReportRates(
   return { conformance: conformanceRate(reportTotals(packReportGroups(r, pack))), automatic: automaticRate(derivePackResults(r, pack.key)) };
 }
 
-/** The rates an adjudication fold reports (`verify --apply --json`, the MCP apply tool), named
+/** The rates an adjudication fold reports (`verify --apply --json`), named
  *  for what they are (#156).
  *
  *  The fold's payload carried one number, `conformancePct`, and callers read it as THE rate. It
@@ -2101,8 +2101,8 @@ export function renderPackReportDocuments(
   const derived = derivePackResults(r, pack.key);
   const std = `${pack.name} ${pack.baseVersion}`;
   // Owner decision: a pack (RGAA) report is flagged PARTIAL while any needs-rendering
-  // criterion lacks a dynamic verdict — the banner names exactly which ones (a Docker-only
-  // scan covers reflow but not the local probes). The core WCAG report carries its own §5
+  // criterion lacks a dynamic verdict — the banner names exactly which ones (a scan that
+  // skipped a probe leaves its criteria uncovered). The core WCAG report carries its own §5
   // manual worklist and is not flagged here.
   const groups = packReportGroups(r, pack, lang);
   const rows = groups.flatMap((g) => g.rows);

@@ -11,9 +11,9 @@ Three things are worth knowing before the table:
   `references/full-audit.md` on every harness: the active session is the auditor, rules on the
   worklists directly (or fans them out to subagents where the harness has them, see
   `references/orchestration.md`), then publishes the evidenced Markdown, HTML and per-page
-  dossiers and passes the `check` gates. The headless `judge --runner claude|codex|api`
-  transport is for CI or another unattended caller; nesting it inside an active session wastes
-  context and gives the report a weaker reader. Only the engine's path differs (below).
+  dossiers and passes the `check` gates. The engine runs no model of its own; in CI the
+  unattended caller is iterion's `rgaa-audit` bot (`references/ci.md`). Only the engine's path
+  differs (below).
 
 - **No harness has a git event.** None of them can hook "about to commit". So the automatic
   review rides the *shell tool* on every one of them, recognising the commands that publish
@@ -73,17 +73,6 @@ copies both skills into `~/.codex/skills/`, or `$CODEX_HOME/skills/`). The engin
 from the installed skill directory's `scripts/ultra11y.mjs` — the plugin's copy, or
 `~/.codex/skills/ultra11y/scripts/ultra11y.mjs` after `install --codex`.
 
-The installed skill can also delegate an unattended local judgment pass to the same signed-in
-Codex account:
-
-```sh
-ultra11y judge --in audits/audit-latest.json --standard rgaa --runner codex --apply
-```
-
-That command uses `codex exec` with an ephemeral, read-only, offline session and ignores user
-config, repository rules and hooks. No API key is required; Codex reuses its ChatGPT login.
-For Claude CLI use `--runner claude` (`--runner cli` is the legacy alias).
-
 ## OpenCode (1.x and 2.x)
 
 ```
@@ -126,25 +115,13 @@ ultra11y install --agents-md
 Writes a managed block into the repository's `AGENTS.md`. Be clear-eyed about what that is:
 there is no hook API, so **nothing is automatic**. The block makes the engine discoverable
 and hands over the adjudication protocol. What actually enforces anything on these harnesses
-is the repo's own gate — `ultra11y init --hook` (git pre-commit) and `ultra11y init --ci`.
+is the repo's own gate — `ultra11y init --hook` (git pre-commit) — and, in CI, iterion's
+`rgaa-audit` bot.
 
-There is also **MCP**, which carries the method where nothing else does — `SKILL.md` and
-every `references/*.md` are exposed as `skill://` resources, plus three prompts
-(`audit_wcag`, `adjudicate_criteria`, `review_diff_a11y`):
-
-```
-claude mcp add ultra11y -- npx -y ultra11y mcp
-
-# better: dedicate it to one project, so `cwd` is optional on every tool AND that
-# project's own standards packs (.ultra11yrc.json) are loaded at startup
-claude mcp add ultra11y -- npx -y ultra11y mcp --cwd /abs/path/to/project
-```
-
-It also carries the **standards themselves** — the reference block (`ultra11y_standards`,
-`ultra11y_criteria`, `ultra11y_glossary`, `ultra11y_guidance`, `ultra11y_method`) and the
-`std://` resources. That is the half that turns the server into a rule engine rather than a
-linter: an agent can read a criterion's numbered tests and the terms it defines instead of
-recalling them. See `references/mcp.md`.
+The criteria themselves are on the CLI on every harness: `criteria [--standard <pack>] <id>`
+prints a criterion's numbered tests, `criteria --standard <pack> --glossary <term>` the terms it
+defines, and `criteria --standard <pack> --plan` the work plan — so an agent reads them instead
+of recalling them.
 
 On a harness with no skill system at all, **reading `SKILL.md` directly with the file-read
 tool is the blessed path**, not a workaround. Discover what exists by listing
@@ -152,12 +129,12 @@ tool is the blessed path**, not a workaround. Discover what exists by listing
 
 ## The matrix
 
-| | skills | automatic review | how it blocks | MCP | repo gate |
-|---|---|---|---|---|---|
-| Claude Code | plugin / `skills add` | yes | `permissionDecision: "deny"` | yes | yes |
-| Codex CLI | plugin / `skills add` | yes | `permissionDecision: "deny"` | yes | yes |
-| OpenCode 1.x · 2.x | plugin / `skills add` | yes | thrown tool error | yes | yes |
-| Cursor, Amp, Zed, Gemini… | AGENTS.md | **no** | — | yes | yes |
+| | skills | automatic review | how it blocks | repo gate |
+|---|---|---|---|---|
+| Claude Code | plugin / `skills add` | yes | `permissionDecision: "deny"` | yes |
+| Codex CLI | plugin / `skills add` | yes | `permissionDecision: "deny"` | yes |
+| OpenCode 1.x · 2.x | plugin / `skills add` | yes | thrown tool error | yes |
+| Cursor, Amp, Zed, Gemini… | AGENTS.md | **no** | — | yes |
 
 `ultra11y status` reports which of these are actually wired on this machine — including the
 one silent failure worth naming, a Codex hook sitting behind a disabled feature flag.

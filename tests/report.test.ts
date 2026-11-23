@@ -14,7 +14,7 @@ import {
   untestedNeedsRendering,
 } from "../src/report.js";
 import { renderedTestedScs } from "../src/rules/rendered.js";
-import { DOCKER_TESTED_SCS, mergeDynamic } from "../src/scan.js";
+import { mergeDynamic } from "../src/scan.js";
 import { localTestedScs } from "../src/scan-local.js";
 import { prdUnits, partitionUnits } from "../src/prd.js";
 import { renderAuditorBacklog } from "../src/auditor.js";
@@ -257,7 +257,7 @@ describe("partial-audit advisory banner (Task 5 — needs-rendering-aware covera
       screenshot: "/tmp/shot.png",
       css: { rules: [], unreadable: 0, truncated: false } as never,
     });
-    const liveTier = [...DOCKER_TESTED_SCS, ...localTestedScs(true)];
+    const liveTier = localTestedScs(true);
     const creditable = [...new Set([...snapshotTier, ...liveTier])].sort();
 
     expect(untestedNeedsRendering(bad).sort()).toEqual(creditable);

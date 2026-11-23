@@ -14,9 +14,6 @@
 // audit. It is a pipe. There is nothing here to keep in sync with the engine.
 //
 // This module is the published implementation (`ultra11y/playwright`, `ultra11y/cypress`).
-// `render --e2e` still writes install-free fixtures for repos that do not depend on
-// ultra11y, and those fixtures interpolate the tables below rather than restating them —
-// see e2e.ts, and tests/e2e-core-sync.test.ts which runs both over the same findings.
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import type { AuditLike, SnapshotPayload } from "./payload.js";

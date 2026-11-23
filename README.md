@@ -33,7 +33,7 @@ ultra11y is built around an honest **division of labour**. Automated tools only 
 - **Agent judgment (gated):** alt-text relevance, link purpose in context, reading/tab order, caption accuracy — the agent rules on these via `verify --manual` → `--apply`, each verdict carrying a justification (or a groundable NC), never a silent "conforming".
 - **Needs rendering (scan tier):** computed contrast, visible focus, zoom/reflow, content on hover — decided by `scan` (axe-core in a real browser); until then they stay **residual risks**, never silently "conforming".
 - **Advisory vs non-conformity:** a good practice with no failing normative test (an `advisory` pack rule, a best-practice-only axe violation, an agent recommendation) renders as « Recommandation (non normative) » — it never flips a criterion to `NC` nor enters the conformance rate. An NC always cites a `normativeRef`.
-- **Stateful scan probes:** the local runtime drives the page with bounded, non-navigating interactions (fill inputs then re-measure overflow; a live-region probe for status messages 4.1.3) — `--no-interact` opts out; `--interact-clicks` re-enables button clicks on authenticated scans (destructive-named buttons are never clicked).
+- **Stateful scan probes:** the scan drives the page with bounded, non-navigating interactions (fill inputs then re-measure overflow; a live-region probe for status messages 4.1.3) — `--no-interact` opts out; `--interact-clicks` re-enables button clicks on authenticated scans (destructive-named buttons are never clicked).
 - **Normative page sample (échantillon):** a country-standard audit runs over a declared `sample.pages` set — **`pages discover --crawl|--sitemap --write` builds it for you** (names read from each page's `<title>`, existing entries never overwritten), `sample check` lints its coverage against the standard's required page kinds, `scan --sample` scans it, and an un-scanned `--standard rgaa` report is flagged **partial**.
 - **Pack-only detection (declarative):** a standards pack can ship its own `rules` (a bounded, ReDoS-guarded matcher DSL — no code) and normativity/severity `overrides`, projecting onto its criteria without forking the engine.
 
@@ -119,12 +119,6 @@ Disable it per-repo with `"hook": { "failOn": "off" }` in `.ultra11yrc.json`, pe
 with `SKIP_A11Y=1`, or per-session with `ULTRA11Y_HOOK=off`; raise or lower the bar with
 `ULTRA11Y_HOOK_FAIL_ON=blocking|major|minor` (default `blocking`).
 
-**As an MCP server** — so an agent drives the engine as tools instead of shelling out:
-
-```sh
-claude mcp add ultra11y -- npx -y ultra11y mcp
-```
-
 **In CI — run iterion's [`rgaa-audit` bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit).**
 ultra11y ships no CI integration of its own. The bot is the harness that turns the engine into an
 audit with no one at the keyboard: it installs the engine pinned (version and sha256), renders
@@ -142,159 +136,33 @@ node scripts/ultra11y.mjs --help
 
 ```
 ultra11y audit    <globs… | ->  [--standard <pack>] [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
-ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
+ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--fail-on blocking|major|minor]
 ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]              # audit rendered-DOM captures alongside source
-ultra11y audit    [--format sarif|github]                                               # CI: code-scanning SARIF, or inline annotations + job summary
-ultra11y audit    --lite [--pages <ids>] [--baseline <file>] [--write-baseline <file>] [--fail-on …]   # rendered regression gate: snapshots only, new findings only
-ultra11y affected --since <ref> | --all [--root <dir>] [--json]                         # the sample pages a diff can change
-ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
-ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--standard <pack>] [--lang auto|en|fr]
+ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--html] [--evidence] [--lang auto|en|fr]
+ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--standard <pack>] [--lang auto|en|fr]
 ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest] [--max-tickets <n>] [--dry-run] [--json]
-ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress] [--captures <dir>] [--out <file>] [--json]
+ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json]
 ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   # payload on stdin → .ultra11y/pages/<id>/ + audit
 ultra11y snapshot list  [--root <dir>] [--json]
 ultra11y pages    --in <audit.json> [--standard <pack>] [--json] [--lang auto|en|fr]   # the per-page criterion grid
 ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        # the per-page report, with screenshots
 ultra11y pages    discover --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--write]   # build the page sample
-ultra11y dev      [--port <n>] [--standard <pack>]   |   dev --next                        # live overlay while you build + dashboard
 ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
-ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--model <id>] [--apply]   # API or local subscription CLI
+ultra11y criteria --standard <pack> --glossary [<term>]  |  criteria [--standard <pack>] --plan   # defined terms · the work plan
 ultra11y check    --report <md> [--standard <pack>] [--quiet] [--json]
+ultra11y check    --in <audit.json> --require-decided[=pages] [--allow-undecided <file>] [--require-rendered]
 ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--json]
 ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --no-conformities]   # also put the claimed CONFORMITIES on trial
+ultra11y verify   --report <md> --in <audit.json> --manual   |   verify --apply <adjudication.json> --in <audit.json> [--ledger]
+ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--manifest]   # fan the judgment out to subagents
 ultra11y fix      <globs… | ->  [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--only <ids>] [--jsx] [--json]
-ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
+ultra11y init     [--hook] [--fail-on blocking|major|minor]
 ultra11y pack     check <pack.json> [--guidance <g.json>]  |  scaffold                 # gate an (AI-)authored standards pack
-ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--out <dir>] [--json]
-ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime …] [--merge <audit.json>] [--json]
-ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote]
+ultra11y scan     <url|file…> [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--out <dir>] [--json]
+ultra11y scan     --sample | --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--merge <audit.json>] [--json]
 
 # global: --pack <paths> (load external standards pack(s) at runtime) · --override
 ```
-
-## Use it as an MCP server
-
-The skill shells out to the CLI and parses its output. An MCP server skips both:
-your agent calls ultra11y as typed tools, with JSON schemas in and structured
-results out. Same engine, same standards data, no wrapper.
-
-```bash
-# stdio — the default, and what Claude Code / Claude Desktop / Cursor expect
-claude mcp add ultra11y -- node /abs/path/to/scripts/ultra11y.mjs mcp
-
-# or over HTTP, on loopback
-node scripts/ultra11y.mjs mcp --transport http --port 7341
-claude mcp add --transport http ultra11y http://127.0.0.1:7341/mcp
-```
-
-```jsonc
-// Claude Desktop takes stdio servers only — a remote URL here will not work.
-{ "mcpServers": { "ultra11y": { "command": "node", "args": ["/abs/path/to/scripts/ultra11y.mjs", "mcp"] } } }
-// Cursor, HTTP:
-{ "mcpServers": { "ultra11y": { "url": "http://127.0.0.1:7341/mcp" } } }
-```
-
-It serves all three MCP primitives, because a skill is three things: the engine
-(**tools**), the method (**prompts**), and the documentation the method refers
-to (**resources**). A client given only the tools runs the audit, sees no
-errors, and reports the page as accessible — a false conformance claim, which is
-the one output an accessibility tool must never produce.
-
-### Tools
-
-Sixteen read tools, in two blocks. **The audit block** tells you what the page does:
-
-| Tool | What it does |
-|------|--------------|
-| `ultra11y_audit` | The static pass — findings keyed by success criterion |
-| `ultra11y_adjudicate` | The criteria the engine **cannot** decide, with their evidence |
-| `ultra11y_report` | The dated conformance report, WCAG or a country pack |
-| `ultra11y_prd` | Non-conformities → remediation units with effort |
-| `ultra11y_tickets` | The same backlog as a ticket plan — dry-run, files nothing |
-| `ultra11y_check` | The gate: nothing asserted conformant that was never tested |
-| `ultra11y_verify` | Claim↔evidence worklist |
-| `ultra11y_pack_check` | Validate a country standards pack against what it really ships |
-| `ultra11y_sample_check` | Lint the normative page sample |
-| `ultra11y_pages` | The per-page view: the criterion × page grid, or one dossier per page |
-| `ultra11y_read` | A file, or a line range, from the project |
-
-**The reference block** tells you what the standard requires — the half that keeps an agent
-from auditing out of memory. `cwd` is optional on all five; it selects whose packs are visible:
-
-| Tool | What it does |
-|------|--------------|
-| `ultra11y_standards` | Which standards exist here, and how much of each any engine can decide |
-| `ultra11y_criteria` | One criterion in full — wording, **numbered tests**, techniques, mapping, defined terms — or the index, or one theme |
-| `ultra11y_glossary` | What a term the standard **defines** means, and which criteria it governs |
-| `ultra11y_guidance` | The before/after implementation pattern, inherited through the WCAG mapping when the pack has none |
-| `ultra11y_method` | The work plan: what the engine settles, what needs a render, what is yours |
-
-`ultra11y_method` is the one to call first. It partitions the standard into evidence tiers —
-`source`, `cross-file`, `rendered-page`, `browser`, `judgment`, `out-of-scope` — from the
-engine's own per-criterion rule applicability, never from guessing at the wording of a test.
-For RGAA it reports that **56 of 106 criteria declare that no engine rule can evidence them**.
-That is the standard saying they are yours, and a plan that hides it reads as coverage that
-does not exist.
-
-`standard` carries no enum, deliberately: a country pack arrives with a project, so an enum
-pinned when the tool list was built would reject a pack that is perfectly valid for the
-project being asked about. The handler validates against the registry and names what it knows.
-
-`--allow-write` additionally exposes `ultra11y_fix` (safe codemods, dry-run by
-default), `ultra11y_fold` (lands the verdicts you wrote on the `ultra11y_adjudicate`
-worklist — `verify --apply` over MCP: same gate, partial by default with every refusal
-listed, dry-run unless `write: true`, `ledger: true` to record the accepted verdicts) and
-`ultra11y_init` (hook/CI/baseline) — the tools that change **your** project. `ultra11y_scan` is declared but declines over MCP: it drives a headless
-browser and may pull a Docker image, which is not a subprocess lifecycle a
-long-lived server should own. It tells you to run it from the CLI and re-audit.
-
-Every tool audits exactly what the CLI would: the rendered captures and the page
-snapshots under `.ultra11y/` are ingested here too, so the server never reports a
-smaller audit than the same command run by hand.
-
-Pass `--cwd <dir>` at startup to dedicate the server to one project — `cwd` then
-becomes optional on every tool.
-
-### Prompts — the workflow, not just the tools
-
-| Prompt | Arguments | What it drives |
-|--------|-----------|----------------|
-| `audit_wcag` | `cwd`, `globs?`, `standard?` | audit → adjudicate → rule on each → report → check, with the untested criteria named |
-| `adjudicate_criteria` | `cwd`, `standard?` | What alt-text relevance, link purpose, heading structure and reading order actually ask |
-| `review_diff_a11y` | `cwd`, `since?` | Audit exactly the diff, refute the false positives, state the residual risks |
-
-Each carries the coverage arithmetic: of the 55 WCAG 2.2 AA criteria the static
-engine decides a handful, a browser decides fourteen, and **thirty-eight are
-yours**.
-
-### Resources — the documentation, and the standards themselves
-
-`SKILL.md` and all 37 `references/*.md` are served under `skill://`, read off
-disk at request time — so a documentation fix reaches every client without a
-rebuild.
-
-The standards are served too, under `std://`, because in MCP documentation is a
-*resource*, not a tool call:
-
-```
-std://rgaa/criteria/8.3      std://rgaa/glossary/lien      std://rgaa/method
-std://rgaa/themes/8          std://rgaa/guidance/13.2      std://rgaa/pack.json
-std://wcag/criteria/1.4.3    std://wcag/glossary           std://wcag/method
-```
-
-`resources/list` carries a bounded index per standard; the per-item URIs are
-**templates** (`resources/templates/list`), because enumerating RGAA's 106
-criteria and 119 glossary terms would bloat every client's listing and go stale
-the moment a project's own pack registers.
-
-Two things worth knowing:
-
-- **A criterion nobody tested is untested, never conformant.** Every tool
-  description and every prompt says so, because the failure mode here is not a
-  wrong answer — it is a confident silence.
-- **The HTTP transport binds `127.0.0.1` and refuses anything else** unless you
-  pass `--allow-remote`. This server reads local files; an exposed port is a
-  read-anything primitive for whoever finds it.
 
 ## Standards packs (RGAA France first; add your country)
 
@@ -308,11 +176,12 @@ node scripts/ultra11y.mjs audit  src --standard rgaa                            
 node scripts/ultra11y.mjs audit  src --standard rgaa --out audits --json            # a pack-keyed document: 106 criteria, 13 themes
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --standard rgaa      # → audits/rgaa-YYYY-MM-DD.md
 node scripts/ultra11y.mjs criteria --standard rgaa 8.3                              # a pack criterion (+ its WCAG SCs)
+node scripts/ultra11y.mjs criteria --standard rgaa --plan                           # the work plan: what each evidence tier settles
 ```
 
 `.ultra11yrc.json { "standard": "rgaa" }` makes it the default for every command. Under a pack,
-no deliverable carries a WCAG cross-reference — report, PRD, per-page sheets, CI annotations
-and SARIF name that standard's criteria and nothing else; the WCAG core travels inside the
+no deliverable carries a WCAG cross-reference — report, PRD, tickets and per-page sheets name
+that standard's criteria and nothing else; the WCAG core travels inside the
 document's `core` field, where the pipeline reads it and no rendering does. The one place the
 mapping is still printed is `criteria --standard rgaa <id>`, which is a reference lookup and
 where a reader goes looking for it.
@@ -385,9 +254,7 @@ or malformed file is reported unreadable. See `skills/ultra11y/references/audit.
   no new non-conformity, and never on lossy JSX/TSX. See `references/fix.md`.
 - **During your E2E run** — `import { checkA11y } from "ultra11y/playwright"` (or
   `ultra11y/cypress` + `ultra11y/cypress/plugin`) audits a targeted page **inside the test run
-  you already have**; `render --e2e` still writes install-free fixtures for a repo that does
-  not depend on ultra11y, and the two cannot drift (the fixtures interpolate the published
-  module's tables, and a test gates both over the same findings). Cypress now feeds the pixel
+  you already have**. Cypress feeds the pixel
   tier too, via `after:screenshot`. `checkA11y(page, { report: true })` emits the per-page
   report straight out of the run. The audit runs, so the page is checked in the state
   your test built (logged in, form filled, modal open) — state a separate `scan` run does not
@@ -397,12 +264,6 @@ or malformed file is reported unreadable. See `skills/ultra11y/references/audit.
   a snapshot is a full document, the page-scoped rules finally run — RGAA **8.3** (`lang`),
   **8.5/8.6** (`title`) — and every finding carries both its page and the source file that
   rendered it. See `references/e2e.md` and `references/pages.md`.
-- **While you build** — `dev --next` writes a one-line Next overlay component and `dev` starts
-  a loopback side-car: a floating panel lists the current page's non-conformities as you
-  browse, each linking to its `file:line` in your editor, and `http://127.0.0.1:4111` shows
-  the per-page grid accumulating. The overlay detaches itself before collecting — otherwise it
-  would audit itself and shift every element index — and renders nothing outside development.
-  See `references/devtools.md`.
 - **A country standard is adjudicated at its OWN granularity** — 97 of RGAA's 106 criteria
   carry at least one judgment test and can still need adjudication to earn C; decisive rules
   can nevertheless prove their bounded failures.
@@ -414,7 +275,7 @@ or malformed file is reported unreadable. See `skills/ultra11y/references/audit.
   an unrelated RGAA test number. Verdicts fold into a separate `packAdjudication` layer so a
   pack decision never rewrites the WCAG core. See `references/judgment.md`.
 - **Rendered tier (offline)** — six rules read a snapshot's browser-only signals inside the
-  ordinary `audit`: **no browser, no Docker, no running server**. `rendered-contrast` measures
+  ordinary `audit`: **no browser, no running server**. `rendered-contrast` measures
   contrast on the *computed* styles (the inline-literal rule could only see colours written in
   the markup); `rendered-contrast-pixel` measures it **on the screenshot** for text over a
   gradient or image, where `background-color` is transparent and every CSSOM-based checker —
@@ -459,129 +320,21 @@ or malformed file is reported unreadable. See `skills/ultra11y/references/audit.
   which drives the engine CLI pinned, adjudicates and refutes with read-only agents, and files
   the issues. The CLI it calls — `audit`, `scan --sample`, `verify --manual`/`--apply`/`--report`,
   `check`, `report`, `pages`, `tickets` — is the engine's stable contract. See `references/ci.md`.
-- **CI surfaces** — a red job says *that* the build broke, not *where*. `--format sarif` emits
-  SARIF 2.1.0 for GitHub code scanning, so each finding lands as an **inline annotation on the
-  causing line** of the PR; `--format github` does the same via `::error::` workflow commands
-  plus a `$GITHUB_STEP_SUMMARY` table, for plans without code scanning. Alert identity reuses
-  the baseline's `findingId`, so an alert survives line drift; a URL-keyed finding gets **no**
-  location rather than a guessed one. Run it from `report --standard rgaa` for pack-keyed
-  output. `ULTRA11Y_PR_COMMENT=1` also keeps one sticky PR comment per standard and kind
-  (`digest`, `pages`, `full`), edited in place. See `references/ci.md`.
 - **Automation** — `init --hook` (default) wires a zero-dependency git pre-commit gate over the
   **strict staged snapshot**: it audits the exact index blobs, auto-applies the safe fixes and
-  re-stages them, and blocks only on judgment issues. `init --baseline`/`--ci` is the opt-in
-  regression variant (hook + committed baseline / GitHub Actions job) that fails only on **new**
-  non-conformities, not the existing backlog. See `references/automation.md`.
-
-### Rendered regressions on every pull request (`audit --lite`)
-
-The full page-by-page run captures every page and adjudicates with a model, which is minutes of
-browser and tens of minutes of model: it belongs on a schedule. The static gate runs on every pull
-request but cannot see the rendered page. `audit --lite` is the gate in between, priced for every
-pull request:
-
-- **only the pages the diff can change** — `ultra11y affected --since origin/main` diffs from the
-  merge-base and follows each sample page's `sources` through their imports (relative paths,
-  tsconfig aliases, `import()`, stylesheets and Sass `@use`/`@import`; type-only imports are
-  erased, so they select nothing). A Next.js App Router page is wrapped by every `layout`/`template`
-  above it. What no import says goes in `sample.global` — a touched global file selects every
-  page — and changed markup no page reaches is listed as `unmapped`, in a warning. No browser, no
-  parse: it reads only the files the pages reach, in well under a second;
-- **the engine alone** — `ultra11y audit --lite --pages <ids>` audits those snapshots and nothing
-  else: no source audit, no adjudication, no per-page report, no PDF, no pixel tier, no HTML;
-- **only NEW findings fail** — the baseline keys a rendered finding on
-  `page|rule|criterion|normalized selector` (generated ids, hashes and digits folded), not on its
-  position in the serialized DOM, which moves whenever anything above it changes. A finding that
-  only moved is not new; a third `img` without `alt` on a page that had two is. Where the baseline
-  is kept is the caller's choice: the push to the default branch audits every page and writes it
-  (`--write-baseline`), and a pull request compares against the one of its merge-base;
-- **a new page is judged with no reference** — that push records every sample page, clean ones
-  included, so a page the merge-base's own baseline does not know was added by the pull request:
-  every finding on it at `fail-on` is new and fails, and the summary says the page is new. Only a
-  baseline that cannot speak for it only warns: none at all, one written by another ultra11y
-  version, or one that is not the merge-base's own (`--baseline-approximate`). A page
-  the push was asked for, or that the sample declares, but that left no snapshot is recorded as
-  `skipped` in the baseline and never judged new;
-- **a route nobody declared is named** — `affected` lists the route files the diff adds or changes
-  (Next.js App Router `page.*`, a `pages/` router — Next, Nuxt, Astro —, SvelteKit
-  `+page.svelte`) that no sample page declares in its `sources`, as `unsampled`.
-  `--require-sampled` fails on them: declare
-  the page in `sample.pages`, or exempt it in `sample.exempt` with a reason. A router configured in
-  code (React Router, Vue Router) has no route files to recognise: declare those pages.
-
-```jsonc
-// .ultra11yrc.json
-{
-  "sample": {
-    // What no import says: the root layout, global styles, and what changes the rendered output
-    // from outside the source tree — dependencies (lockfile, patches), relative to this file.
-    "global": ["src/app/layout.tsx", "src/styles/**", "package.json", "../../pnpm-lock.yaml", "../../patches/**"],
-    // Routes deliberately outside the sample — a reason is required.
-    "exempt": [{ "path": "src/app/(mfa)/**", "reason": "behind MFA, unreachable from the capture" }],
-    "pages": [{ "id": "accueil", "name": "Accueil", "url": "http://localhost:3000/", "sources": ["src/app/page.tsx"] }]
-  }
-}
-```
-
-```ts
-// e2e/a11y/sweep.a11y.ts — capture only what `affected` selected
-const only = process.env.ULTRA11Y_PAGES?.split(",").filter(Boolean);
-for (const route of ROUTES.filter((r) => !only?.length || only.includes(r.id))) {
-  test(route.id, async ({ page }) => {
-    await page.goto(route.path);
-    await checkA11y(page, { as: route.id, name: route.name, sources: route.sources, failOn: false });
-  });
-}
-```
-
-The loop is `ultra11y affected --since origin/main --json`, your capture of those pages, then
-`ultra11y audit --lite --pages <ids> --baseline <file> --fail-on blocking` (and
-`--write-baseline <file>` on the default branch); `--format sarif|github` renders the new
-findings for code scanning or as annotations.
-
-### Optional model tier (`judge`) — for the runs with no agent in the loop
-
-Inside a coding agent the judgment criteria are the agent's to rule on. Outside one — CI or an
-E2E run — nobody does, so they stay « à évaluer ». `judge` adjudicates
-them with a model, and is a **caller, not a second judge**: the worklist, the evidence and the
-prompt are `verify --manual`'s own, and the verdicts pass through the **same fail-closed gate**
-an agent's do. An unjustified `C`, an `NC` citing a line that does not resolve, a verdict for a
-criterion nobody asked about, or an incomplete run are all refused — and a rejected
-adjudication leaves the audit untouched. All-`manual` with reasons is accepted, because that is
-a correct answer. Choose the transport explicitly:
-
-```sh
-# Anthropic Messages API
-ANTHROPIC_API_KEY=… ultra11y judge --in audits/audit-latest.json --runner api --apply
-
-# Local CLI subscriptions; each reuses that CLI's existing login
-ultra11y judge --in audits/audit-latest.json --runner claude --apply
-ultra11y judge --in audits/audit-latest.json --runner codex --apply
-```
-
-`--runner cli` remains an alias of `claude` for existing scripts. The Codex runner invokes
-`codex exec` ephemerally, read-only, offline, without repository rules, hooks or user config;
-it uses the model attached to the ChatGPT account unless `--model` is given. Its subscription
-has no per-run dollar-budget flag, so `--max-budget-usd` is rejected for Codex rather than
-pretending to enforce a ceiling. Use `--timeout` and `--max` to bound the local run.
-
-In CI, the judgment criteria are adjudicated by iterion's
-[`rgaa-audit` bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit), with
-read-only agents and a second reader, through the same fail-closed fold.
-ChatGPT-subscription authentication stays local: public CI does not receive or manufacture a
-Codex subscription secret.
+  re-stages them, and blocks only on judgment issues. See `references/automation.md`.
 
 ### Optional dynamic tier (axe-core)
 
-`scan` runs **axe-core in a headless browser** to decide the *needs-rendering* criteria the static engine leaves as residual risks — chiefly **computed colour contrast (1.4.3)** plus a 320px **reflow** check (1.4.10) and a render cross-check of the structural rules. Two runtimes (default `--runtime auto`): **`--runtime local`** uses a Playwright that resolves from your project (`--cwd`) — **no Docker** — and additionally probes focus visibility (2.4.7), 200% zoom (1.4.4), text spacing (1.4.12) and content-on-hover (1.4.13), plus **stateful** probes (fill inputs then re-measure overflow, and a live-region probe for status messages 4.1.3 — opt out with `--no-interact`, `--interact-clicks` for authed-scan button clicks), and takes `--storage-state` for authenticated pages; **`--runtime docker`** falls back to a self-contained image built on first use. `--merge` folds the findings into a static `AuditResult`, upgrading `manual` criteria to `C`/`NC`. A country-standard audit scans its declared page sample with `scan --sample` (lint it first with `sample check`):
+`scan` runs **axe-core in a headless browser** to decide the *needs-rendering* criteria the static engine leaves as residual risks — chiefly **computed colour contrast (1.4.3)** plus a 320px **reflow** check (1.4.10) and a render cross-check of the structural rules. It uses a Playwright that resolves from your project (`--cwd`), then from ultra11y's own dependencies, and additionally probes focus visibility (2.4.7), 200% zoom (1.4.4), text spacing (1.4.12) and content-on-hover (1.4.13), plus **stateful** probes (fill inputs then re-measure overflow, and a live-region probe for status messages 4.1.3 — opt out with `--no-interact`, `--interact-clicks` for authed-scan button clicks), and takes `--storage-state` for authenticated pages. `--merge` folds the findings into a static `AuditResult`, upgrading `manual` criteria to `C`/`NC`. A country-standard audit scans its declared page sample with `scan --sample` (lint it first with `sample check`):
 
 ```sh
 node scripts/ultra11y.mjs audit "src/**/*.html" --out audits --json > /dev/null
-node scripts/ultra11y.mjs scan http://localhost:3000 --runtime local --cwd . --merge audits/audit-latest.json --out audits
+node scripts/ultra11y.mjs scan http://localhost:3000 --cwd . --merge audits/audit-latest.json --out audits
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --out audits
 ```
 
-Only the Docker runtime needs Docker. `--runtime local` needs a Chromium binary (`npx playwright install chromium`, or one already on the machine named with `--browser-path /usr/bin/chromium` / `ULTRA11Y_BROWSER_PATH` — launched as given, never replaced by a fallback) plus `@playwright/test` and `@axe-core/playwright` — which **come with the npm package**, since they are its own dependencies; the audited project's own copies take precedence when it has them. Running the engine as a **standalone skill bundle** is the exception: an installed skill has no `node_modules` beside it, so there the two packages must be in the audited project, reachable from `--cwd`. The engine bundle itself stays dependency-free either way. The Docker runner + Dockerfile are embedded in the engine and mirrored under `docker/` (with a `docker-compose.yml`). See `skills/ultra11y/references/dynamic.md`.
+The scan needs a Chromium binary (`npx playwright install chromium`, or one already on the machine named with `--browser-path /usr/bin/chromium` / `ULTRA11Y_BROWSER_PATH` — launched as given, never replaced by a fallback) plus `@playwright/test` and `@axe-core/playwright` — which **come with the npm package**, since they are its own dependencies; the audited project's own copies take precedence when it has them. Running the engine as a **standalone skill bundle** is the exception: an installed skill has no `node_modules` beside it, so there the two packages must be in the audited project, reachable from `--cwd`. The engine bundle itself stays dependency-free either way. See `skills/ultra11y/references/dynamic.md`.
 
 Typical audit flow:
 
@@ -625,25 +378,6 @@ only the second is a gap.
 
 The skill (`skills/ultra11y/SKILL.md` + `references/`) teaches the agent when and how to run these, how to complete the manual criteria, and the native-first authoring doctrine.
 
-## Démo RGAA : le refuge
-
-Le dépôt contient un [site de démonstration local](demos/refuge-rgaa/README.txt)
-avec **59 scénarios volontairement non conformes et 59 témoins séparés**.
-Il prolonge la démo Microsoft Edge, conservée avec sa licence et sa provenance
-dans [`demos/microsoft-edge-a11y`](demos/microsoft-edge-a11y).
-
-```sh
-pnpm run demo:refuge        # Python 3 ; http://127.0.0.1:8765/
-pnpm run demo:refuge:check  # ressources, liens, critères et séparation des témoins
-```
-
-Les pages et les médias sont fournis : aucune génération ni dépendance Python
-supplémentaire n’est nécessaire pour visiter le site. Le
-[guide de la démo](demos/refuge-rgaa/README.txt) décrit la reconstruction,
-les tests navigateur et les commandes d’audit. Le catalogue et les verdicts
-attendus restent hors du site audité ; ils ne constituent pas des détections
-mesurées de l’outil. Cette démo ne prétend pas couvrir les 106 critères du RGAA.
-
 ## Development
 
 ```sh
@@ -655,6 +389,7 @@ pnpm run check:build    # asserts every committed artefact is reproducible from 
 pnpm run build:wcag     # re-derive src/data/wcag.json from the vendored W3C source
 pnpm run build:pack:rgaa # re-build the RGAA pack from the vendored DINUM source
 pnpm run build:criteria  # regenerate skills/ultra11y/references/criteria.md
+pnpm run demo            # audit → report → check → criteria on tests/fixtures
 ```
 
 Releases are cut automatically by **semantic-release** on push to `main` (GitHub release +

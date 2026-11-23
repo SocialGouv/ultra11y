@@ -60,7 +60,7 @@ Pick by who does the work: `criterion` suits one person fixing one rule everywhe
   ticket, `[a11y] WCAG [unattributed] — Accessibility audit`. They are never dropped and
   never spread across pages — spreading would invent non-conformities.
 - With **no page in scope**, `--grain page` exits `1` and tells you to capture snapshots
-  (`render --e2e`) or scan a sample (`scan --sample`). It never files zero tickets in silence.
+  (`ultra11y/playwright` · `ultra11y/cypress`) or scan a sample (`scan --sample`). It never files zero tickets in silence.
 
 A `file` ticket carries no conformance rate: a file is not a page.
 

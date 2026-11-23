@@ -17,7 +17,9 @@ import { describe, expect, it } from "vitest";
 
 import { applyAdjudication, type AdjudicationFile } from "../src/adjudicate.js";
 import { runAudit } from "../src/audit.js";
-import { toSarif } from "../src/sarif.js";
+import { renderAuditorBacklog } from "../src/auditor.js";
+import { renderPackReport } from "../src/report.js";
+import { loadPack } from "../src/standards/index.js";
 import { repoRelative } from "../src/util.js";
 
 const audit = () =>
@@ -85,6 +87,7 @@ describe("the adjudication fold", () => {
       remediation: "",
       snippet: "",
     } as unknown as (typeof r.findings)[number]);
-    expect(() => toSarif(r, { standard: "rgaa", lang: "fr" })).not.toThrow();
+    expect(() => renderPackReport(r, loadPack("rgaa"), "fr")).not.toThrow();
+    expect(() => renderAuditorBacklog(r, "fr", "rgaa")).not.toThrow();
   });
 });

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RUNNER, writeRunnerSnapshot, mergeSnapshotAudit, type RunnerOutput } from "../src/scan.js";
-import { PAGES_DIR, readSnapshot, COLLECT_SNAPSHOT } from "../src/snapshot.js";
+import { writeRunnerSnapshot, mergeSnapshotAudit, type RunnerOutput } from "../src/scan.js";
+import { PAGES_DIR, readSnapshot } from "../src/snapshot.js";
 import { pageScopesFrom, derivePages } from "../src/pages.js";
 import { runAudit } from "../src/audit.js";
 import type { AuditResult } from "../src/types.js";
@@ -303,33 +303,6 @@ describe("mergeSnapshotAudit", () => {
     const directoryMerge = mergeSnapshotAudit(baseWithSnapshotDir, snapshotAudit);
     expect(directoryMerge.scope.inputs).toEqual(baseWithSnapshotDir.scope.inputs);
     expect(directoryMerge.findings).toHaveLength(baseWithSnapshotDir.findings.length);
-  });
-});
-
-describe("the Docker runner collects the page too", () => {
-  it("embeds the engine's own collector rather than a copy of it", () => {
-    expect(RUNNER).toContain(JSON.stringify(COLLECT_SNAPSHOT).slice(1, 120));
-  });
-  it("collects BEFORE axe injects its source and before the 320px resize", () => {
-    const collectAt = RUNNER.indexOf("page.evaluate(COLLECT)");
-    const axeAt = RUNNER.indexOf("addScriptTag");
-    const resizeAt = RUNNER.indexOf("setViewportSize");
-    expect(collectAt).toBeGreaterThan(-1);
-    expect(collectAt).toBeLessThan(axeAt);
-    expect(collectAt).toBeLessThan(resizeAt);
-  });
-  it("honours ULTRA11Y_SNAPSHOT=0 and emits the snapshot on stdout", () => {
-    expect(RUNNER).toContain('process.env.ULTRA11Y_SNAPSHOT !== "0"');
-    expect(RUNNER).toContain("reflow, snapshot }");
-  });
-});
-
-describe("docker/runner.mjs stays a real module", () => {
-  it("parses as ESM", () => {
-    const file = new URL("../docker/runner.mjs", import.meta.url).pathname;
-    expect(existsSync(file)).toBe(true);
-    // A syntax error here would only surface inside a container, swallowed by `docker run`.
-    expect(() => new Function(`return async () => { ${readFileSync(file, "utf8").replace(/^import .*/gm, "")} }`)).not.toThrow();
   });
 });
 

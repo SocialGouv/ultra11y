@@ -14,7 +14,7 @@ import { isLinkableUrl } from "./util.js";
 // constat naming an element: « Limite du composant  non perceptible ».
 //
 // The fix belongs at the RENDERING boundary, not in the catalogue. The same strings go to a
-// terminal (where `<h1>` is exactly right), to SARIF (plain text), to a ticket and to HTML
+// terminal (where `<h1>` is exactly right), to a ticket and to HTML
 // (which escapes on its own, src/html.ts). Only the Markdown surfaces need the tag put beyond
 // the reach of the HTML parser, and a code span is how Markdown says "this is literal".
 const CODE_SPAN = /`[^`]*`/g;

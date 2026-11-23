@@ -37,17 +37,17 @@ export function isLinkableUrl(url: string): boolean {
   return isUrlPath(url) || !/^[a-z][a-z0-9+.-]*:/i.test(url.trim());
 }
 
-/** A POSIX, repo-relative path for CI consumers (SARIF artifact URIs, GitHub annotations).
- *  GitHub anchors on paths relative to the checkout, so an absolute path — the user passed
- *  one on the command line — would silently fail to annotate. Relativise it when it sits
+/** A POSIX, repo-relative path (the verdict ledger, ticket grouping). Both anchor on paths
+ *  relative to the checkout, so an absolute path — the user passed one on the command
+ *  line — would silently fail to match. Relativise it when it sits
  *  under `baseDir`; leave it as-is when it does not, rather than inventing a path that
  *  resolves nowhere. */
 export function repoRelative(file: string, baseDir: string): string {
   // A finding with no file at all. It should never reach here — the adjudication fold refuses
   // an NC that names none — but an AuditResult can also be hand-written or produced by an
   // external tool's adapter, and neither goes through that gate. Measured once: one such
-  // finding threw here and took SARIF, the annotations, the pull-request comment, the report,
-  // the HTML and the artifact upload with it, because every one of those steps runs after.
+  // finding threw here and took the report, the HTML and every other rendering with it,
+  // because every one of those steps runs after.
   // A rendering surface that explodes on bad input tells its reader nothing at all.
   if (typeof file !== "string" || !file) return "";
   const posix = file.split("\\").join("/").replace(/^\.\//, "");

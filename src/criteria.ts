@@ -17,6 +17,11 @@ import {
   listTheme as listPackTheme,
   titlePlain as packTitlePlain,
   themeName,
+  standardCoverage,
+  standardLabel,
+  glossaryAnchorsOf,
+  resolveGlossary,
+  type Tier,
   type StandardPack,
   type PackCriterion,
 } from "./standards/index.js";
@@ -48,7 +53,27 @@ export function formatSC(c: Sc, lang: Lang = "en"): string {
   const packs = packsForSc(c.sc);
   if (packs.length)
     out.push(`${lang === "fr" ? "Référencé par" : "Mapped by"} : ${packs.map((p) => `${p.key.toUpperCase()} ${p.ids.join(", ")}`).join(" · ")}`);
+  // The terms the wording links to, with WCAG's own definitions, in the frame's language
+  // (each language keeps its own slugs). Normative: "large scale" means what the glossary says.
+  const glossary = coreGlossary(lang);
+  out.push(
+    ...definedTerms(
+      ((lang === "fr" ? c.termsFr : c.terms) ?? []).map((slug) => [slug, glossary[slug]]),
+      lang,
+    ),
+  );
   return out.join("\n");
+}
+
+/** The glossary block a criterion lookup ends with: every term its own wording (or its tests)
+ *  cites, with the definition — so the lookup is self-sufficient and a verdict never rests
+ *  on a remembered meaning. Unresolvable anchors are skipped, never guessed. */
+function definedTerms(entries: [string, { title: string; body: string } | undefined][], lang: Lang): string[] {
+  const found = entries.filter((e): e is [string, { title: string; body: string }] => e[1] !== undefined);
+  if (!found.length) return [];
+  const out = ["", lang === "fr" ? "Termes définis (glossaire) :" : "Defined terms (glossary):"];
+  for (const [anchor, entry] of found) out.push(`  ${entry.title} (#${anchor}) — ${entry.body.replace(/\s+/g, " ").trim()}`);
+  return out;
 }
 
 function wcagList(lang: Lang): string {
@@ -96,6 +121,12 @@ export function formatPackCriterion(pack: StandardPack, c: PackCriterion, lang: 
   if (c.particularCases?.length) out.push(`${lang === "fr" ? "Cas particuliers" : "Particular cases"} : ${c.particularCases.join(" ")}`);
   const url = criterionUrl(pack, c.id);
   if (url) out.push(`${lang === "fr" ? "Texte officiel" : "Official text"} : ${url}`);
+  out.push(
+    ...definedTerms(
+      glossaryAnchorsOf(c).map((anchor) => [anchor, resolveGlossary(pack.key, anchor)]),
+      lang,
+    ),
+  );
   return out.join("\n");
 }
 
@@ -126,6 +157,57 @@ export interface CriteriaOpts {
   // "if necessary" and "relevant" mean what the glossary says they mean. `true` lists every
   // term; a string resolves one (by anchor or by title, accent-insensitively).
   glossary?: string | boolean;
+  // `--plan`: the audit work plan — how many of the standard's criteria each evidence tier
+  // settles, read from the engine's own rule applicability (src/standards/coverage.ts).
+  plan?: boolean;
+}
+
+const PLAN_TIERS: Tier[] = ["source", "cross-file", "rendered-page", "browser", "judgment", "out-of-scope"];
+
+const PLAN_LABEL: Record<Tier, { fr: string; en: string }> = {
+  source: { fr: "source seule (audit)", en: "source alone (audit)" },
+  "cross-file": { fr: "inter-fichiers (audit --graph)", en: "cross-file (audit --graph)" },
+  "rendered-page": { fr: "page rendue (instantané / capture)", en: "rendered page (snapshot / capture)" },
+  browser: { fr: "navigateur (scan)", en: "browser (scan)" },
+  judgment: { fr: "jugement (verify --manual)", en: "judgment (verify --manual)" },
+  "out-of-scope": { fr: "hors périmètre 2.2 AA", en: "out of 2.2 AA scope" },
+};
+
+/** The work plan of a standard: per evidence tier, the criteria it is the cheapest tier to
+ *  prove CONFORMANT — plus the second axis, the criteria a source rule can still FAIL even
+ *  though source can never prove them. Counts come from the engine, never from the wording. */
+function runPlan(opts: CriteriaOpts): number {
+  const coverage = standardCoverage(opts.standard);
+  const entries = [...coverage];
+  const tiers = PLAN_TIERS.map((tier) => {
+    const ids = entries.filter(([, c]) => c.tier === tier).map(([id]) => id);
+    return { tier, count: ids.length, ids };
+  }).filter((t) => t.count > 0);
+  const sourceIsEnough = entries.filter(([, c]) => c.sourceIsEnough).length;
+  const canFailFromSource = entries.filter(([, c]) => !c.sourceIsEnough && c.canFailFrom.includes("source")).map(([id]) => id);
+  const label = standardLabel(opts.standard);
+  if (opts.json) {
+    const plan = {
+      standard: opts.standard,
+      standardLabel: label,
+      total: coverage.size,
+      tiers,
+      sourceIsEnough,
+      needsMore: coverage.size - sourceIsEnough,
+      canFailFromSource,
+    };
+    console.log(JSON.stringify(plan, null, 2));
+    return 0;
+  }
+  const fr = opts.lang === "fr";
+  console.log(fr ? `${label} — plan de travail, ${coverage.size} critères` : `${label} — work plan, ${coverage.size} criteria`);
+  for (const t of tiers) console.log(`  ${PLAN_LABEL[t.tier][fr ? "fr" : "en"].padEnd(38)} ${String(t.count).padStart(3)}  ${t.ids.join(" ")}`);
+  console.log(
+    fr
+      ? `${coverage.size - sourceIsEnough} critère(s) sur ${coverage.size} exigent plus que le code source pour être déclarés conformes ; ${canFailFromSource.length} peuvent néanmoins être déclarés non conformes depuis le source.`
+      : `${coverage.size - sourceIsEnough} of ${coverage.size} criteria need more than source to be declared conformant; ${canFailFromSource.length} of those can still be failed from source.`,
+  );
+  return 0;
 }
 
 function runWcag(opts: CriteriaOpts): number {
@@ -223,6 +305,7 @@ function runPack(opts: CriteriaOpts): number {
 }
 
 export function runCriteria(opts: CriteriaOpts): number {
+  if (opts.plan) return runPlan(opts);
   if (opts.glossary !== undefined && opts.glossary !== false) return runGlossary(opts);
   return isCore(opts.standard) ? runWcag(opts) : runPack(opts);
 }

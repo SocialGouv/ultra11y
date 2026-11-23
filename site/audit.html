@@ -58,7 +58,7 @@
 <p>Un composant Vue, Svelte ou Astro est lu comme un modèle source : ce qu’injectent les <em lang="en">slots</em> et les liaisons dynamiques est invisible. Ses constats sont marqués « provisoires ». Pour un résultat fiable, on audite le HTML produit (voir <code>render --setup</code> dans <a href="commandes.html">Commandes</a>).</p>
 
 <h2>2. Rendu : scanner avant d’arbitrer</h2>
-<pre><code>npx ultra11y scan http://localhost:3000 --runtime local --merge audits/audit-latest.json --out audits</code></pre>
+<pre><code>npx ultra11y scan http://localhost:3000 --merge audits/audit-latest.json --out audits</code></pre>
 <p><code>scan</code> ouvre la page dans un vrai navigateur, y lance axe-core et des sondes : focus visible, zoom à 200 %, espacement du texte, contenu au survol, affichage à 320 pixels. Il garde une copie de la page et de ses mesures, puis les fusionne dans l’audit.</p>
 <p>Cette étape passe <strong>avant</strong> le jugement de l’IA. Aucune lecture du code ne dit si un contraste calculé est suffisant ou si la page tient au zoom. Sans scan, ces critères ne sont pas seulement ouverts : personne ne peut les trancher. Sur un essai documenté dans la skill, le scan d’une seule page a refermé près de la moitié des critères qui restaient à juger depuis le code seul.</p>
 <p>Un audit RGAA porte normalement sur un <strong>échantillon de pages</strong> représentatif (accueil, contact, mentions légales, formulaires…). <code>pages discover --crawl &lt;url&gt; --write</code> le construit, <code>sample check</code> vérifie qu’il couvre les types de pages attendus, <code>scan --sample</code> le parcourt. Un rapport RGAA sans scan est signalé comme <strong>partiel</strong>.</p>

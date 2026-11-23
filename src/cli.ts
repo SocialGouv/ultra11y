@@ -1,20 +1,7 @@
-import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, readdirSync, appendFileSync, copyFileSync } from "node:fs";
-import { join, relative, resolve, sep, dirname } from "node:path";
+import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
+import { join, relative, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import {
-  SCHEMA_VERSION,
-  VERSION,
-  type Lang,
-  type AuditResult,
-  type DynamicResult,
-  type Finding,
-  type PageResult,
-  type PageScope,
-  type SampleConfig,
-  type SamplePage,
-  type Severity,
-  type Status,
-} from "./types.js";
+import { VERSION, type Lang, type AuditResult, type DynamicResult, type Finding, type PageResult, type SampleConfig, type SamplePage } from "./types.js";
 import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
 import {
@@ -30,7 +17,6 @@ import {
   withReportAnnexes,
 } from "./report.js";
 import { writePrd, prdUnits, type PrdFormat } from "./prd.js";
-import { commentKindFrom, pushPrComment } from "./pr-comment.js";
 import { buildTickets } from "./tickets/grain.js";
 import { pushTickets } from "./tickets/push.js";
 import { autoProvider, createProvider, isProviderId } from "./tickets/registry.js";
@@ -57,7 +43,6 @@ import {
   buildConformityWorklist,
   conformityClaimsFromAudit,
   writeWorklist,
-  formatWorklist,
   applyVerdicts,
   VERIFY_MAX,
   type ConformityClaim,
@@ -71,7 +56,6 @@ import { pruneRefuted, type PruneResult } from "./refute.js";
 import { groundItems } from "./grounding.js";
 import {
   buildAdjudicationWorklist,
-  formatAdjudication,
   writeAdjudication,
   applyAdjudication,
   hydrateAdjudication,
@@ -94,36 +78,17 @@ import {
   type VerdictLedger,
   writeLedger,
 } from "./ledger.js";
-import { DEFAULT_CLI_MODEL, EFFORT_LEVELS, judgeBatchCli, refuteBatchCli } from "./agent-cli.js";
-import { CODEX_EFFORT_LEVELS, judgeBatchCodex, refuteBatchCodex } from "./agent-codex.js";
-import { BATCH_SIZE, apiKeyFromEnv, applyRawVerdicts, batchWorklist, isProviderUnavailableError, judgeAll, modelFromEnv, type LlmOptions } from "./llm.js";
-import { runScan, runScanMany, runCrawlScan, runSampleScan, mergeDynamic, mergeSnapshotAudit, cleanDynamic, dockerAvailable, scanPageSummary } from "./scan.js";
+import { mergeDynamic, mergeSnapshotAudit, scanPageSummary } from "./scan.js";
 import { DOCUMENTS_DIR, downloadSnapshotDocuments } from "./documents.js";
-import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localAvailable, localTierStatus } from "./scan-local.js";
+import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
-import { createAdapter } from "./external/registry.js";
-import { diffSides, sideOfExternal, type DiffBucket } from "./external/diff.js";
-import type { ExternalAdapter, ExternalAudit } from "./external/types.js";
 import { runFix, fixSummary } from "./fix.js";
-import { diffAgainstBaseline, baselineSummary, findingId, parseFailOn, findingsAtOrAbove } from "./baseline.js";
-import {
-  buildRenderBaseline,
-  diffRenderBaseline,
-  gatedFindings,
-  parseRenderBaseline,
-  regressionKey,
-  renderDiffMarkdown,
-  renderDiffWarnings,
-  type RenderBaseline,
-} from "./lite.js";
-import { changedSince, selectAffected } from "./affected.js";
-import { repoRoot, resolveEnginePath, writeHook, writeCi } from "./init.js";
+import { findingId, parseFailOn, findingsAtOrAbove } from "./baseline.js";
+import { repoRoot, resolveEnginePath, writeHook } from "./init.js";
 import { installForTargets, parseTargets, statusReport, uninstallForTargets } from "./install/index.js";
 import { agentsMdBlock } from "./install/agents-md.js";
 import { parseOpencodeMajorFlag } from "./install/opencode.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
-import { toSarif } from "./sarif.js";
-import { annotations, pagesComment, prComment, stepSummary } from "./annotate.js";
 import { evidenceNotice, writeEvidence } from "./evidence.js";
 import { writeHtml } from "./html-emit.js";
 import {
@@ -139,10 +104,8 @@ import {
   type StyleDigest,
 } from "./snapshot.js";
 import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
-import { pageCriterionRows, pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
+import { pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
 import { crawlBound, crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
-import { DEV_DEFAULT_PORT, nextOverlayComponent, startDevServer, type DevServer } from "./dev.js";
-import { cypressCommands, cypressPlugin, detectE2eRunner, e2eSetupPlan, playwrightFixture, type E2ePaths, type E2eRunner } from "./e2e.js";
 import { resolveStandard, getPack, isCore, loadPack, findingsForStandard, type StandardId } from "./standards/index.js";
 import { auditDocumentFor, packAuditDocument, unwrapAudit } from "./standards/document.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
@@ -150,8 +113,6 @@ import { runPackCheck, packScaffold } from "./pack.js";
 import { buildManifest, listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
 import { buildTrialSummary, formatTrialSummary } from "./trial-summary.js";
 import { readStdin, readText } from "./util.js";
-import { runStdioServer } from "./mcp/stdio.js";
-import { startHttpServer } from "./mcp/http.js";
 import type { RenderSignals } from "./types.js";
 
 const HELP = `ultra11y v${VERSION}
@@ -164,23 +125,19 @@ WCAG is the worldwide core, other country standards are pluggable packs.
 
 Usage:
   ultra11y audit    <globs… | -> [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
-  ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--baseline <file>] [--fail-on blocking|major|minor]
+  ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--fail-on blocking|major|minor]
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures + .ultra11y/pages snapshots: audit real HTML)
-  ultra11y audit    [--format sarif|github]        (CI: SARIF for code scanning, or inline annotations + job summary)
-  ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor] [--format sarif|github]   (re-gate an audit already computed — e.g. one carrying adjudicated verdicts — without a second detection pass)
-  ultra11y audit    --lite [--pages <ids>] [--root <dir>] [--baseline <file> [--baseline-approximate]] [--write-baseline <file>] [--fail-on blocking|major|minor] [--format sarif|github] [--out <dir>] [--json]   (rendered regression gate: the page snapshots alone, engine only, fails on NEW findings only)
-  ultra11y affected --since <ref> | --all [--root <dir>] [--require-sampled] [--json]   (the sample pages a diff can change: sources + their imports, sample.global, the merge-base)
-  ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--format sarif|github] [--lang auto|en|fr]
+  ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor]   (re-gate an audit already computed — e.g. one carrying adjudicated verdicts — without a second detection pass)
+  ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--lang auto|en|fr]
   ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (the Markdown report, illustrated with annotated crops)
   ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
-  ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc|remediation] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
-  ultra11y judge    --in <audit.json> [--concurrency <n>] [--ledger [<path>]] [--lang auto|en|fr]
-  ultra11y judge    --refute <VERIFY.todo.json> --runner claude|codex [--standard <pack>] [--grain batch|criterion] [--model <id>] [--effort <level>] [--concurrency <n>] [--max-budget-usd <n> (Claude only)] [--timeout <s>]   (put every already-written claim on trial — batches of 8 by default, read-only; cli aliases claude)
+  ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
-  ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--format audit|remediation] [--lang auto|en|fr]
-  ultra11y render   [<dir>] [--scaffold | --setup | --e2e | --coverage | --storybook] [--runner playwright|cypress|auto] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
+  ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--no-technical] [--lang auto|en|fr]
+  ultra11y render   [<dir>] [--scaffold | --setup | --coverage | --storybook] [--captures <dir>] [--out <file>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES — its tests depend on them)
+  ultra11y criteria [--standard <pack>] --plan [--json]   (the work plan: which criteria the engine settles from source, which need a page, a browser, or judgment)
   ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
   ultra11y check    --in <audit.json> --require-decided [--standard <pack>] [--allow-undecided <file>]   (fail while any criterion is still « to assess »)
   ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
@@ -192,13 +149,11 @@ Usage:
   ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
   ultra11y orchestrate --run <dir> --manifest [--json]   (the loop as data: each step's command/argv, inputs, outputs, exit contract, next step — for any orchestrator)
   ultra11y fix      <globs… | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
-  ultra11y init     [--hook] [--ci] [--baseline] [--fail-on blocking|major|minor]
-  ultra11y judge    --in <audit.json> [--standard <pack>] [--runner api|claude|codex] [--grain batch|criterion] [--max <n>] [--model <id>] [--effort <level>] [--max-budget-usd <n>] [--timeout <s>] [--out <dir>] [--apply]   (adjudicate manual criteria — api needs ANTHROPIC_API_KEY; claude/codex reuse their CLI login; cli aliases claude)
+  ultra11y init     [--hook] [--fail-on blocking|major|minor]
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
-  ultra11y scan     <url|file…> [--runtime auto|local|docker] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
-  ultra11y scan     --sample [--runtime …] [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
-  ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--runtime …] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
-  ultra11y scan     --clean        (remove the dynamic-tier Docker image + temp contexts)
+  ultra11y scan     <url|file…> [--cwd <dir>] [--browser-path <file>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
+  ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
+  ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
@@ -206,15 +161,10 @@ Usage:
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
   ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
-  ultra11y pages    --in <audit.json> --standard <pack> --diff <external.json>   (hold the grid against an audit someone else performed)
-  ultra11y import   --from file <report.json> | --from ara <id> [--source <adapter>] [--out <dir>] [--json]
-  ultra11y mcp      [--transport stdio|http] [--cwd <dir>] [--allow-write] [--port <n>] [--bind <addr>] [--allow-remote] [--allow-origin <o>] [--max-response-bytes <n>]
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
   ultra11y status   [--json] [--project] [--browser [--cwd <dir>]]   (doctor: which agents run the review; --browser asks whether the scan tier resolves here)
-  ultra11y dev      [--port <n>] [--root <dir>] [--standard <pack>] [--lang auto|en|fr]   (dev side-car: live overlay + per-page dashboard)
-  ultra11y dev      --next [--port <n>]        (write the Next overlay component, then wire one line into your layout)
 
 Commands:
   audit      Run the static engine over the inputs (files/globs, or '-' for stdin)
@@ -223,19 +173,12 @@ Commands:
              (default auto: repo <html lang> → the active standard's default locale
              → English). The engine decides the machine-detectable criteria; the AI
              agent adjudicates the judgment ones (verify --manual, gated) and the
-             scan tier decides the needs-rendering ones. --format sarif|github emits
-             the CI rendering instead of the summary (in --baseline gate mode it
-             covers exactly the NEW findings, i.e. what the PR introduced).
+             scan tier decides the needs-rendering ones.
   report     Render an AuditResult into a dated WCAG 2.2 AA compliance report
              (audits/wcag-YYYY-MM-DD.md): metadata, per-guideline synthesis table,
              non-conformities by priority, conforming + not-applicable lists.
              --standard <pack> writes a derived report for a country standard
              (e.g. --standard rgaa → audits/rgaa-YYYY-MM-DD.md).
-             --format renders the same result for CI instead of Markdown: 'sarif'
-             (SARIF 2.1.0 for GitHub code scanning, so findings land as inline PR
-             annotations) or 'github' (::error:: workflow commands on stdout plus a
-             job summary appended to $GITHUB_STEP_SUMMARY). Both honour --standard,
-             so this is how you get an RGAA-keyed SARIF — audit itself is WCAG-keyed.
   prd        Turn an AuditResult into an AUDITOR conformance backlog
              (audits/prd-YYYY-MM-DD.md), one entry per criterion rendered with the
              active standard's vocabulary (RGAA "Thématique/Critère/Test", WCAG core
@@ -255,11 +198,10 @@ Commands:
              react-dom/server SSR snapshot harness to fill in. --setup installs the
              zero-touch test-render capture harvester (one setupFiles line → every
              component your tests render is snapshotted to .ultra11y/captures and
-             audited). --setup captures COMPONENTS from unit tests; --e2e wires the
-             audit into an existing Playwright/Cypress run instead, so a targeted PAGE
-             is checked during the tests you already have — each checked page is
-             persisted to .ultra11y/pages/<id>/ (DOM + computed styles + boxes) and can
-             be re-audited later, offline, with no browser.
+             audited). --setup captures COMPONENTS from unit tests; to check a PAGE
+             during an existing Playwright/Cypress run, use the ultra11y/playwright or
+             ultra11y/cypress package exports instead — each checked page is persisted
+             to .ultra11y/pages/<id>/ and can be re-audited later, offline.
              --coverage reports which components have a rendered capture vs
              which are still opaque-source-only blind spots. --storybook attributes
              per-story HTML (via a storybook-static index) back to source components.
@@ -274,6 +216,10 @@ Commands:
              worklist now inlines the ones each criterion's own tests cite. With no
              term, lists them all. Resolves by anchor or title, accent-insensitive;
              an unknown term errors with suggestions rather than a near-miss.
+             --plan prints the work plan: per evidence tier (source, cross-file,
+             rendered page, browser, judgment, out of scope), how many criteria it
+             settles — the engine's own rule applicability, not a reading of the
+             wording. RGAA: 104 of 106 need more than source to earn C.
   check      Integrity gate on a produced report: every cited criterion resolves,
              every NA is justified, sections + pass-rate maths are well-formed.
              --standard tells it which id grammar/registry to validate against.
@@ -304,10 +250,8 @@ Commands:
   init       Wire ultra11y into the repo (zero-dep, no husky). Default --hook is a git
              pre-commit gate over the STRICT STAGED SNAPSHOT: audits exactly the staged
              index blobs, auto-applies safe fixes (fix --staged --write --safe) and
-             re-stages them, blocking only on issues that need judgment. Opt into the
-             legacy regression gate with --baseline (audit --changed vs a committed
-             audits/baseline.json, only NEW NCs fail) — also used by the --ci job
-             (audit --since the PR base ref).
+             re-stages them, blocking only on issues that need judgment. CI is not
+             wired here: it runs through iterion's rgaa-audit bot.
   pack       Author/verify a runtime standards pack. 'pack check <pack.json>
              [--guidance <g.json>]' runs the validator + guidance gate (every
              criterion maps to well-formed WCAG SCs, every guidance entry resolves to
@@ -316,15 +260,15 @@ Commands:
              Load packs at audit/report time with --pack (or .ultra11yrc.json).
   scan       OPTIONAL dynamic tier: run axe-core in a headless browser to decide the
              needs-rendering criteria the static engine can't — computed contrast
-             (1.4.3), 320px reflow (1.4.10) — over a URL or HTML file. The local
-             runtime (--runtime local, default when Playwright resolves from --cwd;
-             no Docker) additionally probes focus visibility (2.4.7), focus not
+             (1.4.3), 320px reflow (1.4.10) — over a URL or HTML file. It runs on the
+             local Playwright (resolved from --cwd, then from ultra11y's own
+             dependencies), and additionally probes focus visibility (2.4.7), focus not
              obscured (2.4.11 — is the focused component entirely hidden behind a
              sticky header / cookie banner? measured on the same walk of the tab
              ring), 200% zoom (1.4.4), text spacing (1.4.12), content on hover
              (1.4.13) and target size (2.5.8), and accepts --storage-state for
              authenticated pages.
-             By default the local runtime is STATEFUL: it types long values into
+             By default the scan is STATEFUL: it types long values into
              inputs and flags any that clip at 320px/200%/text-spacing (1.4.10/1.4.4/
              1.4.12 — esp. inputs inside table cells), opens closed dialogs to re-check
              focus, and drives SAFE interactions (fill / toggle / click type=button —
@@ -348,25 +292,11 @@ Commands:
   snapshot   Persist a rendered PAGE (.ultra11y/pages/<id>/: documentElement DOM +
              computed-style digest + boxes + a11y tree) and audit it. 'snapshot write'
              reads the collected payload on stdin, so a browser-side producer (the
-             render --e2e fixtures, the dev overlay) needs to know nothing about the
+             ultra11y/playwright and ultra11y/cypress exports) needs to know nothing about the
              on-disk format — one process per checked page. 'snapshot list' shows what
              has been captured. Because a snapshot is a FULL document (a component
              capture is a fragment), the page-scoped rules run on it: that is where
              html lang (RGAA 8.3) and page title (8.5/8.6) become decidable.
-  dev        Development side-car: see the defects on the page you are BUILDING,
-             while you build it. It serves a per-page dashboard on
-             http://127.0.0.1:4111 and an overlay the app loads; every page you
-             visit is snapshotted, audited and listed in a floating panel, each
-             finding linking to its file:line (Next's launch-editor endpoint).
-             --next writes the overlay component to wire into your layout — it
-             renders NOTHING outside development. LOOPBACK ONLY: the server
-             writes files, so it never binds beyond 127.0.0.1.
-  mcp        Serve the engine over the Model Context Protocol, so an MCP client
-             (Claude Code, an IDE) drives audit/report/criteria as tools instead of
-             shelling out. --transport stdio (default) speaks over stdin/stdout;
-             --transport http listens on 127.0.0.1 (--port, --bind), and stays
-             loopback-only unless you pass --allow-remote. Read-only by default:
-             --allow-write opts into the commands that touch files.
   hook       INTERNAL — the decision half of the Claude Code plugin's PreToolUse
              hook. Reads the payload on stdin; when a pending 'git commit', 'git
              push' or 'gh pr create' carries findings >= the threshold, prints the
@@ -415,7 +345,7 @@ Options:
   --format <mode>    prd: 'audit' (default) emits the auditor conformance block (per
                      the active standard's vocabulary) for the backlog AND GitHub issues;
                      'doc' emits a product-requirements document (epics, user stories,
-                     Given/When/Then); 'remediation' emits the legacy dev fix backlog
+                     Given/When/Then)
                      · pages: 'grid' (default) emits the criteria × pages matrix;
                      'report' emits the per-page DOSSIER — one section per page with its
                      screenshot, every criterion of the standard, and the auditor block
@@ -428,9 +358,7 @@ Options:
   --provider <id>    tickets: auto|github|gitlab|jira. 'auto' reads ULTRA11Y_TICKET_PROVIDER,
                      then .ultra11yrc.json, then the git remote (Jira is never auto-detected)
   --grain <mode>     tickets: what one ticket is — criterion (default) | page | page-criterion | single | file
-  --effort <level>   judge CLI runner: Claude accepts low|medium|high|xhigh|max;
-                     Codex accepts minimal|low|medium|high|xhigh. Unset keeps its default
-  --transport <t>    tickets: auto|cli|rest (mcp: stdio|http). 'auto' prefers the CLI (gh/glab),
+  --transport <t>    tickets: auto|cli|rest. 'auto' prefers the CLI (gh/glab),
                      falling back to REST when only a token is available. Jira is REST-only
   --max-tickets <n>  tickets: refuse to file more than n tickets in one run (default 200)
                      tickets --out <dir> also writes the tracker-agnostic set to
@@ -441,49 +369,22 @@ Options:
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
-  --e2e              render: write the Playwright/Cypress fixtures into .ultra11y/e2e/
-  --runner <name>    render --e2e: force playwright|cypress instead of auto-detecting
-  --root <dir>       snapshot, scan, affected, audit --lite: project root holding
+  --root <dir>       snapshot, scan: project root holding
                      .ultra11y/pages and .ultra11yrc.json (default: . — scan writes the
                      snapshots it collects under it)
-  --port <n>         dev: port for the side-car (default: 4111); mcp: HTTP transport port
-  --transport <k>    mcp: stdio (default) or http
-  --bind <addr>      mcp --transport http: address to bind (default 127.0.0.1)
-  --allow-remote     mcp --transport http: accept non-loopback connections (off by default)
-  --allow-origin <o> mcp --transport http: an Origin allowed to call the server
-  --max-response-bytes <n>  mcp: cap a tool response's size
-  --allow-write      mcp: allow the tools that write files (read-only otherwise)
   --glossary [<t>]   criteria: look up a term the country standard defines (or list all)
-  --next             dev: write the Next.js overlay component instead of serving
   --require-captures audit: gate — fail if any opaque/control component lacks a rendered capture (implies --graph)
   --write            fix: apply fixes to disk (default is a dry-run diff)
   --iterate          fix: with --write, re-audit + re-apply mechanical fixes until stable (bounded)
   --dry-run          fix: preview only — never write (this is the default)
   --safe             fix: apply only genuinely-automatic codemods (skip TODO placeholders / judgment proposals)
   --only <ids>       fix: limit auto-fixes to these rule ids (comma-separated)
-  --baseline <file>  audit/init: regression-gate vs / write this baseline AuditResult
-                     · audit --lite: a render baseline (or an audit JSON), compared on the
-                     stable key page|rule|criterion|selector, so a finding that only MOVED
-                     is not new. A missing file means no baseline: warnings, never a failure
-  --lite             audit: the rendered regression gate — audit only the page snapshots
-                     (.ultra11y/pages), engine only: no source, no PDF, no pixel tier, no
-                     report. With --baseline it fails only on NEW findings at --fail-on; a
-                     page the baseline never measured, or a baseline from another ultra11y
-                     version, warns instead of failing
-  --pages <ids>      audit --lite: comma-separated page ids to audit (default: every snapshot).
-                     A page absent from a same-version baseline is NEW: every finding on it
-                     counts as new and gates
-  --baseline-approximate  audit --lite: the baseline is not the merge-base's own, so a page it
-                     lacks only warns
-  --require-sampled  affected: fail when the diff adds or changes a route file (App Router
-                     page.*, pages/…, +page.svelte) no sample page declares in its sources and
-                     sample.exempt does not exempt
-  --write-baseline <file>  audit --lite: write the render baseline of this run
-  --fail-on <sev>    audit/init: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
+  --fail-on <sev>    audit/init/snapshot: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
   --hook             init: write a git pre-commit accessibility gate (staged snapshot + auto-fix by default)
-  --ci               init: write a GitHub Actions accessibility gate
   --report <file>    check/verify: the report markdown to gate
   --theme <N>        criteria: with --standard <pack>, list the pack's theme N
+  --plan             criteria: the work plan — criteria per evidence tier (source,
+                     cross-file, rendered-page, browser, judgment, out-of-scope)
   --list             criteria: print the WCAG success criteria grouped by guideline
   --generate         criteria: emit the bundled references/criteria.md (WCAG 2.2 AA)
   --apply <file>     verify: reduce a filled verdicts file to a pass/fail gate
@@ -495,7 +396,7 @@ Options:
                      (--in <audit.json>) falls back to that anchor, so a retyping the
                      fold accepted is not refused again at trial; without the audit the
                      cited snippet must match the source literally
-  --ledger <file>    verify --apply / judge --apply: record the verdicts the fold ACCEPTED,
+  --ledger <file>    verify --apply: record the verdicts the fold ACCEPTED,
                      so a later run replays them for free (default:
                      .ultra11y/verdicts/<standard>.json). Replay re-derives the evidence
                      and re-runs the same gate; a verdict whose evidence changed is
@@ -557,20 +458,19 @@ Options:
   --crawl <url>      scan: BFS same-origin links from a start URL (served HTML)
   --depth <n>        scan: crawl link-hop depth from the start URL   (default: no limit; 0 = no limit)
   --max <n>          scan: cap on pages scanned (sitemap/crawl)      (default: no limit; 0 = no limit)
-  --runtime <mode>   scan: local (host/target Playwright, no Docker) | docker | auto
-                     (default: auto — local if Playwright resolves from --cwd, else Docker)
+  --runtime <mode>   scan: local (the default and only runtime: the host/target Playwright;
+                     'auto' is accepted as its alias)
   --local            scan: alias of --runtime local
-  --docker           scan: alias of --runtime docker (built on first use)
-  --cwd <dir>        scan: --runtime local resolves @playwright/test + @axe-core/playwright
-                     (and the browser) from here (e.g. --cwd packages/app)
+  --cwd <dir>        scan: resolves @playwright/test + @axe-core/playwright (and the
+                     browser) from here first (e.g. --cwd packages/app)
   --browser-path <file>  scan / status --browser: launch THIS browser executable (e.g. a
                      distribution's /usr/bin/chromium) instead of the one Playwright resolves.
                      Explicit: never replaced by a fallback. Env: ULTRA11Y_BROWSER_PATH
-  --storage-state <file>  scan: --runtime local — Playwright storageState JSON for
+  --storage-state <file>  scan: Playwright storageState JSON for
                      authenticated pages (e.g. test-results/.auth/user.json). Its cookies
                      that match a linked document's URL (domain, path, secure, expiry) are
                      also sent when downloading it — to the audited origin only
-  --no-interact      scan: --runtime local — disable the STATEFUL probes (fill inputs,
+  --no-interact      scan: disable the STATEFUL probes (fill inputs,
                      open dialogs, live-region). Default is ON; the interactions are
                      strictly non-navigating (fill text inputs, toggle checkbox/radio,
                      click button[type=button] — never a link/submit/navigation, and
@@ -578,23 +478,18 @@ Options:
                      supprimer, retirer, effacer, envoyer, valider, confirmer, payer,
                      delete, remove, send, submit, confirm, pay, …) and restore page
                      state, asserting location.href is unchanged after each action
-  --interact-clicks  scan: --runtime local — allow the live-region probe's
+  --interact-clicks  scan: allow the live-region probe's
                      button[type=button] clicks on an AUTHENTICATED scan
                      (--storage-state). Skipped by default there: a click can trigger
                      a server mutation (delete/send) invisible to the location.href
                      assertion. Unauthenticated scans keep clicks on regardless; the
                      destructive-name skip above applies in every case
   --write            pages discover: merge the discovered pages into .ultra11yrc.json
-  --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling —
-                     the only route that sees a state-reached page (a modal, a funnel step)
-  --from <src>       import: "file" (a report on disk, the primary route) or an adapter id ("ara",
-                     which fetches it and writes the raw response beside the parsed one)
-  --source <adapter> import --from file: which adapter reads it (default: ara)
-  --diff <file>      pages: compare the grid with an imported external audit — five buckets
-                     (fixed · unchanged · partially fixed · regressed · not retested)
                      (sample.pages). Without it the proposal is printed and nothing is
                      written. Pages already declared are kept verbatim — auth, storageState
                      and notes are human work and are never overwritten
+  --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling —
+                     the only route that sees a state-reached page (a modal, a funnel step)
   --sample           scan: scan the NORMATIVE page sample from .ultra11yrc.json (its
                      sample.pages), per-page storage-state overriding --storage-state,
                      aggregating one result with per-page provenance for the report
@@ -613,15 +508,7 @@ Options:
                      always audited
   --max-pdf <n>      scan: most PDF documents downloaded per run (default 20; each one
                      capped at 20 MiB)
-  --clean            scan: remove the dynamic-tier image + temp contexts, then exit
-  --api-key <key>    judge: the Anthropic API key. Defaults to $ANTHROPIC_API_KEY. This is
-                     the ONLY place in the tool that takes one — the engine needs no key
-  --model <id>       judge: explicit model. API defaults to $ULTRA11Y_LLM_MODEL / claude-sonnet-5;
-                     Claude CLI defaults to ${DEFAULT_CLI_MODEL}; Codex inherits the account default
-  --apply            judge: fold the verdicts straight into the audit, through the SAME
-                     fail-closed gate an agent's verdicts pass (no unjustified C/NA, no
-                     ungroundable NC, no unadjudicated criterion)
-  --strict           verify --apply / judge --apply: all-or-nothing fold — one refused
+  --strict           verify --apply: all-or-nothing fold — one refused
                      verdict discards the whole adjudication. The default folds PER
                      VERDICT: a refusal costs its own criterion, which stays to assess
                      carrying the refusal, and every verdict that proved itself lands
@@ -649,7 +536,6 @@ Data: WCAG 2.2 © W3C (W3C Document License). RGAA 4.1.2 pack © DINUM, Licence 
 
 export const COMMANDS = [
   "audit",
-  "affected",
   "report",
   "prd",
   "tickets",
@@ -661,13 +547,9 @@ export const COMMANDS = [
   "sample",
   "snapshot",
   "pages",
-  "import",
-  "dev",
-  "mcp",
   "fix",
   "init",
   "pack",
-  "judge",
   "orchestrate",
   "hook",
   "install",
@@ -684,15 +566,6 @@ const VALUE_FLAGS = new Set([
   // `install --opencode --opencode-version 1|2`: the OpenCode major to wire for, instead of
   // asking the `opencode` on PATH.
   "opencode-version",
-  // `judge --refute <VERIFY.todo.json>`: put already-written claims on trial, through the same
-  // transport the adjudication pass uses.
-  "refute",
-  "runner",
-  "grain",
-  "max-budget-usd",
-  "effort",
-  "timeout",
-  "concurrency",
   "out",
   "provider",
   "grain",
@@ -718,17 +591,12 @@ const VALUE_FLAGS = new Set([
   "max",
   // `scan`: most linked PDF documents downloaded per run.
   "max-pdf",
-  // `import`: which external audit tool the report comes from, and (with `--from file`) which
-  // adapter should read it. `pages --diff`: the imported audit to hold the grid against.
-  "from",
-  "source",
-  "diff",
   "since",
   "max-files",
   "dedup",
   "only",
   "standard",
-  // `verify --apply` / `judge --apply`: where to RECORD the verdicts the fold accepted, so a
+  // `verify --apply`: where to RECORD the verdicts the fold accepted, so a
   // later run can replay them without a model (src/ledger.ts). A path; empty falls back to the
   // standard's default location under .ultra11y/verdicts/.
   "ledger",
@@ -736,15 +604,8 @@ const VALUE_FLAGS = new Set([
   // adjudication file. Empty/absent falls back to the standard's default ledger, which is why
   // the conformity half of the gate runs without anyone asking for it.
   "conformities",
-  "baseline",
-  // `audit --lite --write-baseline <file>`: where to write the render baseline of this run.
-  "write-baseline",
-  // `audit --lite --pages a,b`: the snapshots to audit.
-  "pages",
   "fail-on",
   "split",
-  "api-key",
-  "model",
   "pack",
   "format",
   // Bytes of image data the single-file HTML report may carry inline (src/html-emit.ts).
@@ -762,45 +623,14 @@ const VALUE_FLAGS = new Set([
   "run",
   "phase",
   "root",
-  "runner",
-  // Shared by `dev` (side-car port) and `mcp` (HTTP transport port) — one entry, both users.
-  "port",
   "glossary",
-  // `mcp` only. The flag sets are global, so these are accepted (and warned
-  // about, never silently ignored) on every command — like --phase already is.
+  // `tickets --transport auto|cli|rest`.
   "transport",
-  "bind",
-  "allow-origin",
-  "max-response-bytes",
 ]);
-// `init` treats --baseline as a boolean selector ("write the baseline"), not a
-// path, so it must NOT consume the following token. audit/fix keep it as a value
-// flag (`--baseline <file>`). Without this split, `init --baseline --hook` swallows
-// --hook, and `init --baseline` never matches the `=== true` selector in cmdInit.
-const INIT_VALUE_FLAGS = new Set([...VALUE_FLAGS].filter((f) => f !== "baseline"));
-// `verify --apply <file>` takes the verdicts to fold; `judge --apply` is a BOOLEAN — it
-// already holds the verdicts it just produced. Left in VALUE_FLAGS it would swallow the next
-// token, so `judge --apply --out x` would silently apply nothing and write to the default
-// directory. Same reason `init` drops `baseline`.
-const JUDGE_VALUE_FLAGS = new Set([...VALUE_FLAGS].filter((f) => f !== "apply"));
-
-function valueFlagsFor(command: string): ReadonlySet<string> {
-  if (command === "init") return INIT_VALUE_FLAGS;
-  if (command === "judge") return JUDGE_VALUE_FLAGS;
-  return VALUE_FLAGS;
-}
-
 // Boolean flags documented in HELP (every valid flag that is NOT a value flag).
 // Paired with VALUE_FLAGS this is the full set of recognised long flags, used to
 // warn on unknown/misspelled ones instead of silently accepting them as no-ops.
 const BOOLEAN_FLAGS = new Set([
-  // `audit --lite`: the rendered regression gate (src/lite.ts).
-  "lite",
-  // `audit --lite --baseline-approximate`: the baseline is not the merge-base's own (a closest
-  // cache entry), so a page it lacks may not be this change's — warn instead of gating it.
-  "baseline-approximate",
-  // `affected --require-sampled`: fail on a changed route no sample page declares.
-  "require-sampled",
   // `verify --apply … --prune`: apply what the refutation trial decided to the audit, instead
   // of only reporting it (src/refute.ts).
   "prune",
@@ -823,8 +653,6 @@ const BOOLEAN_FLAGS = new Set([
   "scaffold",
   "storybook",
   "setup",
-  "e2e",
-  "next",
   "coverage",
   "write",
   // `pages discover`: build the sample from the snapshots the E2E producer already wrote,
@@ -834,8 +662,9 @@ const BOOLEAN_FLAGS = new Set([
   "iterate",
   "safe",
   "hook",
-  "ci",
   "list",
+  // `criteria --plan`: the work plan per evidence tier (src/criteria.ts runPlan).
+  "plan",
   "generate",
   "semantic",
   // `check`: fail while any criterion of the standard is still « to assess ».
@@ -844,7 +673,7 @@ const BOOLEAN_FLAGS = new Set([
   "require-rendered",
   "allow-stale-undecided",
   "manual",
-  // `verify --apply` / `judge --apply`: restore the all-or-nothing fold, where one refused
+  // `verify --apply`: restore the all-or-nothing fold, where one refused
   // verdict discards the whole adjudication. The default is per-verdict.
   "strict",
   // `verify --manual`: whether the brief may invite a web lookup of the criterion's official
@@ -857,22 +686,19 @@ const BOOLEAN_FLAGS = new Set([
   "no-conformities",
   "no-technical",
   "override",
+  // `scan --local`: alias of `--runtime local`, the only runtime — accepted, changes nothing.
   "local",
-  "docker",
   "no-interact",
   "interact-clicks",
   "no-snapshot",
   // `scan`/`audit`: do not download (scan) or ingest (audit) the PDF documents pages link to.
   "no-pdf",
-  "clean",
   "sample",
   "eco",
   // `orchestrate --manifest`: print the loop's step graph as JSON (src/orchestrate.ts buildManifest).
   "manifest",
   "help",
   "version",
-  "allow-remote",
-  "allow-write",
   // Harness selectors, shared by `hook` and `install`/`uninstall`/`status`. Without these
   // the parser warned "unknown flag --claude-code" on stderr on EVERY guarded shell call.
   "claude-code",
@@ -919,7 +745,7 @@ function looksLikeFlag(token: string | undefined): boolean {
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const [command, ...rest] = argv;
-  const valueFlags = valueFlagsFor(command ?? "");
+  const valueFlags = VALUE_FLAGS;
   const positionals: string[] = [];
   const flags: Record<string, string | boolean> = {};
   const unknown: string[] = [];
@@ -1067,77 +893,6 @@ function peekMergeAudit(mergeIn: string | boolean | undefined): AuditResult | un
   }
 }
 
-// ---- CI output formats (`--format`) --------------------------------------------------
-// `audit` and `report` can render the SAME AuditResult in a machine-readable CI shape
-// instead of their default output. Shared here so the two commands cannot drift.
-type CiFormat = "sarif" | "github";
-
-/** undefined = flag absent · null = unrecognized value (the caller reports and exits 2). */
-function parseCiFormat(v: string | boolean | undefined): CiFormat | null | undefined {
-  if (v === undefined) return undefined;
-  if (v === "sarif") return "sarif";
-  if (v === "github") return "github";
-  return null;
-}
-
-/** Emit the CI rendering of an audit. Annotations go to STDOUT — GitHub only reads workflow
- *  commands there — while the job summary is APPENDED to $GITHUB_STEP_SUMMARY when the
- *  runner set it (else printed to stderr so a local run still shows it). */
-function emitCiFormat(result: AuditResult, format: CiFormat, standard: StandardId, lang: Lang, failOn?: Severity): void {
-  if (format === "sarif") {
-    console.log(JSON.stringify(toSarif(result, { standard, lang }), null, 2));
-    return;
-  }
-  for (const line of annotations(result, { standard, lang, failOn })) console.log(line);
-  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-  const md = stepSummary(result, { standard, lang });
-  if (summaryPath) {
-    try {
-      appendFileSync(summaryPath, `${md}\n`);
-    } catch {
-      /* never fail a run because the job summary could not be written */
-    }
-  } else {
-    console.error(md);
-  }
-  // Sticky pull-request comment — opt-in, and best-effort: off a PR, or with no `gh`/auth,
-  // it simply reports "skipped". A comment is never worth failing a build over.
-  //
-  // It gets its OWN document, not the summary above. The summary has a 1 MiB budget and a
-  // reader who went looking for it; a PR comment has 64 KiB and a reader scanning a diff.
-  // Posting one string to both is what turned a 700-finding audit into a wall on the PR.
-  if (process.env.ULTRA11Y_PR_COMMENT === "1") {
-    // WHICH document this run posts. Anything but an explicit `pages` is the historical
-    // digest under the historical marker: an unset — or misspelled — variable must degrade to
-    // the behaviour every existing workflow already depends on, never to silence.
-    const kind = commentKindFrom(process.env.ULTRA11Y_PR_COMMENT_KIND);
-    // `full` is the page document carrying the digest's actionable half as well — one sticky,
-    // under its own marker, for a workflow that wants a single comment at the end with
-    // everything in it rather than two a reviewer has to reconcile.
-    const render = kind === "pages" || kind === "full" ? pagesComment : prComment;
-    const body = render(result, {
-      standard,
-      lang,
-      kind,
-      // The run is known before the artifact exists, so the link is always safe. The artifact
-      // NAME is only set by the caller when it actually uploads one — naming an artifact that
-      // was never uploaded sends the reader to a page that does not exist.
-      ...(process.env.ULTRA11Y_RUN_URL ? { runUrl: process.env.ULTRA11Y_RUN_URL } : {}),
-      ...(process.env.ULTRA11Y_ARTIFACT_NAME ? { artifactName: process.env.ULTRA11Y_ARTIFACT_NAME } : {}),
-    });
-    const c = pushPrComment(body, standard, kind);
-    console.error(
-      c.ok
-        ? lang === "fr"
-          ? `ultra11y : commentaire de PR ${c.action === "updated" ? "mis à jour" : c.action === "created" ? "créé" : "ignoré"}${c.reason ? ` (${c.reason})` : ""}.`
-          : `ultra11y: PR comment ${c.action}${c.reason ? ` (${c.reason})` : ""}.`
-        : lang === "fr"
-          ? `ultra11y : commentaire de PR impossible${c.reason ? ` — ${c.reason}` : ""}.`
-          : `ultra11y: PR comment failed${c.reason ? ` — ${c.reason}` : ""}.`,
-    );
-  }
-}
-
 // `audit --in <audit.json>` — RE-GATE an audit that was already computed, instead of
 // computing one. It exists for one caller: a pipeline that folded ADJUDICATED verdicts into
 // audit-latest.json and now wants the same severity gate applied to that result. Re-running
@@ -1153,7 +908,6 @@ async function cmdAuditFromFile(p: ParsedArgs, inPath: string): Promise<number> 
     "since",
     "changed",
     "staged",
-    "baseline",
     "graph",
     "cross-file",
     "jsx",
@@ -1203,18 +957,12 @@ async function cmdAuditFromFile(p: ParsedArgs, inPath: string): Promise<number> 
     console.error(`ultra11y audit: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
     return 2;
   }
-  const ciFormat = parseCiFormat(p.flags.format);
-  if (ciFormat === null) {
-    console.error(`ultra11y audit: --format must be sarif|github (got "${String(p.flags.format)}").`);
-    return 2;
-  }
 
   const failOnSet = failOnRaw !== undefined;
   const failOn = failOnSet ? (failOnParsed ?? "bloquant") : undefined;
   const failing = failOn ? findingsAtOrAbove(findingsForStandard(result, standard), failOn) : [];
 
-  if (ciFormat) emitCiFormat(result, ciFormat, standard, lang, failOn);
-  else if (p.flags.json) console.log(JSON.stringify(auditDocumentFor(result, standard, lang), null, 2));
+  if (p.flags.json) console.log(JSON.stringify(auditDocumentFor(result, standard, lang), null, 2));
   else {
     console.log(auditSummary(result, lang, standard));
     if (failOnSet && failing.length)
@@ -1226,7 +974,6 @@ async function cmdAuditFromFile(p: ParsedArgs, inPath: string): Promise<number> 
 async function cmdAudit(p: ParsedArgs): Promise<number> {
   const inFlag = p.flags.in;
   if (typeof inFlag === "string" && inFlag) return cmdAuditFromFile(p, inFlag);
-  if (p.flags.lite === true) return cmdAuditLite(p);
 
   const inputs = p.positionals.length ? p.positionals : ["."];
   if (inputs.length === 0) {
@@ -1368,45 +1115,6 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
     return 2;
   }
 
-  // CI rendering. `audit` is always WCAG-keyed (it takes no --standard by design), so a
-  // pack-tagged SARIF is produced by chaining `report --in … --standard rgaa --format sarif`.
-  const ciFormat = parseCiFormat(p.flags.format);
-  if (ciFormat === null) {
-    console.error(`ultra11y audit: --format must be sarif|github (got "${String(p.flags.format)}").`);
-    return 2;
-  }
-
-  // Regression-gate mode (used by the init hook / CI): diff against a committed
-  // baseline and exit non-zero only on NEW non-conformities at/above --fail-on.
-  const baselineFlag = p.flags.baseline;
-  if (typeof baselineFlag === "string" && baselineFlag) {
-    let baseline: AuditResult | null = null;
-    if (existsSync(baselineFlag)) {
-      try {
-        const parsed: unknown = unwrapAudit(JSON.parse(readText(baselineFlag)));
-        if (isCurrentAudit(parsed)) baseline = parsed;
-        else
-          console.error(
-            `ultra11y audit: --baseline ${baselineFlag} is stale (pre-v2 / not WCAG-keyed); treating as empty. Regenerate with \`init --baseline\`.`,
-          );
-      } catch {
-        console.error(`ultra11y audit: --baseline ${baselineFlag} is not valid JSON; treating as empty.`);
-      }
-    }
-    const diff = diffAgainstBaseline(result, baseline, failOnParsed ?? "bloquant");
-    const blindSpots = requireCaptures ? (result.scope.captureCoverage?.blindSpots ?? []) : [];
-    // In gate mode the subject is the REGRESSION, not the backlog: the CI rendering covers
-    // exactly the new findings, so a PR is annotated with what it introduced.
-    if (ciFormat) emitCiFormat({ ...result, findings: diff.newFindings }, ciFormat, standard, lang, failOnParsed ?? "bloquant");
-    else if (p.flags.json)
-      console.log(JSON.stringify(requireCaptures && result.scope.captureCoverage ? { ...diff, captureCoverage: result.scope.captureCoverage } : diff, null, 2));
-    else {
-      console.log(baselineSummary(diff, lang));
-      if (requireCaptures && result.scope.captureCoverage) console.error(captureCoverageSummary(result.scope.captureCoverage, lang));
-    }
-    return diff.ok && blindSpots.length === 0 ? 0 : 1;
-  }
-
   // Standalone gates (linter-style, no baseline): `--fail-on` gates the whole audit by
   // finding severity; `--require-captures` gates on rendered-capture blind spots. Both
   // compose; a plain audit (neither flag) always exits 0.
@@ -1418,8 +1126,7 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   const failing = failOn ? findingsAtOrAbove(findingsForStandard(result, standard), failOn) : [];
   const blindSpots = requireCaptures ? (result.scope.captureCoverage?.blindSpots ?? []) : [];
 
-  if (ciFormat) emitCiFormat(result, ciFormat, standard, lang, failOn);
-  else if (p.flags.json) console.log(JSON.stringify(document, null, 2));
+  if (p.flags.json) console.log(JSON.stringify(document, null, 2));
   else {
     console.log(auditSummary(result, lang, standard));
     if (requireCaptures && result.scope.captureCoverage) console.error(captureCoverageSummary(result.scope.captureCoverage, lang));
@@ -1432,326 +1139,6 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   }
   if (!failOnSet && !requireCaptures) return 0;
   return failing.length || blindSpots.length ? 1 : 0;
-}
-
-// `audit --lite` — the rendered regression gate (src/lite.ts). Everything the full pipeline adds
-// on top of the engine is left out on purpose — no source files, no captures, no PDF, no pixel
-// tier, no page report, no adjudication — because this runs on every pull request and its one
-// question is "did this change break a page?". The snapshots are the pages a workflow captured,
-// usually the ones `affected` selected.
-async function cmdAuditLite(p: ParsedArgs): Promise<number> {
-  const standard = stdOf(p, "audit");
-  if (standard === null) return 2;
-  let lang = resolveLang(p.flags, { standard });
-  const refused = ["since", "changed", "staged", "graph", "cross-file", "captures", "require-captures", "in", "max-files"].filter(
-    (f) => p.flags[f] !== undefined,
-  );
-  if (p.positionals.length) refused.unshift("<paths>");
-  if (refused.length) {
-    console.error(`ultra11y audit --lite: audits the page snapshots alone, so these do not apply: ${refused.join(", ")}.`);
-    return 2;
-  }
-  const failOnRaw = p.flags["fail-on"];
-  const failOn = parseFailOn(failOnRaw);
-  if (failOn === null) {
-    console.error(`ultra11y audit: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
-    return 2;
-  }
-  const ciFormat = parseCiFormat(p.flags.format);
-  if (ciFormat === null) {
-    console.error(`ultra11y audit: --format must be sarif|github (got "${String(p.flags.format)}").`);
-    return 2;
-  }
-  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
-  const pagesDir = join(root, PAGES_DIR);
-  let available: string[] = [];
-  try {
-    available = readdirSync(pagesDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && existsSync(join(pagesDir, d.name, "dom.html")))
-      .map((d) => d.name)
-      .sort();
-  } catch {
-    /* no snapshot directory: reported below like an empty one */
-  }
-  const warnings: string[] = [];
-  let selected = available;
-  if (typeof p.flags.pages === "string") {
-    const wanted = [
-      ...new Set(
-        p.flags.pages
-          .split(/[\s,]+/)
-          .map((s) => s.trim())
-          .filter(Boolean),
-      ),
-    ];
-    const have = new Set(available);
-    const missing = wanted.filter((id) => !have.has(id));
-    if (missing.length)
-      warnings.push(
-        lang === "fr"
-          ? `page(s) demandée(s) sans instantané dans ${pagesDir} : ${missing.join(", ")} — non auditée(s).`
-          : `page(s) asked for with no snapshot in ${pagesDir}: ${missing.join(", ")} — not audited.`,
-      );
-    selected = wanted.filter((id) => have.has(id));
-  }
-
-  const result = runAudit({
-    inputs: selected.map((id) => join(pagesDir, id, "dom.html")),
-    // Two pages may serialize to the same DOM; each must still be measured under its own id,
-    // or the second one reads as a clean page in the baseline.
-    dedup: "off",
-    noDefaultExcludes: true,
-    pixel: false,
-    onWarn: (m) => console.error(m),
-  });
-  lang = resolveLang(p.flags, { audit: result, standard });
-  const findings = findingsForStandard(result, standard);
-
-  const writeTo = typeof p.flags["write-baseline"] === "string" && p.flags["write-baseline"] ? p.flags["write-baseline"] : undefined;
-  if (writeTo) {
-    // The new-page judgment rests on the baseline knowing every page that EXISTED when it was
-    // written. A page asked for or declared in the sample that left no snapshot (a skipped or
-    // flaky capture) is recorded as skipped, so a later pull request never inherits its backlog
-    // as new.
-    let declared: string[] = [];
-    try {
-      declared = (loadConfig(root)?.sample?.pages ?? []).map((pg) => pg.id).filter((id): id is string => typeof id === "string");
-    } catch {
-      /* an unreadable config is reported by every other command; here it only narrows `skipped` */
-    }
-    const asked = typeof p.flags.pages === "string" ? p.flags.pages.split(/[\s,]+/).filter(Boolean) : [];
-    const baseline = buildRenderBaseline(findings, selected, standard, undefined, [...asked, ...declared]);
-    if (baseline.skipped?.length)
-      warnings.push(
-        lang === "fr"
-          ? `baseline écrite sans ${baseline.skipped.length} page(s) déclarée(s) faute d'instantané (${baseline.skipped.join(", ")}) : elles ne seront pas jugées nouvelles.`
-          : `baseline written without ${baseline.skipped.length} declared page(s) that left no snapshot (${baseline.skipped.join(", ")}): they will not be judged new.`,
-      );
-    mkdirSync(dirname(writeTo), { recursive: true });
-    writeFileSync(writeTo, `${JSON.stringify(baseline, null, 2)}\n`);
-    console.error(
-      lang === "fr"
-        ? `→ baseline de rendu écrite dans ${writeTo} (${selected.length} page(s)).`
-        : `→ render baseline written to ${writeTo} (${selected.length} page(s)).`,
-    );
-  }
-
-  // Gate only when a baseline was asked for. Without one the run is a measurement (the push to
-  // the default branch that writes the next baseline), and every finding is the backlog.
-  const baselineFlag = typeof p.flags.baseline === "string" ? p.flags.baseline : undefined;
-  let baseline: RenderBaseline | null = null;
-  if (baselineFlag && existsSync(baselineFlag)) {
-    try {
-      baseline = parseRenderBaseline(JSON.parse(readText(baselineFlag)), standard);
-      if (!baseline) warnings.push(`--baseline ${baselineFlag} is neither a render baseline nor an ultra11y audit — treated as absent.`);
-    } catch {
-      warnings.push(`--baseline ${baselineFlag} is not valid JSON — treated as absent.`);
-    }
-  }
-  const gating = baselineFlag !== undefined;
-  const diff = diffRenderBaseline(findings, selected, baseline, failOn, undefined, { approximate: p.flags["baseline-approximate"] === true });
-  warnings.push(...(gating ? renderDiffWarnings(diff, lang) : []));
-  if (!selected.length) warnings.push(lang === "fr" ? `aucun instantané de page à auditer sous ${pagesDir}.` : `no page snapshot to audit under ${pagesDir}.`);
-  // What this run REPORTS: the regression when gating, the whole backlog when measuring.
-  const reported = gating ? diff.newFindings : gatedFindings(findings);
-  const reportedResult: AuditResult = { ...result, findings: reported, packFindings: [] };
-
-  if (typeof p.flags.out === "string" && p.flags.out) {
-    const out = p.flags.out;
-    try {
-      mkdirSync(out, { recursive: true });
-      writeFileSync(join(out, "lite.json"), `${JSON.stringify({ ...diff, gating, warnings, findings: reported.length }, null, 2)}\n`);
-      writeFileSync(
-        join(out, "lite.sarif"),
-        `${JSON.stringify(toSarif(reportedResult, { standard, lang, fingerprint: regressionKey, automationId: `ultra11y-lite/${standard}/` }), null, 2)}\n`,
-      );
-    } catch {
-      /* non-fatal: the gate below still decides */
-    }
-  }
-
-  if (ciFormat === "sarif") {
-    console.log(JSON.stringify(toSarif(reportedResult, { standard, lang, fingerprint: regressionKey, automationId: `ultra11y-lite/${standard}/` }), null, 2));
-  } else if (ciFormat === "github") {
-    for (const w of warnings) console.log(`::warning title=ultra11y lite::${w.replace(/%/g, "%25").replace(/\r?\n/g, "%0A")}`);
-    if (gating) for (const line of annotations(reportedResult, { standard, lang })) console.log(line);
-    const md = gating
-      ? renderDiffMarkdown(diff, lang)
-      : lang === "fr"
-        ? `## ultra11y lite — mesure\n\n${selected.length} page(s) auditée(s) · ${reported.length} constat(s)${writeTo ? " · baseline écrite" : ""}.\n`
-        : `## ultra11y lite — measurement\n\n${selected.length} page(s) audited · ${reported.length} finding(s)${writeTo ? " · baseline written" : ""}.\n`;
-    if (process.env.GITHUB_STEP_SUMMARY) {
-      try {
-        appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${md}\n`);
-      } catch {
-        /* a summary that cannot be written never fails a gate */
-      }
-    } else console.error(md);
-  } else if (p.flags.json) {
-    console.log(JSON.stringify({ ...diff, gating, warnings }, null, 2));
-  } else {
-    for (const w of warnings) console.error(`⚠ ${w}`);
-    console.log(
-      gating
-        ? renderDiffMarkdown(diff, lang)
-        : lang === "fr"
-          ? `${selected.length} page(s) auditée(s) · ${reported.length} constat(s).`
-          : `${selected.length} page(s) audited · ${reported.length} finding(s).`,
-    );
-  }
-  return gating && !diff.ok ? 1 : 0;
-}
-
-// `affected` — the sample pages a diff can change (src/affected.ts). No browser and no parse:
-// the merge-base, the import graph reached from each page's sources, and `sample.global`.
-function cmdAffected(p: ParsedArgs): number {
-  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
-  const since = typeof p.flags.since === "string" ? p.flags.since.trim() : "";
-  const lang = resolveLang(p.flags, {});
-  const every = p.flags.all === true;
-  if (!since && !every) {
-    console.error("ultra11y affected: --since <ref> is required (e.g. --since origin/main), or --all for every page.");
-    return 2;
-  }
-  let cfg: ReturnType<typeof loadConfig>;
-  try {
-    cfg = loadConfig(root);
-  } catch (e) {
-    console.error(`ultra11y affected: ${e instanceof Error ? e.message : String(e)}`);
-    return 2;
-  }
-  const v = cfg?.sample ? validateSample(cfg.sample) : undefined;
-  if (!v?.ok || !v.sample) {
-    console.error(
-      v
-        ? `ultra11y affected: invalid \`sample\` in ${join(root, ".ultra11yrc.json")}: ${v.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`
-        : `ultra11y affected: no \`sample.pages\` in ${join(root, ".ultra11yrc.json")} — there is no page to select.`,
-    );
-    return 2;
-  }
-  // `--all`: the run that writes the baseline measures every page, whatever changed.
-  if (every) {
-    const pages = v.sample.pages.map((pg) => pg.id);
-    const r = { pages, all: true, none: pages.length === 0, unmapped: [], global: [], reasons: {}, unsourced: [], unsampled: [], changed: 0 };
-    if (p.flags.json) console.log(JSON.stringify(r, null, 2));
-    else console.log(lang === "fr" ? `Toutes les pages (${pages.length}).` : `Every page (${pages.length}).`);
-    return 0;
-  }
-  let changed: ReturnType<typeof changedSince>;
-  try {
-    changed = changedSince(since, root);
-  } catch (e) {
-    console.error(`ultra11y affected: ${e instanceof Error ? e.message : String(e)}`);
-    return 2;
-  }
-  const r = selectAffected({ root, pages: v.sample.pages, global: v.sample.global, exempt: v.sample.exempt?.map((e) => e.path), changed: changed.files });
-  const fr = lang === "fr";
-  // A route nobody captures ships unaudited: the gate's one blind spot it can name. Report-only
-  // unless asked, so turning the feature on never breaks a workflow that did not.
-  const requireSampled = p.flags["require-sampled"] === true;
-  const unsampledMessage = r.unsampled.length
-    ? fr
-      ? `route(s) ajoutée(s) ou modifiée(s) qu'aucune page de l'échantillon ne déclare : ${r.unsampled.join(", ")} — déclarez la page dans \`sample.pages\` (avec ses \`sources\`), ou exemptez-la dans \`sample.exempt\` avec sa raison.`
-      : `route(s) added or changed that no sample page declares: ${r.unsampled.join(", ")} — declare the page in \`sample.pages\` (with its \`sources\`), or exempt it in \`sample.exempt\` with a reason.`
-    : "";
-  const sampledVerdict = (): number => {
-    if (!unsampledMessage) return 0;
-    console.error(`${requireSampled ? "✗" : "⚠"} ${unsampledMessage}`);
-    return requireSampled ? 1 : 0;
-  };
-  if (p.flags.json) {
-    console.log(JSON.stringify({ since, mergeBase: changed.mergeBase, ...r }, null, 2));
-    return sampledVerdict();
-  }
-  if (r.all)
-    console.log(
-      fr
-        ? `Toutes les pages (${r.pages.length}) : fichier(s) global(aux) touché(s) — ${r.global.join(", ")}.`
-        : `Every page (${r.pages.length}): global file(s) touched — ${r.global.join(", ")}.`,
-    );
-  else if (r.none) console.log(fr ? `Aucune page touchée (${r.changed} fichier(s) modifié(s)).` : `No page affected (${r.changed} changed file(s)).`);
-  else {
-    console.log(fr ? `${r.pages.length} page(s) touchée(s) sur ${v.sample.pages.length} :` : `${r.pages.length} of ${v.sample.pages.length} page(s) affected:`);
-    for (const id of r.pages) console.log(`  ${id}  ← ${(r.reasons[id] ?? []).join(", ")}`);
-  }
-  if (r.unmapped.length)
-    console.error(
-      fr
-        ? `⚠ balisage modifié qu'aucune page de l'échantillon n'atteint : ${r.unmapped.join(", ")}`
-        : `⚠ changed markup no sample page reaches: ${r.unmapped.join(", ")}`,
-    );
-  if (r.unsourced.length)
-    console.error(
-      fr
-        ? `⚠ page(s) sans \`sources\`, sélectionnée(s) seulement par un fichier global : ${r.unsourced.join(", ")}`
-        : `⚠ page(s) declaring no \`sources\`, selected only by a global file: ${r.unsourced.join(", ")}`,
-    );
-  return sampledVerdict();
-}
-
-// `dev` — the development side-car. Long-running by design: it holds the port until you stop
-// it, which is why nothing else in the CLI looks like this.
-async function cmdDev(p: ParsedArgs): Promise<number> {
-  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
-  const standard = stdOf(p, "dev");
-  if (standard === null) return 2;
-  const lang = resolveLang(p.flags, { standard });
-  const portRaw = p.flags.port;
-  const port = typeof portRaw === "string" ? Number.parseInt(portRaw, 10) : DEV_DEFAULT_PORT;
-  if (!Number.isFinite(port) || port < 0 || port > 65535) {
-    console.error(`ultra11y dev: --port must be a number between 0 and 65535 (got "${String(portRaw)}").`);
-    return 2;
-  }
-
-  // `--next` writes the component and stops: wiring the app is the user's one-line edit, and
-  // doing it for them would mean rewriting their layout.
-  if (p.flags.next === true) {
-    const dir = join(root, ".ultra11y", "next");
-    const rel = ".ultra11y/next/overlay.jsx";
-    try {
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, "overlay.jsx"), nextOverlayComponent(port));
-    } catch (e) {
-      console.error(`ultra11y dev: could not write ${rel}: ${e instanceof Error ? e.message : String(e)}`);
-      return 1;
-    }
-    const fr = lang === "fr";
-    console.log(fr ? `Composant overlay écrit : ${rel}` : `Overlay component written: ${rel}`);
-    console.log("");
-    console.log(fr ? "Ajoutez-le à votre layout racine (app/layout.tsx) :" : "Add it to your root layout (app/layout.tsx):");
-    console.log(`  import { Ultra11yOverlay } from "../${rel.replace(/\.jsx$/, "")}";`);
-    console.log(`  <body>{children}<Ultra11yOverlay /></body>`);
-    console.log("");
-    console.log(
-      fr
-        ? `Puis lancez le side-car : ultra11y dev  (tableau de bord : http://127.0.0.1:${port})`
-        : `Then start the side-car: ultra11y dev  (dashboard: http://127.0.0.1:${port})`,
-    );
-    console.log(fr ? "Le composant ne rend RIEN hors développement." : "The component renders NOTHING outside development.");
-    return 0;
-  }
-
-  const fr = lang === "fr";
-  let server: DevServer;
-  try {
-    server = await startDevServer({ root, port, standard, lang, onLog: (m) => console.error(m) });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(
-      /EADDRINUSE/.test(msg) ? `ultra11y dev: port ${port} is already in use — pass --port <n>.` : `ultra11y dev: could not start the server: ${msg}`,
-    );
-    return 1;
-  }
-  console.error(fr ? `ultra11y dev : tableau de bord sur http://127.0.0.1:${server.port}` : `ultra11y dev: dashboard on http://127.0.0.1:${server.port}`);
-  console.error(fr ? "Boucle locale uniquement (l'outil écrit des fichiers). Ctrl-C pour arrêter." : "Loopback only (the tool writes files). Ctrl-C to stop.");
-  await new Promise<void>((resolve) => {
-    const stop = (): void => {
-      void server.close().then(resolve);
-    };
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
-  });
-  return 0;
 }
 
 // `pages discover` — turn ONE entry point into the declared page sample.
@@ -1943,17 +1330,12 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   if (!scope.length) {
     console.error(
       lang === "fr"
-        ? "ultra11y pages : aucune page dans le périmètre. Capturez des instantanés (render --e2e) ou scannez un échantillon (scan --sample)."
-        : "ultra11y pages: no page in scope. Capture snapshots (render --e2e) or scan a sample (scan --sample).",
+        ? "ultra11y pages : aucune page dans le périmètre. Capturez des instantanés (ultra11y/playwright ou ultra11y/cypress) ou scannez un échantillon (scan --sample)."
+        : "ultra11y pages: no page in scope. Capture snapshots (ultra11y/playwright or ultra11y/cypress) or scan a sample (scan --sample).",
     );
     return 1;
   }
   attributePages(result, scope);
-  // --diff <external.json> — hold this grid against an audit someone else performed. NOTHING is
-  // re-decided: both sides arrive decided, `diffSides` only sorts the pairs. See src/external/.
-  if (typeof p.flags.diff === "string" && p.flags.diff) {
-    return diffAgainstExternal(p, result, scope, standard, lang, p.flags.diff);
-  }
 
   if (p.flags.json) {
     // Projected onto the ACTIVE standard, like every rendered surface — see pagesForStandard.
@@ -2181,7 +1563,7 @@ function emitHtml(result: AuditResult, opts: Parameters<typeof writeHtml>[1]): R
 }
 
 // `snapshot write` — the single surface every browser-side producer writes through (the E2E
-// fixtures, the dev sidecar). It takes the collected payload on stdin, persists the snapshot
+// integrations, ultra11y/playwright and ultra11y/cypress). It takes the collected payload on stdin, persists the snapshot
 // and audits it, so a producer needs to know NOTHING about the on-disk format, the
 // provenance comment or the audit. One process per checked page, not three.
 async function cmdSnapshot(p: ParsedArgs): Promise<number> {
@@ -2259,8 +1641,8 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
       // the process that found it, or the offline re-audit sees a page nobody ran axe on.
       ...(payload.axe ? { axe: payload.axe as RenderSignals["axe"] } : {}),
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
-      // pixel tier. writeSnapshot owns the decoding, so every producer — this command, the
-      // dev side-car, `scan` — writes it the one same way.
+      // pixel tier. writeSnapshot owns the decoding, so every producer — this command,
+      // `scan` — writes it the one same way.
       ...(typeof payload.screenshot === "string" && payload.screenshot ? { screenshotBase64: payload.screenshot } : {}),
       // The whole page, for the report's reader — never read by a rule.
       ...(typeof payload.screenshotFull === "string" && payload.screenshotFull ? { screenshotFullBase64: payload.screenshotFull } : {}),
@@ -2302,26 +1684,10 @@ function cmdInit(p: ParsedArgs): number {
     return 2;
   }
   const failOn = failOnParsed ?? "bloquant";
-  // The baseline regression gate is opt-in via --baseline or an explicit --fail-on;
-  // otherwise init wires the default strict-staged auto-fixing hook (no baseline needed).
-  const legacy = p.flags.baseline === true || p.flags["fail-on"] !== undefined;
-  const want = { hook: p.flags.hook === true, ci: p.flags.ci === true, baseline: p.flags.baseline === true };
-  if (!want.hook && !want.ci && !want.baseline) want.hook = true; // default: the staged auto-fix gate
-  if (legacy) want.baseline = true; // the regression gate needs its committed reference
-  const wrote: string[] = [];
-  if (want.baseline) {
-    const inputs = p.positionals.length ? p.positionals : ["."];
-    const result = runAudit({ inputs, onWarn: (m) => console.error(m) });
-    mkdirSync(join(root, "audits"), { recursive: true });
-    const bp = join(root, "audits", "baseline.json");
-    writeFileSync(bp, JSON.stringify(result, null, 2) + "\n");
-    wrote.push(bp);
-  }
-  if (want.hook) wrote.push(writeHook(root, engineRel, failOn, legacy ? "baseline" : "staged"));
-  if (want.ci) wrote.push(writeCi(root, engineRel, failOn));
-  for (const w of wrote) console.log(`ultra11y init: wrote ${w}`);
-  if (want.baseline) console.log(`ultra11y init: done. Commit audits/baseline.json so the gate has a reference.`);
-  else console.log(`ultra11y init: done. The pre-commit gate audits staged changes and auto-applies safe fixes (bypass once with SKIP_A11Y=1).`);
+  // `init` wires exactly one thing: the strict-staged, auto-fixing pre-commit gate. CI runs
+  // through iterion's rgaa-audit bot, so there is no workflow to generate here.
+  console.log(`ultra11y init: wrote ${writeHook(root, engineRel, failOn)}`);
+  console.log(`ultra11y init: done. The pre-commit gate audits staged changes and auto-applies safe fixes (bypass once with SKIP_A11Y=1).`);
   return 0;
 }
 
@@ -2479,6 +1845,7 @@ function cmdCriteria(p: ParsedArgs): number {
     id: p.positionals[0],
     theme: typeof themeFlag === "string" && themeFlag ? Number(themeFlag) : undefined,
     list: p.flags.list === true,
+    plan: p.flags.plan === true,
     json: p.flags.json === true,
     lang: resolveLang(p.flags, { standard }),
     standard,
@@ -2510,27 +1877,11 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : "audits";
   const lang = resolveLang(p.flags, { audit: result, standard });
 
-  // CI renderings of the same result — no Markdown file is written. This is the path that
-  // gives a pack-keyed (RGAA) SARIF, since `audit` itself never takes --standard.
-  const ciFormat = parseCiFormat(p.flags.format);
-  if (ciFormat === null) {
-    console.error(`ultra11y report: --format must be sarif|github (got "${String(p.flags.format)}").`);
+  // `report` renders documents only (Markdown, --html). The CI renderings (--format
+  // sarif|github) were removed: CI runs through iterion's rgaa-audit bot, which reads the JSON.
+  if (p.flags.format !== undefined) {
+    console.error(`ultra11y report: --format is not supported (got "${String(p.flags.format)}"); report writes Markdown, or HTML with --html.`);
     return 2;
-  }
-  // `--format` on `report` names a CI CHANNEL (annotations, SARIF); `--html` names a
-  // DOCUMENT. Asking for both is asking for a file and a stream at once, so it is refused by
-  // name rather than resolved by precedence — a silent winner here is a missing deliverable.
-  if (ciFormat && p.flags.html === true) {
-    console.error(
-      lang === "fr"
-        ? `ultra11y report : --html et --format ${ciFormat} sont incompatibles. --format nomme un canal CI, --html un document ; choisissez l'un ou l'autre.`
-        : `ultra11y report: --html and --format ${ciFormat} are incompatible. --format names a CI channel, --html names a document; pick one.`,
-    );
-    return 2;
-  }
-  if (ciFormat) {
-    emitCiFormat(result, ciFormat, standard, lang);
-    return 0;
   }
 
   // THE EVIDENCE TIER, before anything is rendered — because BOTH deliverables read it. The
@@ -2619,7 +1970,7 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : "audits";
   const lang = resolveLang(p.flags, { audit: result, standard });
   const split = p.flags.split === "criterion" ? "criterion" : undefined;
-  const format: PrdFormat = p.flags.format === "doc" ? "doc" : p.flags.format === "remediation" ? "remediation" : "audit";
+  const format: PrdFormat = p.flags.format === "doc" ? "doc" : "audit";
   // Technical ticket sections (Partie technique + Contexte de reproduction) are ON by default;
   // `--no-technical` suppresses them for a pure-auditor consumption of the audit block.
   const technical = p.flags["no-technical"] !== true;
@@ -2635,16 +1986,41 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
   return 0;
 }
 
-/** Flags that USED to exist, mapped to what replaces them. Checked before the generic
- *  unknown-flag warning so a removal is loud on the first run, not discovered later from an
- *  empty tracker. Reusable for the next removal — one table, one place. */
+const CI_NOTE = "CI runs through iterion's rgaa-audit bot (https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit)";
+const TICKETS_V3 = "removed in v3 — ticket creation is now its own command. Use:";
+
+/** Flags that USED to exist, mapped to the message that names what replaces them. Checked
+ *  before the generic unknown-flag warning so a removal is loud on the first run, not
+ *  discovered later from an empty tracker or a green job that gated nothing. */
 export const REMOVED_FLAGS: Record<string, string> = {
-  "gh-issues": "ultra11y tickets --in <audit.json> --provider github --grain criterion",
-  "gh-single": "ultra11y tickets --in <audit.json> --provider github --grain single",
+  "gh-issues": `${TICKETS_V3} ultra11y tickets --in <audit.json> --provider github --grain criterion`,
+  "gh-single": `${TICKETS_V3} ultra11y tickets --in <audit.json> --provider github --grain single`,
   // The tracker-agnostic export moved WITH ticket filing: `tickets --out` writes the same
   // envelope (and a superset of the payload) at any grain, so an orchestrator still reads
   // one stable path — just not from the command that renders documents.
-  "issues-json": "ultra11y tickets --in <audit.json> --out <dir> --grain criterion",
+  "issues-json": `${TICKETS_V3} ultra11y tickets --in <audit.json> --out <dir> --grain criterion`,
+  // The CI-only surfaces, removed when ultra11y refocused on the skill.
+  lite: `removed with audit --lite (the rendered regression gate). ${CI_NOTE}.`,
+  baseline: `removed (the baseline regression gate). Gate with --fail-on, or wire init --hook; ${CI_NOTE}.`,
+  "write-baseline": `removed with audit --lite. ${CI_NOTE}.`,
+  "baseline-approximate": `removed with audit --lite. ${CI_NOTE}.`,
+  "require-sampled": `removed with the affected command. ${CI_NOTE}.`,
+  ci: `removed: init no longer writes a workflow. ${CI_NOTE}.`,
+  e2e: "removed: use the ultra11y/playwright or ultra11y/cypress package exports to check pages during an E2E run.",
+  diff: "removed with pages --diff (the comparison against an imported external audit).",
+  docker: "removed with the Docker runtime: scan runs on the local Playwright (pass --cwd <dir> to resolve it from a project).",
+  clean: "removed with the Docker runtime: there is no image to clean.",
+};
+
+/** Commands that USED to exist, mapped to what replaces them — same reason as REMOVED_FLAGS:
+ *  a script calling one must fail with a pointer, not a bare "unknown command". */
+export const REMOVED_COMMANDS: Record<string, string> = {
+  mcp: "the MCP server was removed. Look criteria up with `ultra11y criteria`, and drive the engine through the CLI or the skill.",
+  dev: "the dev side-car was removed. Check pages during your tests with the ultra11y/playwright or ultra11y/cypress package exports.",
+  judge:
+    "the headless judge was removed. The agent adjudicates through `verify --manual` / `verify --apply` (fanned out with `orchestrate`); in CI, iterion's rgaa-audit bot does.",
+  affected: `the diff-to-pages selector was removed. ${CI_NOTE}.`,
+  import: "importing an external audit (and pages --diff) was removed.",
 };
 
 /** Config keys that must NEVER appear in `.ultra11yrc.json` — a committed credential is a
@@ -2734,12 +2110,10 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
   const provider = createProvider(providerId, { transport: transportFlag as TransportMode });
 
   // --- the plan ---------------------------------------------------------------------------
-  const format = p.flags.format === "remediation" ? "remediation" : "audit";
   const plan = buildTickets(result, {
     grain: grainFlag as TicketGrain,
     standard,
     lang,
-    format,
     bodyLimit: provider.capabilities.bodyLimit,
     baseDir: process.cwd(),
     technical: p.flags["no-technical"] !== true,
@@ -2748,8 +2122,8 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
   if (plan.error === "no-pages") {
     console.error(
       fr
-        ? "ultra11y tickets : aucune page dans le périmètre. Capturez des instantanés (render --e2e) ou scannez un échantillon (scan --sample) avant d'utiliser --grain page."
-        : "ultra11y tickets: no page in scope. Capture snapshots (render --e2e) or scan a sample (scan --sample) before using --grain page.",
+        ? "ultra11y tickets : aucune page dans le périmètre. Capturez des instantanés (ultra11y/playwright ou ultra11y/cypress) ou scannez un échantillon (scan --sample) avant d'utiliser --grain page."
+        : "ultra11y tickets: no page in scope. Capture snapshots (ultra11y/playwright or ultra11y/cypress) or scan a sample (scan --sample) before using --grain page.",
     );
     return 1;
   }
@@ -2888,74 +2262,10 @@ async function cmdTickets(p: ParsedArgs): Promise<number> {
   return pushed.failed > 0 ? 1 : 0;
 }
 
-/** Merged dependencies of the package.json at `root` (empty when absent/unparseable — the
- *  detectors then simply see no deps). Shared by every `render` detection mode. */
-function depsAt(root: string): Record<string, string> {
-  const pkgPath = join(root, "package.json");
-  if (!existsSync(pkgPath)) return {};
-  try {
-    const pkg = JSON.parse(readText(pkgPath)) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-    return { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
-  } catch {
-    return {};
-  }
-}
-
-/** The engine path to bake into a generated file: repo-relative when the engine lives inside
- *  the repo, absolute otherwise. Same resolution `init` uses for the git hook. */
-function engineRefFor(root: string): string {
-  let ref = process.argv[1] ?? "scripts/ultra11y.mjs";
-  try {
-    const abs = realpathSync(ref);
-    ref = abs.startsWith(root + sep) ? relative(root, abs) : abs;
-  } catch {
-    /* keep as-is */
-  }
-  return ref;
-}
-
 function cmdRender(p: ParsedArgs): number {
   const root = p.positionals[0] ?? ".";
   const lang = resolveLang(p.flags, {}); // render has no --standard and no audit in hand
 
-  // `--e2e` — wire the audit into an EXISTING Cypress/Playwright run, so a targeted page is
-  // checked (and snapshotted) during the tests the project already has, rather than by a
-  // second browser afterwards. The fixtures are generated files, not a published library.
-  if (p.flags.e2e === true) {
-    const forced = typeof p.flags.runner === "string" ? p.flags.runner : undefined;
-    if (forced !== undefined && forced !== "playwright" && forced !== "cypress" && forced !== "auto") {
-      console.error(`ultra11y render: --runner must be playwright|cypress|auto (got "${forced}").`);
-      return 2;
-    }
-    const detected = detectE2eRunner(depsAt(root), (f) => existsSync(join(root, f)));
-    const runners: E2eRunner[] = forced && forced !== "auto" ? [forced] : detected;
-    if (!runners.length) {
-      console.error(e2eSetupPlan([], {}, lang));
-      return 1;
-    }
-    const engineRef = engineRefFor(root);
-    const dir = join(root, ".ultra11y", "e2e");
-    const paths: E2ePaths = {};
-    try {
-      mkdirSync(dir, { recursive: true });
-      if (runners.includes("playwright")) {
-        writeFileSync(join(dir, "playwright.mjs"), playwrightFixture(engineRef));
-        paths.playwright = ".ultra11y/e2e/playwright.mjs";
-      }
-      if (runners.includes("cypress")) {
-        writeFileSync(join(dir, "cypress-plugin.mjs"), cypressPlugin(engineRef));
-        writeFileSync(join(dir, "cypress-commands.mjs"), cypressCommands());
-        paths.cypressPlugin = ".ultra11y/e2e/cypress-plugin.mjs";
-        paths.cypressCommands = ".ultra11y/e2e/cypress-commands.mjs";
-      }
-    } catch (e) {
-      console.error(`ultra11y render: could not write the E2E fixtures: ${e instanceof Error ? e.message : String(e)}`);
-      return 1;
-    }
-    if (p.flags.json) console.log(JSON.stringify({ runners, paths }, null, 2));
-    else console.log(e2eSetupPlan(runners, paths, lang));
-    return 0;
-  }
   if (p.flags.scaffold === true) {
     const out = typeof p.flags.out === "string" && p.flags.out ? p.flags.out : "ultra11y-render.tsx";
     try {
@@ -4209,462 +3519,6 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
   return 0;
 }
 
-// `judge` — adjudicate the manual criteria with a model, for the runs where no coding agent
-// is in the loop (CI, an E2E run).
-//
-// It is a CALLER, not a second judge. The worklist, its harvested evidence, the decision
-// protocol and the prompt all come from `verify --manual`'s own machinery, and the verdicts
-// go through `applyAdjudication` unchanged — so a model cannot assert a conformance the gate
-// refuses: no null verdict, `C`/`NA` justified, an `NC` citing the criterion's OWN test, a
-// `manual` carrying a reason, and every `file:line` re-grounded against real source.
-//
-// Strictly opt-in: the API runner needs ANTHROPIC_API_KEY; local runners reuse their own
-// authenticated CLI. No other command is affected.
-type JudgeRunner = "api" | "claude" | "codex";
-
-/** `cli` shipped as the name of the Claude transport. Keep it as an alias so existing scripts
- * and Action inputs do not change meaning; new callers can state the provider explicitly. */
-function judgeRunner(value: unknown, fallback: JudgeRunner): JudgeRunner | null {
-  const raw = typeof value === "string" && value ? value : fallback;
-  if (raw === "cli") return "claude";
-  return raw === "api" || raw === "claude" || raw === "codex" ? raw : null;
-}
-
-/**
- * `judge --refute <VERIFY.todo.json>` — the SECOND pass, through the same transport.
- *
- * `verify --report` has always written a worklist for a human or a session agent to fill, and
- * `orchestrate --phase verify-report` fans it out to a harness's subagents. Neither is a
- * command a pipeline can run, so no pipeline ran one, and the pass that catches an
- * over-accusing adjudicator was the only pass in the tool nothing could invoke.
- *
- * Every claim keeps its own numbered verdict. `batch` (default) amortises the prompt and CLI
- * startup across eight independent claims; `criterion` preserves the historical one-call-per-
- * item isolation for a caller that values it above cost.
- *
- * Local CLI runners only. The api tier has no tools, and a reviewer who cannot OPEN the cited
- * file can only re-read the claim it was given — which is not a second reading, it is an echo.
- */
-async function cmdRefute(p: ParsedArgs, todoPath: string): Promise<number> {
-  const standard = stdOf(p, "judge");
-  if (standard === null) return 2;
-  const lang = resolveLang(p.flags, { standard });
-  const runner = judgeRunner(p.flags.runner, "claude");
-  if (runner !== "claude" && runner !== "codex") {
-    console.error(
-      lang === "fr"
-        ? "ultra11y judge : --refute exige --runner claude ou --runner codex (`cli` reste un alias de claude). Le tier `api` n'a aucun outil, et un relecteur qui ne peut pas OUVRIR le fichier cité ne relit rien — il répète."
-        : "ultra11y judge: --refute requires --runner claude or --runner codex (`cli` remains a claude alias). The api tier has no tools, and a reviewer who cannot OPEN the cited file is not re-reading anything — it is echoing.",
-    );
-    return 2;
-  }
-  let items: VerifyItem[];
-  try {
-    const parsed = JSON.parse(readText(todoPath)) as unknown;
-    if (!Array.isArray(parsed)) throw new Error("not an array");
-    items = parsed as VerifyItem[];
-  } catch {
-    console.error(`ultra11y judge: --refute file not found or not a verdicts array: ${todoPath}.`);
-    return 2;
-  }
-  // Only what is still open. Re-running after a kill costs the items that did not land and
-  // nothing else — the same resume the adjudication pass gets from re-deriving its residual.
-  const pending = items.filter((it) => typeof it.verdict !== "string" || !it.verdict.trim());
-  if (!pending.length) {
-    console.log(
-      lang === "fr"
-        ? `✓ Rien à mettre à l'épreuve : les ${items.length} entrées portent déjà un verdict.`
-        : `✓ Nothing to try: all ${items.length} entries already carry a verdict.`,
-    );
-    return 0;
-  }
-  const askedConcurrency = typeof p.flags.concurrency === "string" ? Number(p.flags.concurrency) : Number.NaN;
-  const lanes = Number.isFinite(askedConcurrency) && askedConcurrency > 0 ? Math.min(askedConcurrency, 8) : 2;
-  const timeout = typeof p.flags.timeout === "string" ? Number(p.flags.timeout) * 1000 : undefined;
-  const budget = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : undefined;
-  if (runner === "codex" && Number.isFinite(budget)) {
-    console.error(
-      "ultra11y judge: --max-budget-usd is a Claude CLI bound and does not exist for a ChatGPT-subscription Codex run; use --timeout or --max instead.",
-    );
-    return 2;
-  }
-  const effort = typeof p.flags.effort === "string" ? (p.flags.effort as string) : undefined;
-  const allowedEfforts = runner === "codex" ? CODEX_EFFORT_LEVELS : EFFORT_LEVELS;
-  if (effort !== undefined && !allowedEfforts.includes(effort)) {
-    console.error(`ultra11y judge: --effort '${effort}' is not valid for ${runner} — expected ${allowedEfforts.map((level) => `'${level}'`).join(", ")}.`);
-    return 2;
-  }
-  const opts: LlmOptions = {
-    ...(typeof p.flags.model === "string" && p.flags.model ? { model: p.flags.model as string } : {}),
-    ...(Number.isFinite(timeout) && timeout ? { timeoutMs: timeout } : {}),
-    ...(Number.isFinite(budget) ? { maxBudgetUsd: budget } : {}),
-    ...(effort ? { effort } : {}),
-  };
-  let spent = 0;
-  let failed = 0;
-  let attempted = 0;
-  let calls = 0;
-  let providerUnavailable = false;
-  const byN = new Map(items.map((it) => [it.n, it]));
-  const grain = typeof p.flags.grain === "string" ? p.flags.grain : "batch";
-  if (grain !== "batch" && grain !== "criterion") {
-    console.error(`ultra11y judge: --grain '${grain}' is not valid for refutation — expected 'batch' or 'criterion'.`);
-    return 2;
-  }
-  const size = grain === "criterion" ? 1 : 8;
-  const queue: VerifyItem[][] = [];
-  for (let at = 0; at < pending.length; at += size) queue.push(pending.slice(at, at + size));
-  const worker = async (): Promise<void> => {
-    for (;;) {
-      if (providerUnavailable) return;
-      const batch = queue.shift();
-      if (!batch) return;
-      attempted += batch.length;
-      calls++;
-      try {
-        const verdicts = await (runner === "codex" ? refuteBatchCodex : refuteBatchCli)(
-          batch,
-          formatWorklist(batch, p.flags.semantic === true, standard, lang),
-          { ...opts, onCost: (c) => (spent += c) },
-          lang,
-        );
-        for (const v of verdicts) {
-          const target = byN.get(Number(v.n));
-          if (!target) continue;
-          target.verdict = v.verdict as VerifyItem["verdict"];
-          target.note = v.note ?? "";
-        }
-      } catch (e) {
-        // A failed batch leaves each of its claims unadjudicated; a later invocation resumes
-        // exactly those items because successful batches were checkpointed below.
-        failed += batch.length;
-        if (isProviderUnavailableError(e)) providerUnavailable = true;
-        console.error(
-          `ultra11y judge: batch #${batch.map((item) => item.n).join(", #")} (${batch.map((item) => item.criteriaId).join(", ")}) — ${e instanceof Error ? e.message : String(e)}`,
-        );
-      }
-      // Written after every batch, not at the end: a killed run keeps every individual verdict
-      // returned by the completed batches and resumes only the blank items.
-      writeFileSync(todoPath, JSON.stringify(items, null, 2) + "\n");
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(lanes, queue.length) }, worker));
-  if (providerUnavailable && queue.length)
-    console.error(
-      `ultra11y judge: provider unavailable — stopped before ${queue.reduce((count, batch) => count + batch.length, 0)} remaining item(s) instead of repeating the same failed request.`,
-    );
-  const tally = (v: string) => items.filter((it) => (it.verdict ?? "").trim().toLowerCase() === v).length;
-  console.log(
-    lang === "fr"
-      ? `✓ ${attempted - failed}/${pending.length} entrée(s) mise(s) à l'épreuve → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`
-      : `✓ ${attempted - failed}/${pending.length} entry(ies) tried → ${todoPath} (supported ${tally("supported")}, partial ${tally("partial")}, refuted ${tally("refuted")}, unsupported ${tally("unsupported")})`,
-  );
-  console.log(lang === "fr" ? `  ${calls} appel(s), grain ${grain}.` : `  ${calls} call(s), ${grain} grain.`);
-  if (spent > 0) console.log(lang === "fr" ? `  ${spent.toFixed(4)} $ dépensé(s).` : `  $${spent.toFixed(4)} spent.`);
-  return failed ? 1 : 0;
-}
-
-async function cmdJudge(p: ParsedArgs): Promise<number> {
-  // The refutation pass shares this command's transport, its bounds and its cost reporting,
-  // and needs neither an audit nor a worklist of criteria — so it branches before `--in`.
-  const refute = p.flags.refute;
-  if (typeof refute === "string" && refute) return cmdRefute(p, refute);
-  const standard = stdOf(p, "judge");
-  if (standard === null) return 2;
-  const inFlag = p.flags.in;
-  if (typeof inFlag !== "string" || !inFlag) {
-    console.error("ultra11y judge: --in <audit.json> is required.");
-    return 2;
-  }
-  let audit: AuditResult;
-  try {
-    const parsed = unwrapAudit(JSON.parse(inFlag === "-" ? await readStdin() : readText(inFlag))) as unknown;
-    if (!isCurrentAudit(parsed)) {
-      console.error("ultra11y judge: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
-      return 2;
-    }
-    audit = parsed;
-  } catch {
-    console.error(`ultra11y judge: --in file not found or not valid JSON: ${inFlag}.`);
-    return 2;
-  }
-  const lang = resolveLang(p.flags, { audit, standard });
-
-  // WHICH TRANSPORT RULES. `api` posts the worklist to the Messages API; the local Claude and
-  // Codex transports can OPEN the files a criterion cites — the difference the agent tier has
-  // always been about — and run anywhere their authenticated CLI does. `cli` remains the
-  // historical spelling of the Claude transport so existing Action inputs keep their meaning.
-  const runner = judgeRunner(p.flags.runner, "api");
-  if (!runner) {
-    console.error(`ultra11y judge: --runner '${String(p.flags.runner)}' is not a transport — expected 'api', 'claude' or 'codex' ('cli' aliases 'claude').`);
-    return 2;
-  }
-  // One criterion per invocation instead of eight. It costs more calls and buys two things: the
-  // model sees one criterion's evidence rather than eight competing for its attention, and a run
-  // cut short loses at most ONE criterion — the turn-budget cliff that made a truncated agent
-  // pass throw away everything it had already ruled on simply cannot happen.
-  const grain = typeof p.flags.grain === "string" ? (p.flags.grain as string) : "batch";
-  if (grain !== "batch" && grain !== "criterion") {
-    console.error(`ultra11y judge: --grain '${grain}' is not a grain — expected 'batch' or 'criterion'.`);
-    return 2;
-  }
-
-  // HOW HARD THE MODEL IS ASKED TO THINK, which on this worklist is not a detail: what reaches
-  // this tier is what no engine could decide. Validated rather than forwarded, because an
-  // unknown value can otherwise be ignored or fail far away from the command that supplied it.
-  // Refused here, loudly, while the message can still reach a human.
-  const effort = typeof p.flags.effort === "string" ? (p.flags.effort as string) : undefined;
-  const allowedEfforts = runner === "codex" ? CODEX_EFFORT_LEVELS : runner === "claude" ? EFFORT_LEVELS : [];
-  if (effort !== undefined && !allowedEfforts.includes(effort)) {
-    console.error(
-      runner === "api"
-        ? "ultra11y judge: --effort applies to the Claude and Codex CLI runners only — the Messages API has no session to configure."
-        : `ultra11y judge: --effort '${effort}' is not valid for ${runner} — expected ${allowedEfforts.map((level) => `'${level}'`).join(", ")}.`,
-    );
-    return 2;
-  }
-
-  const maxBudgetUsd = typeof p.flags["max-budget-usd"] === "string" ? Number(p.flags["max-budget-usd"]) : undefined;
-  if (runner === "codex" && Number.isFinite(maxBudgetUsd)) {
-    console.error(
-      "ultra11y judge: --max-budget-usd is a Claude CLI bound and does not exist for a ChatGPT-subscription Codex run; use --timeout or --max instead.",
-    );
-    return 2;
-  }
-
-  const key = typeof p.flags["api-key"] === "string" && p.flags["api-key"] ? (p.flags["api-key"] as string) : apiKeyFromEnv();
-  if (!key && runner === "api") {
-    console.error(
-      lang === "fr"
-        ? "ultra11y judge : aucune clé d'API. Exportez ANTHROPIC_API_KEY (ou passez --api-key).\n" +
-            "  C'est le SEUL point de l'outil qui en demande une : le moteur, lui, ne requiert ni clé ni installation.\n" +
-            "  Dans un agent de code, utilisez `verify --manual` — c'est l'agent qui tranche, gratuitement."
-        : "ultra11y judge: no API key. Export ANTHROPIC_API_KEY (or pass --api-key).\n" +
-            "  This is the ONLY place in the tool that asks for one: the engine itself needs no key and no install.\n" +
-            "  Inside a coding agent use `verify --manual` instead — the agent rules, at no cost.",
-    );
-    return 2;
-  }
-
-  let items = buildAdjudicationWorklist(audit, { standard });
-  if (!items.length) {
-    console.log(lang === "fr" ? "Aucun critère à adjuger — rien à faire." : "No criterion left to adjudicate — nothing to do.");
-    return 0;
-  }
-  const max = typeof p.flags.max === "string" ? Number(p.flags.max) : undefined;
-  const truncated = max !== undefined && Number.isFinite(max) && max > 0 && items.length > max;
-  // `--max` bounds the spend. It used to be refused outright together with `--apply`, and
-  // rightly so: the fold was all-or-nothing, so a bounded adjudication could only ever fail on
-  // coverage — billing a full run to guarantee a failure. The fold is now per-verdict, so a
-  // bounded run lands what it covered and leaves the rest to assess, which is precisely what
-  // someone bounding spend is asking for. The pair is impossible only under `--strict`.
-  if (truncated && p.flags.apply === true && p.flags.strict === true) {
-    console.error(
-      lang === "fr"
-        ? `ultra11y judge : --max ${max} ne couvre que ${max} des ${items.length} critères, et --apply --strict exige une adjudication COMPLÈTE (le fold tout-ou-rien refuse une couverture partielle).\n` +
-            "  Retirez --strict pour appliquer ce qui est couvert, retirez --max pour tout adjuger, ou retirez --apply pour produire la worklist et l'appliquer plus tard."
-        : `ultra11y judge: --max ${max} covers only ${max} of ${items.length} criteria, and --apply --strict requires a COMPLETE adjudication (the all-or-nothing fold refuses partial coverage).\n` +
-            "  Drop --strict to apply what is covered, drop --max to adjudicate everything, or drop --apply to produce the worklist and apply it later.",
-    );
-    return 2;
-  }
-  if (truncated) items = items.slice(0, max);
-
-  // Batch, and render EACH batch through the very worklist formatter the agent reads. There
-  // is no second prompt to keep in step with the protocol.
-  const size = grain === "criterion" ? 1 : BATCH_SIZE;
-  // THE FULL PREAMBLE ENDS BY TELLING THE READER TO RUN `verify --apply` (src/adjudicate.ts
-  // T.then). Harmless to the api tier, which has no tools; wrong to hand a process that does.
-  // `preamble: false` is the rendering the on-disk briefs already use — the compressed
-  // contract, without the shell instructions — so each CLI runner reads exactly what
-  // `audits/adjudicate/<id>.md` carries, and the two surfaces cannot describe different jobs.
-  // AND `contract: false` ON BOTH TIERS, because both send `verdictSystemPrompt()` — the api
-  // one as the system parameter, and each CLI transport as its system contract — and its clauses come from
-  // the same source the brief's contract does (src/verdict-rules.ts). Repeating them costs
-  // 2 144 characters per criterion, which at `--grain criterion` over a full RGAA worklist is
-  // 28% of everything the pass pays for, and buys the model nothing it was not already told.
-  // The on-disk briefs `writeAdjudication` produces are unaffected: nobody hands those a
-  // system prompt, so they keep the contract.
-  const render = (slice: typeof items): string => formatAdjudication(slice, lang, standard, { preamble: false, contract: false });
-  const batches = batchWorklist(items, render, size);
-  const explicitModel = typeof p.flags.model === "string" && p.flags.model ? (p.flags.model as string) : undefined;
-  const model = explicitModel ?? (runner === "claude" ? DEFAULT_CLI_MODEL : runner === "api" ? modelFromEnv() : undefined);
-  const modelLabel = model ?? "Codex account default";
-  console.error(
-    lang === "fr"
-      ? `ultra11y judge : ${items.length} critère(s) en ${batches.length} lot(s), transport ${runner}, modèle ${modelLabel}…`
-      : `ultra11y judge: ${items.length} criterion(ia) in ${batches.length} batch(es), ${runner} transport, model ${modelLabel}…`,
-  );
-
-  const outDir = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
-  const cwd = typeof p.flags.cwd === "string" ? (p.flags.cwd as string) : undefined;
-  const applying = p.flags.apply === true;
-  const askedConcurrency = typeof p.flags.concurrency === "string" ? Number(p.flags.concurrency) : Number.NaN;
-  const cliConcurrency = Number.isFinite(askedConcurrency) && askedConcurrency > 0 ? Math.min(askedConcurrency, 8) : 2;
-
-  // CHECKPOINTS, because a killed run used to lose everything it had already paid for.
-  //
-  // Measured: a per-criterion pass reached 31 of 51 criteria in 40 minutes, the CI job hit its
-  // 45-minute ceiling, the process was killed — and the audit came back with all 51 still to
-  // assess. The fold only ran at the END, so 31 rulings were bought and thrown away. Isolating
-  // the model call per criterion buys nothing while the WRITE is still one all-or-nothing
-  // operation, which is exactly what the per-criterion grain was sold as fixing.
-  //
-  // Time-throttled rather than every batch: the fold re-grounds every citation against real
-  // source, and doing that 51 times over would spend on bookkeeping what the grain saves.
-  const CHECKPOINT_MS = 15_000;
-  let lastCheckpoint = 0;
-  const checkpoint = (force: boolean): void => {
-    if (!applying) return;
-    const now = Date.now();
-    if (!force && now - lastCheckpoint < CHECKPOINT_MS) return;
-    lastCheckpoint = now;
-    try {
-      const partial = applyAdjudication(
-        audit,
-        { tool: "ultra11y", kind: "adjudication", schemaVersion: SCHEMA_VERSION, standard, auditDate: audit.date, items },
-        { cwd },
-      );
-      // A partial sweep cannot satisfy the COVERAGE check, and that is correct rather than a
-      // problem: the per-verdict fold still lands every valid verdict, and the criteria nobody
-      // has reached yet stay to assess. Only a checkpoint that landed nothing is worth skipping.
-      if (partial.applied > 0)
-        writeFileSync(join(outDir, "audit-latest.json"), `${JSON.stringify(auditDocumentFor(partial.audit, standard, lang), null, 2)}\n`);
-    } catch {
-      // A checkpoint is a safety net, never a reason to lose the run it protects.
-    }
-  };
-
-  let spent = 0;
-  // A provider-supported dollar ceiling (Claude only) and a wall clock — never an invented
-  // turn budget. The wall clock is enforced by this process for both local transports.
-  const timeoutMs = typeof p.flags.timeout === "string" ? Number(p.flags.timeout) * 1000 : undefined;
-  const { verdicts, failures } = await judgeAll(batches, {
-    apiKey: key,
-    model,
-    backend: runner === "claude" ? judgeBatchCli : runner === "codex" ? judgeBatchCodex : undefined,
-    // TWO local processes, not one, and the reason is measured rather than tuned: sequentially,
-    // one criterion took ~75s on Haiku, so a 51-criterion sweep needs ~64 minutes and a CI job
-    // that allows 45 is killed at 31. Two in flight brings it inside the ceiling; more than a
-    // few is a different risk — each local CLI invocation is its own process and concurrent
-    // subscription turns reach provider limits faster. `--concurrency` overrides it for a
-    // runner with room.
-    concurrency: runner === "claude" || runner === "codex" ? cliConcurrency : undefined,
-    abortOnError: isProviderUnavailableError,
-    // The seam that lets a budget abort be halved rather than lost: the same renderer
-    // `batchWorklist` used, so a re-queued half is prompted exactly like a first-class batch.
-    render,
-    maxBudgetUsd: Number.isFinite(maxBudgetUsd) ? maxBudgetUsd : undefined,
-    effort,
-    timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : undefined,
-    onCost: (usd) => {
-      spent += usd;
-    },
-    onVerdicts: (landed) => {
-      applyRawVerdicts(items, landed);
-      checkpoint(false);
-    },
-    onProgress: (done, total) => console.error(`  ${done}/${total}`),
-  });
-  // What it cost, from the run itself rather than from a dashboard read a day later.
-  if (spent > 0) console.error(lang === "fr" ? `ultra11y judge : ${spent.toFixed(4)} $ dépensé(s).` : `ultra11y judge: ${spent.toFixed(4)} spent.`);
-  for (const f of failures) console.error(`⚠ ${f}`);
-  const filled = applyRawVerdicts(items, verdicts);
-
-  const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
-  const w = writeAdjudication(items, out, { standard, auditDate: audit.date, lang });
-  console.error(
-    lang === "fr" ? `${filled}/${items.length} verdict(s) rendu(s) → ${w.todoPath}` : `${filled}/${items.length} verdict(s) returned → ${w.todoPath}`,
-  );
-  // Say out loud what was NOT covered. A partial adjudication that reads as complete is the
-  // failure mode this whole tool exists to prevent.
-  if (truncated)
-    console.error(
-      lang === "fr"
-        ? `⚠ --max ${max} : les critères au-delà n'ont pas été soumis et restent à évaluer.`
-        : `⚠ --max ${max}: the criteria beyond it were not submitted and stay to assess.`,
-    );
-
-  if (p.flags.apply !== true) {
-    console.log(w.todoPath);
-    if (!p.flags.json)
-      console.log(
-        lang === "fr"
-          ? "Relisez les verdicts, puis appliquez-les : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json>`."
-          : "Review the verdicts, then apply them: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json>`.",
-      );
-    return 0;
-  }
-
-  // --apply runs the SAME gate an agent's verdicts go through. A truncated run cannot pass
-  // its coverage check, which is the correct outcome, not a bug.
-  const adj = JSON.parse(readText(w.todoPath)) as AdjudicationFile;
-  const r = applyAdjudication(audit, adj, { strict: p.flags.strict === true });
-  // Same policy as `verify --apply`: a batch the model got wrong costs its own criteria, not
-  // the whole paid run. Only a fold that landed nothing at all is an error.
-  if (!r.ok && (p.flags.strict === true || r.applied + r.stillManual === 0)) {
-    console.error(lang === "fr" ? `✗ Adjudication rejetée (${r.issues.length} problème(s)) :` : `✗ Adjudication rejected (${r.issues.length} issue(s)):`);
-    for (const i of r.issues.slice(0, 40)) console.error(`  ✗ ${i}`);
-    if (r.issues.length > 40) console.error(`  … +${r.issues.length - 40}`);
-    reportNotInWorklist(r.notInWorklist, lang);
-    return 1;
-  }
-  if (r.rejected > 0) {
-    console.error(
-      lang === "fr"
-        ? `⚠ ${r.rejected} critère(s) refusé(s) par la porte — ils restent à évaluer, avec le motif du refus :`
-        : `⚠ ${r.rejected} criterion(ia) refused by the gate — they stay to assess, carrying the refusal:`,
-    );
-    for (const i of r.issues.slice(0, 40)) console.error(`  ✗ ${i}`);
-    if (r.issues.length > 40) console.error(`  … +${r.issues.length - 40}`);
-  }
-  reportNotInWorklist(r.notInWorklist, lang);
-  mkdirSync(out, { recursive: true });
-  const auditPath = join(out, "audit-latest.json");
-  writeFileSync(auditPath, `${JSON.stringify(auditDocumentFor(r.audit, adj.standard, lang), null, 2)}\n`);
-  // Same recording as `verify --apply`: what the model paid for, written down where the next
-  // run can replay it for free.
-  const ledgerOut = ledgerTarget(p, adj.standard);
-  if (ledgerOut) {
-    // A LEDGER WRITTEN WITHOUT THE CAPTURES IS STALE ON ARRIVAL.
-    //
-    // The fingerprint is over the evidence the harvest READ FROM DISK, so recording a verdict
-    // where the audit's page captures are absent fingerprints a strictly smaller set than the
-    // one CI rebuilds — and the replay drops it as stale, every run, silently. Measured on a
-    // real repository: RGAA 12.3 recorded over 13 evidence items where the run harvests 22.
-    // The entry looked well-formed, the fold accepted it, it was committed and reviewed, and
-    // it never once replayed.
-    //
-    // A warning, not a refusal: the verdict itself is sound and still lands on THIS audit, and
-    // a caller who genuinely has no captures (a source-only repository) has nothing to fix.
-    // What must not happen is writing it and saying nothing.
-    const blind = unreadableCaptures(r.audit);
-    if (blind.length)
-      console.error(
-        lang === "fr"
-          ? `⚠ Registre écrit sans les instantanés de ${blind.length} page(s) que cet audit dit avoir lues (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "…" : ""}). L'évidence moissonnée ici est plus petite que celle qu'un run reconstruira, donc ces verdicts seront déclarés PÉRIMÉS au rejeu. Adjugez là où \`.ultra11y/pages/\` existe.`
-          : `⚠ Ledger written without the snapshots of ${blind.length} page(s) this audit says it read (${blind.slice(0, 5).join(", ")}${blind.length > 5 ? "…" : ""}). The evidence harvested here is smaller than the one a run will rebuild, so these verdicts will be dropped as STALE on replay. Adjudicate where \`.ultra11y/pages/\` exists.`,
-      );
-    const refused = new Set(r.rejectedCriteria);
-    const accepted = new Set(adj.items.map((it) => it.criteriaId).filter((id) => !refused.has(id)));
-    // Paths written relative to the audited root, so the committed ledger names files a
-    // reviewer can open and another checkout can replay.
-    const fresh = entriesFrom(adj, accepted, r.audit.date, cwd ?? ".");
-    writeLedger(ledgerOut, mergeLedger(readLedger(ledgerOut), adj.standard, fresh));
-    console.log(
-      lang === "fr"
-        ? `✓ ${fresh.length} verdict(s) enregistré(s) au registre → ${ledgerOut}`
-        : `✓ ${fresh.length} verdict(s) recorded in the ledger → ${ledgerOut}`,
-    );
-  }
-  console.log(
-    lang === "fr"
-      ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} hors de la liste` : ""} → ${auditPath}`
-      : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} not in this worklist` : ""} → ${auditPath}`,
-  );
-  return 0;
-}
-
 async function cmdFix(p: ParsedArgs): Promise<number> {
   const inputs = p.positionals.length ? p.positionals : ["."];
   const stdin = inputs.includes("-") ? await readStdin() : undefined;
@@ -4739,7 +3593,7 @@ async function cmdFix(p: ParsedArgs): Promise<number> {
 }
 
 /** Where `scan` writes the page snapshots it collects: `--root <dir>` when given — the same
- *  contract as `snapshot write`, `dev` and `pages discover --from-snapshots` — else the
+ *  contract as `snapshot write` and `pages discover --from-snapshots` — else the
  *  working directory. Absolute either way, as it always was: the merge audits the snapshot
  *  DOMs by this path. Undefined under `--no-snapshot`: nothing is persisted. `--cwd` plays
  *  no part here: it keeps its own meaning, where Playwright resolves from. */
@@ -4760,18 +3614,9 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   // — see peekMergeAudit). --lang stays explicit-wins.
   const mergeAudit = peekMergeAudit(p.flags.merge);
   const lang = resolveLang(p.flags, mergeAudit ? { audit: mergeAudit, standard } : { standard });
-  if (p.flags.clean) {
-    const r = cleanDynamic();
-    console.log(
-      lang === "fr"
-        ? `Nettoyage : image dynamique ${r.imageRemoved ? "supprimée" : "absente"}, ${r.tempContextsRemoved} contexte(s) temporaire(s) supprimé(s).`
-        : `Cleanup: dynamic image ${r.imageRemoved ? "removed" : "absent"}, ${r.tempContextsRemoved} temp context(s) removed.`,
-    );
-    return 0;
-  }
-  // A local target that does not exist is a user error, independent of any runtime — say
-  // so BEFORE probing for Playwright/Docker, otherwise a machine with neither reports
-  // "no runtime available" for what is really a typo in the path.
+  // A local target that does not exist is a user error, independent of the runtime — say
+  // so BEFORE probing for Playwright, otherwise a machine without it reports "no runtime
+  // available" for what is really a typo in the path.
   for (const target of p.positionals.filter((a) => a !== "-")) {
     if (/^https?:\/\//i.test(target) || existsSync(target)) continue;
     console.error(
@@ -4781,61 +3626,17 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     );
     return 1;
   }
-  // Resolve the execution runtime. `auto` (default) prefers the local host/target
-  // Playwright (no Docker) when it resolves from --cwd, else falls back to Docker.
+  // The runtime is the host/target Playwright, resolved from --cwd (then from ultra11y's own
+  // dependencies) — the only one there is. `--runtime local|auto` / `--local` stay accepted
+  // (they name exactly that runtime); anything else is refused rather than silently scanned
+  // some other way. No availability pre-check: the local runner's own launch errors name what
+  // to install, and it can still fall back on an installed Google Chrome.
   const cwd = typeof p.flags.cwd === "string" && p.flags.cwd ? (p.flags.cwd as string) : process.cwd();
   const storageState = typeof p.flags["storage-state"] === "string" && p.flags["storage-state"] ? (p.flags["storage-state"] as string) : undefined;
   const browserPath = browserPathOf(p.flags);
-  const runtimeFlag =
-    typeof p.flags.runtime === "string" && p.flags.runtime
-      ? (p.flags.runtime as string)
-      : p.flags.local === true
-        ? "local"
-        : p.flags.docker === true
-          ? "docker"
-          : "auto";
-  if (!["auto", "local", "docker"].includes(runtimeFlag)) {
-    console.error(`ultra11y scan: --runtime must be local, docker, or auto (got "${runtimeFlag}").`);
-    return 2;
-  }
-  let useLocal: boolean;
-  if (runtimeFlag === "local") useLocal = true;
-  else if (runtimeFlag === "docker") useLocal = false;
-  else if (localAvailable(cwd, { browserPath })) useLocal = true;
-  else if (dockerAvailable()) {
-    useLocal = false;
-    // A silent degrade is indistinguishable from a working fallback — name what was
-    // missing, so the one line a reader gets answers "what do I install".
-    const s = localTierStatus(cwd, { browserPath });
-    console.error(
-      lang === "fr"
-        ? `ultra11y scan : tier local indisponible${s.ok ? "" : ` (${s.reason})`} — bascule sur Docker. Passez --runtime local pour en faire une erreur.`
-        : `ultra11y scan: local tier unavailable${s.ok ? "" : ` (${s.reason})`} — falling back to Docker. Pass --runtime local to make this an error instead.`,
-    );
-  } else {
-    console.error(
-      lang === "fr"
-        ? "ultra11y scan : aucun runtime disponible — ni Playwright local (passez --cwd vers un projet avec @playwright/test + @axe-core/playwright installés), ni Docker. Voir --runtime."
-        : "ultra11y scan: no runtime available — neither a local Playwright (pass --cwd at a project with @playwright/test + @axe-core/playwright installed) nor Docker. See --runtime.",
-    );
-    return 1;
-  }
-  if (storageState && !useLocal) {
-    // --storage-state + the Docker tier is an unsupported combination, not a
-    // degrade-and-continue: the Docker runner has no mechanism to use a Playwright
-    // storageState, so scanning unauthenticated would produce MISLEADING results (a login
-    // wall instead of the app) while exiting 0. This holds whether Docker was asked for
-    // EXPLICITLY (--runtime docker/--docker) or reached as the auto fallback (no local
-    // Playwright resolved) — in both cases authenticated scanning needs the local runtime.
-    console.error(
-      runtimeFlag === "docker"
-        ? lang === "fr"
-          ? "ultra11y scan : --storage-state n'est pas pris en charge avec --runtime docker (ou --docker) — combinaison non supportée. Utilisez --runtime local avec --cwd."
-          : "ultra11y scan: --storage-state is not supported with --runtime docker (or --docker) — unsupported combination. Use --runtime local with --cwd."
-        : lang === "fr"
-          ? "ultra11y scan : --storage-state exige le runtime local, mais aucun Playwright local n'a été résolu (auto a basculé sur Docker). Passez --runtime local --cwd <projet>, ou retirez --storage-state."
-          : "ultra11y scan: --storage-state requires the local runtime, but no local Playwright was resolved (auto fell back to Docker). Pass --runtime local --cwd <project>, or drop --storage-state.",
-    );
+  const runtimeFlag = typeof p.flags.runtime === "string" && p.flags.runtime ? (p.flags.runtime as string) : "local";
+  if (runtimeFlag !== "local" && runtimeFlag !== "auto") {
+    console.error(`ultra11y scan: --runtime must be local (got "${runtimeFlag}"). The Docker runtime was removed; the scan runs on the local Playwright.`);
     return 2;
   }
 
@@ -4847,7 +3648,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   // AUTHENTICATED scan (--storage-state) the button clicks are additionally skipped by
   // default (a click can trigger a server mutation invisible to the href assertion);
   // `--interact-clicks` opts back in. `--no-interact` disables all stateful probes, leaving
-  // only the pristine-page ones. (Docker never interacts.)
+  // only the pristine-page ones.
   const interact = p.flags["no-interact"] !== true;
   const interactClicks = p.flags["interact-clicks"] === true;
   const sitemap = typeof p.flags.sitemap === "string" ? (p.flags.sitemap as string) : undefined;
@@ -4860,9 +3661,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
 
   // --sample: iterate the NORMATIVE page sample from `.ultra11yrc.json` (per-page
   // storageState overrides --storage-state). Loaded + validated here (hard error on a
-  // malformed sample). An authenticated page needs the local runtime — the Docker tier has
-  // no storageState mechanism, so a sample with any auth page + Docker is refused, not run
-  // unauthenticated. SECURITY: storageState is only ever a path — its content is never read.
+  // malformed sample). SECURITY: storageState is only ever a path — its content is never read.
   const useSample = p.flags.sample === true;
   let sampleConfig: SampleConfig | undefined;
   if (useSample) {
@@ -4889,40 +3688,12 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       return 2;
     }
     sampleConfig = v.sample;
-    if (!useLocal && sampleConfig.pages.some((pg) => pg.storageState)) {
-      // `--runtime local` is not always the caller's to pass: under an orchestrator the scan
-      // is invoked for them. On `auto` the runtime fell back to Docker because the local tier
-      // could not resolve, so naming the missing dependency is the only actionable half of
-      // this message — "use --runtime local" alone sends such a user to a flag they cannot
-      // reach, and telling them to force a runtime that still cannot load would exchange this
-      // error for a worse one.
-      // `runtimeFlag`, not `p.flags.runtime`: `--docker` is a documented alias, and reading the
-      // raw flag would hand a caller who typed it the OTHER half of this message — "install
-      // these dependencies" when the fix is to drop the flag they just passed.
-      const forced = runtimeFlag === "docker";
-      console.error(
-        lang === "fr"
-          ? `ultra11y scan : l'échantillon comporte des pages authentifiées (storageState), non prises en charge par le runtime Docker.${
-              forced
-                ? " Retirez --runtime docker."
-                : " Le runtime local n'a pas pu être résolu : installez @playwright/test et @axe-core/playwright dans le projet audité (ou pointez --cwd dessus)."
-            }`
-          : `ultra11y scan: the sample has authenticated pages (storageState), unsupported by the Docker runtime.${
-              forced
-                ? " Drop --runtime docker."
-                : " The local runtime could not be resolved: install @playwright/test and @axe-core/playwright in the audited project (or point --cwd at it)."
-            }`,
-      );
-      return 2;
-    }
   }
 
   let dynamic: DynamicResult;
   try {
     if (useSample && sampleConfig) {
-      dynamic = useLocal
-        ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
-        : runSampleScan(sampleConfig.pages, undefined, snapshotRoot);
+      dynamic = await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
     } else if (sitemap || crawl) {
       const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : undefined;
       const max = typeof p.flags.max === "string" ? Number(p.flags.max) : undefined;
@@ -4931,23 +3702,17 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       // of a large site is indistinguishable from a hung job, which is the only real cost of
       // dropping the cap.
       const onPage = (url: string, n: number): void => console.error(`ultra11y scan: page ${n} — ${url}`);
-      dynamic = useLocal
-        ? await runCrawlScanLocal({ sitemap, crawl, depth, max, onPage, cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
-        : await runCrawlScan({ sitemap, crawl, depth, max, onPage, snapshotRoot });
+      dynamic = await runCrawlScanLocal({ sitemap, crawl, depth, max, onPage, cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
     } else {
       const targets = p.positionals.filter((a) => a !== "-");
       if (targets.length === 0) {
-        console.error("ultra11y scan: provide one or more URLs/HTML files, --sitemap <url>, --crawl <url>, or --clean.");
+        console.error("ultra11y scan: provide one or more URLs/HTML files, --sitemap <url>, --crawl <url>, or --sample.");
         return 2;
       }
-      if (useLocal) {
-        dynamic =
-          targets.length === 1
-            ? await runScanLocal({ target: targets[0]!, cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
-            : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
-      } else {
-        dynamic = targets.length === 1 ? runScan({ target: targets[0]!, snapshotRoot }) : runScanMany(targets, undefined, snapshotRoot);
-      }
+      dynamic =
+        targets.length === 1
+          ? await runScanLocal({ target: targets[0]!, cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
+          : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
     }
   } catch (e) {
     console.error(`ultra11y scan: ${e instanceof Error ? e.message : String(e)}`);
@@ -5272,213 +4037,6 @@ function cmdSample(p: ParsedArgs): number {
   return 0;
 }
 
-const DIFF_LABEL: Record<DiffBucket, { fr: string; en: string }> = {
-  fixed: { fr: "Corrigé", en: "Fixed" },
-  unchanged: { fr: "Inchangé", en: "Unchanged" },
-  "partially-fixed": { fr: "Partiellement corrigé", en: "Partially fixed" },
-  regressed: { fr: "Régressé", en: "Regressed" },
-  "not-retested": { fr: "Non retesté", en: "Not retested" },
-  "only-left": { fr: "Nous seuls", en: "Ours only" },
-  "only-right": { fr: "Eux seuls", en: "Theirs only" },
-};
-
-/** `pages --diff` — our per-page grid vs an imported external audit.
- *
- *  The LEFT side is `derivePackResults(pageView(...))`, the same projection the report and the
- *  grid use; the RIGHT is the adapter's output. Neither is adjusted here. The output leads with
- *  the pages one side rules on and the other does not, because that is the failure the reporter
- *  actually hit: a criterion reported on the funnel, ticketed against the stats page, closed
- *  without a fix. A count would not have caught it; a page-keyed disagreement would. */
-function diffAgainstExternal(p: ParsedArgs, result: AuditResult, scope: PageScope[], standard: StandardId, lang: Lang, file: string): number {
-  let ext: ExternalAudit;
-  try {
-    ext = JSON.parse(readText(file)) as ExternalAudit;
-  } catch (e) {
-    console.error(`ultra11y pages --diff: ${e instanceof Error ? e.message : String(e)}`);
-    return 1;
-  }
-  if (ext?.kind !== "external-audit") {
-    console.error(`ultra11y pages --diff: ${file} is not an imported external audit (run \`ultra11y import\` first).`);
-    return 2;
-  }
-  if (isCore(standard)) {
-    console.error("ultra11y pages --diff: pass --standard <pack> — an external audit is keyed by the standard's own criterion ids, not by WCAG SCs.");
-    return 2;
-  }
-  if (ext.standard !== standard) {
-    console.error(`ultra11y pages --diff: the imported audit is keyed by "${ext.standard}" but --standard is "${standard}".`);
-    return 2;
-  }
-
-  // Our side, criterion-by-criterion and page-by-page, from the ONE projection.
-  const ours = new Map<string, Map<string, Status>>();
-  for (const page of derivePages(result, scope)) {
-    const m = new Map<string, Status>();
-    for (const c of pageCriterionRows(result, page, standard, lang)) m.set(c.id, c.status);
-    ours.set(page.id, m);
-  }
-
-  const d = diffSides({ byPage: ours }, sideOfExternal(ext));
-  if (p.flags.json) {
-    console.log(JSON.stringify({ standard, external: ext.source, ...d }, null, 2));
-    return 0;
-  }
-
-  const fr = lang === "fr";
-  console.log(fr ? `# Écart avec l'audit externe (${ext.source.adapter})` : `# Difference against the external audit (${ext.source.adapter})`);
-  console.log("");
-  const order: DiffBucket[] = ["regressed", "not-retested", "only-right", "partially-fixed", "fixed", "only-left", "unchanged"];
-  console.log(order.map((b) => `${DIFF_LABEL[b][fr ? "fr" : "en"]} : ${d.counts[b]}`).join(" · "));
-  console.log("");
-  if (d.pagesOnlyRight.length) {
-    console.log(
-      fr
-        ? `> ⚠️ ${d.pagesOnlyRight.length} page(s) auditée(s) par l'auditeur externe n'existent pas dans votre grille : ${d.pagesOnlyRight.join(", ")}. Ses constats sur ces pages n'ont rien à quoi se comparer.`
-        : `> ⚠️ ${d.pagesOnlyRight.length} page(s) the external auditor ruled on are absent from your grid: ${d.pagesOnlyRight.join(", ")}. Their findings there have nothing to compare against.`,
-    );
-    console.log("");
-  }
-  if (d.pagesOnlyLeft.length) {
-    console.log(
-      fr
-        ? `> ℹ️ ${d.pagesOnlyLeft.length} page(s) de votre grille ne figurent pas dans l'audit externe : ${d.pagesOnlyLeft.join(", ")}.`
-        : `> ℹ️ ${d.pagesOnlyLeft.length} page(s) in your grid are absent from the external audit: ${d.pagesOnlyLeft.join(", ")}.`,
-    );
-    console.log("");
-  }
-  const mark = (s: Status | null): string => (s === null ? "?" : s === "manual" ? "?" : s === "NA" ? "—" : s);
-  console.log(fr ? "| Page | Critère | Nous | Eux | Écart | Commentaire de l'auditeur |" : "| Page | Criterion | Ours | Theirs | Bucket | Auditor's comment |");
-  console.log("| --- | --- | --- | --- | --- | --- |");
-  // Everything but `unchanged`: a reconciliation is about what moved. The count above still
-  // reports it, so nothing is hidden — only unlisted.
-  for (const r of d.rows.filter((x) => x.bucket !== "unchanged")) {
-    const note = (r.comment ?? "").replace(/\s*\n+\s*/g, " ").slice(0, 160);
-    console.log(`| ${r.page} | ${r.criterion} | ${mark(r.left)} | ${mark(r.right)} | ${DIFF_LABEL[r.bucket][fr ? "fr" : "en"]} | ${note} |`);
-  }
-  return 0;
-}
-
-/** `import` — read an audit someone else performed into the tool-neutral (page, criterion,
- *  status) model, so it can be held against this engine's own grid.
- *
- *  A FILE is the primary interface and the network is a convenience, not the other way round.
- *  The engine is advertised as install-free and keyless; an importer that only worked online
- *  would make a reproducible audit depend on a third party being up. `--from ara <id>` therefore
- *  writes the RAW response to disk BEFORE parsing it, so what was imported is committable and a
- *  re-import needs no network at all. */
-async function cmdImport(p: ParsedArgs): Promise<number> {
-  const lang = resolveLang(p.flags, {});
-  const from = typeof p.flags.from === "string" ? p.flags.from : undefined;
-  const arg = p.positionals[0];
-  if (!from || !arg) {
-    console.error(
-      lang === "fr"
-        ? "ultra11y import : usage `import --from file <rapport.json>` ou `import --from ara <id>` (voir --help)."
-        : "ultra11y import: usage `import --from file <report.json>` or `import --from ara <id>` (see --help).",
-    );
-    return 2;
-  }
-
-  const outDir = typeof p.flags.out === "string" ? p.flags.out : undefined;
-  let rawText: string;
-  let sourceUrl: string | undefined;
-  let adapterId: string;
-
-  if (from === "file") {
-    // The source's own format, on disk. Which adapter reads it is the user's call — guessing
-    // would mean sniffing a schema, and a wrong guess is a confidently wrong crosswalk.
-    adapterId = typeof p.flags.source === "string" ? p.flags.source : "ara";
-    try {
-      rawText = arg === "-" ? await readStdin() : readText(arg);
-    } catch (e) {
-      console.error(`ultra11y import: ${e instanceof Error ? e.message : String(e)}`);
-      return 1;
-    }
-  } else {
-    adapterId = from;
-    let adapter: ExternalAdapter;
-    try {
-      adapter = createAdapter(adapterId);
-    } catch (e) {
-      console.error(`ultra11y import: ${e instanceof Error ? e.message : String(e)}`);
-      return 2;
-    }
-    if (!adapter.fetchUrl) {
-      console.error(`ultra11y import: the "${adapterId}" adapter has no remote endpoint — use \`--from file <report.json>\`.`);
-      return 2;
-    }
-    sourceUrl = adapter.fetchUrl(arg);
-    try {
-      const res = await fetch(sourceUrl, { redirect: "follow" });
-      if (!res.ok) {
-        console.error(`ultra11y import: ${sourceUrl} returned HTTP ${res.status}.`);
-        return 1;
-      }
-      rawText = await res.text();
-    } catch (e) {
-      console.error(`ultra11y import: could not reach ${sourceUrl} — ${e instanceof Error ? e.message : String(e)}`);
-      return 1;
-    }
-    // Commit the artefact before interpreting it: what was imported must be inspectable, and a
-    // re-import must not need the network again.
-    if (outDir) {
-      mkdirSync(outDir, { recursive: true });
-      const rawFile = join(outDir, `external-${adapterId}-${arg}.raw.json`);
-      writeFileSync(rawFile, rawText.endsWith("\n") ? rawText : `${rawText}\n`);
-      if (!p.flags.json) console.log(rawFile);
-    }
-  }
-
-  let raw: unknown;
-  try {
-    raw = JSON.parse(rawText);
-  } catch (e) {
-    console.error(`ultra11y import: the report is not valid JSON — ${e instanceof Error ? e.message : String(e)}`);
-    return 1;
-  }
-
-  let adapter: ExternalAdapter;
-  try {
-    adapter = createAdapter(adapterId);
-  } catch (e) {
-    console.error(`ultra11y import: ${e instanceof Error ? e.message : String(e)}`);
-    return 2;
-  }
-
-  const parsed = adapter.parse(raw, { importedAt: new Date().toISOString(), ...(sourceUrl ? { url: sourceUrl } : {}) });
-  if (!parsed.ok) {
-    console.error(
-      lang === "fr"
-        ? `ultra11y import : le rapport n'a pas pu être lu sans perte (${parsed.issues.length} problème(s)) — rien n'est écrit, plutôt qu'un import partiel qui aurait l'air complet :`
-        : `ultra11y import: the report could not be read without loss (${parsed.issues.length} issue(s)) — nothing is written, rather than a partial import that would look complete:`,
-    );
-    for (const i of parsed.issues.slice(0, 20)) console.error(`  ✗ ${i}`);
-    if (parsed.issues.length > 20) console.error(`  … ${parsed.issues.length - 20} more`);
-    return 1;
-  }
-
-  const audit = parsed.audit;
-  if (p.flags.json) {
-    console.log(JSON.stringify(audit, null, 2));
-    return 0;
-  }
-  if (outDir) {
-    mkdirSync(outDir, { recursive: true });
-    const file = join(outDir, "external-latest.json");
-    writeFileSync(file, `${JSON.stringify(audit, null, 2)}\n`);
-    console.log(file);
-  } else {
-    console.log(JSON.stringify(audit, null, 2));
-  }
-  const decided = audit.results.filter((r) => r.status !== "manual").length;
-  console.error(
-    lang === "fr"
-      ? `${audit.pages.length} page(s), ${audit.results.length} résultat(s) dont ${decided} tranché(s) — audit externe, jamais fusionné dans le verdict du moteur. Comparez : \`pages --in <audit.json> --diff <ce fichier>\`.`
-      : `${audit.pages.length} page(s), ${audit.results.length} result(s), ${decided} ruled — an external audit, never merged into the engine's own verdict. Compare with: \`pages --in <audit.json> --diff <this file>\`.`,
-  );
-  return 0;
-}
-
 /** standardLabel that never throws for the core (used in an advisory message). */
 function standardLabelSafe(standard: StandardId): string {
   return isCore(standard) ? "WCAG 2.2 AA" : (getPack(standard)?.name ?? standard);
@@ -5510,73 +4068,6 @@ function cmdPack(p: ParsedArgs): number {
   }
   console.error("ultra11y pack: expected `pack check <pack.json> [--guidance <g.json>]` or `pack scaffold`.");
   return 2;
-}
-
-// Serve the audit over the Model Context Protocol. Returns only when the server
-// stops, so main() does not fall through while it is still listening.
-async function cmdMcp(p: ParsedArgs): Promise<number> {
-  const transport = typeof p.flags.transport === "string" ? p.flags.transport : "stdio";
-  if (transport !== "stdio" && transport !== "http") {
-    console.error(`ultra11y: invalid --transport "${transport}" (expected: stdio, http)`);
-    return 2;
-  }
-  const maxRaw = typeof p.flags["max-response-bytes"] === "string" ? Number(p.flags["max-response-bytes"]) : undefined;
-  if (maxRaw !== undefined && (!Number.isFinite(maxRaw) || maxRaw <= 0)) {
-    console.error("ultra11y: invalid --max-response-bytes");
-    return 2;
-  }
-  const options = {
-    // A default project root makes `cwd` optional on every tool, for a server
-    // dedicated to one project.
-    defaultCwd: typeof p.flags.cwd === "string" ? p.flags.cwd : undefined,
-    allowWrite: p.flags["allow-write"] === true,
-    maxResponseBytes: maxRaw,
-  };
-
-  if (transport === "stdio") {
-    // Nothing is written to stdout here: from this point stdout carries
-    // JSON-RPC frames only, and runStdioServer guards that.
-    await runStdioServer(options);
-    return 0;
-  }
-
-  const port = typeof p.flags.port === "string" ? Number(p.flags.port) : 7341;
-  if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    console.error("ultra11y: invalid --port");
-    return 2;
-  }
-  const originRaw = typeof p.flags["allow-origin"] === "string" ? p.flags["allow-origin"] : undefined;
-  const allowOrigin = originRaw
-    ? originRaw
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean)
-    : undefined;
-  let running: Awaited<ReturnType<typeof startHttpServer>>;
-  try {
-    running = await startHttpServer({
-      ...options,
-      port,
-      bind: typeof p.flags.bind === "string" ? p.flags.bind : undefined,
-      allowOrigin,
-      allowRemote: p.flags["allow-remote"] === true,
-    });
-  } catch (e) {
-    console.error(`ultra11y: ${(e as Error).message}`);
-    return 2;
-  }
-  // stderr, not stdout: an HTTP server's stdout is not a protocol stream, but
-  // keeping the two transports identical here means no one has to remember
-  // which is which.
-  console.error(`ultra11y: MCP server listening on ${running.url}`);
-  console.error(`  client: claude mcp add --transport http ultra11y ${running.url}`);
-  for (const sig of ["SIGINT", "SIGTERM"] as const) {
-    process.once(sig, () => {
-      void running.close().then(() => process.exit(0));
-    });
-  }
-  await new Promise<void>((res) => running.server.once("close", res));
-  return 0;
 }
 
 function cmdOrchestrate(p: ParsedArgs): number {
@@ -5666,6 +4157,11 @@ export async function main(argv: string[]): Promise<number> {
     console.log(VERSION);
     return 0;
   }
+  const removedCommand = REMOVED_COMMANDS[first];
+  if (removedCommand) {
+    console.error(`ultra11y: "${first}" is no longer a command — ${removedCommand}`);
+    return 2;
+  }
   if (!isCommand(first)) {
     console.error(`ultra11y: unknown command "${first}". Run \`ultra11y --help\`.`);
     return 2;
@@ -5673,19 +4169,19 @@ export async function main(argv: string[]): Promise<number> {
 
   const p = parseArgs(argv);
   // `<cmd> --help` / `<cmd> -h` shows help with NO side effects. Without this every
-  // subcommand ignored the flag and ran — and `init --help` would write a hook +
-  // baseline into the cwd repo.
+  // subcommand ignored the flag and ran — and `init --help` would write a hook
+  // into the cwd repo.
   if (p.flags.help === true || p.flags.h === true) {
     console.log(HELP);
     return 0;
   }
   // A REMOVED flag must not fall through to the generic "unknown flag (ignored)" warning
-  // below: a scripted CI would keep exiting 0 while filing nothing at all — precisely the
-  // silent failure this release exists to end. Name the replacement and fail.
+  // below: a scripted CI would keep exiting 0 while filing (or gating) nothing at all. Name
+  // the replacement and fail.
   for (const f of p.unknown) {
     const replacement = REMOVED_FLAGS[f];
     if (replacement) {
-      console.error(`ultra11y: --${f} was removed in v3 — ticket creation is now its own command. Use: ${replacement}`);
+      console.error(`ultra11y: --${f} was ${replacement}`);
       return 2;
     }
   }
@@ -5696,23 +4192,19 @@ export async function main(argv: string[]): Promise<number> {
   // Enum-valued flags: warn (never silently coerce) on an unsupported value so `--lang de`
   // or `--dedup fuzzy` is visible instead of quietly falling back to the default.
   // This check runs BEFORE dispatch, so it cannot know which command owns the flag: the
-  // allowed set must be the UNION over every command that takes it. Listing only one
-  // command's values made the guard cry wolf on valid input — `report --format sarif` and
-  // `audit --format github` both warned "not one of audit|doc|remediation" while working
-  // perfectly, which teaches the reader to ignore the warning that is meant to catch a typo.
-  // Per-command validation is each cmdX's own job (parseCiFormat, cmdPages…), and stays strict.
+  // allowed set must be the UNION over every command that takes it — listing only one
+  // command's values makes the guard cry wolf on valid input, which teaches the reader to
+  // ignore the warning that is meant to catch a typo. Per-command validation is each cmdX's
+  // own job (cmdReport, cmdPages…), and stays strict.
   const ENUM_FLAGS: Record<string, readonly string[]> = {
     lang: ["auto", "en", "fr"],
     dedup: ["exact", "normalized", "off"],
-    format: ["audit", "doc", "remediation", "sarif", "github", "grid", "report"],
+    format: ["audit", "doc", "grid", "report"],
     split: ["criterion", "page"],
-    runtime: ["auto", "local", "docker"],
+    runtime: ["auto", "local"],
     provider: ["auto", "github", "gitlab", "jira"],
-    // Union: tickets owns the tracker grains; judge additionally accepts batch.
-    grain: ["criterion", "page", "page-criterion", "single", "file", "batch"],
-    // The union over every command that takes it: `mcp` serves stdio|http, `tickets`
-    // picks cli|rest. Listing one command's values made the guard cry wolf on the other.
-    transport: ["stdio", "http", "auto", "cli", "rest"],
+    grain: ["criterion", "page", "page-criterion", "single", "file"],
+    transport: ["auto", "cli", "rest"],
   };
   for (const [flag, allowed] of Object.entries(ENUM_FLAGS)) {
     const v = p.flags[flag];
@@ -5729,11 +4221,7 @@ export async function main(argv: string[]): Promise<number> {
           .map((s) => s.trim())
           .filter(Boolean)
       : [];
-  // `mcp --cwd <dir>` dedicates the server to another project, and a standards pack is
-  // that project's configuration — read it from THERE, not from whichever directory node
-  // happened to be started in. Every other command works on the process cwd.
-  const configRoot = p.command === "mcp" && typeof p.flags.cwd === "string" && p.flags.cwd ? resolve(p.flags.cwd) : process.cwd();
-  const loaded = loadRuntimeStandards(configRoot, packList, (m) => console.error(m), p.flags.override === true);
+  const loaded = loadRuntimeStandards(process.cwd(), packList, (m) => console.error(m), p.flags.override === true);
   if (loaded.errors.length) {
     for (const e of loaded.errors) console.error(`ultra11y: ${e}`);
     return 2;
@@ -5743,8 +4231,6 @@ export async function main(argv: string[]): Promise<number> {
   switch (p.command as Command) {
     case "audit":
       return cmdAudit(p);
-    case "affected":
-      return cmdAffected(p);
     case "report":
       return cmdReport(p);
     case "tickets":
@@ -5763,26 +4249,18 @@ export async function main(argv: string[]): Promise<number> {
       return cmdScan(p);
     case "sample":
       return cmdSample(p);
-    case "import":
-      return cmdImport(p);
     case "snapshot":
       return cmdSnapshot(p);
     case "pages":
       return cmdPages(p);
-    case "dev":
-      return cmdDev(p);
     case "fix":
       return cmdFix(p);
     case "init":
       return cmdInit(p);
     case "pack":
       return cmdPack(p);
-    case "judge":
-      return cmdJudge(p);
     case "orchestrate":
       return cmdOrchestrate(p);
-    case "mcp":
-      return cmdMcp(p);
     case "hook":
       return cmdHook(p);
     case "install":

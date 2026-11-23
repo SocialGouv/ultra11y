@@ -1,6 +1,6 @@
 // The audit plan is DERIVED, not guessed.
 //
-// The whole value of `ultra11y_method` rests on these numbers being lookups over the repo's
+// The whole value of `criteria --plan` rests on these numbers being lookups over the repo's
 // own data rather than a heuristic. A plan that double-counts, drops a criterion, or files a
 // criterion the engine cannot see as "the engine has it" is worse than no plan — it turns
 // into a conformance claim nobody tested.
@@ -161,7 +161,7 @@ describe("the documented RGAA figures match the pack", () => {
     expect(judgmentTestCriteria).toBe(92);
     expect(adjudicationCount).toBe(104);
     expect(read("skills/ultra11y/references/judgment.md")).toMatch(/92 (?:of RGAA's|criteria)/);
-    for (const doc of ["skills/ultra11y/SKILL.md", "skills/ultra11y/references/ci.md", "skills/ultra11y/references/mcp.md"]) {
+    for (const doc of ["skills/ultra11y/SKILL.md", "skills/ultra11y/references/ci.md"]) {
       expect(read(doc), doc).toMatch(/104 of 106/);
     }
   });

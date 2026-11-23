@@ -26,8 +26,8 @@ npm_config_update_notifier=false npx -y ultra11y@5.43.0 --version   # → 5.43.0
   no runtime dependencies, so vendoring is a supported path — that is exactly what the skills
   do. `scan` resolves `@playwright/test` and `@axe-core/playwright` from
   `--cwd` first, then from the engine's own install, so a vendored file alone cannot scan.
-- **Node ≥ 22.18.** No other system dependency, no API key. (`judge` takes a key; nothing
-  else does. `scan` needs a browser tier — see `references/dynamic.md`.)
+- **Node ≥ 22.18.** No other system dependency, no API key. (`scan` needs a browser tier —
+  see `references/dynamic.md`.)
 - **Pin the file, not only the version.** An orchestrator that resolves the engine itself
   should check the entry file's sha256 before running it: `--version` is a banner any file
   can print.
@@ -198,8 +198,8 @@ leaves the target repository byte-identical. That matters when the orchestrator 
 repo it does not own — write the run's intermediates out-of-tree and let only the final
 dated report land in the project, if at all.
 
-`.ultra11y/pages/` is written only by the page-snapshot commands (`scan`, `snapshot`,
-`dev`). All of them take `--root` to relocate it — for `scan`, where the snapshots it
+`.ultra11y/pages/` is written only by the page-snapshot commands (`scan`, `snapshot`).
+Both of them take `--root` to relocate it — for `scan`, where the snapshots it
 collects are written (`--cwd` stays where Playwright resolves from), so an orchestrator can
 run from the audited checkout without dirtying it. `audit`, `report`, `prd`, `tickets`,
 `verify` and `check` never touch it.
@@ -228,8 +228,7 @@ Read exit codes from the process, **not** from a pipeline — `cmd --json | head
   static pass rate, which judgements never move — and `automaticPassRatePct` is the same number
   under its real name. Under a pack standard, `conformance` is the standard's own conformity rate
   with its operands (the object `report --json` carries) and `conformanceRatePct` its
-  percentage, `null` when nothing is applicable: that is the rate an adjudication moves. The MCP
-  `ultra11y_fold` tool returns the same fields. `rejected` counts only
+  percentage, `null` when nothing is applicable: that is the rate an adjudication moves. `rejected` counts only
   the verdicts the gate refused; the open criteria the file never mentioned (a lot, a truncated
   sweep) are `notInWorklist[]`. Count on `applied + stillManual + rejected + notInWorklist.length`,
   never on the exit code alone.

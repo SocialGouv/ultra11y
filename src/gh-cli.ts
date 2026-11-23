@@ -1,10 +1,8 @@
 // The `gh` BINARY ADAPTER — nothing else. Shelling out is how ultra11y talks to GitHub
 // without an npm dependency and without ever holding a token: `gh` handles its own auth.
 //
-// This module imports nothing from ultra11y on purpose, so it can be shared by the two
-// unrelated things that need `gh` — the sticky PR comment (src/pr-comment.ts, a report
-// surface) and the GitHub ticket provider (src/tickets/providers/github.ts) — without
-// creating a cycle or making either depend on the other.
+// This module imports nothing from ultra11y on purpose, so the GitHub ticket provider
+// (src/tickets/providers/github.ts) can use it without creating a cycle.
 import { execFileSync } from "node:child_process";
 
 /** Run `gh` and return its stdout. Captures stderr (pipe, not ignore) so a failed call

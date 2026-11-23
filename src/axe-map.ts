@@ -213,8 +213,8 @@ export function scForAxeRule(ruleId: string): string {
 // (`audit`) yet a mere recommendation when found dynamically (`scan`/axe). The pin is a
 // statement of INTENT, not a snapshot of axe's tagging: this defect has a normative
 // static twin, so it must stay normative cross-channel REGARDLESS of how axe currently
-// tags the rule. That drift-proofs the decision — the docker runner installs axe-core
-// from a caret range ("^4.10.0"), so the tag set a user's build ships can change with no
+// tags the rule. That drift-proofs the decision — the scan resolves @axe-core/playwright
+// at runtime, from a caret range, so the tag set a user's build ships can change with no
 // repo change; a pin can't be silently downgraded by such a re-tag, whereas relying on
 // the tags could. The twin ids are documented inline and cross-checked by
 // tests/axe-map.test.ts against the live registry; that guard is two-directional for

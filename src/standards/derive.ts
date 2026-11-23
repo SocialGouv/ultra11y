@@ -526,7 +526,7 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
  *  The core is WCAG: a declarative pack rule's finding is NOT a WCAG non-conformity and must
  *  never enter a WCAG-keyed surface (nor `audit --fail-on`, which is why `audit` takes no
  *  `--standard`). Under a pack, its own rule findings are part of its verdict and belong in
- *  every rendering of it — the report already includes them; SARIF, the annotations and the
+ *  every rendering of it — the report already includes them; the
  *  per-page grid used to drop them silently. */
 export function findingsForStandard(audit: AuditResult, standard: string): Finding[] {
   if (standard === CORE_KEY) return audit.findings;
@@ -536,9 +536,8 @@ export function findingsForStandard(audit: AuditResult, standard: string): Findi
   // criterion to attach them to. It also made severity gates fail on defects the selected
   // standard did not count. A finding belongs here only when at least one derived criterion
   // actually carries it.
-  // `audit.findings` is also the selection boundary used by baseline-mode CI: that path
-  // narrows the flat list to NEW findings while deliberately retaining the full criterion
-  // grid for coverage. Match by stable occurrence id (not object identity, which is lost on
+  // `audit.findings` may also be a narrowed selection: a caller can keep only some of the
+  // flat list while deliberately retaining the full criterion grid for coverage. Match by stable occurrence id (not object identity, which is lost on
   // JSON round-trips), otherwise deriving from the retained grid resurrects the backlog.
   const eligible = new Set(
     [

@@ -19,8 +19,8 @@ criteria are coarser than the engine's rules, that denominator is deliberately s
 it is **not** a full conformance rate. Full WCAG 2.2 AA conformance requires completing
 the "to assess" criteria by hand.
 
-That rate remains available in the complete artifact, beside its qualification. GitHub job
-summaries and PR comments do **not** print it: they print `decided/total`, the provenance
+That rate remains available in the complete artifact, beside its qualification. The summaries
+(the `audit` console summary, the `check --require-decided` tally) do **not** print it: they print `decided/total`, the provenance
 breakdown (`engine`, `scan`, `agent`) and the remaining count. This prevents a static result
 such as 11 conformities and 1 non-conformity from being read as “92% RGAA” when only 12 of the
 106 RGAA criteria have actually been decided.
@@ -98,7 +98,7 @@ built from the SAME units `prd` and `tickets` emit (see `references/tickets.md`)
 recommendations with their files; (C) each page's basis of judgment and findings with
 selectors; (D) the procedure for the criteria to assess; (E) the exhaustive grid.
 
-The report links the annex by its bare file name, and `check`, `verify` (and the MCP tools)
+The report links the annex by its bare file name, and `check` and `verify`
 read both as one document: the structure and headline are in the report, the occurrences
 `verify` adjudicates and the automatic rate `check` recomputes are in the annex. A report whose
 linked annex is missing is refused (exit 2) — keep the two files together.

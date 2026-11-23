@@ -13,14 +13,14 @@ ultra11y audit <src> --standard rgaa --out audits
 ultra11y scan --crawl <url> --max 0 --standard rgaa \
   --merge audits/audit-latest.json --out audits
 
-# 3. Replay the committed ledger, then send only the residue to Haiku in batches of 8.
+# 3. Replay the committed ledger, then adjudicate only the residue — yourself, or fanned out.
 ultra11y verify --apply .ultra11y/verdicts/rgaa.json \
   --in audits/audit-latest.json --standard rgaa --out audits
-for pass in 1 2 3; do
-  ultra11y judge --in audits/audit-latest.json --out audits --apply \
-    --standard rgaa --runner claude --grain batch \
-    --model haiku --max-budget-usd <n> --concurrency 4 --ledger
-done
+ultra11y verify --in audits/audit-latest.json --standard rgaa --manual --out audits
+ultra11y orchestrate --run audits --phase adjudicate      # batches + prompts for subagents (optional)
+#   … rule every item of audits/ADJUDICATE.todo.json (or merge the subagents' fragments) …
+ultra11y verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json \
+  --standard rgaa --out audits --ledger
 
 # The worklist is authoritative. A run-wide NC may be present because other page cells remain
 # open: every emitted item gets one grounded verdict, or an explicit manual reason.
@@ -28,8 +28,8 @@ done
 # 4. A second reader puts those claims on trial, and the outcome is APPLIED.
 ultra11y report --in audits/audit-latest.json --standard rgaa --out audits
 ultra11y verify --report audits/<report>.md --in audits/audit-latest.json --out audits --max-verify 0
-ultra11y judge --refute audits/VERIFY.todo.json --standard rgaa --runner claude \
-  --grain batch --model haiku --concurrency 4
+ultra11y orchestrate --run audits --phase verify-report   # one read-only reader per batch (optional)
+#   … give every claim of audits/VERIFY.todo.json a verdict …
 ultra11y verify --apply audits/VERIFY.todo.json --report audits/<report>.md \
   --in audits/audit-latest.json --out audits --prune --ledger
 
@@ -46,28 +46,21 @@ Step 5 prints the line that answers « did all 106 run? » directly:
   106 criteria — 55 engine, 12 measured (scan), 37 agent, 2 declared undecidable, 0 with no verdict.
 ```
 
-## Why this transport
+## Who adjudicates
 
-There is only one judge — `applyAdjudication` — and every mode passes through it. What differs
-between them is not rigour; it is the transport, the grain, the resume and whether you can see
-what it cost.
+There is only one judge — `applyAdjudication` — and every verdict passes through it, whoever
+wrote it. The engine runs no model of its own: inside a coding agent the session rules the
+worklist (`verify --manual`), directly or fanned out to subagents with `orchestrate`
+(`references/orchestration.md`); in CI, iterion's `rgaa-audit` bot hands the same worklist to
+its read-only agents (`references/ci.md`).
 
 | | why |
 |---|---|
-| `--runner claude` | Claude subscription/OAuth, read-only tools, safe mode, real dollar ceiling, wall-clock kill and reported cost. `--runner cli` is its compatibility alias. |
-| `--runner codex` | ChatGPT subscription through local `codex exec`, ephemeral/read-only/offline with config, rules and hooks ignored. It inherits the account model unless pinned. Use `--timeout`/`--max`; Codex has no `--max-budget-usd`. |
-| `--grain batch` | Batches of 8 criteria amortise the system prompt and normative context. Verdicts are checkpointed during the run; each loop pass re-reads the updated audit and receives only the refused or unanswered residue. Use `criterion` only to diagnose a stubborn criterion. |
+| `orchestrate --run <dir>` | Batches of 8 criteria amortise the normative context; each prompt is self-contained, and only the residue the fold refused or left unanswered goes back out on the next pass. `--eco` is the sequential low-token path. |
 | `--ledger` | A verdict paid for once becomes a claim re-verified on every later run (`verify --apply <ledger>`). |
 
-Not the others, and for concrete reasons: `--runner api` reports no cost, honours no timeout
-and enforces no dollar ceiling.
-`verify --manual` in a session is free and has the best evidence of any of them — it stays the
-recourse for the hard residue, not the recipe.
-
-To run the same recipe on a Codex subscription, replace both `--runner claude` occurrences
-with `--runner codex`, remove the Claude model and `--max-budget-usd`, and keep the same RGAA
-standard on every phase. A run with `--standard rgaa` builds and adjudicates only the RGAA
-criterion grid; it does not launch a second WCAG judgment pass.
+A run with `--standard rgaa` builds and adjudicates only the RGAA criterion grid; it does not
+launch a second WCAG judgment pass.
 
 ## Why step 2 is not optional
 
@@ -80,7 +73,7 @@ tokens to have read.
 ## Why step 4 is not optional either
 
 A cheap adjudicator does not miss things — it **over-accuses**. Measured on a full RGAA pass
-with Haiku, against a reference ledger adjudicated by a stronger model through the same gate:
+with a small model (Haiku), against a reference ledger adjudicated by a stronger model through the same gate:
 
 | | |
 |---|---:|
