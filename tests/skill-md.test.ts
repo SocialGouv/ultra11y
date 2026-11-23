@@ -188,7 +188,7 @@ describe("skill docs stay in sync with the CLI", () => {
 });
 
 describe("SKILL.md routes to the references (progressive disclosure)", () => {
-  it("ships exactly the forty-one reference docs", () => {
+  it("ships exactly the forty reference docs", () => {
     expect(refFiles.sort()).toEqual([
       "act.md",
       "adjudication.md",
@@ -196,7 +196,6 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "authoring.md",
       "automation.md",
       "ci.md",
-      "claude-code-report.md",
       "correction.md",
       "criteria.md",
       "cross-file.md",
@@ -208,6 +207,7 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "focus-and-logic.md",
       "forbidden-patterns.md",
       "forms-and-errors.md",
+      "full-audit.md",
       "guidance.md",
       "harnesses.md",
       "judgment.md",
@@ -239,18 +239,48 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
     }
   });
 
-  it("routes Claude Code to a detailed evidenced report and CI to the compact exhaustive surface", () => {
-    const claude = refBodies["claude-code-report.md"] ?? "";
+  it("routes every harness to the full evidenced audit and CI to the compact exhaustive surface", () => {
+    const full = refBodies["full-audit.md"] ?? "";
     const ci = refBodies["ci.md"] ?? "";
-    expect(body).toContain("references/claude-code-report.md");
-    expect(claude).toContain("report --in audits/audit-latest.json");
-    expect(claude).toContain("--html --evidence");
-    expect(claude).toContain("--format report --split page");
-    expect(claude).toContain("verify --report");
-    expect(claude).toContain("--require-decided=pages");
-    expect(claude).not.toMatch(/ultra11y\.mjs judge[^\n]*--runner claude/);
+    expect(body).toContain("references/full-audit.md");
+    expect(full).toContain("report --in audits/audit-latest.json");
+    expect(full).toContain("--html --evidence");
+    expect(full).toContain("--format report --split page");
+    expect(full).toContain("verify --report");
+    expect(full).toContain("--ledger");
+    expect(full).toContain("--require-decided=pages");
+    expect(full).toContain("references/orchestration.md");
+    expect(full).not.toMatch(/ultra11y\.mjs judge[^\n]*--runner claude/);
     for (const setting of ["report: 'false'", "html: 'false'", "evidence: 'false'", "pages-report: compact", "require-decided: pages"]) {
       expect(ci).toContain(setting);
+    }
+  });
+
+  // Issue #157: the full-audit route used to be conditioned on "in Claude Code", so the same
+  // request on Codex or OpenCode fell to the quick path and lost the ledger, the refutation,
+  // the per-page dossiers and the completeness gate.
+  it("routes full audits to full-audit.md without a harness condition", () => {
+    // No routing bullet's request is conditioned on a harness ("… in Claude Code").
+    expect(body).not.toMatch(/- \*\*"[^"\n]*\bin (?:Claude Code|Codex|OpenCode)\b[^"\n]*"\*\*/);
+    const bullet = body.slice(body.indexOf('- **"Full / detailed audit"'));
+    const fullBullet = bullet.slice(0, bullet.indexOf("\n- **", 1));
+    expect(fullBullet, "SKILL.md has no full-audit routing bullet").toContain("references/full-audit.md");
+    expect(fullBullet).toMatch(/compliance or conformance report/);
+    expect(fullBullet).toMatch(/any\s+harness/);
+    expect(fullBullet).not.toMatch(/\bin Claude Code\b/);
+    for (const h of ["Claude Code", "Codex", "OpenCode"]) expect(fullBullet).toContain(h);
+    // The quick path stays, but says it is not the conformance deliverable.
+    const quick = body.slice(body.indexOf('- **"Quick audit'));
+    expect(quick.slice(0, quick.indexOf("\n- **", 1))).toContain("references/audit.md");
+    expect(refBodies["audit.md"] ?? "").toContain("references/full-audit.md");
+  });
+
+  it("spells out the engine path for each harness", () => {
+    for (const text of [body, skills["review-a11y"]!.body]) {
+      expect(text).toMatch(/\$\{CLAUDE_SKILL_DIR\}\/scripts\/ultra11y\.mjs/);
+      expect(text).toMatch(/~\/\.codex\/skills\/[a-z0-9-]+\/scripts\/ultra11y\.mjs/);
+      expect(text).toMatch(/~\/\.config\/opencode\/skills\/[a-z0-9-]+\/scripts\/ultra11y\.mjs/);
+      expect(text).toContain("npx -y ultra11y");
     }
   });
 });

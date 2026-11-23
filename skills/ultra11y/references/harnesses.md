@@ -5,7 +5,15 @@ findings. On each harness those resolve as below. Only the **deltas** are listed
 not mentioned here is identical everywhere, because the engine is one zero-dependency
 bundle and the CLI it exposes is the same on all of them.
 
-Two things are worth knowing before the table:
+Three things are worth knowing before the table:
+
+- **The full audit is the same everywhere.** A requested full or detailed audit follows
+  `references/full-audit.md` on every harness: the active session is the auditor, rules on the
+  worklists directly (or fans them out to subagents where the harness has them, see
+  `references/orchestration.md`), then publishes the evidenced Markdown, HTML and per-page
+  dossiers and passes the `check` gates. The headless `judge --runner claude|codex|api`
+  transport is for CI or another unattended caller; nesting it inside an active session wastes
+  context and gives the report a weaker reader. Only the engine's path differs (below).
 
 - **No harness has a git event.** None of them can hook "about to commit". So the automatic
   review rides the *shell tool* on every one of them, recognising the commands that publish
@@ -24,11 +32,8 @@ Two things are worth knowing before the table:
 
 The plugin carries both skills *and* the hook. `hooks/hooks.json` → `hooks/pre-tool-use.mjs`
 → `ultra11y hook --claude-code`. The engine resolves from `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
-
-For a requested full audit, Claude Code follows `references/claude-code-report.md`: it acts as
-the auditor directly, then publishes the evidenced Markdown, HTML and per-page dossiers. The
-headless `judge --runner claude` transport is for CI or another unattended caller; nesting it
-inside the active Claude Code session wastes context and gives the report a weaker reader.
+Claude Code's own fan-out tools are the Agent tool and, where available, the Workflow tool
+that runs the `orchestrate`-emitted `*.workflow.mjs` scripts (Claude Code only).
 
 The review arrives as `permissionDecision: "deny"` on the pending command, with the findings
 in `additionalContext`.
@@ -62,7 +67,9 @@ The deltas that actually matter:
   it with `/hooks`.
 
 Gate only, without the marketplace: `ultra11y install --codex` (it sets the feature flag and
-copies both skills into `~/.codex/skills/`).
+copies both skills into `~/.codex/skills/`, or `$CODEX_HOME/skills/`). The engine then resolves
+from the installed skill directory's `scripts/ultra11y.mjs` — the plugin's copy, or
+`~/.codex/skills/ultra11y/scripts/ultra11y.mjs` after `install --codex`.
 
 The installed skill can also delegate an unattended local judgment pass to the same signed-in
 Codex account:
@@ -104,7 +111,9 @@ findings**. Same content, different envelope — read the error, do not retry bl
 
 The engine runs on the `node` from PATH (OpenCode itself is a Bun binary); with no Node
 there the gate is silent rather than broken. Skills also live under
-`~/.config/opencode/skills/` once `install --opencode` has copied them there.
+`~/.config/opencode/skills/` (honouring `$XDG_CONFIG_HOME`) once `install --opencode` has copied
+them there, and the engine resolves from that skill directory's `scripts/ultra11y.mjs` — or from
+the npm package's `skills/ultra11y/` when the plugin is pinned in `opencode.json`.
 
 ## Everything else (Cursor, Amp, Zed, Gemini CLI, Windsurf, aider…)
 

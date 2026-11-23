@@ -102,7 +102,7 @@ test).
 
 | file | for |
 |---|---|
-| `ADJUDICATE.todo.json` · `ADJUDICATE.md` | a session **with a shell** (Claude Code, Codex…): evidence inline, fill `ADJUDICATE.todo.json` in place, fold yourself |
+| `ADJUDICATE.todo.json` · `ADJUDICATE.md` | a session **with a shell** (Claude Code, Codex, OpenCode…): evidence inline, fill `ADJUDICATE.todo.json` in place, fold yourself |
 | `ADJUDICATE.verdicts.json` | the **only file to write** when you have no shell — verdicts, no evidence |
 
 Fill exactly one of the two. `verify --apply` accepts either and runs the same fold, so the

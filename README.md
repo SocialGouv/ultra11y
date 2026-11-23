@@ -652,8 +652,9 @@ node scripts/ultra11y.mjs check  --report audits/wcag-YYYY-MM-DD.md # integrity 
 
 ### A report someone will actually open
 
-There are two deliberate publication profiles. In an interactive Claude Code audit, the skill
-produces the detailed deliverable: adjudicated Markdown, a printable single-file HTML report,
+There are two deliberate publication profiles. In an interactive audit — on Claude Code, Codex
+or OpenCode alike, following `skills/ultra11y/references/full-audit.md` — the skill produces the
+detailed deliverable: adjudicated Markdown, a printable single-file HTML report,
 per-page HTML/Markdown dossiers, screenshots and annotated evidence. In GitHub Actions,
 `pages-report: compact` with `report`, `html` and `evidence` disabled still gates every criterion
 on every page but uploads only the status Markdown, page JSON, source audit and verdict ledger.

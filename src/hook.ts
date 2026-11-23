@@ -3,8 +3,9 @@
 // No agent harness has a git-aware hook event, so the plugin listens on PreToolUse for the
 // shell tool and recognises the commands that PUBLISH work: `git commit`, `git push`,
 // `gh pr create`. When the change about to go out carries accessibility findings at or
-// above the threshold, the hook denies the command once and hands Claude the reason plus
-// the findings, which is what gets `review-a11y` invoked without the user asking.
+// above the threshold, the hook denies the command once and hands the agent (Claude Code,
+// Codex, or OpenCode through its plugin) the reason plus the findings, which is what gets
+// `review-a11y` invoked without the user asking.
 //
 // TWO RULES GOVERN EVERYTHING BELOW.
 //

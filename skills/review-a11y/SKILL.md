@@ -21,10 +21,18 @@ DOM to `scan`. A human is at most optional oversight.
 `scripts/ultra11y.mjs` lives **next to this SKILL.md** (the engine ships inside the skill;
 no install, no key). Run it with the reviewed project as the working directory. In the
 ultra11y repository itself, the repo root's `scripts/ultra11y.mjs` is the same file.
-On Claude Code that path is `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`; on Codex and
-OpenCode it is the skill directory the plugin installed. If neither resolves — a harness
-with no skill system — `npx -y ultra11y <command>` is the same engine. Per-harness deltas:
-`references/harnesses.md` in the `ultra11y` skill.
+Resolve that path per harness:
+- **Claude Code**: `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
+- **Codex**: the installed skill directory — the plugin's copy, or
+  `~/.codex/skills/review-a11y/scripts/ultra11y.mjs` (under `$CODEX_HOME` when set) after
+  `ultra11y install --codex`.
+- **OpenCode**: `~/.config/opencode/skills/review-a11y/scripts/ultra11y.mjs` (under
+  `$XDG_CONFIG_HOME` when set) after `ultra11y install --opencode`, or the npm package's
+  `skills/review-a11y/` when the plugin is pinned in `opencode.json`.
+- **Anywhere else**, or when no skill directory resolves: `npx -y ultra11y <command>` is the
+  same engine.
+
+Per-harness deltas: `references/harnesses.md` in the `ultra11y` skill.
 
 > **Core rules** (shared with `ultra11y`):
 > 1. **Never invent a non-conformity**: report only what the engine found or what you can
@@ -124,9 +132,11 @@ stop. Everything in §4 stays opt-in and belongs to the caller, not to you.
 - **Formal deliverables** (dated report, auditor conformance blocks, PRD backlog, GitHub
   issues, RGAA/country-standard vocabulary): that is the `ultra11y` skill — same engine,
   same findings (`report`, `prd`, `check`/`verify` gates).
-- **Make it automatic**: installed as a **Claude Code plugin**, a `PreToolUse` hook stops a
-  pending `git commit` / `git push` / `gh pr create` that carries findings and hands them
-  over — that is what invokes this skill without anyone asking. It never fires twice for the
+- **Make it automatic**: installed as a **Claude Code, Codex or OpenCode plugin**, a hook on
+  the shell tool stops a pending `git commit` / `git push` / `gh pr create` that carries
+  findings and hands them over — a `PreToolUse` deny on Claude Code and Codex, a failed shell
+  call carrying the findings on OpenCode — and that is what invokes this skill without anyone
+  asking. It never fires twice for the
   same findings, so a retry lands. For a gate that does not need an agent at all, the
   `ultra11y` skill's `init --hook` installs a mechanical pre-commit run of this same staged
   audit.

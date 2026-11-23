@@ -1,8 +1,18 @@
-# Detailed conformance reports in Claude Code
+# The full audit — one route on every harness
 
-Use this route when the user asks Claude Code for an audit or conformance report. The active
-Claude Code session is the auditor: it reads the criterion briefs and writes the verdicts
-itself. It does not launch a nested `judge --runner claude` session.
+Use this route whenever the user asks for a full or detailed audit, a compliance or
+conformance report, or an RGAA audit — on Claude Code, Codex, OpenCode or any other harness.
+Every step is a plain engine CLI call, so the same request produces the same deliverables
+everywhere. The active agent session is the auditor: it reads the criterion briefs and writes
+the verdicts itself.
+
+`node scripts/ultra11y.mjs` below is the engine that ships inside this skill (see
+**Running the engine** in `SKILL.md` for its path on each harness); `npx -y ultra11y` is the
+same engine where no skill directory resolves.
+
+`references/audit.md` is the quick path — a static audit, a report and the integrity `check`,
+with no ledger, no refutation, no per-page dossiers and no completeness gate. Use it only for a
+first look; never hand its output over as a conformance deliverable.
 
 The completion criterion is a **defensible deliverable**, not merely a clean static scan:
 
@@ -17,7 +27,8 @@ The completion criterion is a **defensible deliverable**, not merely a clean sta
 
 Read `.ultra11yrc.json` when present. Confirm the standard, language and page sample. For a
 country standard, prefer `sample check` plus `scan --sample`; otherwise crawl without a hidden
-cap (`--max 0`). A source-only country-standard report is partial and must say so.
+cap (`--max 0`). A source-only country-standard report is partial and must say so. The `sample`
+block of `.ultra11yrc.json` and the PDF document checks are described in `references/audit.md`.
 
 ## 2. Audit source and rendered pages
 
@@ -42,16 +53,30 @@ If the scan cannot start a browser, it falls back on Playwright's full Chromium 
 on an installed Google Chrome; the error, when none starts, names the Playwright install that
 was resolved and the command that installs its browser.
 
-## 3. Adjudicate directly
+## 3. Adjudicate
 
-Generate the judgment worklist with `verify --manual`. Read each small
+Generate the judgment worklist with `verify --manual`, then rule on it in one of three ways —
+the verdicts pass the same fail-closed fold whichever you pick:
+
+- **adjudicate directly** in this session (the default for an interactive request);
+- **fan out to subagents** when the worklist is large — `orchestrate --run audits --phase
+  adjudicate` emits the batches and the per-role contracts, and any harness with subagents
+  can dispatch them (Claude Code's Agent or Workflow tool, Codex subagents, OpenCode's Task
+  tool); see `references/orchestration.md`. Subagents return verdicts; you fold them;
+- **run `judge --runner <claude|codex|api>`** when nobody is in the loop to rule (CI, an
+  unattended run) — a caller of the same worklist and the same gate, not a second judge; see
+  `references/runbook.md`. Inside an interactive session, prefer one of the first two: nesting
+  a headless judge inside the active session wastes context and gives the report a weaker
+  reader.
+
+Ruling directly: read each small
 `audits/adjudicate/<criterion>.md` brief, decide against its official tests, fill the verdicts
 in **`audits/ADJUDICATE.todo.json`** — the one file to write in a session with a shell (its
 items carry the evidence and the `citations[]` slots; `ADJUDICATE.verdicts.json` is the
 evidence-free twin for an adjudicator without a shell, and `verify --apply` accepts either, but
 fill one, not both) — then fold it with `verify --apply … --ledger`. The ledger records every
-accepted verdict, so the trial in step 4 can repair it and a later run can replay it. Use the
-orchestration route when the worklist is large, but keep the final fold in the parent session.
+accepted verdict, so the trial in step 4 can repair it and a later run can replay it. However
+the verdicts were produced, the final fold stays in the parent session.
 
 ```sh
 node scripts/ultra11y.mjs report --in audits/audit-latest.json \
@@ -74,7 +99,10 @@ the verdict schema (including the `citations[]` shape) and fail-closed fold.
 Render the report, generate the adversarial `VERIFY.todo.json`, adjudicate every claim, apply
 the verdicts with `--prune --ledger`, then render again. This trial covers both alleged
 non-conformities and agent-declared conformities **and** « non applicable » — on a small site
-that is easily 70+ claims.
+that is easily 70+ claims. Rule on the trial the same three ways as step 3: directly, by
+fanning out (`orchestrate --run audits --phase verify-report`), or with `judge --refute
+audits/VERIFY.todo.json --runner <claude|codex>` for an unattended run (the refuter has to open
+the cited files, so the tool-less `api` runner does not take this phase).
 
 ```sh
 node scripts/ultra11y.mjs report --in audits/audit-latest.json \

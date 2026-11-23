@@ -56,7 +56,7 @@ $ENGINE verify --manual --in "$RUN/audit-latest.json" --out "$RUN" --json
 # 3. ADJUDICATE — the agent fills every `verdict` (C/NC/NA/manual) in the verdicts file.
 #    The file carries its own `contract` (see below) — the agent needs nothing else. The fold
 #    re-hydrates the evidence from the audit, so a verdicts-only file is accepted. An agent
-#    WITH a shell (a Claude Code session) fills ADJUDICATE.todo.json in place instead — one
+#    WITH a shell (a Claude Code, Codex or OpenCode session) fills ADJUDICATE.todo.json in place instead — one
 #    file or the other, never both. Each `citations[]` entry is { file, line, selector,
 #    snippet } copied from the criterion's own evidence (references/judgment.md).
 
@@ -113,7 +113,7 @@ engine, standard?, placeholders[], phases[], steps[] }`. Each step carries:
 `placeholders[]` names the tokens a caller substitutes: `<globs>` (what to audit) and, until a trial
 worklist has been generated, `<report.md>` (the report the `report` step writes). Every command
 carries the run's context: `--in`, `--standard` and the conformity source the trial list was built
-with. The Claude Code `RUNBOOK.md` is rendered from this same manifest, so the two cannot drift.
+with. The agent-facing `RUNBOOK.md` is rendered from this same manifest, so the two cannot drift.
 
 ## The adjudication contract
 

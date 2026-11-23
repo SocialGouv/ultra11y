@@ -64,8 +64,9 @@ For an exhaustive certification run whose output must stay small, use the compac
 
 This still gates every criterion on every captured page. Its visible summary lists the complete
 page-by-page grid, while its artifact contains only `pages-status.md`, `pages.json`,
-`audit-latest.json` and the portable verdict ledger. Use the detailed Claude Code route when a
-human-readable conformance dossier is the deliverable; CI's job here is exhaustive evidence,
+`audit-latest.json` and the portable verdict ledger. Use the full-audit route
+(`references/full-audit.md`, the same on every harness) when a human-readable conformance
+dossier is the deliverable; CI's job here is exhaustive evidence,
 fast feedback and a clean handoff.
 
 A page sweep is usually a **second job** — it needs a built app, a database, a browser — and
