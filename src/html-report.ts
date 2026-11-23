@@ -503,7 +503,7 @@ export function scoreboardBlocks(result: AuditResult, standard: StandardId, lang
       { text: `${p.name}${p.auth ? " 🔒" : ""}`, ...(sheetHref ? { href: sheetHref(p.id) } : {}) },
       { text: p.url, mono: true },
       { text: basisLabel(p.basis, lang) },
-      { text: formatPageRate(criteria, standard), align: "end" as const },
+      { text: formatPageRate(criteria, standard, lang), align: "end" as const },
     ];
   });
   const out: Block[] = [
@@ -578,7 +578,7 @@ function pageGridBlocks(result: AuditResult, page: PageResult, standard: Standar
       kind: "para",
       runs: [
         { text: `${t.pageRate} : `, strong: true },
-        { text: formatPageRate(rows, standard), strong: true },
+        { text: formatPageRate(rows, standard, lang), strong: true },
       ],
     },
     { kind: "para", runs: [{ text: t.tally(tally.c, tally.nc, tally.na, tally.manual) }] },

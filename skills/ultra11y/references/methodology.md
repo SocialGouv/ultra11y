@@ -70,7 +70,8 @@ never `file:line`, selectors, tool method or commands:
 - **Header** — date, the audited pages (or « source code only »), the headline rate (a pack
   report: the standard's own conformity rate, validated ÷ applicable, and right under it, when
   pages are in scope, the « taux moyen de conformité » — the mean of the per-page rates, each
-  computed the same way over its page), the caveats that change
+  conforming ÷ (conforming + non-conforming) over its page, the criteria still to assess counted
+  beside it), the caveats that change
   what a reader may conclude, and the link to the annex.
 - **Summary** — the level on the standard's published scale (`conformityLevels` in the pack;
   RGAA: non conforme < 50 % ≤ partiellement conforme < 100 % = totalement conforme), or a
@@ -78,7 +79,8 @@ never `file:line`, selectors, tool method or commands:
   criterion, occurrences, the pages it was found on — linked, or « all pages (N/N) » — and the
   expected fix); and the next steps: what fixing the non-conformities does to the rate, how
   many criteria the next level needs, the criteria still to assess. While criteria are open,
-  every figure is a floor.
+  every figure drawn from the global rate is a floor, and the per-page rates and their mean are
+  provisional.
 - **The 5 gated sections**: (1) synthesis by WCAG guideline / theme (C/NC/NA/to assess),
   (2) non-conformities by priority — per criterion: the problem found (the engine's own
   wording; axe-core's English messages and stock remediation are left to the annex), the pages

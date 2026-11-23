@@ -10,7 +10,7 @@ import { writeHook, ciWorkflow } from "../init.js";
 import { parseFailOn } from "../baseline.js";
 import { runPackCheck } from "../pack.js";
 import { prdUnits, partitionUnits } from "../prd.js";
-import { renderReport, renderPackReport, withReportAnnexes } from "../report.js";
+import { foldRates, renderReport, renderPackReport, withReportAnnexes } from "../report.js";
 import { renderHtmlDocument } from "../html.js";
 import { compositeDoc, pagesIndexDoc } from "../html-report.js";
 import { buildTickets } from "../tickets/grain.js";
@@ -552,6 +552,7 @@ function handleFold(args: Record<string, unknown>, cwd: string): unknown {
     notInWorklist: r.notInWorklist,
     issues: r.issues,
     conformancePct: r.audit.conformancePct,
+    ...foldRates(r.audit, adj.standard),
     grounding: r.grounding,
   };
   // The CLI's rule: strict refuses on any issue, partial only when NOTHING landed.

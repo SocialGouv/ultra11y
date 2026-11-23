@@ -20,6 +20,7 @@ import { decide, type PreToolUsePayload } from "./hook.js";
 import {
   averageConformanceRate,
   averageRateLine,
+  foldRates,
   pageConformanceCell,
   writeReportFiles,
   packPartialAudit,
@@ -1987,11 +1988,11 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   if (format === "grid") {
     console.log(renderPageGrid(result, scope, standard, lang));
     // Under a pack, the « taux moyen » under the grid, with the per-page rate each page
-    // contributes to it — validated ÷ applicable, not the grid's decided-only rate row.
+    // contributes to it — the same rate as the grid's own rate row.
     if (!isCore(standard)) {
       const avg = averageConformanceRate(result, derivePages(result, scope), standard, lang);
       const rated = new Map(avg.pages.map((pg) => [pg.id, pg]));
-      const cells = derivePages(result, scope).map((pg) => `${pg.name} ${pageConformanceCell(rated.get(pg.id))}`);
+      const cells = derivePages(result, scope).map((pg) => `${pg.name} ${pageConformanceCell(rated.get(pg.id), lang)}`);
       console.log(`${averageRateLine(avg, lang)}\n\n> ${cells.join(" · ")}\n`);
     }
     return 0;
@@ -4030,6 +4031,7 @@ function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): num
           missing: rp.missing,
           issues: r.issues,
           conformancePct: r.audit.conformancePct,
+          ...foldRates(r.audit, standard),
           grounding: r.grounding,
         },
         null,
@@ -4188,6 +4190,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
           notInWorklist: r.notInWorklist,
           issues: r.issues,
           conformancePct: r.audit.conformancePct,
+          ...foldRates(r.audit, adj.standard),
           findings: r.audit.findings.length,
           grounding: r.grounding,
         },
@@ -5098,8 +5101,8 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     else {
       console.log(
         lang === "fr"
-          ? `Audit statique + dynamique fusionné → ${join(out, "audit-latest.json")} (${merged.conformancePct}% réussite, ${merged.findings.length} findings).`
-          : `Static + dynamic audit merged → ${join(out, "audit-latest.json")} (${merged.conformancePct}% pass rate, ${merged.findings.length} findings).`,
+          ? `Audit statique + dynamique fusionné → ${join(out, "audit-latest.json")} (${merged.conformancePct}% de réussite automatique, ${merged.findings.length} findings).`
+          : `Static + dynamic audit merged → ${join(out, "audit-latest.json")} (${merged.conformancePct}% automatic pass rate, ${merged.findings.length} findings).`,
       );
       if (dynamic.snapshots?.length)
         console.log(

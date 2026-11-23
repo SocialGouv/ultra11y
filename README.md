@@ -446,8 +446,9 @@ or malformed file is reported unreadable. See `skills/ultra11y/references/audit.
   pages), and a criterion is conforming *by silence* only on a page whose real rendered DOM
   was audited. An adjudicated non-conformity counts only on the pages its findings are on; an adjudicated
   conformity stays a claim about the whole run, except on a page with none of the criterion's
-  subject. Under a country standard, a page's rate uses the overall rate's formula: validated ÷
-  applicable, so a criterion still to assess keeps it a floor. And `pages --format report [--split page]` turns that into the **deliverable an
+  subject. Under a country standard, a page's rate is the RGAA page formula: conforming ÷
+  (conforming + non-conforming), the criteria still to assess counted beside it and marking it
+  provisional. And `pages --format report [--split page]` turns that into the **deliverable an
   auditor hands over**: one dossier per page — identity, **screenshot**, rate, *every* criterion
   of the standard with its status on that page, then each non-conformity as the ordinary auditor
   block. It re-decides nothing and invents no format, so a page sheet and the compliance report

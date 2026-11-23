@@ -411,6 +411,9 @@ const L = {
     unattributed: (n: number) =>
       `${n} constat(s) non rattaché(s) à une page (code partagé, fichier hors routes) — comptés dans l'audit global, jamais répartis d'office.`,
     rate: "Taux",
+    // Beside a page's rate while criteria remain open: the rate is over the decided ones only.
+    rateProvisional: "provisoire",
+    rateOpen: (n: number) => `${n} à évaluer`,
     snapshot: "instantané",
     source: "source",
     notAudited: "non audité",
@@ -435,6 +438,8 @@ const L = {
     unattributed: (n: number) =>
       `${n} unattributed finding(s) (shared code, file outside any route) — counted in the overall audit, never spread across pages.`,
     rate: "Rate",
+    rateProvisional: "provisional",
+    rateOpen: (n: number) => `${n} to assess`,
     snapshot: "snapshot",
     source: "source",
     notAudited: "not audited",
@@ -458,6 +463,48 @@ const L = {
  *  format it identically; a surface that prints its own is a surface that will drift. */
 export function formatRate(rate: number | null, decided: number, total: number): string {
   return `${rate === null ? "—" : `${rate} %`} (${decided}/${total})`;
+}
+
+/** A page's rate under a country standard, and the operands it follows from. */
+export interface PackPageRate {
+  /** NULL when the page decided nothing (`decided === 0`) — a rate over nothing is not a rate. */
+  pct: number | null;
+  /** Conforming criteria, the ones conforming for want of a subject taken out. */
+  validated: number;
+  nc: number;
+  /** `validated + nc`: the denominator. */
+  decided: number;
+  /** Criteria still « à évaluer » on the page. Outside the rate, and printed beside it. */
+  open: number;
+  /** Criteria with no subject on the page. Outside the rate. */
+  na: number;
+}
+
+/** THE RGAA PAGE RATE: conforming criteria ÷ (conforming + non-conforming), the criteria with no
+ *  subject on the page left out of both halves (`na` is a SUBSET of `c`, see INAPPLICABLE_STATUS).
+ *
+ *  The criteria still to assess are NOT in the denominator. They were (a9fc2ad, #148), so that a
+ *  page with nothing settled could not read 100 %; but on pages judged from source a criterion
+ *  non-conforming on ANOTHER page is « à évaluer » here, and run-wide verdicts land on every page,
+ *  so an open criterion and a non-conformity weighed the same and every page of a run printed the
+ *  same rate as the overall one (#156): the page carrying all the findings and the page carrying
+ *  none, both « 85 % (70/82) ». The legitimate half of #148 is kept another way: the open count
+ *  travels beside the rate and marks it provisional (`formatPackPageRate`), and a page that
+ *  decided nothing has no rate at all. */
+export function packPageRate(t: { c: number; nc: number; na: number; manual: number }): PackPageRate {
+  const validated = Math.max(0, t.c - t.na);
+  const decided = validated + t.nc;
+  return { pct: decided === 0 ? null : Math.round((validated / decided) * 100), validated, nc: t.nc, decided, open: t.manual, na: t.na };
+}
+
+/** A pack page rate as every surface prints it: `96 % (70/73)`, then — while criteria remain to
+ *  assess — `· provisoire, 9 à évaluer`. The open count is the half a reader cannot infer from
+ *  the bracket, and the one that says the number can still move either way. */
+export function formatPackPageRate(r: Pick<PackPageRate, "pct" | "validated" | "decided" | "open">, lang: Lang): string {
+  const s = L[lang];
+  const base = formatRate(r.pct, r.validated, r.decided);
+  if (r.open === 0) return base;
+  return `${base} · ${r.pct === null ? "" : `${s.rateProvisional}, `}${s.rateOpen(r.open)}`;
 }
 
 /** Honesty rule 3, as one sentence: a conformity an agent RULED is not a conformity the engine
@@ -735,37 +782,46 @@ export function renderRedirected(redirected: ScanRedirect[], lang: Lang = "en"):
   return out;
 }
 
-/** One page's standing over the rows of the grid it is printed on — same C ÷ (C + NC) basis
- *  as everywhere else, and the same NULL for "nothing decided". Taking it from the grid model
+/** One page's tally over the rows of the grid it is printed on. Taking it from the grid model
  *  rather than from `PageResult` is what makes the header a summary of the body under a pack
- *  as well as under the core: `PageResult` only ever carries the WCAG projection.
- *
- *  Returned as the argument tuple `formatRate` takes, so no caller can pair a rate with
- *  somebody else's denominator. */
-export function gridRate(
+ *  as well as under the core: `PageResult` only ever carries the WCAG projection. A cell the
+ *  model has no status for is `manual`, as the renderer prints it. */
+function gridTally(
   rows: { id: string }[],
   status: Map<string, Map<string, Status>>,
   pageId: string,
-  /** Under a pack, the cells that leave the rate: its presence selects the pack's arithmetic. */
   inapplicable?: ReadonlySet<string>,
-): [number | null, number, number] {
-  let c = 0;
-  let nc = 0;
-  let open = 0;
-  let absent = 0;
+): { c: number; nc: number; na: number; manual: number } {
+  const t = { c: 0, nc: 0, na: 0, manual: 0 };
   for (const row of rows) {
-    const st = status.get(row.id)?.get(pageId);
+    const st = status.get(row.id)?.get(pageId) ?? "manual";
     if (st === "C") {
-      c++;
-      if (inapplicable?.has(`${row.id}|${pageId}`)) absent++;
-    } else if (st === "NC") nc++;
-    else if (st === "manual") open++;
+      t.c++;
+      if (inapplicable?.has(`${row.id}|${pageId}`)) t.na++;
+    } else if (st === "NC") t.nc++;
+    else if (st === "manual") t.manual++;
   }
+  return t;
+}
+
+/** The WCAG core page rate over the grid's rows — C ÷ (C + NC), NULL for "nothing decided".
+ *
+ *  Returned as the argument tuple `formatRate` takes, so no caller can pair a rate with
+ *  somebody else's denominator. */
+export function gridRate(rows: { id: string }[], status: Map<string, Map<string, Status>>, pageId: string): [number | null, number, number] {
+  const { c, nc } = gridTally(rows, status, pageId);
   const decided = c + nc;
-  if (!inapplicable) return [decided === 0 ? null : Math.round((c / decided) * 100), decided, rows.length];
-  const validated = c - absent;
-  const applicable = validated + nc + open;
-  return [validated + nc === 0 ? null : Math.round((validated / applicable) * 100), validated, applicable];
+  return [decided === 0 ? null : Math.round((c / decided) * 100), decided, rows.length];
+}
+
+/** The pack page rate over the grid's rows (`packPageRate`): the cells in `inapplicable` leave it. */
+export function gridPackRate(
+  rows: { id: string }[],
+  status: Map<string, Map<string, Status>>,
+  pageId: string,
+  inapplicable: ReadonlySet<string>,
+): PackPageRate {
+  return packPageRate(gridTally(rows, status, pageId, inapplicable));
 }
 
 /** The Markdown grid: one row per criterion, one column per page. */
@@ -796,7 +852,12 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
   // pull request, so the wrong one was the one people read.
   const { rows, status, human, inapplicable } = pageGridModel(result, derived, standard, lang);
   out.push(
-    `| **${s.rate}** | ${derived.map((p) => `**${formatRate(...gridRate(rows, status, p.id, isCore(standard) ? undefined : inapplicable))}**`).join(" | ")} |`,
+    `| **${s.rate}** | ${derived
+      .map(
+        (p) =>
+          `**${isCore(standard) ? formatRate(...gridRate(rows, status, p.id)) : formatPackPageRate(gridPackRate(rows, status, p.id, inapplicable), lang)}**`,
+      )
+      .join(" | ")} |`,
   );
   out.push(`| _${s.snapshot}?_ | ${derived.map((p) => `_${basisLabel(p.basis, lang)}_`).join(" | ")} |`);
 

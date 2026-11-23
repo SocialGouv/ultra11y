@@ -88,7 +88,7 @@ describe("the Markdown grid's rate is a summary of the grid, not of another stan
     const [page] = derivePages(result, scope);
     const rows = pageCriterionRows(result, page!, "rgaa", "fr");
     // The dossier's own numbers, rendered by its own helper, must be the ones in the grid.
-    expect(rateCell("rgaa")).toContain(formatPageRate(rows, "rgaa"));
+    expect(rateCell("rgaa")).toContain(formatPageRate(rows, "rgaa", "fr"));
   });
 
   it("leaves the core grid exactly as it was", () => {

@@ -22,7 +22,8 @@ import { applyAdjudication, buildAdjudicationWorklist, type AdjudicationFile, ty
 import { formatPageRate, type PageCriterionRow, pageCriterionRows, pageRatePct, pageTally } from "../src/pages-report.js";
 import { subjectsAbsent, subjectsForPackCriterion } from "../src/adjudicate-subjects.js";
 import { loadPack } from "../src/standards/index.js";
-import { derivePages, pagesOf, attributePages, pageGridModel, unattributedFindings } from "../src/pages.js";
+import { derivePages, pagesOf, attributePages, pageGridModel, renderPageGrid, unattributedFindings } from "../src/pages.js";
+import { averageConformanceRate } from "../src/report.js";
 import type { AuditResult, Finding, PageScope } from "../src/types.js";
 
 const dir = mkdtempSync(join(tmpdir(), "u11y-grid-adj-"));
@@ -206,7 +207,7 @@ describe("a non-conformity the agent ruled stays on the pages it was found on", 
   });
 });
 
-describe("a page's rate is the overall rate's formula, over that page", () => {
+describe("a page's rate is the RGAA page formula, conforming ÷ (conforming + non-conforming)", () => {
   const row = (status: "C" | "NC" | "manual", inapplicable = false): PageCriterionRow => ({
     id: "x",
     label: "x",
@@ -217,22 +218,32 @@ describe("a page's rate is the overall rate's formula, over that page", () => {
   });
   const rows = [...Array.from({ length: 6 }, () => row("C")), row("C", true), row("C", true), row("NC"), row("manual")];
 
-  it("under a pack: a criterion with no subject leaves it, one still to assess stays in it", () => {
-    expect(pageRatePct(rows, "rgaa")).toBe(75);
-    expect(formatPageRate(rows, "rgaa")).toBe("75 % (6/8)");
+  it("under a pack: neither a criterion with no subject nor one still to assess enters it", () => {
+    expect(pageRatePct(rows, "rgaa")).toBe(86);
+    expect(formatPageRate(rows, "rgaa", "en")).toBe("86 % (6/7) · provisional, 1 to assess");
+    expect(formatPageRate(rows, "rgaa", "fr")).toBe("86 % (6/7) · provisoire, 1 à évaluer");
   });
 
-  it("does not read 100 % on a page with no non-conformity and criteria still open", () => {
-    expect(pageRatePct([row("C"), row("C"), row("manual"), row("manual")], "rgaa")).toBe(50);
+  it("prints the criteria still open beside a page with no non-conformity, and marks it provisional", () => {
+    const open = [row("C"), row("C"), row("manual"), row("manual")];
+    expect(pageRatePct(open, "rgaa")).toBe(100);
+    expect(formatPageRate(open, "rgaa", "en")).toBe("100 % (2/2) · provisional, 2 to assess");
+  });
+
+  it("is final, with no open count, once nothing is left to assess", () => {
+    expect(formatPageRate([row("C"), row("C"), row("NC"), row("C", true)], "rgaa", "en")).toBe("67 % (2/3)");
   });
 
   it("stays — when nothing was decided, rather than a score", () => {
-    expect(pageRatePct([row("manual"), row("C", true)], "rgaa")).toBeNull();
+    const none = [row("manual"), row("C", true)];
+    expect(pageRatePct(none, "rgaa")).toBeNull();
+    expect(formatPageRate(none, "rgaa", "en")).toBe("— (0/0) · 1 to assess");
+    expect(formatPageRate(none, "rgaa", "en")).not.toMatch(/\d %/);
   });
 
   it("keeps the WCAG core on its own overall arithmetic", () => {
     expect(pageRatePct(rows, "wcag")).toBe(89);
-    expect(formatPageRate(rows, "wcag")).toBe("89 % (9/10)");
+    expect(formatPageRate(rows, "wcag", "en")).toBe("89 % (9/10)");
   });
 });
 
@@ -315,5 +326,93 @@ describe("a strict page grid can adjudicate a run-level non-conformity", () => {
     );
     expect(folded.issues.join("\n")).not.toMatch(/not open for adjudication/);
     expect(folded.audit.packAdjudication?.criteria.find((criterion) => criterion.id === "1.1")?.status).toBe("NA");
+  });
+});
+
+describe("two pages judged from source carry their own rates (#156)", () => {
+  // Measured on the non-conforming fixture: « home » rendered from bad.html carries every
+  // finding, « about » carries none, and after an RGAA adjudication both read « 85 % (70/82) » —
+  // the overall rate. On a source page a non-conformity found elsewhere is « à évaluer », and the
+  // page rate counted « à évaluer » in its denominator like a non-conformity, so no page could
+  // differ from another.
+  const BAD = join(process.cwd(), "tests/fixtures/non-conforming/bad.html");
+
+  function sourcePages(): AuditResult {
+    const audit = runAudit({ inputs: [BAD] });
+    audit.scope.pages = [
+      { id: "home", name: "Home", url: "https://x/", sources: [BAD], basis: "attributed" },
+      { id: "about", name: "About", url: "https://x/about", basis: "attributed" },
+    ];
+    attributePages(audit, audit.scope.pages);
+    return audit;
+  }
+
+  /** Rule what the engine raised nothing on: a C citing its evidence, an NA where there is none. */
+  function ruled(audit: AuditResult): AuditResult {
+    const items = buildAdjudicationWorklist(audit, { standard: "rgaa" })
+      .filter((i) => !i.signals?.length)
+      .map((i) =>
+        i.evidence.length && i.evidenceComplete !== false
+          ? ({ ...i, verdict: "C", justification: "vérifié sur le code", citations: [i.evidence[0]!] } as AdjudicationItem)
+          : ({ ...i, verdict: "NA", justification: "aucun sujet de ce critère dans le périmètre", findings: [] } as AdjudicationItem),
+      );
+    const r = applyAdjudication(audit, file(items), { cwd: dir });
+    expect(r.applied, r.issues.join("\n")).toBeGreaterThan(0);
+    return r.audit;
+  }
+
+  const rowsOf = (audit: AuditResult, id: string) =>
+    pageCriterionRows(audit, derivePages(audit, audit.scope.pages ?? []).find((p) => p.id === id)!, "rgaa", "fr");
+
+  it("gives the page with the findings a lower rate than the page without", () => {
+    const audit = ruled(sourcePages());
+    const home = rowsOf(audit, "home");
+    const about = rowsOf(audit, "about");
+    expect(pageTally(home).nc).toBeGreaterThan(0);
+    expect(pageTally(about).nc).toBe(0);
+    const homeRate = pageRatePct(home, "rgaa");
+    const aboutRate = pageRatePct(about, "rgaa");
+    expect(homeRate).not.toBeNull();
+    expect(aboutRate).toBe(100);
+    expect(homeRate!).toBeLessThan(aboutRate!);
+    // Each rate is conforming ÷ (conforming + non-conforming) over that page alone.
+    const t = pageTally(home);
+    expect(homeRate).toBe(Math.round(((t.c - t.na) / (t.c - t.na + t.nc)) * 100));
+  });
+
+  it("prints the criteria still to assess beside each rate, and marks it provisional", () => {
+    const audit = ruled(sourcePages());
+    for (const id of ["home", "about"]) {
+      const rows = rowsOf(audit, id);
+      const open = pageTally(rows).manual;
+      expect(open).toBeGreaterThan(0);
+      expect(formatPageRate(rows, "rgaa", "fr")).toMatch(new RegExp(`^\\d+ % \\(\\d+/\\d+\\) · provisoire, ${open} à évaluer$`));
+    }
+  });
+
+  it("states two different rates in the grid's rate row and in the mean", () => {
+    const audit = ruled(sourcePages());
+    const grid = renderPageGrid(audit, audit.scope.pages ?? [], "rgaa", "fr");
+    const rateRow = grid.split("\n").find((l) => l.startsWith("| **Taux** |"))!;
+    const cells = rateRow
+      .split("|")
+      .slice(2, -1)
+      .map((c) => c.trim());
+    expect(cells).toHaveLength(2);
+    expect(cells[0]).not.toBe(cells[1]);
+    expect(cells[0]).toBe(`**${formatPageRate(rowsOf(audit, "home"), "rgaa", "fr")}**`);
+    const avg = averageConformanceRate(audit, derivePages(audit, audit.scope.pages ?? []), "rgaa", "fr");
+    expect(new Set(avg.pages.map((p) => p.pct)).size).toBe(2);
+  });
+
+  it("has no rate on a page where nothing was decided — never 100 %", () => {
+    const audit = sourcePages();
+    const t = pageTally(rowsOf(audit, "about"));
+    expect(t.c - t.na + t.nc).toBe(0);
+    expect(pageRatePct(rowsOf(audit, "about"), "rgaa")).toBeNull();
+    expect(formatPageRate(rowsOf(audit, "about"), "rgaa", "en")).toMatch(/^— \(0\/0\) · \d+ to assess$/);
+    const avg = averageConformanceRate(audit, derivePages(audit, audit.scope.pages ?? []), "rgaa", "fr");
+    expect(avg.excluded).toContain("about");
+    expect(avg.pages.map((p) => p.id)).not.toContain("about");
   });
 });

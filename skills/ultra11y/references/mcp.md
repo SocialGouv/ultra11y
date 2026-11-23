@@ -211,7 +211,10 @@ refused. It is a dry run unless `write: true`, which writes `<out>/audit-latest.
 the project root, like the CLI); `ledger: true` also merges the **accepted** verdicts into
 `.ultra11y/verdicts/<standard>.json`, never a refused one. A verdict a named human auditor
 ruled carries `decidedBy: "human"` and `auditor: { name, organisation? }` and folds the same
-way (see `references/verify.md`).
+way (see `references/verify.md`). Its `conformancePct` is the WCAG core's **automatic** pass
+rate, which a judgement never moves — `automaticPassRatePct` names it — and under a pack
+`conformance` / `conformanceRatePct` carry the standard's own conformity rate, the one the fold
+does move (see `references/orchestrators.md`).
 
 Steps 2 and 5 are the ones that make it a rule engine rather than a linter. Skipping step 2
 means auditing without knowing that 92 criteria carry judgment tests and **104 of 106** still need adjudication to earn C;

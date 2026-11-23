@@ -197,7 +197,7 @@ describe("the index", () => {
     // been assessed.
     const rows = md.split("\n").filter((l) => l.startsWith("| Page d'accueil |") || l.startsWith("| Contact |"));
     expect(rows.length).toBe(2);
-    for (const row of rows) expect(row).toMatch(/\| (?:\d+ %|—) \(\d+\/\d+\) \|/);
+    for (const row of rows) expect(row).toMatch(/\| (?:\d+ %|—) \(\d+\/\d+\)(?: · (?:provisoire, )?\d+ à évaluer)? \|/);
   });
 
   it("renders `—`, never a number, for a page on which nothing was decided", () => {
@@ -212,9 +212,9 @@ describe("the index", () => {
   });
 
   it("names the short rate column in both languages", () => {
-    expect(md).toContain("| Taux (validés ÷ applicables) |");
+    expect(md).toContain("| Taux (conformes ÷ décidés) |");
     const en = renderPagesIndex(result, derived, { standard: "rgaa", lang: "en" });
-    expect(en).toContain("| Rate (validated ÷ applicable) |");
+    expect(en).toContain("| Rate (conforming ÷ decided) |");
     // ...and the eight-column shape is unchanged, so the separator row still lines up.
     const header = md.split("\n").find((l) => l.startsWith("| Page |"))!;
     expect(header.split("|").length - 2).toBe(8);
