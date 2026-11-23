@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [7.1.0](https://github.com/SocialGouv/ultra11y/compare/v7.0.0...v7.1.0) (2026-11-23)
+
+
+### Features
+
+* audit what the app renders from its unit tests, Jest/Vitest snapshots and ultra11y/jest, ultra11y/vitest ([#176](https://github.com/SocialGouv/ultra11y/issues/176)) ([e0245ea](https://github.com/SocialGouv/ultra11y/commit/e0245eabde8f0c7ef5fbbefd659f206843593fb2)), closes [#169](https://github.com/SocialGouv/ultra11y/issues/169) [#169](https://github.com/SocialGouv/ultra11y/issues/169)
+
 # [7.0.0](https://github.com/SocialGouv/ultra11y/compare/v6.0.0...v7.0.0) (2026-11-23)
 
 
