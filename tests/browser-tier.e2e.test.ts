@@ -166,6 +166,11 @@ describe.runIf(true)("the browser tier, driven for real", () => {
     const axe = JSON.parse(readFileSync(join(root, PAGES_DIR, "fiche", "axe.json"), "utf8"));
     expect(axe.ran, "@axe-core/playwright is installed here, so the pass must have happened").toBe(true);
     expect(Array.isArray(axe.violations)).toBe(true);
+    // The axe that ran is ultra11y's pinned axe-core, reported by the injected script itself.
+    const pinned = (JSON.parse(readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8")) as { dependencies: Record<string, string> }).dependencies[
+      "axe-core"
+    ];
+    expect(axe.engine).toEqual({ version: pinned, origin: "ultra11y", runner: "playwright" });
   }, 120_000);
 
   it("returns instead of hanging when a hover trigger is never actionable", async () => {
@@ -282,6 +287,12 @@ describe("the recall fixture's rendered tier", () => {
     const { runScanManyLocal } = await import("../src/scan-local.js");
     const urls = ["/", "/contact.html", "/tarifs.html", "/cadres.html"].map((u) => `${siteOrigin}${u}`);
     const scan = await runScanManyLocal(urls, { cwd: REPO, snapshotRoot: scanRoot, lang: "fr" });
+
+    // (0) THE SAME AXE as `ultra11y/playwright`: ultra11y's pinned axe-core, as reported by the
+    // injected script, on the result and in every snapshot's axe.json.
+    const pinned = (JSON.parse(readFileSync(join(REPO, "package.json"), "utf8")) as { dependencies: Record<string, string> }).dependencies["axe-core"];
+    expect(scan.axe).toEqual({ version: pinned, origin: "ultra11y", runner: "scan" });
+    for (const id of scan.snapshots ?? []) expect(JSON.parse(readFileSync(join(scanRoot, PAGES_DIR, id, "axe.json"), "utf8")).engine).toEqual(scan.axe);
 
     // (1) THE PROBES — measured in the browser, never derivable from source.
     // A DynamicFinding names its producer in `axeRule`, as the bare ENGINE name; `mergeDynamic`
@@ -1288,4 +1299,61 @@ describe("the Playwright fixture does not record a placeholder as a page (#135)"
     const endless = await record(doc(`<main><div style="height:${FULL_SCREENSHOT_MAX_HEIGHT * 2}px"></div></main>`), "infinie");
     expect(png(join(endless.dir, "screen-full.png")).height).toBe(FULL_SCREENSHOT_MAX_HEIGHT);
   }, 120_000);
+});
+
+// `scan --all-routes --no-snapshot --root <dir>`: the inventory `pages discover --root <dir>`
+// wrote is read from --root even though nothing is snapshotted, and the routes this run scanned
+// are labelled scanned from the run itself — there is no snapshot on disk to read them back from.
+describe("scan --all-routes --no-snapshot reads --root and labels what it scanned", () => {
+  const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+  it("finds the inventory under --root, and reports the scanned routes as scanned", async () => {
+    if (!browserAvailable) return;
+    const { main } = await import("../src/cli.js");
+    const { writeRoutes } = await import("../src/routes.js");
+    const project = mkdtempSync(join(tmpdir(), "u11y-allroutes-"));
+    writeRoutes(project, [`${origin}/`, `${origin}/aide`, `${origin}/introuvable`], "crawl");
+    const auditFile = join(mkdtempSync(join(tmpdir(), "u11y-allroutes-base-")), "audit.json");
+    writeFileSync(auditFile, JSON.stringify(runAudit({ inputs: [join(root, "page.html")] })));
+    // Run from ANOTHER directory: the inventory must come from --root, not from the cwd.
+    const elsewhere = mkdtempSync(join(tmpdir(), "u11y-allroutes-cwd-"));
+    const out: string[] = [];
+    const log = console.log;
+    const err = console.error;
+    console.log = (...a: unknown[]) => void out.push(a.join(" "));
+    console.error = () => {};
+    const cwd = process.cwd();
+    let code: number;
+    try {
+      process.chdir(elsewhere);
+      code = await main([
+        "scan",
+        "--all-routes",
+        "--no-snapshot",
+        "--no-interact",
+        "--root",
+        project,
+        "--cwd",
+        REPO,
+        "--merge",
+        auditFile,
+        "--out",
+        join(elsewhere, "audits"),
+        "--json",
+      ]);
+    } finally {
+      process.chdir(cwd);
+      console.log = log;
+      console.error = err;
+    }
+    expect(code).toBe(0);
+    expect(existsSync(join(project, PAGES_DIR)), "--no-snapshot persisted nothing").toBe(false);
+    const doc = JSON.parse(out.join("\n"));
+    const by = Object.fromEntries((doc.scope.routes as { path: string; observed: string; page?: string; why?: { reason: string } }[]).map((r) => [r.path, r]));
+    expect(by["/"]).toMatchObject({ observed: "scanned" });
+    expect(by["/aide"]).toMatchObject({ observed: "scanned" });
+    // No snapshot was written, so no page id is claimed for them.
+    expect(by["/"]!.page).toBeUndefined();
+    expect(by["/introuvable"]).toMatchObject({ observed: "not-reached", why: { reason: "http-status" } });
+  }, 180_000);
 });

@@ -10,7 +10,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import type { DynamicFinding, DynamicResult, Lang, SamplePage, ScanRedirect } from "./types.js";
+import type { AxeEngineInfo, DynamicFinding, DynamicResult, Lang, SamplePage, ScanRedirect } from "./types.js";
 import { type DiscoverOpts, discoverUrls, type ProbeHit, type RunnerOutput, tagSampleFindings, toDynamicResult, writeRunnerSnapshot } from "./scan.js";
 // The stress probes live in their own module so the E2E plugin can run them on a page it
 // already owns — see src/probes.ts. Imported, never copied: a probe that means two things
@@ -35,6 +35,7 @@ import {
   TEXT_SPACING_CSS,
   TEXT_SPACING_PROBE,
 } from "./probes.js";
+import { type AxeEngine, resolveAxeEngine, runAxe } from "./axe-engine.js";
 import { sampleScope } from "./sample.js";
 import {
   COLLECT_SNAPSHOT,
@@ -88,13 +89,20 @@ function measuredScs(outs: readonly RunnerOutput[], interact: boolean): string[]
   return [...union].sort();
 }
 
+/** The axe-core build a multi-page run measured with: the one a page's injected script
+ *  reported, else the one resolved (a run whose every page was refused still says which). */
+function axeInfo(outs: readonly RunnerOutput[], axe: AxeEngine): AxeEngineInfo {
+  return outs.find((o) => o.axe)?.axe ?? { version: axe.version, origin: axe.origin, runner: "scan" };
+}
+
 // Playwright + AxeBuilder are resolved at runtime (never typed deps of this package),
 // so they cross the boundary untyped. biome's noExplicitAny is off for this repo.
 type Any = any;
 
 interface LocalDeps {
   chromium: Any;
-  AxeBuilder: Any;
+  /** The axe run ultra11y controls (src/axe-engine.ts). */
+  axe: AxeEngine;
 }
 
 const PW_SPEC = "@playwright/test";
@@ -226,26 +234,36 @@ export function localAvailable(cwd: string, choice: BrowserChoice = {}): boolean
   return localTierStatus(cwd, choice).ok;
 }
 
-/** Load Playwright `chromium` + the `AxeBuilder` class from the target project. */
+/** Load Playwright `chromium` (the target project's first) and the controlled axe run.
+ *
+ *  Playwright keeps the project-first order: two Playwright copies in one process do not share
+ *  their `Page` objects. axe does NOT: the axe-core build is ultra11y's own, pinned, so `scan`
+ *  and `ultra11y/playwright` measure with the same engine whatever the project installed (see
+ *  src/axe-engine.ts). The project's copy is a fallback, and a visible one. */
 export function resolveLocalDeps(cwd: string): LocalDeps {
   let chromium: Any;
-  let AxeBuilder: Any;
+  let axe: AxeEngine;
   try {
     const pw = requireRuntime(cwd, PW_SPEC);
-    const axeMod = requireRuntime(cwd, AXE_SPEC);
     chromium = pw.chromium;
-    AxeBuilder = axeMod.default ?? axeMod;
+    axe = resolveAxeEngine({ cwd });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(
       `Playwright resolves neither from "${cwd}" nor from ultra11y itself. Both are dependencies of this package, so the usual cause is the standalone engine bundle running with no node_modules beside it: pass --cwd <dir> at a project that has @playwright/test + @axe-core/playwright (e.g. --cwd packages/app). (${msg})`,
     );
   }
-  if (!chromium || typeof AxeBuilder !== "function") {
-    throw new Error(`Resolved Playwright/@axe-core/playwright from "${cwd}" but they did not expose chromium / AxeBuilder. Check the installed versions.`);
+  if (!chromium) {
+    throw new Error(`Resolved Playwright from "${cwd}" but it did not expose chromium. Check the installed version.`);
   }
-  return { chromium, AxeBuilder };
+  // Once per process and source: a sweep resolves per run, and one note says it.
+  if (axe.note && !notedAxe.has(axe.sourcePath)) {
+    notedAxe.add(axe.sourcePath);
+    console.error(axe.note);
+  }
+  return { chromium, axe };
 }
+const notedAxe = new Set<string>();
 
 /** Which Playwright `resolveLocalDeps` would load from `cwd` — its path and version — so a
  *  launch failure can name the install to fix. The engine resolves the TARGET project's
@@ -634,12 +652,10 @@ export function probeSources(): Record<string, string> {
   };
 }
 
-const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
-
 /** Drive one page through axe-core + every probe, returning a RunnerOutput. */
 async function runOnPage(
   browser: Any,
-  AxeBuilder: Any,
+  axe: AxeEngine,
   target: string,
   isFile: boolean,
   opts: { storageState?: string; interact: boolean; allowClicks: boolean; lang: Lang; snapshot?: boolean },
@@ -710,8 +726,9 @@ async function runOnPage(
       }
     }
 
-    const axeRes = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
-    const violations = (axeRes.violations as Any[]).map((v: Any) => ({
+    // The controlled axe run (src/axe-engine.ts): ultra11y's pinned axe-core and rule tags.
+    const axeRun = await runAxe(axe, page, "scan");
+    const violations = (axeRun.violations as Any[]).map((v: Any) => ({
       id: v.id as string,
       impact: (v.impact ?? null) as string | null,
       help: v.help as string,
@@ -888,6 +905,7 @@ async function runOnPage(
       landedUrl,
       ...(httpStatus !== undefined ? { httpStatus } : {}),
       violations,
+      axe: axeRun.engine,
       reflow,
       focusVisible: dialogFocus.length ? [...focusVisible, ...dialogFocus] : focusVisible,
       focusObscured: focusRing.obscured,
@@ -941,10 +959,10 @@ export async function runScanLocal(opts: LocalScanOpts): Promise<DynamicResult> 
   const isFile = !isUrl && statSync(opts.target).isFile();
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   try {
-    const out = await runOnPage(browser, AxeBuilder, opts.target, isFile, {
+    const out = await runOnPage(browser, axe, opts.target, isFile, {
       storageState: opts.storageState,
       interact,
       allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
@@ -952,7 +970,12 @@ export async function runScanLocal(opts: LocalScanOpts): Promise<DynamicResult> 
       snapshot: Boolean(opts.snapshotRoot),
     });
     const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, opts.target) : undefined;
-    return { ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE), testedScs: measuredScs([out], interact), ...(id ? { snapshots: [id] } : {}) };
+    return {
+      ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE),
+      testedScs: measuredScs([out], interact),
+      scanned: [opts.target],
+      ...(id ? { snapshots: [id] } : {}),
+    };
   } finally {
     await browser.close();
   }
@@ -974,7 +997,7 @@ export interface LocalManyOpts {
 export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Promise<DynamicResult> {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
@@ -982,6 +1005,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
   // rather than from what this runtime is capable of measuring — see `measuredScs`.
   const outs: RunnerOutput[] = [];
   const redirected: ScanRedirect[] = [];
+  const scanned: string[] = [];
   try {
     for (const url of urls) {
       // ONE BAD PAGE COSTS ITS OWN PAGE, NOT THE RUN.
@@ -1000,7 +1024,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
       // merely SHORTER than the site it claims to cover.
       let out: RunnerOutput;
       try {
-        out = await runOnPage(browser, AxeBuilder, url, false, {
+        out = await runOnPage(browser, axe, url, false, {
           storageState: opts.storageState,
           interact,
           allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
@@ -1043,6 +1067,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
       }
       findings.push(...toDynamicResult(out, url, lang, LOCAL_ENGINE).findings);
       outs.push(out);
+      scanned.push(url);
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, url) : undefined;
       if (id) snapshots.push(id);
     }
@@ -1056,6 +1081,8 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
     date: today(),
     findings,
     testedScs: measuredScs(outs, interact),
+    axe: axeInfo(outs, axe),
+    ...(scanned.length ? { scanned } : {}),
     ...(snapshots.length ? { snapshots } : {}),
     ...(redirected.length ? { redirected } : {}),
   };
@@ -1071,7 +1098,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
 export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpts): Promise<DynamicResult> {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
@@ -1079,6 +1106,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
   // rather than from what this runtime is capable of measuring — see `measuredScs`.
   const outs: RunnerOutput[] = [];
   const redirected: ScanRedirect[] = [];
+  const scannedUrls: string[] = [];
   try {
     for (const page of pages) {
       const storageState = page.storageState ?? opts.storageState; // per-page override
@@ -1087,7 +1115,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
       // name, and the rest of the sample is still scanned.
       let out: RunnerOutput;
       try {
-        out = await runOnPage(browser, AxeBuilder, page.url, isFile, {
+        out = await runOnPage(browser, axe, page.url, isFile, {
           storageState,
           interact,
           allowClicks: clicksAllowed(storageState, opts.interactClicks),
@@ -1127,6 +1155,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
       }
       findings.push(...tagSampleFindings(toDynamicResult(out, page.url, lang, LOCAL_ENGINE).findings, page));
       outs.push(out);
+      scannedUrls.push(page.url);
       // The sample page's declared id/name/auth/notes win over anything derived from the
       // URL: that identity is what the report and the per-page grid speak.
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, page.url, page) : undefined;
@@ -1150,6 +1179,8 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
     findings,
     sample: sampleScope({ pages: scanned }),
     testedScs: measuredScs(outs, interact),
+    axe: axeInfo(outs, axe),
+    ...(scannedUrls.length ? { scanned: scannedUrls } : {}),
     ...(snapshots.length ? { snapshots } : {}),
     ...(redirected.length ? { redirected } : {}),
   };

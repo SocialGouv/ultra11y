@@ -1,7 +1,17 @@
 import { realpathSync, writeFileSync, mkdirSync, existsSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
 import { join, relative, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { VERSION, type Lang, type AuditResult, type DynamicResult, type Finding, type PageResult, type SampleConfig, type SamplePage } from "./types.js";
+import {
+  VERSION,
+  type Lang,
+  type AuditResult,
+  type DynamicResult,
+  type Finding,
+  type PageResult,
+  type SampleConfig,
+  type SamplePage,
+  type ScanRedirect,
+} from "./types.js";
 import { runAudit } from "./audit.js";
 import { decide, type PreToolUsePayload } from "./hook.js";
 import {
@@ -87,7 +97,9 @@ import {
   type VerdictLedger,
   writeLedger,
 } from "./ledger.js";
-import { mergeDynamic, mergeSnapshotAudit, scanPageSummary } from "./scan.js";
+import { combineDynamic, mergeDynamic, mergeSnapshotAudit, scanPageSummary } from "./scan.js";
+import { resolveAxeEngine } from "./axe-engine.js";
+import { ALL_ROUTES_MAX, type ObservedPage, type RouteSource, readRoutes, routeCounts, routeCoverage, routesToScan, writeRoutes } from "./routes.js";
 import { DOCUMENTS_DIR, downloadSnapshotDocuments } from "./documents.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
@@ -161,7 +173,7 @@ Usage:
   ultra11y init     [--hook] [--fail-on blocking|major|minor]
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
   ultra11y scan     <url|file…> [--cwd <dir>] [--browser-path <file>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
-  ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
+  ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--all-routes [--max-routes <n>]] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample, then the rest of the route inventory)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
@@ -170,7 +182,7 @@ Usage:
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
-  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
+  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write | --routes-only] [--json]   (build the page sample and the route inventory)
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
@@ -504,9 +516,19 @@ Options:
   --write            pages discover: merge the discovered pages into .ultra11yrc.json
                      (sample.pages). Without it the proposal is printed and nothing is
                      written. Pages already declared are kept verbatim — auth, storageState
-                     and notes are human work and are never overwritten
+                     and notes are human work and are never overwritten. Also records every
+                     discovered route in the inventory .ultra11y/routes.json
+  --routes-only      pages discover: record the route inventory (.ultra11y/routes.json) and
+                     leave the sample untouched — the RGAA sample stays the one you chose,
+                     and the report's annex lists every other route with how it was observed
   --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling —
                      the only route that sees a state-reached page (a modal, a funnel step)
+  --all-routes       scan: after the sample (with --sample), scan every route of the inventory
+                     (.ultra11y/routes.json) the sample does not hold — except the routes your
+                     E2E run already captured, which win. Each route is then listed in the
+                     annex: captured, scanned, source only, or not reached
+  --max-routes <n>   scan --all-routes: most routes scanned beyond the sample (default: 50);
+                     the routes left out are listed « not reached », never dropped
   --sample           scan: scan the NORMATIVE page sample from .ultra11yrc.json (its
                      sample.pages), per-page storage-state overriding --storage-state,
                      aggregating one result with per-page provenance for the report
@@ -607,6 +629,8 @@ const VALUE_FLAGS = new Set([
   "crawl",
   "depth",
   "max",
+  // `scan --all-routes`: the most inventory routes visited beyond the sample (src/routes.ts).
+  "max-routes",
   // `scan`: most linked PDF documents downloaded per run.
   "max-pdf",
   "since",
@@ -676,6 +700,10 @@ const BOOLEAN_FLAGS = new Set([
   // `pages discover`: build the sample from the snapshots the E2E producer already wrote,
   // instead of crawling — the only route that can see a state-reached page.
   "from-snapshots",
+  // `pages discover`: record the route inventory (.ultra11y/routes.json) without touching the sample.
+  "routes-only",
+  // `scan`: cover every route of the inventory, beyond the sample (bounded by --max-routes).
+  "all-routes",
   "dry-run",
   "iterate",
   "safe",
@@ -1096,6 +1124,10 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
       attributePages(result, scope);
     }
   }
+  // Every route of the inventory, when there is one, with how it was observed.
+  // Only the snapshots this audit actually read count as observations: under --no-captures or a
+  // diff scope they were left out, and a route must not read « capturée » / « scannée » then.
+  stampRoutes(result, ".", lang, { recorded: pagesInScope });
 
   // Only persist audit-latest.json when an output dir is explicitly requested. A plain
   // `audit` streams to stdout (--json / text summary) and must NOT litter the CWD with an
@@ -1189,6 +1221,13 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
       );
       return 1;
     }
+    recordRouteInventory(
+      p,
+      lang,
+      snaps.map((s) => s.url),
+      "snapshots",
+    );
+    if (p.flags["routes-only"] === true) return 0;
     return writeDiscoveredSample(p, lang, snaps, snaps.length);
   }
 
@@ -1243,6 +1282,10 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
     return 1;
   }
 
+  // The inventory first: it is every route found, whatever the sample keeps of them.
+  recordRouteInventory(p, lang, urls, sitemap ? "sitemap" : "crawl");
+  if (p.flags["routes-only"] === true) return 0;
+
   // Titles, bounded and best-effort: a page whose document has none keeps a name humanized
   // from its path rather than an invented one.
   const titles = new Map<string, string>();
@@ -1263,6 +1306,65 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
 /** Merge proposed pages into `.ultra11yrc.json` (or print them), shared by every discovery
  *  route — sitemap, crawl and snapshots. `mergeSample` keeps what is already declared, so a
  *  re-run never overwrites the human work of describing how a page is reached. */
+/** Stamp `scope.routes` — every route of the inventory, the sample and the recorded pages, with
+ *  how each was observed (src/routes.ts). A no-op without an inventory, so an audit of a project
+ *  that never ran `pages discover --write` is unchanged. */
+export interface StampRoutesExtra {
+  refused?: ScanRedirect[];
+  bounded?: string[];
+  max?: number;
+  /** Read the pages recorded under `<root>/.ultra11y/pages` as observations. Default true. False
+   *  when this audit left the snapshots out (`--no-captures`, `--changed`/`--staged`/`--since`):
+   *  a route is then never labelled captured or scanned on the strength of a page nothing in
+   *  this run measured — it is source-only or not reached. */
+  recorded?: boolean;
+  /** The URLs this run's browser actually scanned (DynamicResult.scanned), labelled scanned
+   *  whether or not a snapshot was persisted for them (`scan --no-snapshot`). */
+  scanned?: readonly string[];
+}
+
+export function stampRoutes(result: AuditResult, root: string, lang: Lang, extra: StampRoutesExtra = {}): void {
+  const inventory = readRoutes(root);
+  if (!inventory) return;
+  let sample: SamplePage[] | undefined;
+  try {
+    sample = loadConfig(process.cwd())?.sample?.pages;
+  } catch {
+    /* an unreadable config has no sample to label — every route is then « hors échantillon » */
+  }
+  const pages: ObservedPage[] =
+    extra.recorded === false ? [] : readSnapshots(root).map((s) => ({ id: s.meta.id, url: s.meta.url, ...(s.meta.runner ? { runner: s.meta.runner } : {}) }));
+  for (const url of extra.scanned ?? []) pages.push({ url, runner: "scan" });
+  result.scope.routes = routeCoverage({
+    inventory,
+    ...(sample ? { sample } : {}),
+    pages,
+    refused: [...(result.scope.redirected ?? []), ...(extra.refused ?? [])],
+    ...(extra.bounded ? { bounded: extra.bounded } : {}),
+    ...(extra.max !== undefined ? { max: extra.max } : {}),
+  });
+  const n = routeCounts(result.scope.routes);
+  console.error(
+    lang === "fr"
+      ? `ultra11y : ${result.scope.routes.length} route(s) — ${n.captured} capturée(s) (E2E), ${n.scanned} scannée(s), ${n.source} source seule, ${n["not-reached"]} non atteinte(s).`
+      : `ultra11y: ${result.scope.routes.length} route(s) — ${n.captured} captured (E2E), ${n.scanned} scanned, ${n.source} source only, ${n["not-reached"]} not reached.`,
+  );
+}
+
+/** Persist the discovered routes to `.ultra11y/routes.json` (with `--write` or `--routes-only`).
+ *  The inventory is the whole application; the sample is what the verdicts are stated over.
+ *  Every later audit lists each inventory route with how it was observed (src/routes.ts). */
+function recordRouteInventory(p: ParsedArgs, lang: Lang, urls: readonly string[], via: RouteSource): void {
+  if (p.flags.write !== true && p.flags["routes-only"] !== true) return;
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  const { file, added, total } = writeRoutes(root, urls, via);
+  console.error(
+    lang === "fr"
+      ? `ultra11y pages discover : inventaire des routes → ${file} (${total} route(s), ${added} nouvelle(s)). \`ultra11y scan --sample --all-routes\` couvre l'échantillon puis le reste.`
+      : `ultra11y pages discover: route inventory → ${file} (${total} route(s), ${added} new). \`ultra11y scan --sample --all-routes\` covers the sample, then the rest.`,
+  );
+}
+
 function writeDiscoveredSample(p: ParsedArgs, lang: Lang, proposed: SamplePage[], found: number): number {
   let existing: SampleConfig | undefined;
   try {
@@ -1887,8 +1989,10 @@ function cmdStatus(p: ParsedArgs): number {
     p.flags.browser === true
       ? localTierStatus(typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : ".", { browserPath: browserPathOf(p.flags) })
       : undefined;
+  // The axe-core build `scan` and `ultra11y/playwright` would inject from here (src/axe-engine.ts).
+  const axe = browser ? axeStatus(typeof p.flags.cwd === "string" && p.flags.cwd ? p.flags.cwd : ".") : undefined;
   if (p.flags.json === true) {
-    console.log(JSON.stringify({ version: VERSION, targets: rows, ...(browser ? { browser } : {}) }, null, 2));
+    console.log(JSON.stringify({ version: VERSION, targets: rows, ...(browser ? { browser } : {}), ...(axe ? { axe } : {}) }, null, 2));
     return 0;
   }
   console.log(`ultra11y ${VERSION}`);
@@ -1901,7 +2005,18 @@ function cmdStatus(p: ParsedArgs): number {
       `  ${"browser".padEnd(12)} ${browser.ok ? "available" : "unavailable"}  ${browser.ok ? "@playwright/test + @axe-core/playwright" : browser.reason}`,
     );
   }
+  if (axe) console.log(`  ${"axe-core".padEnd(12)} ${axe.ok ? `${axe.version} (${axe.origin})` : "unavailable"}  ${axe.ok ? axe.path : axe.reason}`);
   return 0;
+}
+
+/** Which axe-core the browser tiers would run from `cwd`: ultra11y's pinned copy, or the project's. */
+function axeStatus(cwd: string): { ok: true; version: string; origin: string; path: string } | { ok: false; reason: string } {
+  try {
+    const e = resolveAxeEngine({ cwd });
+    return { ok: true, version: e.version, origin: e.origin, path: e.sourcePath };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 function cmdCriteria(p: ParsedArgs): number {
@@ -3777,9 +3892,64 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     sampleConfig = v.sample;
   }
 
+  // --all-routes: THE WHOLE APPLICATION, not only the sample. The route inventory
+  // (`.ultra11y/routes.json`, written by `pages discover --write`) is walked after the sample:
+  // every route the sample does not hold, except those the project's E2E run already captured
+  // (that capture holds the state the tests built, and wins). Bounded by --max-routes, and a
+  // route the bound leaves out is listed in the report as not reached, never dropped.
+  const allRoutes = p.flags["all-routes"] === true;
+  // From --root whether or not this run snapshots: `pages discover --root <dir>` wrote the
+  // inventory there, and `--no-snapshot` changes what is persisted, not where the project is.
+  const routesRoot = typeof p.flags.root === "string" && p.flags.root ? resolve(p.flags.root) : process.cwd();
+  let maxRoutes = ALL_ROUTES_MAX;
+  let routePlan: ReturnType<typeof routesToScan> | undefined;
+  if (allRoutes) {
+    const inventory = readRoutes(routesRoot);
+    if (!inventory) {
+      console.error(
+        lang === "fr"
+          ? "ultra11y scan : --all-routes lit l'inventaire des routes (.ultra11y/routes.json) — créez-le d'abord avec `ultra11y pages discover --sitemap <url> | --crawl <url> | --from-snapshots --write` (ou `--routes-only`)."
+          : "ultra11y scan: --all-routes reads the route inventory (.ultra11y/routes.json) — create it first with `ultra11y pages discover --sitemap <url> | --crawl <url> | --from-snapshots --write` (or `--routes-only`).",
+      );
+      return 2;
+    }
+    if (typeof p.flags["max-routes"] === "string") {
+      const n = Number(p.flags["max-routes"]);
+      if (!Number.isInteger(n) || n < 0) {
+        console.error(`ultra11y scan: --max-routes must be a non-negative integer (got "${p.flags["max-routes"]}").`);
+        return 2;
+      }
+      maxRoutes = n;
+    }
+    const recorded = readSnapshots(routesRoot).map((s) => ({ id: s.meta.id, url: s.meta.url, ...(s.meta.runner ? { runner: s.meta.runner } : {}) }));
+    routePlan = routesToScan(inventory, { ...(useSample && sampleConfig ? { sample: sampleConfig.pages } : {}), captured: recorded, max: maxRoutes });
+    console.error(
+      lang === "fr"
+        ? `ultra11y scan : ${inventory.routes.length} route(s) inventoriée(s) — ${useSample && sampleConfig ? `${sampleConfig.pages.length} page(s) d'échantillon, puis ` : ""}${routePlan.scan.length} route(s) hors échantillon à scanner, ${routePlan.captured.length} déjà capturée(s) par les tests E2E${routePlan.bounded.length ? `, ${routePlan.bounded.length} au-delà de --max-routes ${maxRoutes} (listées « non atteintes »)` : ""}.`
+        : `ultra11y scan: ${inventory.routes.length} inventoried route(s) — ${useSample && sampleConfig ? `${sampleConfig.pages.length} sample page(s), then ` : ""}${routePlan.scan.length} route(s) beyond the sample to scan, ${routePlan.captured.length} already captured by the E2E tests${routePlan.bounded.length ? `, ${routePlan.bounded.length} beyond --max-routes ${maxRoutes} (listed "not reached")` : ""}.`,
+    );
+  }
+
   let dynamic: DynamicResult;
   try {
-    if (useSample && sampleConfig) {
+    if (allRoutes && routePlan) {
+      const sampleRun =
+        useSample && sampleConfig
+          ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
+          : undefined;
+      const restRun = routePlan.scan.length
+        ? await runScanManyLocal(routePlan.scan, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
+        : undefined;
+      if (!sampleRun && !restRun) {
+        console.error(
+          lang === "fr"
+            ? "ultra11y scan : rien à scanner — chaque route de l'inventaire est déjà capturée par les tests E2E, ou exclue par --max-routes 0."
+            : "ultra11y scan: nothing to scan — every inventory route is already captured by the E2E tests, or excluded by --max-routes 0.",
+        );
+        return 0;
+      }
+      dynamic = combineDynamic(sampleRun, restRun);
+    } else if (useSample && sampleConfig) {
       dynamic = await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
     } else if (sitemap || crawl) {
       const depth = typeof p.flags.depth === "string" ? Number(p.flags.depth) : undefined;
@@ -3835,7 +4005,8 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     // 0 there would hand CI a green step and an empty report — the exact shape of a run that
     // passed. The usual cause is one fixable thing (an expired session, a wrong base URL),
     // so failing here is what makes it visible on the first run instead of the tenth.
-    if (useSample && sampleConfig && dynamic.redirected.length === sampleConfig.pages.length) {
+    const sampleIds = new Set((sampleConfig?.pages ?? []).map((pg) => pg.id));
+    if (useSample && sampleConfig && dynamic.redirected.filter((r) => sampleIds.has(r.id)).length === sampleConfig.pages.length) {
       console.error(
         lang === "fr"
           ? `ultra11y scan : aucune des ${sampleConfig.pages.length} pages de l'échantillon n'a pu être enregistrée — rien n'a été mesuré. Vérifiez la session, l'URL de base et l'état applicatif attendu par ces pages.`
@@ -3936,6 +4107,15 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
         attributePages(merged, scope);
       }
     }
+    // Every inventory route, and how it was observed — including the ones this scan refused
+    // and the ones --max-routes left out.
+    stampRoutes(merged, routesRoot, lang, {
+      ...(dynamic.redirected ? { refused: dynamic.redirected } : {}),
+      ...(routePlan?.bounded.length ? { bounded: routePlan.bounded, max: maxRoutes } : {}),
+      // What this run scanned, read from the run itself rather than from the snapshots on
+      // disk: under --no-snapshot there are none, and the routes it visited are still scanned.
+      ...(dynamic.scanned?.length ? { scanned: dynamic.scanned } : {}),
+    });
     mkdirSync(out, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);
     writeFileSync(join(out, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");

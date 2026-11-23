@@ -2632,9 +2632,9 @@ var require_ignore = __commonJS({
 });
 
 // src/cli.ts
-import { realpathSync as realpathSync6, writeFileSync as writeFileSync16, mkdirSync as mkdirSync16, existsSync as existsSync30, readFileSync as readFileSync24, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
-import { join as join31, relative as relative9, resolve as resolve13, dirname as dirname16 } from "path";
-import { fileURLToPath as fileURLToPath3, pathToFileURL } from "url";
+import { realpathSync as realpathSync6, writeFileSync as writeFileSync17, mkdirSync as mkdirSync17, existsSync as existsSync32, readFileSync as readFileSync26, appendFileSync, copyFileSync as copyFileSync4 } from "fs";
+import { join as join33, relative as relative9, resolve as resolve13, dirname as dirname18 } from "path";
+import { fileURLToPath as fileURLToPath4, pathToFileURL } from "url";
 
 // src/types.ts
 var VERSION = "7.1.0";
@@ -2646,8 +2646,8 @@ var INAPPLICABLE_STATUS = "C";
 
 // src/audit.ts
 import { createHash as createHash2 } from "crypto";
-import { existsSync as existsSync8, readFileSync as readFileSync9, statSync as statSync4 } from "fs";
-import { dirname as dirname9, resolve as resolvePath } from "path";
+import { existsSync as existsSync9, readFileSync as readFileSync10, statSync as statSync4 } from "fs";
+import { dirname as dirname10, resolve as resolvePath } from "path";
 
 // src/data/wcag.json
 var wcag_default = {
@@ -34899,6 +34899,114 @@ function criterionMeasuredOn(ruleIds2, scs, cov, ran) {
   return inThisRun.every((id) => ruleRanOn(id, cov, scs, docRules));
 }
 
+// src/axe-engine.ts
+import { existsSync as existsSync4, readFileSync as readFileSync6 } from "fs";
+import { createRequire as createRequire2 } from "module";
+import { dirname as dirname4, join as join6 } from "path";
+import { fileURLToPath } from "url";
+var AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
+var AXE_CORE_PIN = "4.13.0";
+var BUILDER_SPEC = "@axe-core/playwright";
+var SOURCE_SPEC = "axe-core/axe.min.js";
+var PACKAGE_SPEC = "axe-core/package.json";
+var sourceCache = /* @__PURE__ */ new Map();
+function locateSource(anchor) {
+  const tryFrom = (from) => {
+    try {
+      const req = createRequire2(from);
+      const path = req.resolve(SOURCE_SPEC);
+      const version = req(PACKAGE_SPEC).version ?? "unknown";
+      return { path, version };
+    } catch {
+      return void 0;
+    }
+  };
+  const direct = tryFrom(anchor);
+  if (direct) return direct;
+  try {
+    return tryFrom(createRequire2(anchor).resolve(BUILDER_SPEC));
+  } catch {
+    return void 0;
+  }
+}
+function loadBuilder(anchor) {
+  try {
+    const mod = createRequire2(anchor)(BUILDER_SPEC);
+    const B = mod.default ?? mod.AxeBuilder ?? mod;
+    return typeof B === "function" ? B : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function insideUltra11y(anchor) {
+  let dir;
+  try {
+    dir = dirname4(anchor.startsWith("file:") ? fileURLToPath(anchor) : anchor);
+  } catch {
+    return false;
+  }
+  for (; ; ) {
+    const manifest = join6(dir, "package.json");
+    if (existsSync4(manifest)) {
+      try {
+        return JSON.parse(readFileSync6(manifest, "utf8")).name === "ultra11y";
+      } catch {
+        return false;
+      }
+    }
+    const up = dirname4(dir);
+    if (up === dir) return false;
+    dir = up;
+  }
+}
+function resolveAxeEngine(opts) {
+  const self = opts.self ?? import.meta.url;
+  const project = join6(opts.cwd, "package.json");
+  const AxeBuilder = loadBuilder(self) ?? loadBuilder(project);
+  if (!AxeBuilder) {
+    throw new Error(`${BUILDER_SPEC} resolves neither from ultra11y itself nor from ${opts.cwd}.`);
+  }
+  const own = locateSource(self);
+  const located = own ?? locateSource(project);
+  if (!located) throw new Error(`axe-core resolves neither from ultra11y itself nor from ${opts.cwd}.`);
+  let source = sourceCache.get(located.path);
+  if (source === void 0) {
+    source = readFileSync6(located.path, "utf8");
+    sourceCache.set(located.path, source);
+  }
+  const origin = own && insideUltra11y(self) ? located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned" : "project";
+  const note = origin === "project" ? `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here \u2014 running the audited project's axe-core ${located.version} (${located.path}). Results are recorded with that version; install ultra11y with its dependencies to run the pinned one.` : origin === "unpinned" ? `ultra11y: the axe-core resolved from ultra11y's own package is ${located.version}, not the pinned ${AXE_CORE_PIN} (${located.path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.` : void 0;
+  return {
+    AxeBuilder,
+    source,
+    sourcePath: located.path,
+    version: located.version,
+    origin,
+    ...note ? { note } : {}
+  };
+}
+async function runAxe(engine, page, runner) {
+  const res = await new engine.AxeBuilder({ page, axeSource: engine.source }).withTags([...AXE_TAGS]).analyze();
+  return {
+    violations: res.violations ?? [],
+    engine: { version: res.testEngine?.version ?? engine.version, origin: engine.origin, ...runner ? { runner } : {} }
+  };
+}
+function unionAxeEngines(...lists) {
+  const by = /* @__PURE__ */ new Map();
+  for (const list of lists)
+    for (const e of list ?? []) {
+      const key2 = `${e.version}
+${e.origin}`;
+      const hit = by.get(key2) ?? { version: e.version, origin: e.origin, runners: /* @__PURE__ */ new Set() };
+      if (e.runner) {
+        for (const r2 of e.runner.split(",")) if (r2) hit.runners.add(r2);
+      }
+      by.set(key2, hit);
+    }
+  return [...by.values()].sort((a2, b) => a2.version.localeCompare(b.version) || a2.origin.localeCompare(b.origin)).map((e) => ({ version: e.version, origin: e.origin, ...e.runners.size ? { runner: [...e.runners].sort().join(",") } : {} }));
+}
+
 // src/adjudicate-subjects.ts
 var VOLATILE = [
   [/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, "<date>"],
@@ -40682,7 +40790,7 @@ function crossToFinding(doc, ruleId, def, cf) {
 }
 
 // src/graph/spec-resolve.ts
-import { resolve as absPath, basename as basename4, dirname as dirname6, posix as posix2 } from "path";
+import { resolve as absPath, basename as basename4, dirname as dirname7, posix as posix2 } from "path";
 
 // node_modules/get-tsconfig/dist/index.mjs
 import m2 from "path";
@@ -41579,7 +41687,7 @@ var fn = r((e) => {
 }, "createPathsMatcher");
 
 // src/graph/resolve.ts
-import { dirname as dirname4, join as join6 } from "path";
+import { dirname as dirname5, join as join7 } from "path";
 var EXT_ORDER = [".tsx", ".jsx", ".ts", ".js"];
 function candidates(base) {
   const out = [base];
@@ -41589,7 +41697,7 @@ function candidates(base) {
     for (const e of EXT_ORDER) out.push(stripped + e);
   }
   for (const e of EXT_ORDER) out.push(base + e);
-  for (const e of EXT_ORDER) out.push(join6(base, `index${e}`));
+  for (const e of EXT_ORDER) out.push(join7(base, `index${e}`));
   return out;
 }
 function matchKnown(base, known) {
@@ -41601,7 +41709,7 @@ function matchKnown(base, known) {
 }
 function resolveSpecifier(fromFile, spec, known, aliases) {
   if (spec.startsWith(".")) {
-    return matchKnown(join6(dirname4(toPosix2(fromFile)), spec), known);
+    return matchKnown(join7(dirname5(toPosix2(fromFile)), spec), known);
   }
   if (aliases?.length) {
     for (const rule of aliases) {
@@ -41609,7 +41717,7 @@ function resolveSpecifier(fromFile, spec, known, aliases) {
         if (!spec.startsWith(rule.prefix)) continue;
         const rest = spec.slice(rule.prefix.length);
         for (const base of rule.bases) {
-          const hit = matchKnown(join6(base, rest), known);
+          const hit = matchKnown(join7(base, rest), known);
           if (hit) return hit;
         }
       } else if (spec === rule.prefix) {
@@ -41624,11 +41732,11 @@ function resolveSpecifier(fromFile, spec, known, aliases) {
 }
 
 // src/graph/tsconfig.ts
-import { existsSync as existsSync4, readFileSync as readFileSync6 } from "fs";
-import { dirname as dirname5, join as join7, resolve as resolve3, relative as relative3 } from "path";
+import { existsSync as existsSync5, readFileSync as readFileSync7 } from "fs";
+import { dirname as dirname6, join as join8, resolve as resolve3, relative as relative3 } from "path";
 function readJsonish(path) {
   try {
-    const raw = readFileSync6(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1").replace(/,(\s*[}\]])/g, "$1");
+    const raw = readFileSync7(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1").replace(/,(\s*[}\]])/g, "$1");
     return JSON.parse(raw);
   } catch {
     return null;
@@ -41637,9 +41745,9 @@ function readJsonish(path) {
 function findTsconfig(startDir) {
   let dir = resolve3(startDir);
   for (let i = 0; i < 30; i++) {
-    const p2 = join7(dir, "tsconfig.json");
-    if (existsSync4(p2)) return p2;
-    const parent = dirname5(dir);
+    const p2 = join8(dir, "tsconfig.json");
+    if (existsSync5(p2)) return p2;
+    const parent = dirname6(dir);
     if (parent === dir) break;
     dir = parent;
   }
@@ -41655,15 +41763,15 @@ function tsconfigChain(startDir) {
     const p2 = queue.shift();
     if (seen.has(p2)) continue;
     seen.add(p2);
-    if (!existsSync4(p2)) continue;
+    if (!existsSync5(p2)) continue;
     out.push(p2);
     const cfg = readJsonish(p2);
     const exts = Array.isArray(cfg?.extends) ? cfg.extends : typeof cfg?.extends === "string" ? [cfg.extends] : [];
-    const dir = dirname5(p2);
+    const dir = dirname6(p2);
     for (const e of exts) {
       if (typeof e !== "string") continue;
       const cands = e.endsWith(".json") ? [resolve3(dir, e)] : [resolve3(dir, `${e}.json`), resolve3(dir, e, "tsconfig.json")];
-      const hit = cands.find((c) => existsSync4(c));
+      const hit = cands.find((c) => existsSync5(c));
       if (hit) queue.push(hit);
     }
   }
@@ -41672,7 +41780,7 @@ function tsconfigChain(startDir) {
 function readTsAliases(startDir, cwd = process.cwd()) {
   const tsconfigPath = findTsconfig(startDir);
   if (!tsconfigPath) return [];
-  const root = dirname5(tsconfigPath);
+  const root = dirname6(tsconfigPath);
   const cfg = readJsonish(tsconfigPath);
   if (!cfg) return [];
   let co = cfg.compilerOptions ?? {};
@@ -41696,7 +41804,7 @@ function readTsAliases(startDir, cwd = process.cwd()) {
     const bases = targets.map((t3) => {
       const star = t3.indexOf("*");
       const tp = wildcard && star >= 0 ? t3.slice(0, star) : t3;
-      return toPosix2(relative3(cwd, join7(baseAbs, tp))) || ".";
+      return toPosix2(relative3(cwd, join8(baseAbs, tp))) || ".";
     });
     out.push({ prefix: prefix2, wildcard, bases });
   }
@@ -41756,7 +41864,7 @@ function loadScopedPaths(startDir) {
       if (!patterns.length) continue;
       const match = fn({ path: cfgPath, config });
       if (!match) continue;
-      out.push({ dir: toPosix2(dirname6(cfgPath)), patterns, match });
+      out.push({ dir: toPosix2(dirname7(cfgPath)), patterns, match });
     } catch {
     }
   }
@@ -42304,7 +42412,7 @@ function runPackRules(doc, pack) {
 }
 
 // src/graph/build.ts
-import { dirname as dirname7 } from "path";
+import { dirname as dirname8 } from "path";
 
 // src/graph/imports.ts
 var NAME_PROPS2 = /* @__PURE__ */ new Set(["aria-label", "aria-labelledby", "title", "label", "alt"]);
@@ -42673,14 +42781,14 @@ function buildGraphAndDocs(files, opts = {}) {
     }
     nodes.push(extractGraphNode(ast, doc, file, { sfc }));
   }
-  const startDir = files[0] ? dirname7(files[0]) : process.cwd();
+  const startDir = files[0] ? dirname8(files[0]) : process.cwd();
   return { graph: buildGraph(nodes, readTsAliases(startDir), startDir), docs };
 }
 
 // src/discover.ts
-import { existsSync as existsSync5 } from "fs";
+import { existsSync as existsSync6 } from "fs";
 import { execFileSync } from "child_process";
-import { join as join8, relative as relative4 } from "path";
+import { join as join9, relative as relative4 } from "path";
 function git(args, maxBuffer) {
   try {
     return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], ...maxBuffer ? { maxBuffer } : {} });
@@ -42705,7 +42813,7 @@ function gitChangedFiles(ref) {
   add2(git(["diff", "--name-only", "--diff-filter=d", "--cached", base]));
   add2(git(["ls-files", "--others", "--exclude-standard"]));
   const cwd = process.cwd();
-  return [...out].map((p2) => relative4(cwd, join8(repoRoot2, p2)));
+  return [...out].map((p2) => relative4(cwd, join9(repoRoot2, p2)));
 }
 function gitStagedFiles() {
   const top = git(["rev-parse", "--show-toplevel"]);
@@ -42714,7 +42822,7 @@ function gitStagedFiles() {
   if (out === null) return null;
   const repoRoot2 = top.trim();
   const cwd = process.cwd();
-  return out.split("\n").map((s2) => s2.trim()).filter(Boolean).map((p2) => relative4(cwd, join8(repoRoot2, p2)));
+  return out.split("\n").map((s2) => s2.trim()).filter(Boolean).map((p2) => relative4(cwd, join9(repoRoot2, p2)));
 }
 function stagedContent(file) {
   return git(["show", `:./${toPosix2(file)}`], 32 * 1024 * 1024);
@@ -42803,9 +42911,9 @@ function discover(inputs, opts = {}) {
     } else {
       const filter = makeFilter(opts);
       const inScope = inScopeMatcher(inputs);
-      files = changed.filter((f2) => existsSync5(f2) && filter(f2) && (!inScope || inScope(f2)));
+      files = changed.filter((f2) => existsSync6(f2) && filter(f2) && (!inScope || inScope(f2)));
       const hostFilter = inlineHostFilter(opts);
-      hosts = opts.inlineSnapshots ? changed.filter((f2) => existsSync5(f2) && !filter(f2) && hostFilter(f2) && (!inScope || inScope(f2))) : [];
+      hosts = opts.inlineSnapshots ? changed.filter((f2) => existsSync6(f2) && !filter(f2) && hostFilter(f2) && (!inScope || inScope(f2))) : [];
     }
   } else {
     files = expandInputs(inputs, opts);
@@ -42816,14 +42924,14 @@ function discover(inputs, opts = {}) {
 }
 
 // src/documents.ts
-import { existsSync as existsSync7, readFileSync as readFileSync8, realpathSync as realpathSync2, statSync as statSync3 } from "fs";
-import { dirname as dirname8, isAbsolute as isAbsolute2, join as join10, relative as relative5 } from "path";
-import { fileURLToPath } from "url";
+import { existsSync as existsSync8, readFileSync as readFileSync9, realpathSync as realpathSync2, statSync as statSync3 } from "fs";
+import { dirname as dirname9, isAbsolute as isAbsolute2, join as join11, relative as relative5 } from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
 
 // src/document-store.ts
 import { createHash } from "crypto";
-import { existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync3 } from "fs";
-import { join as join9 } from "path";
+import { existsSync as existsSync7, mkdirSync as mkdirSync3, readFileSync as readFileSync8, writeFileSync as writeFileSync3 } from "fs";
+import { join as join10 } from "path";
 var DOCUMENTS_DIR = ".ultra11y/documents";
 var DOCUMENT_MAX_COUNT = 20;
 var DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
@@ -42925,9 +43033,9 @@ var SIDECAR_KIND = "ultra11y-document";
 var SIDECAR_VERSION = 1;
 function readDocumentOrigin(pdfPath) {
   const side = pdfPath.replace(/\.pdf$/i, ".json");
-  if (side === pdfPath || !existsSync6(side)) return void 0;
+  if (side === pdfPath || !existsSync7(side)) return void 0;
   try {
-    const raw = JSON.parse(readFileSync7(side, "utf8"));
+    const raw = JSON.parse(readFileSync8(side, "utf8"));
     if (!raw || typeof raw !== "object" || raw.v !== SIDECAR_VERSION) return void 0;
     if (raw.kind !== SIDECAR_KIND && !(raw.kind === void 0 && /(?:^|[\\/])[0-9a-f]{64}\.pdf$/i.test(pdfPath))) return void 0;
     const url = typeof raw.url === "string" ? raw.url : void 0;
@@ -42944,9 +43052,9 @@ function recordDocumentPages(file, url, pageIds) {
 `);
 }
 function storeDocument(root, url, bytes, pageIds) {
-  const dir = join9(root, DOCUMENTS_DIR);
+  const dir = join10(root, DOCUMENTS_DIR);
   const sha = createHash("sha256").update(bytes).digest("hex");
-  const file = join9(dir, `${sha}.pdf`);
+  const file = join10(dir, `${sha}.pdf`);
   mkdirSync3(dir, { recursive: true });
   writeFileSync3(file, bytes);
   recordDocumentPages(file, url, pageIds);
@@ -44056,7 +44164,7 @@ function loadPdfDoc(path, file = path) {
     if (doc.pdf) doc.pdf = { ...doc.pdf, unreadable: "too-large", detail: `file is ${size} bytes; the reader stops at ${PDF_MAX_BYTES}` };
     return doc;
   }
-  return pdfDocFromBytes(readFileSync8(path), file, readDocumentOrigin(path));
+  return pdfDocFromBytes(readFileSync9(path), file, readDocumentOrigin(path));
 }
 function pdfLinksIn(html, pageUrl) {
   let page;
@@ -44095,7 +44203,7 @@ function pdfLinksIn(html, pageUrl) {
 function readStorageCookies(path) {
   let raw;
   try {
-    raw = JSON.parse(readFileSync8(path, "utf8"));
+    raw = JSON.parse(readFileSync9(path, "utf8"));
   } catch {
     return [];
   }
@@ -44161,12 +44269,12 @@ function nodeFetcher(timeoutMs, cookies) {
   };
 }
 function readLocal(url, pageUrls, maxBytes) {
-  const path = fileURLToPath(url);
-  if (!existsSync7(path)) return { reason: "not found" };
+  const path = fileURLToPath2(url);
+  if (!existsSync8(path)) return { reason: "not found" };
   const real = realpathSync2(path);
   const inside = pageUrls.some((pageUrl) => {
     try {
-      const dir = realpathSync2(dirname8(fileURLToPath(pageUrl)));
+      const dir = realpathSync2(dirname9(fileURLToPath2(pageUrl)));
       const rel = relative5(dir, real);
       return rel !== "" && !rel.startsWith("..") && !isAbsolute2(rel);
     } catch {
@@ -44177,7 +44285,7 @@ function readLocal(url, pageUrls, maxBytes) {
   const st = statSync3(real);
   if (!st.isFile()) return { reason: "not a file" };
   if (st.size > maxBytes) return { reason: `larger than ${maxBytes} bytes` };
-  const bytes = readFileSync8(real);
+  const bytes = readFileSync9(real);
   if (!hasPdfHeader(bytes)) return { reason: "not a PDF \u2014 the file has no %PDF- header" };
   return { bytes, url };
 }
@@ -44233,11 +44341,11 @@ async function downloadLinkedDocuments(root, pages, opts = {}) {
 async function downloadSnapshotDocuments(root, snapshotIds, opts = {}) {
   const pages = [];
   for (const id of snapshotIds) {
-    const dir = join10(root, PAGES_DIR, id);
+    const dir = join11(root, PAGES_DIR, id);
     try {
-      const meta2 = JSON.parse(readFileSync8(join10(dir, "meta.json"), "utf8"));
+      const meta2 = JSON.parse(readFileSync9(join11(dir, "meta.json"), "utf8"));
       if (typeof meta2.url !== "string" || !meta2.url) continue;
-      pages.push({ id, url: meta2.url, html: readFileSync8(join10(dir, "dom.html"), "utf8") });
+      pages.push({ id, url: meta2.url, html: readFileSync9(join11(dir, "dom.html"), "utf8") });
     } catch {
     }
   }
@@ -44438,9 +44546,9 @@ function externalScripts(doc) {
       unreadable2++;
       continue;
     }
-    const path = resolvePath(dirname9(doc.file), src.split(/[?#]/)[0].replace(/^\//, ""));
+    const path = resolvePath(dirname10(doc.file), src.split(/[?#]/)[0].replace(/^\//, ""));
     try {
-      if (existsSync8(path) && statSync4(path).isFile() && statSync4(path).size <= SCRIPT_READ_LIMIT) readable.push(readFileSync9(path, "utf8"));
+      if (existsSync9(path) && statSync4(path).isFile() && statSync4(path).size <= SCRIPT_READ_LIMIT) readable.push(readFileSync10(path, "utf8"));
       else unreadable2++;
     } catch {
       unreadable2++;
@@ -44472,6 +44580,7 @@ function newAccum() {
     renderedRan: /* @__PURE__ */ new Map(),
     probedScs: /* @__PURE__ */ new Map(),
     axeRan: /* @__PURE__ */ new Set(),
+    axeEngines: [],
     subjectsSeen: /* @__PURE__ */ new Set(),
     pageSubjects: /* @__PURE__ */ new Map()
   };
@@ -44599,6 +44708,7 @@ function foldDoc(acc, doc, graph) {
     const axe = doc.signals?.axe;
     if (axe?.ran) {
       if (!placeholder) acc.axeRan.add(pageId);
+      if (axe.engine) acc.axeEngines.push(axe.engine);
       for (const sc of Object.keys(AXE_DECIDES)) acc.renderedScs.add(sc);
       for (const f2 of axeFindings(axe.violations ?? [], doc.file, pageId)) {
         const list = acc.byCriterion.get(f2.criteriaId) ?? [];
@@ -44923,7 +45033,9 @@ function finalize(acc, inputs, extra = {}) {
       pagesAudited: [...new Set(acc.captures.map((c) => c.provenance.page).filter((x2) => !!x2))].sort(),
       // What each page was MEASURED by. Omitted when no snapshot was folded, so a source-only
       // audit is byte-for-byte unchanged — and, per PageCoverage, absence closes nothing.
-      ...acc.pageIds.size ? { pageCoverage: pageCoverageOf(acc) } : {}
+      ...acc.pageIds.size ? { pageCoverage: pageCoverageOf(acc) } : {},
+      // Which axe-core produced the axe verdicts read from the captures. Omitted when none says.
+      ...acc.axeEngines.length ? { axe: unionAxeEngines(acc.axeEngines) } : {}
     },
     guidelines,
     criteria,
@@ -45007,7 +45119,7 @@ function runAudit(opts) {
       try {
         if (statSync4(file).size > PDF_MAX_BYTES) doc2 = loadPdfDoc(file);
         else {
-          const bytes = readFileSync9(file);
+          const bytes = readFileSync10(file);
           if (dedupMode !== "off") {
             const h3 = createHash2("sha1").update(bytes).digest("hex");
             if (seen.has(h3)) {
@@ -45079,9 +45191,9 @@ function runAudit(opts) {
 // src/hook.ts
 import { execFileSync as execFileSync2 } from "child_process";
 import { createHash as createHash3 } from "crypto";
-import { existsSync as existsSync11, mkdirSync as mkdirSync4, writeFileSync as writeFileSync4 } from "fs";
+import { existsSync as existsSync12, mkdirSync as mkdirSync4, writeFileSync as writeFileSync4 } from "fs";
 import { tmpdir } from "os";
-import { join as join12 } from "path";
+import { join as join13 } from "path";
 
 // src/baseline.ts
 var RANK = { bloquant: 0, majeur: 1, mineur: 2 };
@@ -45101,11 +45213,11 @@ function findingsAtOrAbove(findings, failOn) {
 }
 
 // src/config.ts
-import { existsSync as existsSync10, statSync as statSync5 } from "fs";
-import { join as join11, isAbsolute as isAbsolute3 } from "path";
+import { existsSync as existsSync11, statSync as statSync5 } from "fs";
+import { join as join12, isAbsolute as isAbsolute3 } from "path";
 
 // src/pack.ts
-import { existsSync as existsSync9 } from "fs";
+import { existsSync as existsSync10 } from "fs";
 
 // src/standards/pack.ts
 function localize(pack, s2, lang) {
@@ -45284,7 +45396,7 @@ function checkGuidance(ds, pack) {
 function runPackCheck(packPath, guidancePath) {
   const errors = [];
   const warnings = [];
-  if (!existsSync9(packPath)) return { ok: false, errors: [`pack file not found: ${packPath}`], warnings };
+  if (!existsSync10(packPath)) return { ok: false, errors: [`pack file not found: ${packPath}`], warnings };
   let raw;
   try {
     raw = JSON.parse(readText(packPath));
@@ -45308,7 +45420,7 @@ function runPackCheck(packPath, guidancePath) {
     }
   }
   if (v2.ok && v2.pack && guidancePath) {
-    if (!existsSync9(guidancePath)) {
+    if (!existsSync10(guidancePath)) {
       errors.push(`guidance file not found: ${guidancePath}`);
     } else {
       let gRaw;
@@ -49231,8 +49343,8 @@ function hasGuidance(packKey) {
 // src/config.ts
 var CONFIG_FILE = ".ultra11yrc.json";
 function loadConfig(cwd) {
-  const p2 = join11(cwd, CONFIG_FILE);
-  if (!existsSync10(p2)) return null;
+  const p2 = join12(cwd, CONFIG_FILE);
+  if (!existsSync11(p2)) return null;
   let parsed;
   try {
     parsed = JSON.parse(readText(p2));
@@ -49245,16 +49357,16 @@ function loadConfig(cwd) {
   return parsed;
 }
 function packPaths(path) {
-  if (!existsSync10(path)) return null;
+  if (!existsSync11(path)) return null;
   if (statSync5(path).isDirectory()) {
-    const pack = join11(path, "pack.json");
-    if (!existsSync10(pack)) return null;
-    const glossary = join11(path, "glossary.json");
-    const guidance = join11(path, "guidance.json");
+    const pack = join12(path, "pack.json");
+    if (!existsSync11(pack)) return null;
+    const glossary = join12(path, "glossary.json");
+    const guidance = join12(path, "guidance.json");
     return {
       pack,
-      glossary: existsSync10(glossary) ? glossary : void 0,
-      guidance: existsSync10(guidance) ? guidance : void 0
+      glossary: existsSync11(glossary) ? glossary : void 0,
+      guidance: existsSync11(guidance) ? guidance : void 0
     };
   }
   return { pack: path };
@@ -49274,7 +49386,7 @@ function loadStandardsInto(cwd, packFlags, onWarn, override, opts) {
   }
   result.defaultStandard = config?.standard;
   for (const raw of [...config?.packs ?? [], ...packFlags]) {
-    const paths = packPaths(isAbsolute3(raw) ? raw : join11(cwd, raw));
+    const paths = packPaths(isAbsolute3(raw) ? raw : join12(cwd, raw));
     if (!paths) {
       result.errors.push(`--pack ${raw}: not found (expected a pack JSON file or a directory with pack.json)`);
       continue;
@@ -49304,7 +49416,7 @@ ${formatIssues(v2.issues).join("\n")}`);
     result.loadedPacks.push(v2.pack.key);
     if (paths.guidance) loadGuidanceFile(paths.guidance, result, onWarn);
   }
-  for (const g of config?.guidance ?? []) loadGuidanceFile(isAbsolute3(g) ? g : join11(cwd, g), result, onWarn);
+  for (const g of config?.guidance ?? []) loadGuidanceFile(isAbsolute3(g) ? g : join12(cwd, g), result, onWarn);
   for (const sm of config?.secondaryMappings ?? []) {
     if (!sm || typeof sm.standard !== "string" || typeof sm.ruleId !== "string" || typeof sm.criterion !== "string") {
       result.errors.push("secondaryMappings: each entry must be { standard, ruleId, criterion, note? }");
@@ -49319,7 +49431,7 @@ ${formatIssues(v2.issues).join("\n")}`);
   return result;
 }
 function loadGuidanceFile(path, result, onWarn) {
-  if (!existsSync10(path)) {
+  if (!existsSync11(path)) {
     onWarn(`ultra11y: guidance ${path} not found \u2014 skipping.`);
     return;
   }
@@ -49429,10 +49541,10 @@ function loopKey(sessionId, intent, findings) {
 }
 function firstSighting(key2) {
   try {
-    const dir = join12(tmpdir(), "ultra11y-hook");
+    const dir = join13(tmpdir(), "ultra11y-hook");
     mkdirSync4(dir, { recursive: true });
-    const marker = join12(dir, key2);
-    if (existsSync11(marker)) return false;
+    const marker = join13(dir, key2);
+    if (existsSync12(marker)) return false;
     writeFileSync4(marker, "");
     return true;
   } catch {
@@ -49515,12 +49627,12 @@ function decide(payload, deps = {}) {
 }
 
 // src/report.ts
-import { copyFileSync, existsSync as existsSync12, mkdirSync as mkdirSync6, writeFileSync as writeFileSync6 } from "fs";
-import { dirname as dirname10, join as join14, relative as relative6 } from "path";
+import { copyFileSync, existsSync as existsSync13, mkdirSync as mkdirSync6, writeFileSync as writeFileSync6 } from "fs";
+import { dirname as dirname11, join as join15, relative as relative6 } from "path";
 
 // src/prd.ts
 import { mkdirSync as mkdirSync5, writeFileSync as writeFileSync5 } from "fs";
-import { join as join13 } from "path";
+import { join as join14 } from "path";
 
 // src/standards/derive.ts
 function ruler(decided) {
@@ -51082,7 +51194,7 @@ function renderPrdDoc(r2, lang = "en", standard = "wcag") {
 function writePrd(r2, opts) {
   mkdirSync5(opts.out, { recursive: true });
   if (opts.format === "doc") {
-    const p3 = join13(opts.out, `prd-doc-${r2.date}.md`);
+    const p3 = join14(opts.out, `prd-doc-${r2.date}.md`);
     writeFileSync5(p3, renderPrdDoc(r2, opts.lang, opts.standard));
     return [p3];
   }
@@ -51091,13 +51203,13 @@ function writePrd(r2, opts) {
     const files = renderAuditorPerCriterion(r2, opts.lang, opts.standard, { technical });
     const paths = [];
     for (const f2 of files) {
-      const p3 = join13(opts.out, f2.name);
+      const p3 = join14(opts.out, f2.name);
       writeFileSync5(p3, f2.content);
       paths.push(p3);
     }
     return paths;
   }
-  const p2 = join13(opts.out, `prd-${r2.date}.md`);
+  const p2 = join14(opts.out, `prd-${r2.date}.md`);
   writeFileSync5(p2, renderAuditorBacklog(r2, opts.lang, opts.standard, { technical }));
   return [p2];
 }
@@ -51634,7 +51746,23 @@ var L6 = {
     annexRecTitle: "B. Recommandations \u2014 emplacements dans le code",
     annexPagesTitle: "C. Pages \u2014 base de jugement et constats",
     annexManualTitle: "D. Crit\xE8res \xE0 \xE9valuer \u2014 marche \xE0 suivre",
-    annexGridTitle: "E. Grille exhaustive des crit\xE8res"
+    annexGridTitle: "E. Grille exhaustive des crit\xE8res",
+    axeEngine: "Moteur axe-core",
+    axeOrigin: (origin) => origin === "ultra11y" ? "copie \xE9pingl\xE9e d'ultra11y" : origin === "unpinned" ? "copie d'ultra11y, mais pas \xE0 la version \xE9pingl\xE9e" : "copie du projet audit\xE9 \u2014 celle d'ultra11y n'\xE9tait pas r\xE9solvable",
+    axeMixed: "Plusieurs versions d'axe-core ont produit les verdicts axe de cet audit : d'un niveau \xE0 l'autre, leurs r\xE9sultats ne sont pas strictement comparables.",
+    annexRoutesTitle: "F. Routes de l'application \u2014 couverture",
+    routesIntro: (n) => `${n} route(s) connue(s) : l'inventaire (\`.ultra11y/routes.json\`), l'\xE9chantillon et les pages enregistr\xE9es. Chacune est list\xE9e avec la fa\xE7on dont elle a \xE9t\xE9 observ\xE9e ; aucune n'est omise.`,
+    routesHead: "| Route | \xC9chantillon | Observ\xE9e | Page | Remarque |",
+    routeInSample: "\xE9chantillon RGAA",
+    routeOutOfSample: "hors \xE9chantillon",
+    routeObserved: {
+      captured: "captur\xE9e (tests E2E)",
+      scanned: "scann\xE9e (navigateur ultra11y)",
+      source: "code source seulement",
+      "not-reached": "non atteinte"
+    },
+    routeWhy: (reason, detail) => reason === "redirect" ? `redirig\xE9e vers ${detail ?? "une autre adresse"}` : reason === "http-status" ? `a r\xE9pondu HTTP ${detail ?? "?"}` : reason === "error" ? `\xE9chec du navigateur${detail ? ` : ${detail}` : ""}` : `au-del\xE0 de --max-routes${detail ? ` ${detail}` : ""}`,
+    routesTodo: (n) => `${n} route(s) non atteinte(s). Pour les couvrir : \`ultra11y scan --sample --all-routes --merge <audit.json>\`, ou un test Playwright avec \`ultra11y/playwright\` pour celles qui exigent un \xE9tat (session, parcours).`
   },
   en: {
     title: (std) => `Accessibility audit report \u2014 ${std}`,
@@ -51832,7 +51960,23 @@ var L6 = {
     annexRecTitle: "B. Recommendations \u2014 code locations",
     annexPagesTitle: "C. Pages \u2014 basis of judgment and findings",
     annexManualTitle: "D. Criteria to assess \u2014 procedure",
-    annexGridTitle: "E. Exhaustive criteria grid"
+    annexGridTitle: "E. Exhaustive criteria grid",
+    axeEngine: "axe-core engine",
+    axeOrigin: (origin) => origin === "ultra11y" ? "ultra11y's pinned copy" : origin === "unpinned" ? "ultra11y's own copy, but not at the pinned version" : "the audited project's copy \u2014 ultra11y's own was not resolvable",
+    axeMixed: "More than one axe-core version produced this audit's axe verdicts: from one tier to another, their results are not strictly comparable.",
+    annexRoutesTitle: "F. Application routes \u2014 coverage",
+    routesIntro: (n) => `${n} known route(s): the inventory (\`.ultra11y/routes.json\`), the sample and the recorded pages. Each is listed with how it was observed; none is omitted.`,
+    routesHead: "| Route | Sample | Observed | Page | Note |",
+    routeInSample: "RGAA sample",
+    routeOutOfSample: "beyond the sample",
+    routeObserved: {
+      captured: "captured (E2E tests)",
+      scanned: "scanned (ultra11y browser)",
+      source: "source code only",
+      "not-reached": "not reached"
+    },
+    routeWhy: (reason, detail) => reason === "redirect" ? `redirected to ${detail ?? "another address"}` : reason === "http-status" ? `answered HTTP ${detail ?? "?"}` : reason === "error" ? `the browser failed${detail ? `: ${detail}` : ""}` : `beyond --max-routes${detail ? ` ${detail}` : ""}`,
+    routesTodo: (n) => `${n} route(s) not reached. To cover them: \`ultra11y scan --sample --all-routes --merge <audit.json>\`, or a Playwright test with \`ultra11y/playwright\` for those that need a state (a session, a funnel).`
   }
 };
 var NEEDS_RENDERING = [
@@ -52194,7 +52338,7 @@ function withReportAnnexes(md, reportPath, read) {
   let out = md;
   for (const name of names) {
     if (md.includes(annexMarker(name))) continue;
-    const path = join14(dirname10(reportPath), name);
+    const path = join15(dirname11(reportPath), name);
     let annex;
     try {
       annex = read(path);
@@ -52453,13 +52597,13 @@ function render(r2, lang, opts) {
       out.push(`- ${s2.pageNcCriteria(failing.length)}${adv.length ? ` \xB7 ${adv.length} ${s2.advCount}` : ""}`);
       const notes = pageScope.find((x2) => x2.id === pg.id)?.notes;
       if (notes) out.push(`- _${notes}_`);
-      const shot = pageScreenshot(PAGES_DIR, pg.id) ?? join14(PAGES_DIR, pg.id, "screen.png");
-      if (existsSync12(shot)) {
+      const shot = pageScreenshot(PAGES_DIR, pg.id) ?? join15(PAGES_DIR, pg.id, "screen.png");
+      if (existsSync13(shot)) {
         let href = relative6(opts.outDir ?? ".", shot).split("\\").join("/");
         if (opts.outDir) {
           try {
-            mkdirSync6(join14(opts.outDir, "assets"), { recursive: true });
-            copyFileSync(shot, join14(opts.outDir, "assets", `${pg.id}.png`));
+            mkdirSync6(join15(opts.outDir, "assets"), { recursive: true });
+            copyFileSync(shot, join15(opts.outDir, "assets", `${pg.id}.png`));
             href = `./assets/${pg.id}.png`;
           } catch {
           }
@@ -52550,6 +52694,8 @@ function render(r2, lang, opts) {
     ax.push(`- **${s2.rate}** : ${opts.headerRatePct ?? r2.conformancePct}% \u2014 ${s2.autoRateNote(autoValidated, autoDecided)}`);
   }
   ax.push(`- **${s2.renderedPages(pagesRead)}**${pagesRead === 0 ? ` \u2014 ${s2.noRenderedPages}` : ""}`);
+  for (const e of r2.scope.axe ?? [])
+    ax.push(`- **${s2.axeEngine}** : \`axe-core@${e.version}\` (${s2.axeOrigin(e.origin)}${e.runner ? ` ; ${e.runner.split(",").join(", ")}` : ""})`);
   const automation = automationOverview(opts.standard);
   if (automation) {
     ax.push(
@@ -52586,6 +52732,7 @@ function render(r2, lang, opts) {
     ax.push(`> \u{1F9EA} ${s2.unitSnapshots(entries, files, skipped, inline)}`, "");
   }
   if (r2.scope.captureCoverage?.blindSpots.length) ax.push(`> \u26A0\uFE0F ${s2.blindSpots(r2.scope.captureCoverage.blindSpots.length)}`, "");
+  if (new Set((r2.scope.axe ?? []).map((e) => e.version)).size > 1) ax.push(`> \u26A0\uFE0F ${s2.axeMixed}`, "");
   ax.push(`## ${s2.annexNcTitle}`, "");
   if (ncUnits.length === 0) ax.push(s2.none, "");
   else {
@@ -52646,7 +52793,21 @@ function render(r2, lang, opts) {
     ax.push(`> ${s2.manualWarn} ${s2.manualHowTo}`, "");
   }
   ax.push(...exhaustiveGrid(opts.groups, opts.standard, lang, s2.annexGridTitle));
+  if (r2.scope.routes?.length) ax.push("", ...renderRoutes(r2.scope.routes, lang));
   return { report: out.join("\n"), annex: ax.join("\n"), reportFile, annexFile };
+}
+function renderRoutes(routes, lang) {
+  const s2 = L6[lang];
+  const cell2 = (t3) => t3.replace(/\|/g, "\\|");
+  const out = [`## ${s2.annexRoutesTitle}`, "", s2.routesIntro(routes.length), "", s2.routesHead, "|---|---|---|---|---|"];
+  for (const r2 of routes)
+    out.push(
+      `| \`${cell2(r2.path)}\` | ${r2.sample ? s2.routeInSample : s2.routeOutOfSample} | ${s2.routeObserved[r2.observed] ?? r2.observed} | ${r2.page ? `\`${cell2(r2.page)}\`` : "\u2014"} | ${r2.why ? cell2(s2.routeWhy(r2.why.reason, r2.why.detail)) : ""} |`
+    );
+  const missing = routes.filter((r2) => r2.observed === "not-reached").length;
+  out.push("");
+  if (missing) out.push(`> ${s2.routesTodo(missing)}`, "");
+  return out;
 }
 function renderReportDocuments(r2, lang = "en", outDir, cropFor) {
   const s2 = L6[lang];
@@ -52735,8 +52896,8 @@ function renderPackReportDocuments(r2, pack, lang = "en", outDir, cropFor) {
 function writeReportFiles(r2, opts) {
   const docs = isCore(opts.standard) ? renderReportDocuments(r2, opts.lang, opts.out, opts.cropFor) : renderPackReportDocuments(r2, loadPack(opts.standard), opts.lang, opts.out, opts.cropFor);
   mkdirSync6(opts.out, { recursive: true });
-  const path = join14(opts.out, docs.reportFile);
-  const annexPath = join14(opts.out, docs.annexFile);
+  const path = join15(opts.out, docs.reportFile);
+  const annexPath = join15(opts.out, docs.annexFile);
   writeFileSync6(annexPath, docs.annex);
   writeFileSync6(path, docs.report);
   return { path, annexPath };
@@ -53976,12 +54137,12 @@ function renderCriteriaReference() {
 }
 
 // src/check.ts
-import { existsSync as existsSync15, readFileSync as readFileSync12, readdirSync as readdirSync3 } from "fs";
-import { dirname as dirname11, join as join16 } from "path";
+import { existsSync as existsSync16, readFileSync as readFileSync13, readdirSync as readdirSync3 } from "fs";
+import { dirname as dirname12, join as join17 } from "path";
 
 // src/verify.ts
-import { existsSync as existsSync13, mkdirSync as mkdirSync7, readFileSync as readFileSync10, writeFileSync as writeFileSync7 } from "fs";
-import { join as join15 } from "path";
+import { existsSync as existsSync14, mkdirSync as mkdirSync7, readFileSync as readFileSync11, writeFileSync as writeFileSync7 } from "fs";
+import { join as join16 } from "path";
 var VERIFY_MAX = 40;
 var plain = (s2) => s2.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1");
 function auditorCriterionLine(standard) {
@@ -54273,13 +54434,13 @@ function applyVerdicts(items, expected) {
 var VERIFY_CONTEXT_FILE = "VERIFY.context.json";
 function writeVerifyContext(outDir, ctx) {
   mkdirSync7(outDir, { recursive: true });
-  const p2 = join15(outDir, VERIFY_CONTEXT_FILE);
+  const p2 = join16(outDir, VERIFY_CONTEXT_FILE);
   writeFileSync7(p2, JSON.stringify(ctx, null, 2) + "\n");
   return p2;
 }
 function readVerifyContext(dir) {
   try {
-    const c = JSON.parse(readFileSync10(join15(dir, VERIFY_CONTEXT_FILE), "utf8"));
+    const c = JSON.parse(readFileSync11(join16(dir, VERIFY_CONTEXT_FILE), "utf8"));
     return c && c.kind === "verify-context" && c.conformities && c.capped ? c : void 0;
   } catch {
     return void 0;
@@ -54287,12 +54448,12 @@ function readVerifyContext(dir) {
 }
 function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") {
   mkdirSync7(outDir, { recursive: true });
-  const todoPath = join15(outDir, "VERIFY.todo.json");
-  const mdPath = join15(outDir, "VERIFY.md");
+  const todoPath = join16(outDir, "VERIFY.todo.json");
+  const mdPath = join16(outDir, "VERIFY.md");
   let carried = items;
-  if (existsSync13(todoPath)) {
+  if (existsSync14(todoPath)) {
     try {
-      const previous = JSON.parse(readFileSync10(todoPath, "utf8"));
+      const previous = JSON.parse(readFileSync11(todoPath, "utf8"));
       const byClaim = new Map(previous.map((it) => [resumableItemKey(it), it]));
       carried = items.map((it) => {
         const old = byClaim.get(resumableItemKey(it));
@@ -54311,7 +54472,7 @@ function writeWorklist(items, outDir, semantic, standard = "wcag", lang = "en") 
 }
 
 // src/grounding.ts
-import { existsSync as existsSync14, readFileSync as readFileSync11 } from "fs";
+import { existsSync as existsSync15, readFileSync as readFileSync12 } from "fs";
 import { resolve as resolve7 } from "path";
 var WINDOW = 10;
 var norm2 = (s2) => s2.normalize("NFKC").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, " ").replace(/>\s+/g, ">").replace(/\s+</g, "<").trim();
@@ -54332,10 +54493,10 @@ function selectorProbes(selector) {
 function groundFinding(g, opts = {}) {
   if (isUnresolvable(g.file)) return { ok: true, moved: false };
   const path = resolve7(opts.cwd ?? process.cwd(), g.file);
-  if (!existsSync14(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
+  if (!existsSync15(path)) return { ok: false, moved: false, issue: `cited file not found: ${g.file}` };
   let text;
   try {
-    text = readFileSync11(path, "utf8");
+    text = readFileSync12(path, "utf8");
   } catch {
     return { ok: false, moved: false, issue: `cited file unreadable: ${g.file}` };
   }
@@ -54556,11 +54717,11 @@ function checkSemantic(md, opts) {
   const standard = opts.standard ?? "wcag";
   const s2 = M[lang];
   const empty2 = { total: 0, grounded: 0, moved: 0, failed: 0 };
-  const artifact = opts.verdictsPath ?? join16(dirname11(opts.reportPath), "VERIFY.todo.json");
-  if (!existsSync15(artifact)) return { ok: false, issues: [s2.semanticMissing(artifact)], ...empty2 };
+  const artifact = opts.verdictsPath ?? join17(dirname12(opts.reportPath), "VERIFY.todo.json");
+  if (!existsSync16(artifact)) return { ok: false, issues: [s2.semanticMissing(artifact)], ...empty2 };
   let items;
   try {
-    const parsed = JSON.parse(readFileSync12(artifact, "utf8"));
+    const parsed = JSON.parse(readFileSync13(artifact, "utf8"));
     if (!Array.isArray(parsed)) throw new Error("not an array");
     items = parsed;
   } catch {
@@ -54626,10 +54787,10 @@ function sectionBody(md, n) {
 function checkSampleCaptured(root = ".", lang = "en") {
   const fr = lang === "fr";
   let declared = [];
-  const rc = join16(root, ".ultra11yrc.json");
+  const rc = join17(root, ".ultra11yrc.json");
   let raw;
   try {
-    raw = readFileSync12(rc, "utf8");
+    raw = readFileSync13(rc, "utf8");
   } catch {
     return { ok: true, issues: [], missing: [], declared: 0, captured: 0 };
   }
@@ -54651,7 +54812,7 @@ function checkSampleCaptured(root = ".", lang = "en") {
   let captured = /* @__PURE__ */ new Set();
   try {
     captured = new Set(
-      readdirSync3(join16(root, PAGES_DIR), { withFileTypes: true }).filter((d2) => d2.isDirectory()).map((d2) => d2.name).filter((id) => existsSync15(join16(root, PAGES_DIR, id, "dom.html")))
+      readdirSync3(join17(root, PAGES_DIR), { withFileTypes: true }).filter((d2) => d2.isDirectory()).map((d2) => d2.name).filter((id) => existsSync16(join17(root, PAGES_DIR, id, "dom.html")))
     );
   } catch {
   }
@@ -54797,13 +54958,13 @@ function openPerPage(audit, standard, lang) {
 }
 
 // src/adjudicate.ts
-import { existsSync as existsSync17, mkdirSync as mkdirSync8, statSync as statSync7, writeFileSync as writeFileSync8 } from "fs";
-import { isAbsolute as isAbsolute4, join as join18, relative as relative7, resolve as resolve9 } from "path";
+import { existsSync as existsSync18, mkdirSync as mkdirSync8, statSync as statSync7, writeFileSync as writeFileSync8 } from "fs";
+import { isAbsolute as isAbsolute4, join as join19, relative as relative7, resolve as resolve9 } from "path";
 
 // src/verapdf.ts
 import { spawnSync } from "child_process";
-import { existsSync as existsSync16, statSync as statSync6 } from "fs";
-import { delimiter, join as join17, resolve as resolve8 } from "path";
+import { existsSync as existsSync17, statSync as statSync6 } from "fs";
+import { delimiter, join as join18, resolve as resolve8 } from "path";
 var OFF = /^(?:off|0|false|no)$/i;
 function veraPdfCommand(env = process.env) {
   const pinned = env.ULTRA11Y_VERAPDF?.trim();
@@ -54812,9 +54973,9 @@ function veraPdfCommand(env = process.env) {
   for (const dir of (env.PATH ?? "").split(delimiter)) {
     if (!dir) continue;
     for (const n of names) {
-      const p2 = join17(dir, n);
+      const p2 = join18(dir, n);
       try {
-        if (existsSync16(p2) && statSync6(p2).isFile()) return p2;
+        if (existsSync17(p2) && statSync6(p2).isFile()) return p2;
       } catch {
       }
     }
@@ -56576,7 +56737,7 @@ function captureFilesPresent(files, cwd) {
     const m3 = /^(.*(?:^|\/)\.ultra11y\/pages\/[^/]+)\//.exec(f2.replace(/\\/g, "/"));
     if (m3?.[1]) dirs.add(resolve9(cwd ?? process.cwd(), m3[1]));
   }
-  const present = CAPTURE_FILES.filter((name) => [...dirs].some((d2) => existsSync17(join18(d2, name))));
+  const present = CAPTURE_FILES.filter((name) => [...dirs].some((d2) => existsSync18(join19(d2, name))));
   return present.length ? present : ["dom.html"];
 }
 var VERAPDF_RULES_SHOWN = 6;
@@ -56917,8 +57078,8 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
 function writeAdjudication(items, outDir, opts) {
   mkdirSync8(outDir, { recursive: true });
   items = items.map(relativizeItem);
-  const todoPath = join18(outDir, "ADJUDICATE.todo.json");
-  const mdPath = join18(outDir, "ADJUDICATE.md");
+  const todoPath = join19(outDir, "ADJUDICATE.todo.json");
+  const mdPath = join19(outDir, "ADJUDICATE.md");
   const file = {
     tool: "ultra11y",
     kind: "adjudication",
@@ -56936,15 +57097,15 @@ function writeAdjudication(items, outDir, opts) {
       ...opts.web ? { web: true } : {}
     })
   );
-  const verdictsPath = join18(outDir, "ADJUDICATE.verdicts.json");
+  const verdictsPath = join19(outDir, "ADJUDICATE.verdicts.json");
   writeFileSync8(verdictsPath, JSON.stringify({ ...file, items: slimAdjudicationItems(items) }, null, 2) + "\n");
-  const itemsDir = join18(outDir, "adjudicate");
+  const itemsDir = join19(outDir, "adjudicate");
   mkdirSync8(itemsDir, { recursive: true });
   const unrendered = new Set(opts.unrendered ?? []);
   for (const it of items) {
     const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
     writeFileSync8(
-      join18(itemsDir, `${it.criteriaId}.md`),
+      join19(itemsDir, `${it.criteriaId}.md`),
       formatAdjudication([it], opts.lang ?? "en", opts.standard, {
         preamble: false,
         ...mine.length ? { unrendered: mine } : {},
@@ -57109,11 +57270,11 @@ function pruneRefuted(audit, standard, items, lang = "en", untried = []) {
 
 // src/ledger.ts
 import { createHash as createHash4 } from "crypto";
-import { existsSync as existsSync18, mkdirSync as mkdirSync9, readFileSync as readFileSync13, writeFileSync as writeFileSync9 } from "fs";
-import { dirname as dirname12, isAbsolute as isAbsolute5, join as join19, resolve as resolve10 } from "path";
+import { existsSync as existsSync19, mkdirSync as mkdirSync9, readFileSync as readFileSync14, writeFileSync as writeFileSync9 } from "fs";
+import { dirname as dirname13, isAbsolute as isAbsolute5, join as join20, resolve as resolve10 } from "path";
 var LEDGER_DIR = ".ultra11y/verdicts";
 function ledgerPath(standard, root = ".") {
-  return join19(root, LEDGER_DIR, `${standard}.json`);
+  return join20(root, LEDGER_DIR, `${standard}.json`);
 }
 var norm3 = (s2) => s2.replace(/\s+/g, " ").trim();
 var canonicalFile2 = (file) => {
@@ -57184,7 +57345,7 @@ function verdictStillHolds(entry2, today2, opts) {
       `Ledger verdict is STALE \u2014 ${added.size} piece(s) of evidence are NEW since the verdict was recorded on ${entry2.date} (${was} item(s) then, ${today2.length} now). A conformity covers what was read, and this was not. Re-adjudicate this criterion.`
     );
   }
-  const exists = opts.fileExists ?? ((f2) => existsSync18(f2));
+  const exists = opts.fileExists ?? ((f2) => existsSync19(f2));
   const contributing = /* @__PURE__ */ new Set([...evidenceFilesOf(today2), ...evidenceFilesOf(today2, root)]);
   const silent = (entry2.evidenceFiles ?? []).filter((f2) => !contributing.has(f2) && !contributing.has(identityFile(f2, root)) && exists(f2));
   if (silent.length > 0) {
@@ -57222,19 +57383,19 @@ function isLedger(v2) {
   return !!o && typeof o === "object" && o.tool === "ultra11y" && o.kind === "verdict-ledger" && Array.isArray(o.entries);
 }
 function readLedger(path) {
-  if (!existsSync18(path)) return void 0;
+  if (!existsSync19(path)) return void 0;
   try {
-    const parsed = JSON.parse(readFileSync13(path, "utf8"));
+    const parsed = JSON.parse(readFileSync14(path, "utf8"));
     return isLedger(parsed) ? parsed : void 0;
   } catch {
     return void 0;
   }
 }
 function unreadableCaptures(audit, cwd = ".") {
-  return (audit.scope.pagesAudited ?? []).filter((id) => !existsSync18(join19(cwd, PAGES_DIR, id, "dom.html")));
+  return (audit.scope.pagesAudited ?? []).filter((id) => !existsSync19(join20(cwd, PAGES_DIR, id, "dom.html")));
 }
 function writeLedger(path, ledger) {
-  mkdirSync9(dirname12(path), { recursive: true });
+  mkdirSync9(dirname13(path), { recursive: true });
   const sorted = { ...ledger, entries: [...ledger.entries].sort((a2, b) => a2.criteriaId.localeCompare(b.criteriaId, "en", { numeric: true })) };
   writeFileSync9(path, `${JSON.stringify(sorted, null, 2)}
 `);
@@ -57329,7 +57490,7 @@ function replayLedger(audit, ledger, opts = {}) {
   const unreadable2 = (audit.scope.pagesAudited ?? []).filter((id) => {
     const canonical = `${PAGES_DIR}/${id}/dom.html`;
     const fromInputs = currentFiles.get(canonical);
-    return !(fromInputs && existsSync18(fromInputs)) && !existsSync18(join19(root, canonical));
+    return !(fromInputs && existsSync19(fromInputs)) && !existsSync19(join20(root, canonical));
   });
   const harvestComplete = unreadable2.length === 0;
   for (const e of ledger.entries) if (!open.has(e.criteriaId)) obsolete.push(e.criteriaId);
@@ -57342,7 +57503,7 @@ function replayLedger(audit, ledger, opts = {}) {
     }
     const held = verdictStillHolds(e, it.evidence, {
       harvestComplete,
-      fileExists: (f2) => existsSync18(join19(root, f2)),
+      fileExists: (f2) => existsSync19(join20(root, f2)),
       root
     });
     if (!held.holds) {
@@ -57374,8 +57535,8 @@ function replayLedger(audit, ledger, opts = {}) {
 }
 
 // src/scan.ts
-import { existsSync as existsSync19, readFileSync as readFileSync14 } from "fs";
-import { fileURLToPath as fileURLToPath2 } from "url";
+import { existsSync as existsSync20, readFileSync as readFileSync15 } from "fs";
+import { fileURLToPath as fileURLToPath3 } from "url";
 
 // src/crawl.ts
 function parseSitemapUrls(xml) {
@@ -57578,7 +57739,7 @@ function writeRunnerSnapshot(root, out, target, page) {
       // `ran: true` is the axe counterpart of `probed`: the pass happened, so its silence on
       // the criteria AXE_DECIDES is usable. A RunnerOutput always carries `violations` because
       // a runner always runs axe — that is the one instrument neither runtime skips.
-      axe: { violations: out.violations, ran: true },
+      axe: { violations: out.violations, ran: true, ...out.axe ? { engine: out.axe } : {} },
       ...collected.screenshot ? { screenshotBase64: collected.screenshot } : {},
       ...collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {}
     });
@@ -57603,7 +57764,7 @@ function hostPageOf(url, target) {
   if (!url) return target;
   if (url.startsWith("file://")) {
     try {
-      return fileURLToPath2(url);
+      return fileURLToPath3(url);
     } catch {
       return target;
     }
@@ -57665,7 +57826,7 @@ function toDynamicResult(out, target, lang = "en", engine = "axe-core@playwright
       });
     }
   }
-  return { tool: "ultra11y", engine, target, date: today(), findings };
+  return { tool: "ultra11y", engine, target, date: today(), findings, ...out.axe ? { axe: out.axe } : {} };
 }
 async function fetchHtml(url) {
   try {
@@ -57698,10 +57859,10 @@ function tagSampleFindings(findings, page) {
 var sevRank = { bloquant: 3, majeur: 2, mineur: 1 };
 function resolveHostAnchor(file, snippet2) {
   const s2 = snippet2?.trim();
-  if (!s2 || !existsSync19(file)) return null;
+  if (!s2 || !existsSync20(file)) return null;
   let source;
   try {
-    source = readFileSync14(file, "utf8");
+    source = readFileSync15(file, "utf8");
   } catch {
     return null;
   }
@@ -57737,6 +57898,25 @@ function scanPageSummary(dynamic, sampleSize) {
     refused: (dynamic.redirected ?? []).map((r2) => ({ id: r2.id, reason: r2.reason }))
   };
 }
+function combineDynamic(sample, rest) {
+  if (!sample) return rest;
+  if (!rest) return sample;
+  const tested = [.../* @__PURE__ */ new Set([...sample.testedScs ?? [], ...rest.testedScs ?? []])].sort();
+  const snapshots = [...sample.snapshots ?? [], ...rest.snapshots ?? []];
+  const redirected = [...sample.redirected ?? [], ...rest.redirected ?? []];
+  const axe = sample.axe ?? rest.axe;
+  const scanned = [...sample.scanned ?? [], ...rest.scanned ?? []];
+  return {
+    ...sample,
+    target: `${sample.target} + ${rest.target}`,
+    findings: [...sample.findings, ...rest.findings],
+    ...tested.length ? { testedScs: tested } : {},
+    ...snapshots.length ? { snapshots } : {},
+    ...scanned.length ? { scanned } : {},
+    ...redirected.length ? { redirected } : {},
+    ...axe ? { axe } : {}
+  };
+}
 function mergeDynamic(audit, dynamic, lang = "en") {
   const merged = JSON.parse(JSON.stringify(audit));
   const seenFindings = new Set(merged.findings.map(portableFindingId));
@@ -57753,6 +57933,7 @@ function mergeDynamic(audit, dynamic, lang = "en") {
     const tested = /* @__PURE__ */ new Set([...merged.scope.scan?.testedScs ?? [], ...dynamic.testedScs]);
     merged.scope.scan = { testedScs: [...tested].sort() };
   }
+  if (dynamic.axe) merged.scope.axe = unionAxeEngines(merged.scope.axe, [dynamic.axe]);
   const byId2 = new Map(merged.criteria.map((c) => [c.id, c]));
   const remediation = lang === "fr" ? "V\xE9rifi\xE9 au rendu par axe-core ; corrigez l'\xE9l\xE9ment cit\xE9." : "Verified at render time by axe-core; fix the cited element.";
   for (const df of dynamic.findings) {
@@ -57848,6 +58029,8 @@ function mergeSnapshotAudit(base, snap) {
   if (Object.keys(cov).length) merged.scope.pageCoverage = cov;
   const scs = /* @__PURE__ */ new Set([...base.scope.scan?.testedScs ?? [], ...snap.scope.scan?.testedScs ?? []]);
   if (scs.size) merged.scope.scan = { testedScs: [...scs].sort() };
+  const axeEngines = unionAxeEngines(base.scope.axe, snap.scope.axe);
+  if (axeEngines.length) merged.scope.axe = axeEngines;
   const byId2 = new Map(merged.criteria.map((c) => [c.id, c]));
   const snapById = new Map(snap.criteria.map((c) => [c.id, c]));
   for (const f2 of snap.findings) {
@@ -57912,13 +58095,125 @@ function mergeSnapshotAudit(base, snap) {
   return merged;
 }
 
+// src/routes.ts
+import { existsSync as existsSync21, mkdirSync as mkdirSync10, readFileSync as readFileSync16, writeFileSync as writeFileSync10 } from "fs";
+import { dirname as dirname14, join as join21 } from "path";
+var ROUTES_FILE = ".ultra11y/routes.json";
+var ALL_ROUTES_MAX = 50;
+function routePath(url) {
+  let path;
+  try {
+    const u2 = new URL(url);
+    path = decodeURI(u2.pathname) + u2.search;
+  } catch {
+    path = url;
+  }
+  const [p2, q2] = path.split("?", 2);
+  let base = p2.replace(/\/index\.html?$/i, "/");
+  if (base.length > 1) base = base.replace(/\/+$/, "");
+  if (!base) base = "/";
+  return q2 ? `${base}?${q2}` : base;
+}
+function readRoutes(root) {
+  const file = join21(root, ROUTES_FILE);
+  if (!existsSync21(file)) return void 0;
+  try {
+    const raw = JSON.parse(readFileSync16(file, "utf8"));
+    if (!Array.isArray(raw.routes)) return void 0;
+    const routes = raw.routes.filter((r2) => !!r2 && typeof r2.url === "string" && r2.url.length > 0);
+    return { v: 1, routes: routes.map((r2) => ({ url: r2.url, via: Array.isArray(r2.via) ? r2.via : [] })) };
+  } catch {
+    return void 0;
+  }
+}
+function writeRoutes(root, urls, via) {
+  const file = join21(root, ROUTES_FILE);
+  const inv = readRoutes(root) ?? { v: 1, routes: [] };
+  const byPath = new Map(inv.routes.map((r2) => [routePath(r2.url), r2]));
+  let added = 0;
+  for (const url of urls) {
+    const key2 = routePath(url);
+    const hit = byPath.get(key2);
+    if (hit) {
+      if (!hit.via.includes(via)) hit.via.push(via);
+      continue;
+    }
+    const entry2 = { url, via: [via] };
+    byPath.set(key2, entry2);
+    inv.routes.push(entry2);
+    added++;
+  }
+  inv.routes.sort((a2, b) => routePath(a2.url).localeCompare(routePath(b.url)));
+  mkdirSync10(dirname14(file), { recursive: true });
+  writeFileSync10(file, `${JSON.stringify(inv, null, 2)}
+`);
+  return { file, added, total: inv.routes.length };
+}
+var ORDER = { captured: 0, scanned: 1, source: 2, "not-reached": 3 };
+function routeCoverage(input) {
+  const rows = /* @__PURE__ */ new Map();
+  const ensure = (url) => {
+    const key2 = routePath(url);
+    let row = rows.get(key2);
+    if (!row) {
+      row = { path: key2, url, sample: false, observed: "not-reached" };
+      rows.set(key2, row);
+    }
+    return row;
+  };
+  for (const r2 of input.inventory?.routes ?? []) ensure(r2.url);
+  for (const s2 of input.sample ?? []) {
+    const row = ensure(s2.url);
+    row.sample = true;
+    if (row.observed === "not-reached" && s2.sources?.length) row.observed = "source";
+  }
+  for (const p2 of input.pages ?? []) {
+    const row = ensure(p2.url);
+    const observed = p2.runner === "scan" ? "scanned" : "captured";
+    if (ORDER[observed] < ORDER[row.observed] || observed === row.observed && !row.page) {
+      row.observed = observed;
+      if (p2.id) row.page = p2.id;
+    }
+  }
+  for (const r2 of input.refused ?? []) {
+    const row = ensure(r2.requested);
+    if (row.observed !== "not-reached") continue;
+    const detail = r2.reason === "http-status" ? String(r2.status ?? "") : r2.reason === "error" ? r2.detail : r2.landed;
+    row.why = { reason: r2.reason ?? "redirect", ...detail ? { detail } : {} };
+  }
+  for (const url of input.bounded ?? []) {
+    const row = ensure(url);
+    if (row.observed === "not-reached" && !row.why) row.why = { reason: "max-routes", ...input.max !== void 0 ? { detail: String(input.max) } : {} };
+  }
+  return [...rows.values()].sort((a2, b) => Number(b.sample) - Number(a2.sample) || a2.path.localeCompare(b.path));
+}
+function routeCounts(rows) {
+  const out = { captured: 0, scanned: 0, source: 0, "not-reached": 0 };
+  for (const r2 of rows) out[r2.observed]++;
+  return out;
+}
+function routesToScan(inventory, opts) {
+  const inSample = new Set((opts.sample ?? []).map((s2) => routePath(s2.url)));
+  const capturedPaths = new Set((opts.captured ?? []).filter((p2) => p2.runner !== "scan").map((p2) => routePath(p2.url)));
+  const max = opts.max ?? ALL_ROUTES_MAX;
+  const rest = [];
+  const captured = [];
+  for (const r2 of inventory.routes) {
+    const key2 = routePath(r2.url);
+    if (inSample.has(key2)) continue;
+    if (capturedPaths.has(key2)) captured.push(r2.url);
+    else rest.push(r2.url);
+  }
+  return { scan: rest.slice(0, max), captured, bounded: rest.slice(max) };
+}
+
 // src/scan-local.ts
-import { existsSync as existsSync21, realpathSync as realpathSync3, statSync as statSync8 } from "fs";
-import { createRequire as createRequire2 } from "module";
-import { dirname as dirname13, join as join20, resolve as resolve11 } from "path";
+import { existsSync as existsSync23, realpathSync as realpathSync3, statSync as statSync8 } from "fs";
+import { createRequire as createRequire3 } from "module";
+import { dirname as dirname15, join as join22, resolve as resolve11 } from "path";
 
 // src/sample.ts
-import { existsSync as existsSync20 } from "fs";
+import { existsSync as existsSync22 } from "fs";
 function looksLikeTarget(u2) {
   return /^https?:\/\//i.test(u2) || /^(\.\.?[/\\]|[/\\])/.test(u2) || /\.x?html?$/i.test(u2);
 }
@@ -57954,7 +58249,7 @@ function validateSample(raw) {
     if (p2.auth !== void 0 && typeof p2.auth !== "boolean") err(`sample.pages[${i}].auth`, "auth must be a boolean");
     if (p2.storageState !== void 0 && (typeof p2.storageState !== "string" || p2.storageState.trim() === "")) {
       err(`sample.pages[${i}].storageState`, "storageState must be a non-empty file path string");
-    } else if (typeof p2.storageState === "string" && p2.storageState.trim() !== "" && !existsSync20(p2.storageState)) {
+    } else if (typeof p2.storageState === "string" && p2.storageState.trim() !== "" && !existsSync22(p2.storageState)) {
       warn(
         `sample.pages[${i}].storageState`,
         `storageState path not found: "${p2.storageState}" (resolved from the current directory) \u2014 the scan will not be able to load this session`
@@ -58127,6 +58422,9 @@ function measuredScs(outs, interact) {
   if (!outs.some((o) => o.probed !== void 0)) return localTestedScs(interact);
   return [...union].sort();
 }
+function axeInfo(outs, axe) {
+  return outs.find((o) => o.axe)?.axe ?? { version: axe.version, origin: axe.origin, runner: "scan" };
+}
 var PW_SPEC = "@playwright/test";
 var AXE_SPEC = "@axe-core/playwright";
 function resolveAnchors(cwd) {
@@ -58136,7 +58434,7 @@ function requireRuntime(cwd, spec) {
   let last;
   for (const from of resolveAnchors(cwd)) {
     try {
-      return createRequire2(from)(spec);
+      return createRequire3(from)(spec);
     } catch (e) {
       last = e;
     }
@@ -58146,7 +58444,7 @@ function requireRuntime(cwd, spec) {
 function resolvesRuntime(cwd, spec) {
   return resolveAnchors(cwd).some((from) => {
     try {
-      createRequire2(from).resolve(spec);
+      createRequire3(from).resolve(spec);
       return true;
     } catch {
       return false;
@@ -58180,9 +58478,9 @@ function localTierStatus(cwd, choice = {}) {
   try {
     const pw = requireRuntime(cwd, PW_SPEC);
     const bin = pw.chromium?.executablePath?.();
-    if (typeof bin === "string" && bin.length > 0 && !existsSync21(bin)) {
+    if (typeof bin === "string" && bin.length > 0 && !existsSync23(bin)) {
       const pw2 = resolvedPlaywright(cwd);
-      const cliJs = pw2 ? join20(dirname13(pw2.path), "cli.js") : void 0;
+      const cliJs = pw2 ? join22(dirname15(pw2.path), "cli.js") : void 0;
       return {
         ok: false,
         reason: `no browser binary at ${bin} for ${PW_SPEC}${pw2?.version ? `@${pw2.version}` : ""}${pw2 ? ` (${pw2.path})` : ""} \u2014 run \`${cliJs ? `node ${cliJs}` : "npx playwright"} install chromium\`, or install Google Chrome (\`scan\` falls back on it)`
@@ -58195,27 +58493,31 @@ function localTierStatus(cwd, choice = {}) {
 }
 function resolveLocalDeps(cwd) {
   let chromium;
-  let AxeBuilder;
+  let axe;
   try {
     const pw = requireRuntime(cwd, PW_SPEC);
-    const axeMod = requireRuntime(cwd, AXE_SPEC);
     chromium = pw.chromium;
-    AxeBuilder = axeMod.default ?? axeMod;
+    axe = resolveAxeEngine({ cwd });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(
       `Playwright resolves neither from "${cwd}" nor from ultra11y itself. Both are dependencies of this package, so the usual cause is the standalone engine bundle running with no node_modules beside it: pass --cwd <dir> at a project that has @playwright/test + @axe-core/playwright (e.g. --cwd packages/app). (${msg})`
     );
   }
-  if (!chromium || typeof AxeBuilder !== "function") {
-    throw new Error(`Resolved Playwright/@axe-core/playwright from "${cwd}" but they did not expose chromium / AxeBuilder. Check the installed versions.`);
+  if (!chromium) {
+    throw new Error(`Resolved Playwright from "${cwd}" but it did not expose chromium. Check the installed version.`);
   }
-  return { chromium, AxeBuilder };
+  if (axe.note && !notedAxe.has(axe.sourcePath)) {
+    notedAxe.add(axe.sourcePath);
+    console.error(axe.note);
+  }
+  return { chromium, axe };
 }
+var notedAxe = /* @__PURE__ */ new Set();
 function resolvedPlaywright(cwd) {
   for (const from of resolveAnchors(cwd)) {
     try {
-      const req = createRequire2(from);
+      const req = createRequire3(from);
       const path = req.resolve(PW_SPEC);
       let version;
       try {
@@ -58269,7 +58571,7 @@ async function launchChromium(chromium, cwd = ".", warn = (m3) => console.error(
   const pw = resolvedPlaywright(cwd);
   const which = pw ? `${PW_SPEC}${pw.version ? `@${pw.version}` : ""} resolved at ${pw.path}` : `${PW_SPEC} (resolution path unknown)`;
   const own = pw ? !pw.path.startsWith(realDir(cwd)) && !pw.path.startsWith(resolve11(cwd)) : false;
-  const cliJs = pw ? join20(dirname13(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
+  const cliJs = pw ? join22(dirname15(pw.path), "cli.js") : "node_modules/@playwright/test/cli.js";
   throw new Error(
     `Could not launch Chromium: the browser for ${which} is not installed, and no installed Google Chrome was found either. Install the browser for THAT Playwright \u2014 \`node ${cliJs} install chromium\`${own ? " (this is ultra11y's own Playwright, not the audited project's)" : ""} \u2014 or install Google Chrome. (${msg.split("\n")[0]})`
   );
@@ -58449,8 +58751,7 @@ function landedOnRequestedPage(requested, landed) {
   if (a2.search && a2.search !== b.search) return false;
   return true;
 }
-var AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
-async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
+async function runOnPage(browser, axe, target, isFile, opts) {
   const context = await browser.newContext(opts.storageState ? { storageState: opts.storageState } : {});
   const page = await context.newPage();
   const empty2 = [];
@@ -58486,8 +58787,8 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
         }
       }
     }
-    const axeRes = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
-    const violations = axeRes.violations.map((v2) => ({
+    const axeRun = await runAxe(axe, page, "scan");
+    const violations = axeRun.violations.map((v2) => ({
       id: v2.id,
       impact: v2.impact ?? null,
       help: v2.help,
@@ -58591,6 +58892,7 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
       landedUrl,
       ...httpStatus !== void 0 ? { httpStatus } : {},
       violations,
+      axe: axeRun.engine,
       reflow,
       focusVisible: dialogFocus.length ? [...focusVisible, ...dialogFocus] : focusVisible,
       focusObscured: focusRing.obscured,
@@ -58617,16 +58919,16 @@ async function runOnPage(browser, AxeBuilder, target, isFile, opts) {
 }
 async function runScanLocal(opts) {
   const isUrl = /^https?:\/\//i.test(opts.target);
-  if (!isUrl && !existsSync21(opts.target)) {
+  if (!isUrl && !existsSync23(opts.target)) {
     throw new Error(`File not found: ${opts.target}. Pass an http(s):// URL or an existing HTML file.`);
   }
   const isFile = !isUrl && statSync8(opts.target).isFile();
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   try {
-    const out = await runOnPage(browser, AxeBuilder, opts.target, isFile, {
+    const out = await runOnPage(browser, axe, opts.target, isFile, {
       storageState: opts.storageState,
       interact,
       allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
@@ -58634,7 +58936,12 @@ async function runScanLocal(opts) {
       snapshot: Boolean(opts.snapshotRoot)
     });
     const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, opts.target) : void 0;
-    return { ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE), testedScs: measuredScs([out], interact), ...id ? { snapshots: [id] } : {} };
+    return {
+      ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE),
+      testedScs: measuredScs([out], interact),
+      scanned: [opts.target],
+      ...id ? { snapshots: [id] } : {}
+    };
   } finally {
     await browser.close();
   }
@@ -58642,17 +58949,18 @@ async function runScanLocal(opts) {
 async function runScanManyLocal(urls, opts) {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   const findings = [];
   const snapshots = [];
   const outs = [];
   const redirected = [];
+  const scanned = [];
   try {
     for (const url of urls) {
       let out;
       try {
-        out = await runOnPage(browser, AxeBuilder, url, false, {
+        out = await runOnPage(browser, axe, url, false, {
           storageState: opts.storageState,
           interact,
           allowClicks: clicksAllowed(opts.storageState, opts.interactClicks),
@@ -58683,6 +58991,7 @@ async function runScanManyLocal(urls, opts) {
       }
       findings.push(...toDynamicResult(out, url, lang, LOCAL_ENGINE).findings);
       outs.push(out);
+      scanned.push(url);
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, url) : void 0;
       if (id) snapshots.push(id);
     }
@@ -58696,6 +59005,8 @@ async function runScanManyLocal(urls, opts) {
     date: today(),
     findings,
     testedScs: measuredScs(outs, interact),
+    axe: axeInfo(outs, axe),
+    ...scanned.length ? { scanned } : {},
     ...snapshots.length ? { snapshots } : {},
     ...redirected.length ? { redirected } : {}
   };
@@ -58703,19 +59014,20 @@ async function runScanManyLocal(urls, opts) {
 async function runSampleScanLocal(pages, opts) {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, AxeBuilder } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd);
   const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   const findings = [];
   const snapshots = [];
   const outs = [];
   const redirected = [];
+  const scannedUrls = [];
   try {
     for (const page of pages) {
       const storageState = page.storageState ?? opts.storageState;
       const isFile = !/^https?:\/\//i.test(page.url);
       let out;
       try {
-        out = await runOnPage(browser, AxeBuilder, page.url, isFile, {
+        out = await runOnPage(browser, axe, page.url, isFile, {
           storageState,
           interact,
           allowClicks: clicksAllowed(storageState, opts.interactClicks),
@@ -58745,6 +59057,7 @@ async function runSampleScanLocal(pages, opts) {
       }
       findings.push(...tagSampleFindings(toDynamicResult(out, page.url, lang, LOCAL_ENGINE).findings, page));
       outs.push(out);
+      scannedUrls.push(page.url);
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, page.url, page) : void 0;
       if (id) snapshots.push(id);
     }
@@ -58761,6 +59074,8 @@ async function runSampleScanLocal(pages, opts) {
     findings,
     sample: sampleScope({ pages: scanned }),
     testedScs: measuredScs(outs, interact),
+    axe: axeInfo(outs, axe),
+    ...scannedUrls.length ? { scanned: scannedUrls } : {},
     ...snapshots.length ? { snapshots } : {},
     ...redirected.length ? { redirected } : {}
   };
@@ -58774,7 +59089,7 @@ async function runCrawlScanLocal(opts) {
 }
 
 // src/fix.ts
-import { writeFileSync as writeFileSync10 } from "fs";
+import { writeFileSync as writeFileSync11 } from "fs";
 
 // src/fix/edits.ts
 function openTag(source, start) {
@@ -58997,7 +59312,7 @@ function fixOne(file, source, opts, canWrite = true) {
     regression = after.length > findings.length || after.some((f2) => !beforeKinds.has(f2.ruleId));
     if (opts.write && !regression && file !== "<stdin>") {
       if (canWrite) {
-        writeFileSync10(file, output);
+        writeFileSync11(file, output);
         written = true;
       } else {
         skippedPartialStage = true;
@@ -59083,9 +59398,9 @@ function fixSummary(r2, lang = "fr", write = false, standard = CORE2) {
 }
 
 // src/init.ts
-import { writeFileSync as writeFileSync11, mkdirSync as mkdirSync10, chmodSync, realpathSync as realpathSync4 } from "fs";
+import { writeFileSync as writeFileSync12, mkdirSync as mkdirSync11, chmodSync, realpathSync as realpathSync4 } from "fs";
 import { execFileSync as execFileSync6 } from "child_process";
-import { join as join21, relative as relative8, sep as sep4 } from "path";
+import { join as join23, relative as relative8, sep as sep4 } from "path";
 var EN_SEV = { bloquant: "blocking", majeur: "major", mineur: "minor" };
 function repoRoot() {
   try {
@@ -59131,17 +59446,17 @@ exit 1
 `;
 }
 function writeHook(root, enginePath, failOn) {
-  const dir = join21(root, ".git", "hooks");
-  mkdirSync10(dir, { recursive: true });
-  const path = join21(dir, "pre-commit");
-  writeFileSync11(path, stagedHookScript(enginePath, failOn));
+  const dir = join23(root, ".git", "hooks");
+  mkdirSync11(dir, { recursive: true });
+  const path = join23(dir, "pre-commit");
+  writeFileSync12(path, stagedHookScript(enginePath, failOn));
   chmodSync(path, 493);
   return path;
 }
 
 // src/install/json-edit.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync22, mkdirSync as mkdirSync11, readFileSync as readFileSync15, renameSync, rmSync, writeFileSync as writeFileSync12 } from "fs";
-import { dirname as dirname14 } from "path";
+import { copyFileSync as copyFileSync2, existsSync as existsSync24, mkdirSync as mkdirSync12, readFileSync as readFileSync17, renameSync, rmSync, writeFileSync as writeFileSync13 } from "fs";
+import { dirname as dirname16 } from "path";
 var SettingsParseError = class extends Error {
   constructor(path, cause) {
     super(`${path} is not valid JSON (${cause}) \u2014 fix or move it, then run install again. It has NOT been modified.`);
@@ -59154,16 +59469,16 @@ function stamp() {
   return (/* @__PURE__ */ new Date()).toISOString().replaceAll(/[:.]/g, "-");
 }
 function writeTextWithBackup(path, content, marker = "ultra11y") {
-  if (existsSync22(path) && readFileSync15(path, "utf8") === content) return { path, changed: false };
-  mkdirSync11(dirname14(path), { recursive: true });
+  if (existsSync24(path) && readFileSync17(path, "utf8") === content) return { path, changed: false };
+  mkdirSync12(dirname16(path), { recursive: true });
   let backup;
-  if (existsSync22(path)) {
+  if (existsSync24(path)) {
     backup = `${path}.${marker}-backup-${stamp()}`;
     copyFileSync2(path, backup);
   }
   const tmp = `${path}.${process.pid}.tmp`;
   try {
-    writeFileSync12(tmp, content, { mode: 420 });
+    writeFileSync13(tmp, content, { mode: 420 });
     renameSync(tmp, path);
   } catch (e) {
     rmSync(tmp, { force: true });
@@ -59173,8 +59488,8 @@ function writeTextWithBackup(path, content, marker = "ultra11y") {
 }
 function editJsonFile(path, mutate) {
   let root = {};
-  if (existsSync22(path)) {
-    const raw = readFileSync15(path, "utf8");
+  if (existsSync24(path)) {
+    const raw = readFileSync17(path, "utf8");
     if (raw.trim()) {
       let parsed;
       try {
@@ -59190,13 +59505,13 @@ function editJsonFile(path, mutate) {
   }
   const before = JSON.stringify(root);
   mutate(root);
-  if (JSON.stringify(root) === before && existsSync22(path)) return { path, changed: false };
+  if (JSON.stringify(root) === before && existsSync24(path)) return { path, changed: false };
   return writeTextWithBackup(path, `${JSON.stringify(root, null, 2)}
 `);
 }
 function readJsonSafe(path) {
   try {
-    const parsed = JSON.parse(readFileSync15(path, "utf8"));
+    const parsed = JSON.parse(readFileSync17(path, "utf8"));
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
   } catch {
     return null;
@@ -59237,7 +59552,7 @@ function claudeCodeWired(settingsPath) {
 }
 
 // src/install/text-edit.ts
-import { existsSync as existsSync23, readFileSync as readFileSync16, rmSync as rmSync2 } from "fs";
+import { existsSync as existsSync25, readFileSync as readFileSync18, rmSync as rmSync2 } from "fs";
 var BLOCK_BEGIN = "<!-- BEGIN ultra11y (managed by `ultra11y install --agents-md`; edit outside this block) -->";
 var BLOCK_END = "<!-- END ultra11y -->";
 var blockRe = () => new RegExp(`${escapeRe2(BLOCK_BEGIN)}[\\s\\S]*?${escapeRe2(BLOCK_END)}\\n?`);
@@ -59249,15 +59564,15 @@ function upsertManagedBlock(path, body) {
 ${body.trim()}
 ${BLOCK_END}
 `;
-  if (!existsSync23(path)) return writeTextWithBackup(path, block);
-  const current = readFileSync16(path, "utf8");
+  if (!existsSync25(path)) return writeTextWithBackup(path, block);
+  const current = readFileSync18(path, "utf8");
   if (blockRe().test(current)) return writeTextWithBackup(path, current.replace(blockRe(), block));
   const sep5 = current.endsWith("\n\n") ? "" : current.endsWith("\n") ? "\n" : "\n\n";
   return writeTextWithBackup(path, `${current}${sep5}${block}`);
 }
 function removeManagedBlock(path) {
-  if (!existsSync23(path)) return { path, changed: false };
-  const current = readFileSync16(path, "utf8");
+  if (!existsSync25(path)) return { path, changed: false };
+  const current = readFileSync18(path, "utf8");
   if (!blockRe().test(current)) return { path, changed: false };
   const rest = current.replace(blockRe(), "");
   if (rest.trim() === "") {
@@ -59267,13 +59582,13 @@ function removeManagedBlock(path) {
   return writeTextWithBackup(path, rest.replace(/\n+$/, "\n"));
 }
 function hasManagedBlock(path) {
-  return existsSync23(path) && blockRe().test(readFileSync16(path, "utf8"));
+  return existsSync25(path) && blockRe().test(readFileSync18(path, "utf8"));
 }
 
 // src/install/agents-md.ts
-import { join as join22 } from "path";
+import { join as join24 } from "path";
 function agentsMdPath(root) {
-  return join22(root, "AGENTS.md");
+  return join24(root, "AGENTS.md");
 }
 function agentsMdBlock(root) {
   const e = engineInvocation(root);
@@ -59327,25 +59642,25 @@ function agentsMdWired(root) {
 }
 
 // src/install/codex.ts
-import { existsSync as existsSync25, readFileSync as readFileSync18 } from "fs";
-import { join as join24 } from "path";
+import { existsSync as existsSync27, readFileSync as readFileSync20 } from "fs";
+import { join as join26 } from "path";
 
 // src/install/paths.ts
-import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync24, mkdirSync as mkdirSync12, readFileSync as readFileSync17, realpathSync as realpathSync5, statSync as statSync9 } from "fs";
+import { copyFileSync as copyFileSync3, cpSync, existsSync as existsSync26, mkdirSync as mkdirSync13, readFileSync as readFileSync19, realpathSync as realpathSync5, statSync as statSync9 } from "fs";
 import { homedir } from "os";
-import { dirname as dirname15, join as join23 } from "path";
+import { dirname as dirname17, join as join25 } from "path";
 function codexHome() {
-  return process.env.CODEX_HOME || join23(homedir(), ".codex");
+  return process.env.CODEX_HOME || join25(homedir(), ".codex");
 }
 function opencodeConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join23(xdg && xdg !== "" ? xdg : join23(homedir(), ".config"), "opencode");
+  return join25(xdg && xdg !== "" ? xdg : join25(homedir(), ".config"), "opencode");
 }
 function claudeSettingsPath(project, cwd = process.cwd()) {
-  return project ? join23(cwd, ".claude", "settings.json") : join23(homedir(), ".claude", "settings.json");
+  return project ? join25(cwd, ".claude", "settings.json") : join25(homedir(), ".claude", "settings.json");
 }
 function pinnedEnginePath() {
-  return join23(homedir(), ".ultra11y", "bin", "ultra11y.mjs");
+  return join25(homedir(), ".ultra11y", "bin", "ultra11y.mjs");
 }
 function installedCliCommand() {
   const override = process.env.ULTRA11Y_BIN;
@@ -59360,7 +59675,7 @@ function installedCliCommand() {
   if (source && !ephemeral) return `node ${JSON.stringify(source)}`;
   const pin = pinnedEnginePath();
   if (source) {
-    mkdirSync12(join23(pin, ".."), { recursive: true });
+    mkdirSync13(join25(pin, ".."), { recursive: true });
     copyFileSync3(source, pin);
   }
   return `node ${JSON.stringify(pin)}`;
@@ -59368,37 +59683,37 @@ function installedCliCommand() {
 function packageRoot() {
   let dir;
   try {
-    dir = dirname15(realpathSync5(process.argv[1] ?? ""));
+    dir = dirname17(realpathSync5(process.argv[1] ?? ""));
   } catch {
     return null;
   }
   for (let i = 0; i < 6 && dir && dir !== "/"; i++) {
-    if (existsSync24(join23(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
-    dir = dirname15(dir);
+    if (existsSync26(join25(dir, "skills", "review-a11y", "SKILL.md"))) return dir;
+    dir = dirname17(dir);
   }
   return null;
 }
 function bundledSkillsDir() {
   const root = packageRoot();
-  const p2 = root ? join23(root, "skills") : null;
-  return p2 && existsSync24(p2) ? p2 : null;
+  const p2 = root ? join25(root, "skills") : null;
+  return p2 && existsSync26(p2) ? p2 : null;
 }
 function bundledOpencodePlugin() {
   const root = packageRoot();
-  const p2 = root ? join23(root, ".opencode", "plugins", "ultra11y.js") : null;
-  return p2 && existsSync24(p2) ? p2 : null;
+  const p2 = root ? join25(root, ".opencode", "plugins", "ultra11y.js") : null;
+  return p2 && existsSync26(p2) ? p2 : null;
 }
 function copySkillsInto(source, dest) {
   const out = [];
   for (const name of ["ultra11y", "review-a11y"]) {
-    const from = join23(source, name);
-    if (!existsSync24(from)) continue;
-    const to = join23(dest, name);
-    const same = ["SKILL.md", join23("scripts", "ultra11y.mjs")].every((f2) => {
-      const a2 = join23(from, f2);
-      const b = join23(to, f2);
+    const from = join25(source, name);
+    if (!existsSync26(from)) continue;
+    const to = join25(dest, name);
+    const same = ["SKILL.md", join25("scripts", "ultra11y.mjs")].every((f2) => {
+      const a2 = join25(from, f2);
+      const b = join25(to, f2);
       try {
-        return existsSync24(b) && statSync9(a2).size === statSync9(b).size && readFileSync17(a2).equals(readFileSync17(b));
+        return existsSync26(b) && statSync9(a2).size === statSync9(b).size && readFileSync19(a2).equals(readFileSync19(b));
       } catch {
         return false;
       }
@@ -59448,7 +59763,7 @@ function featuresBody(content) {
 function installCodex({ codexDir, command, skillsSource }) {
   const reports = [];
   reports.push(
-    editJsonFile(join24(codexDir, "hooks.json"), (root) => {
+    editJsonFile(join26(codexDir, "hooks.json"), (root) => {
       const hooks = root.hooks ??= {};
       hooks.PreToolUse = [
         ...withoutOurs2(hooks.PreToolUse),
@@ -59456,11 +59771,11 @@ function installCodex({ codexDir, command, skillsSource }) {
       ];
     })
   );
-  const configPath = join24(codexDir, "config.toml");
-  const current = existsSync25(configPath) ? readFileSync18(configPath, "utf8") : "";
+  const configPath = join26(codexDir, "config.toml");
+  const current = existsSync27(configPath) ? readFileSync20(configPath, "utf8") : "";
   const edit = enableHooksFeature(current);
   if (edit.changed) reports.push(writeTextWithBackup(configPath, edit.content));
-  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join24(codexDir, "skills")));
+  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join26(codexDir, "skills")));
   return {
     reports,
     guidance: [
@@ -59475,8 +59790,8 @@ function installCodex({ codexDir, command, skillsSource }) {
 }
 function uninstallCodex({ codexDir }) {
   const reports = [];
-  const hooksPath = join24(codexDir, "hooks.json");
-  if (existsSync25(hooksPath)) {
+  const hooksPath = join26(codexDir, "hooks.json");
+  if (existsSync27(hooksPath)) {
     reports.push(
       editJsonFile(hooksPath, (root) => {
         const hooks = root.hooks;
@@ -59491,20 +59806,20 @@ function uninstallCodex({ codexDir }) {
   return { reports, guidance: ["codex: `[features] hooks = true` was left enabled \u2014 other hooks may depend on it."] };
 }
 function codexWired(codexDir) {
-  const root = readJsonSafe(join24(codexDir, "hooks.json"));
+  const root = readJsonSafe(join26(codexDir, "hooks.json"));
   const groups = root?.hooks?.PreToolUse;
   if (!Array.isArray(groups)) return 0;
   return groups.reduce((n, g) => n + (g.hooks ?? []).filter((h3) => String(h3.command ?? "").includes(CODEX_MARKER)).length, 0);
 }
 function codexHooksEnabled(codexDir) {
-  const p2 = join24(codexDir, "config.toml");
-  return existsSync25(p2) && HOOKS_ON.test(featuresBody(readFileSync18(p2, "utf8")));
+  const p2 = join26(codexDir, "config.toml");
+  return existsSync27(p2) && HOOKS_ON.test(featuresBody(readFileSync20(p2, "utf8")));
 }
 
 // src/install/opencode.ts
 import { spawnSync as spawnSync2 } from "child_process";
-import { existsSync as existsSync26, readFileSync as readFileSync19, rmSync as rmSync3 } from "fs";
-import { join as join25 } from "path";
+import { existsSync as existsSync28, readFileSync as readFileSync21, rmSync as rmSync3 } from "fs";
+import { join as join27 } from "path";
 var OPENCODE_MARKER = "ULTRA11Y_OPENCODE_PLUGIN";
 var PLUGIN_DIRS = ["plugin", "plugins"];
 function dirFor(major) {
@@ -59513,8 +59828,8 @@ function dirFor(major) {
 function opencodePinKey(major) {
   return major === 2 ? "plugins" : "plugin";
 }
-var pluginFile = (configDir, dir) => join25(configDir, dir, "ultra11y.js");
-var ours = (path) => existsSync26(path) && readFileSync19(path, "utf8").includes(OPENCODE_MARKER);
+var pluginFile = (configDir, dir) => join27(configDir, dir, "ultra11y.js");
+var ours = (path) => existsSync28(path) && readFileSync21(path, "utf8").includes(OPENCODE_MARKER);
 function parseOpencodeVersion(text) {
   const m3 = /\bv?(\d+)\.\d+\.\d+/.exec(text);
   if (!m3) return null;
@@ -59553,7 +59868,7 @@ function isUltra11yPin(entry2) {
 }
 function pinnedKeys(configDir) {
   try {
-    const cfg = JSON.parse(readFileSync19(join25(configDir, "opencode.json"), "utf8"));
+    const cfg = JSON.parse(readFileSync21(join27(configDir, "opencode.json"), "utf8"));
     return ["plugin", "plugins"].filter((k) => Array.isArray(cfg?.[k]) && cfg[k].some(isUltra11yPin));
   } catch {
     return [];
@@ -59562,28 +59877,28 @@ function pinnedKeys(configDir) {
 function installOpencode({ configDir, pluginSource, skillsSource, enginePath, major = null }) {
   const dir = dirFor(major);
   const target = pluginFile(configDir, dir);
-  if (existsSync26(target) && !ours(target)) {
+  if (existsSync28(target) && !ours(target)) {
     throw new Error(`refusing to overwrite ${target}: it is not a file ultra11y wrote. Remove it manually if you want the plugin here.`);
   }
-  const reports = [writeTextWithBackup(target, readFileSync19(pluginSource, "utf8"))];
+  const reports = [writeTextWithBackup(target, readFileSync21(pluginSource, "utf8"))];
   const guidance = [];
-  if (enginePath && existsSync26(enginePath)) {
-    reports.push(writeTextWithBackup(join25(configDir, dir, "ultra11y.mjs"), readFileSync19(enginePath, "utf8")));
+  if (enginePath && existsSync28(enginePath)) {
+    reports.push(writeTextWithBackup(join27(configDir, dir, "ultra11y.mjs"), readFileSync21(enginePath, "utf8")));
   }
-  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join25(configDir, "skills")));
+  if (skillsSource) reports.push(...copySkillsInto(skillsSource, join27(configDir, "skills")));
   for (const other of PLUGIN_DIRS) {
     if (other === dir) continue;
     const stale = pluginFile(configDir, other);
     if (!ours(stale)) continue;
     rmSync3(stale, { force: true });
-    rmSync3(join25(configDir, other, "ultra11y.mjs"), { force: true });
+    rmSync3(join27(configDir, other, "ultra11y.mjs"), { force: true });
     guidance.push(`opencode: moved the plugin from ${other}/ to ${dir}/ \u2014 it is loaded from one place only.`);
   }
   const key2 = opencodePinKey(major);
   guidance.push(
     major === null ? "opencode: no `opencode` on PATH to ask its version \u2014 wired plugin/, which OpenCode 1 and 2 both read (pass --opencode-version 1|2 to choose)." : `opencode: wired for OpenCode ${major}.`,
     "opencode: restart the session \u2014 plugins load at startup.",
-    `opencode: the alternative is an npm pin \u2014 add "${key2}": ["ultra11y@latest"] to ${join25(configDir, "opencode.json")} and drop this file.`,
+    `opencode: the alternative is an npm pin \u2014 add "${key2}": ["ultra11y@latest"] to ${join27(configDir, "opencode.json")} and drop this file.`,
     "opencode: the gate surfaces as a blocked tool call whose error message carries the findings (OpenCode has no permission-decision channel)."
   );
   const pins = pinnedKeys(configDir);
@@ -59598,11 +59913,11 @@ function uninstallOpencode({ configDir }) {
     const target = pluginFile(configDir, dir);
     if (!ours(target)) continue;
     rmSync3(target, { force: true });
-    rmSync3(join25(configDir, dir, "ultra11y.mjs"), { force: true });
+    rmSync3(join27(configDir, dir, "ultra11y.mjs"), { force: true });
     reports.push({ path: target, changed: true });
   }
-  const configPath = join25(configDir, "opencode.json");
-  if (existsSync26(configPath)) {
+  const configPath = join27(configDir, "opencode.json");
+  if (existsSync28(configPath)) {
     reports.push(
       editJsonFile(configPath, (root) => {
         for (const key2 of ["plugin", "plugins"]) {
@@ -59628,8 +59943,8 @@ function opencodeWired(configDir) {
 }
 
 // src/install/index.ts
-import { existsSync as existsSync27 } from "fs";
-import { join as join26 } from "path";
+import { existsSync as existsSync29 } from "fs";
+import { join as join28 } from "path";
 var ALL_TARGETS = ["claude-code", "codex", "opencode"];
 function parseTargets(flags) {
   const picked = /* @__PURE__ */ new Set();
@@ -59668,7 +59983,7 @@ function installForTargets(opts) {
             const out2 = installCodex({ codexDir: codexHome(), command: cmd(), skillsSource: opts.skills === false ? null : bundledSkillsDir() });
             r2.reports.push(...out2.reports);
             r2.guidance.push(...out2.guidance);
-          } else r2.reports.push({ path: join26(codexHome(), "hooks.json"), changed: false });
+          } else r2.reports.push({ path: join28(codexHome(), "hooks.json"), changed: false });
           break;
         }
         case "opencode": {
@@ -59677,15 +59992,15 @@ function installForTargets(opts) {
             r2.error = "opencode: this engine was not run from a package carrying .opencode/plugins/ultra11y.js \u2014 install ultra11y from npm and retry.";
             break;
           }
-          const configDir = opts.project === true ? join26(cwd, ".opencode") : opencodeConfigDir();
+          const configDir = opts.project === true ? join28(cwd, ".opencode") : opencodeConfigDir();
           const major = opts.opencodeVersion ?? detectOpencodeMajor();
           if (!opts.dryRun) {
-            const engine = existsSync27(pinnedEnginePath()) ? pinnedEnginePath() : join26(packageRoot() ?? "", "scripts", "ultra11y.mjs");
+            const engine = existsSync29(pinnedEnginePath()) ? pinnedEnginePath() : join28(packageRoot() ?? "", "scripts", "ultra11y.mjs");
             const out2 = installOpencode({
               configDir,
               pluginSource: source,
               skillsSource: opts.skills === false ? null : bundledSkillsDir(),
-              enginePath: existsSync27(engine) ? engine : null,
+              enginePath: existsSync29(engine) ? engine : null,
               major
             });
             r2.reports.push(...out2.reports);
@@ -59728,7 +60043,7 @@ function uninstallForTargets(opts) {
           break;
         }
         case "opencode": {
-          const out2 = uninstallOpencode({ configDir: opts.project === true ? join26(cwd, ".opencode") : opencodeConfigDir() });
+          const out2 = uninstallOpencode({ configDir: opts.project === true ? join28(cwd, ".opencode") : opencodeConfigDir() });
           r2.reports.push(...out2.reports);
           r2.guidance.push(...out2.guidance);
           break;
@@ -59749,14 +60064,14 @@ function statusReport(opts = {}) {
   const claudePath = claudeSettingsPath(opts.project === true, cwd);
   const root = projectRoot(cwd);
   const codexDir = codexHome();
-  const ocDir = opts.project === true ? join26(cwd, ".opencode") : opencodeConfigDir();
+  const ocDir = opts.project === true ? join28(cwd, ".opencode") : opencodeConfigDir();
   const codexOn = codexWired(codexDir) > 0;
   return [
     { target: "claude-code", wired: claudeCodeWired(claudePath) > 0, path: claudePath, note: "the plugin route wires this separately and does not show here" },
     {
       target: "codex",
       wired: codexOn,
-      path: join26(codexDir, "hooks.json"),
+      path: join28(codexDir, "hooks.json"),
       // A wired hook behind a disabled feature flag never fires and looks fine. Say so.
       note: codexOn && !codexHooksEnabled(codexDir) ? "WIRED BUT INERT: `[features] hooks = true` is not set in config.toml" : void 0
     },
@@ -59957,8 +60272,8 @@ function captureCoverageSummary(cov, lang) {
 
 // src/evidence.ts
 import { createHash as createHash5 } from "crypto";
-import { existsSync as existsSync28, mkdirSync as mkdirSync13, readFileSync as readFileSync20, writeFileSync as writeFileSync13 } from "fs";
-import { join as join27 } from "path";
+import { existsSync as existsSync30, mkdirSync as mkdirSync14, readFileSync as readFileSync22, writeFileSync as writeFileSync14 } from "fs";
+import { join as join29 } from "path";
 var DEFAULT_GEOMETRY = { pad: 24, minWidth: 320, minHeight: 120, maxWidth: 960, maxHeight: 540 };
 var DEFAULT_CAPS = { perRule: 6, perPage: 12, total: 200 };
 var HALO = { r: 255, g: 255, b: 255, a: 0.92 };
@@ -59975,7 +60290,7 @@ function pageIdOfSnapshot(file) {
 }
 function readJson2(file) {
   try {
-    return JSON.parse(readFileSync20(file, "utf8"));
+    return JSON.parse(readFileSync22(file, "utf8"));
   } catch {
     return void 0;
   }
@@ -59991,21 +60306,21 @@ function resolveScale(img, viewport, boxes) {
 }
 function loadPageEvidence(root, pageId) {
   const dir = snapshotDir(root, pageId);
-  const domFile = join27(dir, "dom.html");
-  const shotFile = join27(dir, "screen.png");
-  if (!existsSync28(domFile)) return { skip: "no-snapshot" };
-  if (!existsSync28(shotFile)) return { skip: "no-screenshot" };
+  const domFile = join29(dir, "dom.html");
+  const shotFile = join29(dir, "screen.png");
+  if (!existsSync30(domFile)) return { skip: "no-snapshot" };
+  if (!existsSync30(shotFile)) return { skip: "no-screenshot" };
   let dom;
   let shot;
   try {
-    dom = readFileSync20(domFile, "utf8");
-    shot = readFileSync20(shotFile);
+    dom = readFileSync22(domFile, "utf8");
+    shot = readFileSync22(shotFile);
   } catch {
     return { skip: "no-snapshot" };
   }
   const img = decodePng(shot);
   if (!img) return { skip: "unreadable-image" };
-  const digest = readJson2(join27(dir, "boxes.json"));
+  const digest = readJson2(join29(dir, "boxes.json"));
   if (!digest) return { skip: "no-boxes" };
   const doc = parseHtml(dom, domFile);
   const boxes = alignedBoxes(dom, digest, doc);
@@ -60021,7 +60336,7 @@ function loadPageEvidence(root, pageId) {
   return { pageId, img, scale, viewport, ordinalOf, boxes, truncated: Boolean(digest.truncated) };
 }
 function metaOf(dir) {
-  const raw = readJson2(join27(dir, "meta.json"));
+  const raw = readJson2(join29(dir, "meta.json"));
   if (raw === void 0) return void 0;
   const v2 = validateSnapshotMeta(raw);
   return v2.ok && v2.meta ? v2.meta : void 0;
@@ -60186,7 +60501,7 @@ function writeEvidence(result, opts) {
       }
       continue;
     }
-    const dir = join27(opts.outDir, "assets", pageId);
+    const dir = join29(opts.outDir, "assets", pageId);
     let wrote = false;
     const perRule = /* @__PURE__ */ new Map();
     const seen = /* @__PURE__ */ new Set();
@@ -60211,13 +60526,13 @@ function writeEvidence(result, opts) {
         continue;
       }
       const name = cropName(f2);
-      const path = join27(dir, name);
+      const path = join29(dir, name);
       try {
         if (!wrote) {
-          mkdirSync13(dir, { recursive: true });
+          mkdirSync14(dir, { recursive: true });
           wrote = true;
         }
-        writeFileSync13(path, crop.png);
+        writeFileSync14(path, crop.png);
       } catch {
         manifest.skipped.set(id, "no-screenshot");
         bump(tally, "no-screenshot");
@@ -60249,8 +60564,8 @@ function writeEvidence(result, opts) {
 }
 
 // src/html-emit.ts
-import { mkdirSync as mkdirSync14, readFileSync as readFileSync21, statSync as statSync10, writeFileSync as writeFileSync14 } from "fs";
-import { join as join28 } from "path";
+import { mkdirSync as mkdirSync15, readFileSync as readFileSync23, statSync as statSync10, writeFileSync as writeFileSync15 } from "fs";
+import { join as join30 } from "path";
 
 // src/html.ts
 var MARK4 = { C: "C", NC: "NC", NA: "\u2014", manual: "?" };
@@ -61000,7 +61315,7 @@ function inlineSize(path) {
 }
 function dataUri(path) {
   try {
-    return `data:image/png;base64,${readFileSync21(path).toString("base64")}`;
+    return `data:image/png;base64,${readFileSync23(path).toString("base64")}`;
   } catch {
     return void 0;
   }
@@ -61039,7 +61354,7 @@ function writeHtml(result, opts) {
   const t3 = T5[lang];
   const budget = opts.inlineBudget ?? DEFAULT_INLINE_BUDGET;
   const stdKey = isCore(standard) ? "wcag" : loadPack(standard).key;
-  mkdirSync14(opts.outDir, { recursive: true });
+  mkdirSync15(opts.outDir, { recursive: true });
   const crops = [...opts.evidence?.crops.values() ?? []];
   const shots = [...opts.screenshots?.values() ?? []];
   const rung = pickRung(
@@ -61071,7 +61386,7 @@ function writeHtml(result, opts) {
     return drawn;
   };
   const flat = opts.layout === "pages";
-  const sheetDir = flat ? opts.outDir : join28(opts.outDir, "pages");
+  const sheetDir = flat ? opts.outDir : join30(opts.outDir, "pages");
   const up = flat ? "./" : "../";
   const compositeName = `ultra11y-${stdKey}-${result.date}.html`;
   const nav = flat ? [{ href: "./index.html", text: t3.pagesTitle }] : [
@@ -61090,26 +61405,26 @@ function writeHtml(result, opts) {
       nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` }))
     });
     if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
-    compositePath = join28(opts.outDir, compositeName);
-    writeFileSync14(compositePath, renderHtmlDocument(composite));
+    compositePath = join30(opts.outDir, compositeName);
+    writeFileSync15(compositePath, renderHtmlDocument(composite));
   }
   const fileCrops = cropLookup(opts.evidence, lang, (_p, href) => href.replace(/^\.\//, up));
   const indexNav = nav.map((n) => ({ ...n, current: n.href === "./index.html" }));
   const index = flat ? pagesIndexDoc(result, { standard, lang, nav: indexNav, sheetHref: (id) => `./page-${id}.html` }) : indexDoc(result, { standard, lang, nav: indexNav, links: nav.filter((n) => n.href !== "./index.html") });
-  const indexPath = join28(opts.outDir, "index.html");
-  writeFileSync14(indexPath, renderHtmlDocument(index));
+  const indexPath = join30(opts.outDir, "index.html");
+  writeFileSync15(indexPath, renderHtmlDocument(index));
   const sheets = [];
   if (opts.pages) {
     const derived = derivePages(result, pagesOf(result));
-    mkdirSync14(sheetDir, { recursive: true });
+    mkdirSync15(sheetDir, { recursive: true });
     const sheetNav = flat ? [{ href: "./index.html", text: t3.pagesTitle }] : [
       { href: `${up}index.html`, text: t3.indexTitle },
       { href: `${up}${compositeName}`, text: t3.docTitle },
       { href: "./index.html", text: t3.pagesTitle }
     ];
     if (!flat) {
-      writeFileSync14(
-        join28(sheetDir, "index.html"),
+      writeFileSync15(
+        join30(sheetDir, "index.html"),
         renderHtmlDocument(
           pagesIndexDoc(result, {
             standard,
@@ -61119,7 +61434,7 @@ function writeHtml(result, opts) {
           })
         )
       );
-      sheets.push(join28(sheetDir, "index.html"));
+      sheets.push(join30(sheetDir, "index.html"));
     }
     for (const p2 of derived) {
       const doc = pageDoc(result, p2, {
@@ -61132,8 +61447,8 @@ function writeHtml(result, opts) {
         // beside the entry point, seen from wherever this sheet sits.
         ...opts.screenshots?.has(p2.id) ? { screenshot: `${up}assets/${p2.id}.png` } : {}
       });
-      const path = join28(sheetDir, `page-${p2.id}.html`);
-      writeFileSync14(path, renderHtmlDocument(doc));
+      const path = join30(sheetDir, `page-${p2.id}.html`);
+      writeFileSync15(path, renderHtmlDocument(doc));
       sheets.push(path);
     }
   }
@@ -61152,11 +61467,11 @@ function noticeRuns(notices) {
 }
 
 // src/orchestrate.ts
-import { existsSync as existsSync29, mkdirSync as mkdirSync15, readFileSync as readFileSync22, rmSync as rmSync4, writeFileSync as writeFileSync15 } from "fs";
-import { join as join30, resolve as resolve12 } from "path";
+import { existsSync as existsSync31, mkdirSync as mkdirSync16, readFileSync as readFileSync24, rmSync as rmSync4, writeFileSync as writeFileSync16 } from "fs";
+import { join as join32, resolve as resolve12 } from "path";
 
 // src/orchestrate-templates.ts
-import { basename as basename5, join as join29 } from "path";
+import { basename as basename5, join as join31 } from "path";
 
 // src/verdict-rules.ts
 var VERDICT_KINDS = `Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold, and its criterion goes back to \xAB to assess \xBB carrying the refusal):
@@ -61285,7 +61600,7 @@ function toBatches(ids2, batchSize) {
 }
 function phaseWorkflowScript(pb) {
   const spec = phaseSpec(pb.phase);
-  const scriptPath = join29(pb.run, "orchestration", `${pb.phase}.workflow.mjs`);
+  const scriptPath = join31(pb.run, "orchestration", `${pb.phase}.workflow.mjs`);
   const meta2 = { name: `ultra11y-${pb.phase}`, description: spec.description(pb.items), phases: [{ title: spec.title }] };
   return [
     `export const meta = ${JSON.stringify(meta2)}`,
@@ -61293,7 +61608,7 @@ function phaseWorkflowScript(pb) {
     `// NOT a plain Node script: launch via the Workflow tool \u2014 Workflow({ scriptPath: ${JSON.stringify(scriptPath)} }).`,
     `// Emitted by \`ultra11y orchestrate\` from the CURRENT worklist. The worklist is the source`,
     `// of truth: if it changes, re-run \`orchestrate --phase ${pb.phase}\` before launching.`,
-    `// One adapter of ${join29(pb.run, "orchestration", `${pb.phase}.batches.json`)} \u2014 the harness-neutral batches.`,
+    `// One adapter of ${join31(pb.run, "orchestration", `${pb.phase}.batches.json`)} \u2014 the harness-neutral batches.`,
     ``,
     `// Constants for THIS run (injected at emit time; no Date.now/Math.random in this harness).`,
     `const RUN = ${JSON.stringify(pb.run)}`,
@@ -61328,7 +61643,7 @@ function batchPromptMd(pb, b, contract) {
   const briefs = pb.phase === "adjudicate" ? `
 Each criterion's brief \u2014 its official wording, numbered tests and methodology \u2014 is beside the worklist; read it before ruling:
 
-${b.ids.map((id) => `- \`${join29(pb.run, "adjudicate", `${id}.md`)}\``).join("\n")}
+${b.ids.map((id) => `- \`${join31(pb.run, "adjudicate", `${id}.md`)}\``).join("\n")}
 ` : "";
   return `# ultra11y ${pb.phase} \u2014 batch ${b.id} (${b.role})
 
@@ -61377,8 +61692,8 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 
 ## Which files \u2014 your prompt decides, and it wins over this document
 
-- **With a shell.** Read \`${join29(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join29(runAbs, "ADJUDICATE.todo.json")} --in ${join29(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
-- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join29(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join29(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
+- **With a shell.** Read \`${join31(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join31(runAbs, "ADJUDICATE.todo.json")} --in ${join31(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
+- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join31(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join31(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
 
 ## For EACH criterion
 
@@ -61395,7 +61710,7 @@ function ecoRefuterContract(runAbs, verify) {
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
 
-There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join29(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
+There is no fan-out here and no ITEMS selection: you handle EVERY entry of \`${join31(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`), one at a time, writing your verdict into that same file.
 
 For EACH entry:
 
@@ -61408,24 +61723,24 @@ For EACH entry:
    When unsure, choose the HARSHER verdict \u2014 a false pass is worse than a false fail.
 3. \`note\` is REQUIRED \u2014 one line grounded in what you read (quote or paraphrase the decisive code).
 
-Then fold: \`ultra11y verify --apply ${join29(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
+Then fold: \`ultra11y verify --apply ${join31(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
 `;
 }
 function agentContracts(runAbs, opts = {}) {
   const footer = ONE_WRITER_FOOTER.replaceAll("<RUN>", runAbs);
-  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join29(runAbs, "audit-latest.json")}` };
+  const verify = opts.verify ?? { report: "<report.md>", flags: `--in ${join31(runAbs, "audit-latest.json")}` };
   if (opts.eco) return { adjudicator: ecoAdjudicatorContract(runAbs), refuter: ecoRefuterContract(runAbs, verify) };
   return {
     adjudicator: `# Contract: adjudicator
 
 You adjudicate the residual judgment criteria of an ultra11y audit \u2014 the ones the deterministic engine could not decide (alt-text relevance, link purpose in context, reading order\u2026). The ACTIVE STANDARD is recorded in the worklist's \`standard\` field: under a country standard (e.g. \`rgaa\`) the items are that standard's OWN criteria, each carrying its numbered tests \u2014 not WCAG success criteria.
 
-Worklist: \`${join29(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,\u2026>\`).
+Worklist: \`${join31(runAbs, "ADJUDICATE.todo.json")}\` (an object with \`kind: "adjudication"\` and \`items[]\`). Handle ONLY the criteria whose \`criteriaId\` is named in your prompt (\`ITEMS=<id,\u2026>\`).
 
 For EACH of your criteria:
 
 1. Read its worklist entry for the EVIDENCE: \`evidence[]\` holds source-anchored excerpts (\`file\`, \`line\`, \`selector\`, \`snippet\`) harvested from the audited code \u2014 open the cited files at the cited lines whenever the snippet alone cannot decide.
-1b. Read \`${join29(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF \u2014 its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
+1b. Read \`${join31(runAbs, "adjudicate")}/<criteriaId>.md\` for the CRITERION ITSELF \u2014 its official wording, its numbered tests with the standard's own test methodology, the technical note, the particular cases and the glossary terms the tests are defined in terms of. The worklist JSON carries none of that: it holds the evidence and the slots your verdict goes into, and ruling on a country standard from the criterion's title alone is how a verdict ends up citing a test it never read. That brief also cites the standard's official page for the criterion: if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
 2. Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold):
    - \`C\` (conforming) \u2014 REQUIRES \`justification\` explaining why the evidence satisfies the criterion, AND \`citations[]\` naming the evidence you cleared (\`file\`/\`line\` copied VERBATIM from this item's own \`evidence[]\`; an anchor that is not in that list is treated as fabricated). A criterion whose \`evidence[]\` is empty cannot be \`C\` at all \u2014 it is \`manual\` (\`undecidable\`), or \`NA\` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate \u2014 an uncited NA is put on trial by \`verify\`.
    - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the item's OWN tests, which its brief lists for you under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
@@ -61439,7 +61754,7 @@ ${footer}`,
 
 You are an adversarial skeptic verifying the non-conformities of an ultra11y report. Your job is to try to REFUTE each claim: assume it is wrong until the source proves it.
 
-Worklist: \`${join29(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`). Handle ONLY the entries whose \`n\` is named in your prompt (\`ITEMS=<n,\u2026>\`).
+Worklist: \`${join31(runAbs, "VERIFY.todo.json")}\` (a JSON array; each entry has \`n\`, \`criteriaId\`, \`file\`, \`line\`, \`selector\`, \`claim\`). Handle ONLY the entries whose \`n\` is named in your prompt (\`ITEMS=<n,\u2026>\`).
 
 For EACH of your entries:
 
@@ -61468,8 +61783,8 @@ function runbookMd(manifest, unrendered = []) {
 > no model in the loop \u2014 then re-emit this runbook:
 >
 > \`\`\`
-> ${engine} scan <url> --runtime local --merge ${join29(runAbs, "audit-latest.json")} --out ${runAbs}
-> ${engine} verify --manual --in ${join29(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} scan <url> --runtime local --merge ${join31(runAbs, "audit-latest.json")} --out ${runAbs}
+> ${engine} verify --manual --in ${join31(runAbs, "audit-latest.json")} --out ${runAbs}
 > ${engine} orchestrate --run ${runAbs}
 > \`\`\`
 >
@@ -61491,16 +61806,16 @@ ${status}
 
 ## The loop (play every role yourself, one item at a time)
 
-1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join29(runAbs, "audit-latest.json")}\`.
-2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join29(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join29(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
+1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join31(runAbs, "audit-latest.json")}\`.
+2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join31(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join31(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`${cmd("report")}\`.
-4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join29(runAbs, "VERIFY.todo.json")}\` (and \`${join29(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join29(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
+4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join31(runAbs, "VERIFY.todo.json")}\` (and \`${join31(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join31(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
 5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
 6. **Fix & re-audit**: \`${cmd("fix")}\`, hand-apply the judgment fixes, then loop from step 1 until the gate stays green.
 
 ## With subagents \u2014 the same phases, fanned out
 
-\`orchestrate --run ${runAbs} --phase <p>\` writes \`${join29(runAbs, "orchestration", "<p>.batches.json")}\` (every batch as data: its items, the schema its answer must match, its output path and the fold) and one self-contained prompt per batch under \`${join29(runAbs, "orchestration", "<p>")}/<batch-id>.md\`. On any harness: hand each prompt file VERBATIM to one subagent, save each returned JSON at that batch's \`output\` (\`${join29(runAbs, "orchestration", "out", "<p>")}/<batch-id>.json\`), fill the worklist from those answers yourself, then run the phase's fold above. On Claude Code, \`Workflow({ scriptPath: "${join29(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` dispatches the same batches in one call. You stay the sole writer either way.
+\`orchestrate --run ${runAbs} --phase <p>\` writes \`${join31(runAbs, "orchestration", "<p>.batches.json")}\` (every batch as data: its items, the schema its answer must match, its output path and the fold) and one self-contained prompt per batch under \`${join31(runAbs, "orchestration", "<p>")}/<batch-id>.md\`. On any harness: hand each prompt file VERBATIM to one subagent, save each returned JSON at that batch's \`output\` (\`${join31(runAbs, "orchestration", "out", "<p>")}/<batch-id>.json\`), fill the worklist from those answers yourself, then run the phase's fold above. On Claude Code, \`Workflow({ scriptPath: "${join31(runAbs, "orchestration", "<p>.workflow.mjs")}" })\` dispatches the same batches in one call. You stay the sole writer either way.
 ${batchList(manifest)}`;
 }
 function batchList(manifest) {
@@ -61521,7 +61836,7 @@ function runStandard(run) {
   if (ctx?.standard) return ctx.standard;
   for (const f2 of ["ADJUDICATE.todo.json", "audit-latest.json"]) {
     try {
-      const std = JSON.parse(readFileSync22(join30(run, f2), "utf8")).standard;
+      const std = JSON.parse(readFileSync24(join32(run, f2), "utf8")).standard;
       if (typeof std === "string" && std) return std;
     } catch {
     }
@@ -61532,7 +61847,7 @@ function verifyRunContext(runDir) {
   const run = resolve12(runDir);
   const ctx = readVerifyContext(run);
   const standard = runStandard(run);
-  const flagArgs = ["--in", ctx?.in ?? join30(run, "audit-latest.json")];
+  const flagArgs = ["--in", ctx?.in ?? join32(run, "audit-latest.json")];
   if (standard) flagArgs.push("--standard", standard);
   if (ctx?.conformities.source === "file") flagArgs.push("--conformities", ctx.conformities.path);
   if (ctx?.conformities.source === "disabled") flagArgs.push("--no-conformities");
@@ -61546,16 +61861,16 @@ function verifyRunContext(runDir) {
 var GLOBS_PLACEHOLDER = "<globs>";
 var REPORT_PLACEHOLDER = "<report.md>";
 function engineArgs(run) {
-  const audit = join30(run, "audit-latest.json");
+  const audit = join32(run, "audit-latest.json");
   const v2 = verifyRunContext(run);
   return {
     audit: ["audit", GLOBS_PLACEHOLDER, "--graph", "--out", run],
     "adjudicate-worklist": ["verify", "--manual", "--in", audit, "--out", run],
-    "adjudicate-fold": ["verify", "--apply", join30(run, "ADJUDICATE.todo.json"), "--in", audit, "--out", run],
+    "adjudicate-fold": ["verify", "--apply", join32(run, "ADJUDICATE.todo.json"), "--in", audit, "--out", run],
     report: ["report", "--in", audit, "--out", run],
     "verify-worklist": ["verify", "--report", v2.report, ...v2.flagArgs, "--out", run],
-    "verify-fold": ["verify", "--apply", join30(run, "VERIFY.todo.json"), "--report", v2.report, ...v2.flagArgs],
-    gate: ["check", "--report", v2.report, ...v2.standard ? ["--standard", v2.standard] : [], "--semantic", "--verdicts", join30(run, "VERIFY.todo.json")],
+    "verify-fold": ["verify", "--apply", join32(run, "VERIFY.todo.json"), "--report", v2.report, ...v2.flagArgs],
+    gate: ["check", "--report", v2.report, ...v2.standard ? ["--standard", v2.standard] : [], "--semantic", "--verdicts", join32(run, "VERIFY.todo.json")],
     fix: ["fix", GLOBS_PLACEHOLDER, "--write", "--iterate"]
   };
 }
@@ -61564,12 +61879,12 @@ function renderCommand(engineAbs, args) {
 }
 function listPhases(runDir, engineAbs) {
   const run = resolve12(runDir);
-  const adjPath = join30(run, "ADJUDICATE.todo.json");
+  const adjPath = join32(run, "ADJUDICATE.todo.json");
   let adjIds = [];
   let adjReady = false;
-  if (existsSync29(adjPath)) {
+  if (existsSync31(adjPath)) {
     try {
-      const f2 = JSON.parse(readFileSync22(adjPath, "utf8"));
+      const f2 = JSON.parse(readFileSync24(adjPath, "utf8"));
       if (f2 && f2.kind === "adjudication" && Array.isArray(f2.items)) {
         adjReady = true;
         adjIds = f2.items.map((i) => i.criteriaId);
@@ -61577,12 +61892,12 @@ function listPhases(runDir, engineAbs) {
     } catch {
     }
   }
-  const verPath = join30(run, "VERIFY.todo.json");
+  const verPath = join32(run, "VERIFY.todo.json");
   let verIds = [];
   let verReady = false;
-  if (existsSync29(verPath)) {
+  if (existsSync31(verPath)) {
     try {
-      const items = JSON.parse(readFileSync22(verPath, "utf8"));
+      const items = JSON.parse(readFileSync24(verPath, "utf8"));
       if (Array.isArray(items)) {
         verReady = true;
         verIds = items.map((i) => String(i.n));
@@ -61613,13 +61928,13 @@ function listPhases(runDir, engineAbs) {
   ];
 }
 function batchPaths(runDir, phase) {
-  const orch = join30(resolve12(runDir), "orchestration");
-  return { file: join30(orch, `${phase}.batches.json`), promptDir: join30(orch, phase), outDir: join30(orch, "out", phase) };
+  const orch = join32(resolve12(runDir), "orchestration");
+  return { file: join32(orch, `${phase}.batches.json`), promptDir: join32(orch, phase), outDir: join32(orch, "out", phase) };
 }
 function worklistItems(ph) {
   if (!ph.ready) return [];
   try {
-    const raw = JSON.parse(readFileSync22(ph.worklist, "utf8"));
+    const raw = JSON.parse(readFileSync24(ph.worklist, "utf8"));
     const items = ph.name === "adjudicate" ? raw.items : raw;
     return Array.isArray(items) ? items : [];
   } catch {
@@ -61634,7 +61949,7 @@ function phaseBatches(ph, runDir, engineAbs, batchSize = BATCH_SIZE) {
   const chunks = toBatches(ph.ids, batchSize);
   const width = Math.max(2, String(chunks.length).length);
   const { promptDir, outDir } = batchPaths(run, ph.name);
-  const contract = join30(run, "orchestration", "agents", `${role}.md`);
+  const contract = join32(run, "orchestration", "agents", `${role}.md`);
   return {
     kind: "ultra11y-orchestration-batches",
     schemaVersion: 1,
@@ -61657,8 +61972,8 @@ function phaseBatches(ph, runDir, engineAbs, batchSize = BATCH_SIZE) {
         ids: ids2,
         items: items.slice(i * batchSize, i * batchSize + ids2.length),
         contract,
-        prompt: join30(promptDir, `${id}.md`),
-        output: join30(outDir, `${id}.json`),
+        prompt: join32(promptDir, `${id}.md`),
+        output: join32(outDir, `${id}.json`),
         schema: spec.schema,
         fold: ph.apply
       };
@@ -61671,11 +61986,11 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
   const args = engineArgs(run);
   const phases = listPhases(run, engineAbs);
   const v2 = verifyRunContext(run);
-  const audit = join30(run, "audit-latest.json");
-  const adjTodo = join30(run, "ADJUDICATE.todo.json");
-  const verTodo = join30(run, "VERIFY.todo.json");
+  const audit = join32(run, "audit-latest.json");
+  const adjTodo = join32(run, "ADJUDICATE.todo.json");
+  const verTodo = join32(run, "VERIFY.todo.json");
   const placeholder = (f2) => f2 === GLOBS_PLACEHOLDER || f2 === REPORT_PLACEHOLDER;
-  const ready = (inputs) => inputs.every((f2) => placeholder(f2) || existsSync29(f2));
+  const ready = (inputs) => inputs.every((f2) => placeholder(f2) || existsSync31(f2));
   const engine = (id, title, inputs, outputs, exit, next) => ({
     id,
     kind: "engine",
@@ -61695,7 +62010,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
       kind: "judgment",
       title,
       role,
-      contract: join30(run, "orchestration", "agents", `${role}.md`),
+      contract: join32(run, "orchestration", "agents", `${role}.md`),
       worklist: ph.worklist,
       items: ph.items,
       batches: pb.batches.map((b) => b.ids),
@@ -61736,7 +62051,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
         "adjudicate-worklist",
         "Adjudication worklist \u2014 the criteria the engine could not decide",
         [audit],
-        [adjTodo, join30(run, "ADJUDICATE.md"), join30(run, "ADJUDICATE.verdicts.json"), join30(run, "adjudicate")],
+        [adjTodo, join32(run, "ADJUDICATE.md"), join32(run, "ADJUDICATE.verdicts.json"), join32(run, "adjudicate")],
         { "0": "worklist written (possibly empty: nothing to adjudicate)", "2": EXIT_USAGE },
         "adjudicate"
       ),
@@ -61745,7 +62060,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
         adj,
         "adjudicator",
         "Adjudicate \u2014 fill every item's verdict (C/NC/NA/manual)",
-        [adjTodo, join30(run, "adjudicate")],
+        [adjTodo, join32(run, "adjudicate")],
         "adjudicate-fold"
       ),
       engine(
@@ -61772,7 +62087,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
         "verify-worklist",
         "Trial worklist \u2014 the report's non-conformities and the audit's claimed conformities",
         [v2.report, verAudit],
-        [verTodo, join30(run, "VERIFY.md"), join30(run, "VERIFY.context.json")],
+        [verTodo, join32(run, "VERIFY.md"), join32(run, "VERIFY.context.json")],
         { "0": "worklist written", "2": EXIT_USAGE },
         "verify"
       ),
@@ -61806,8 +62121,8 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
 }
 function unrenderedInRun(run) {
   try {
-    const audit = JSON.parse(readFileSync22(join30(run, "audit-latest.json"), "utf8"));
-    const todo = JSON.parse(readFileSync22(join30(run, "ADJUDICATE.todo.json"), "utf8"));
+    const audit = JSON.parse(readFileSync24(join32(run, "audit-latest.json"), "utf8"));
+    const todo = JSON.parse(readFileSync24(join32(run, "ADJUDICATE.todo.json"), "utf8"));
     return unrenderedResidual(audit, todo.items ?? []);
   } catch {
     return [];
@@ -61815,7 +62130,7 @@ function unrenderedInRun(run) {
 }
 function orchestrateRun(runDir, engineAbs, opts = {}) {
   const run = resolve12(runDir);
-  if (!existsSync29(run)) {
+  if (!existsSync31(run)) {
     return { exitCode: 2, written: [], notices: [], errors: [`run dir not found: ${run}`], phases: [] };
   }
   const phases = listPhases(run, engineAbs);
@@ -61842,22 +62157,22 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
     }
     selected = [ph];
   }
-  const orchDir = join30(run, "orchestration");
-  const agentsDir = join30(orchDir, "agents");
-  mkdirSync15(join30(orchDir, "out"), { recursive: true });
-  mkdirSync15(agentsDir, { recursive: true });
+  const orchDir = join32(run, "orchestration");
+  const agentsDir = join32(orchDir, "agents");
+  mkdirSync16(join32(orchDir, "out"), { recursive: true });
+  mkdirSync16(agentsDir, { recursive: true });
   const written = [];
   const notices = [];
   for (const [name, content] of Object.entries(agentContracts(run, { eco: opts.eco === true, verify: verifyRunContext(run) }))) {
-    const p2 = join30(agentsDir, `${name}.md`);
-    writeFileSync15(p2, content);
+    const p2 = join32(agentsDir, `${name}.md`);
+    writeFileSync16(p2, content);
     written.push(p2);
   }
   const emitted = new Set(opts.eco ? [] : selected.filter((p2) => p2.items > 0).map((p2) => p2.name));
   for (const ph of phases) {
     if (emitted.has(ph.name)) continue;
     const { file, promptDir } = batchPaths(run, ph.name);
-    const stale = [join30(orchDir, `${ph.name}.workflow.mjs`), file, promptDir].filter((f2) => existsSync29(f2));
+    const stale = [join32(orchDir, `${ph.name}.workflow.mjs`), file, promptDir].filter((f2) => existsSync31(f2));
     if (stale.length) {
       for (const f2 of stale) rmSync4(f2, { recursive: true, force: true });
       const why = opts.eco ? "--eco takes the sequential path" : !ph.ready ? "its worklist no longer exists" : ph.items === 0 ? "its worklist is now empty" : `--phase ${opts.phase} emits that phase only`;
@@ -61877,30 +62192,30 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
       const pb = phaseBatches(ph, run, engineAbs, BATCH_SIZE);
       const paths = batchPaths(run, ph.name);
       rmSync4(paths.promptDir, { recursive: true, force: true });
-      mkdirSync15(paths.promptDir, { recursive: true });
-      mkdirSync15(paths.outDir, { recursive: true });
-      writeFileSync15(paths.file, `${JSON.stringify(pb, null, 2)}
+      mkdirSync16(paths.promptDir, { recursive: true });
+      mkdirSync16(paths.outDir, { recursive: true });
+      writeFileSync16(paths.file, `${JSON.stringify(pb, null, 2)}
 `);
       written.push(paths.file);
       for (const b of pb.batches) {
-        writeFileSync15(b.prompt, batchPromptMd(pb, b, contracts[pb.role] ?? ""));
+        writeFileSync16(b.prompt, batchPromptMd(pb, b, contracts[pb.role] ?? ""));
         written.push(b.prompt);
       }
-      const p2 = join30(orchDir, `${ph.name}.workflow.mjs`);
-      writeFileSync15(p2, phaseWorkflowScript(pb));
+      const p2 = join32(orchDir, `${ph.name}.workflow.mjs`);
+      writeFileSync16(p2, phaseWorkflowScript(pb));
       written.push(p2);
     }
   }
-  const rb = join30(orchDir, "RUNBOOK.md");
-  writeFileSync15(rb, runbookMd(buildManifest(run, engineAbs), unrenderedInRun(run)));
+  const rb = join32(orchDir, "RUNBOOK.md");
+  writeFileSync16(rb, runbookMd(buildManifest(run, engineAbs), unrenderedInRun(run)));
   written.push(rb);
   return { exitCode: 0, written, notices, errors: [], phases };
 }
 
 // src/trial-summary.ts
 import { createHash as createHash6 } from "crypto";
-import { readFileSync as readFileSync23 } from "fs";
-var sha256 = (path) => createHash6("sha256").update(readFileSync23(path)).digest("hex");
+import { readFileSync as readFileSync25 } from "fs";
+var sha256 = (path) => createHash6("sha256").update(readFileSync25(path)).digest("hex");
 var entry = (it) => ({
   n: it.n,
   kind: it.kind ?? "nc",
@@ -62185,7 +62500,7 @@ Usage:
   ultra11y init     [--hook] [--fail-on blocking|major|minor]
   ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
   ultra11y scan     <url|file\u2026> [--cwd <dir>] [--browser-path <file>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
-  ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample)
+  ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--all-routes [--max-routes <n>]] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample, then the rest of the route inventory)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin \u2192 .ultra11y/pages/<id>/ + audit it)
@@ -62194,7 +62509,7 @@ Usage:
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
-  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write] [--json]   (build the page sample)
+  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write | --routes-only] [--json]   (build the page sample and the route inventory)
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
@@ -62528,9 +62843,19 @@ Options:
   --write            pages discover: merge the discovered pages into .ultra11yrc.json
                      (sample.pages). Without it the proposal is printed and nothing is
                      written. Pages already declared are kept verbatim \u2014 auth, storageState
-                     and notes are human work and are never overwritten
+                     and notes are human work and are never overwritten. Also records every
+                     discovered route in the inventory .ultra11y/routes.json
+  --routes-only      pages discover: record the route inventory (.ultra11y/routes.json) and
+                     leave the sample untouched \u2014 the RGAA sample stays the one you chose,
+                     and the report's annex lists every other route with how it was observed
   --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling \u2014
                      the only route that sees a state-reached page (a modal, a funnel step)
+  --all-routes       scan: after the sample (with --sample), scan every route of the inventory
+                     (.ultra11y/routes.json) the sample does not hold \u2014 except the routes your
+                     E2E run already captured, which win. Each route is then listed in the
+                     annex: captured, scanned, source only, or not reached
+  --max-routes <n>   scan --all-routes: most routes scanned beyond the sample (default: 50);
+                     the routes left out are listed \xAB not reached \xBB, never dropped
   --sample           scan: scan the NORMATIVE page sample from .ultra11yrc.json (its
                      sample.pages), per-page storage-state overriding --storage-state,
                      aggregating one result with per-page provenance for the report
@@ -62627,6 +62952,8 @@ var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "crawl",
   "depth",
   "max",
+  // `scan --all-routes`: the most inventory routes visited beyond the sample (src/routes.ts).
+  "max-routes",
   // `scan`: most linked PDF documents downloaded per run.
   "max-pdf",
   "since",
@@ -62693,6 +63020,10 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   // `pages discover`: build the sample from the snapshots the E2E producer already wrote,
   // instead of crawling — the only route that can see a state-reached page.
   "from-snapshots",
+  // `pages discover`: record the route inventory (.ultra11y/routes.json) without touching the sample.
+  "routes-only",
+  // `scan`: cover every route of the inventory, beyond the sample (bounded by --max-routes).
+  "all-routes",
   "dry-run",
   "iterate",
   "safe",
@@ -62922,13 +63253,13 @@ async function cmdAudit(p2) {
   const capturesFlag = typeof p2.flags.captures === "string" && p2.flags.captures ? p2.flags.captures : void 0;
   const capturesDir = capturesFlag ?? CAPTURES_DIR;
   const scopedToDiff = p2.flags.changed === true || p2.flags.staged === true || since !== void 0;
-  const capturesWanted = p2.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync30(capturesDir));
+  const capturesWanted = p2.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync32(capturesDir));
   const useCaptures = capturesWanted && !scopedToDiff && !inputs.includes(capturesDir);
-  const pagesWanted = p2.flags["no-captures"] !== true && !inputs.includes("-") && existsSync30(PAGES_DIR);
+  const pagesWanted = p2.flags["no-captures"] !== true && !inputs.includes("-") && existsSync32(PAGES_DIR);
   const usePages = pagesWanted && !scopedToDiff && !inputs.includes(PAGES_DIR);
   const pagesInScope = pagesWanted && !scopedToDiff;
   const documentsGlob = `${DOCUMENTS_DIR}/*.pdf`;
-  const useDocuments = p2.flags["no-pdf"] !== true && !inputs.includes("-") && !scopedToDiff && existsSync30(DOCUMENTS_DIR) && !inputs.includes(documentsGlob) && !inputs.includes(DOCUMENTS_DIR);
+  const useDocuments = p2.flags["no-pdf"] !== true && !inputs.includes("-") && !scopedToDiff && existsSync32(DOCUMENTS_DIR) && !inputs.includes(documentsGlob) && !inputs.includes(DOCUMENTS_DIR);
   const auditInputs = [...inputs, ...useCaptures ? [capturesDir] : [], ...usePages ? [PAGES_DIR] : [], ...useDocuments ? [documentsGlob] : []];
   if (useCaptures)
     console.error(
@@ -62969,14 +63300,15 @@ async function cmdAudit(p2) {
       attributePages(result, scope);
     }
   }
+  stampRoutes(result, ".", lang, { recorded: pagesInScope });
   const document = isCore(standard) ? result : packAuditDocument(result, standard, lang);
   if (typeof p2.flags.out === "string") {
     const out = p2.flags.out;
     const asFile = out.toLowerCase().endsWith(".json");
-    const target = asFile ? out : join31(out, "audit-latest.json");
+    const target = asFile ? out : join33(out, "audit-latest.json");
     try {
-      mkdirSync16(asFile ? dirname16(out) : out, { recursive: true });
-      writeFileSync16(target, JSON.stringify(document, null, 2) + "\n");
+      mkdirSync17(asFile ? dirname18(out) : out, { recursive: true });
+      writeFileSync17(target, JSON.stringify(document, null, 2) + "\n");
       console.error(lang === "fr" ? `\u2192 audit \xE9crit dans ${target}` : `\u2192 audit written to ${target}`);
     } catch {
     }
@@ -63014,10 +63346,17 @@ async function cmdPagesDiscover(p2) {
     const snaps = sampleFromSnapshots(readSnapshots(root));
     if (!snaps.length) {
       console.error(
-        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join31(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join31(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
+        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join33(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join33(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
       );
       return 1;
     }
+    recordRouteInventory(
+      p2,
+      lang,
+      snaps.map((s2) => s2.url),
+      "snapshots"
+    );
+    if (p2.flags["routes-only"] === true) return 0;
     return writeDiscoveredSample(p2, lang, snaps, snaps.length);
   }
   if (!sitemap && !crawl) {
@@ -63055,6 +63394,8 @@ async function cmdPagesDiscover(p2) {
     );
     return 1;
   }
+  recordRouteInventory(p2, lang, urls, sitemap ? "sitemap" : "crawl");
+  if (p2.flags["routes-only"] === true) return 0;
   const titles = /* @__PURE__ */ new Map();
   const CONCURRENCY = 6;
   const queue = [...urls];
@@ -63067,6 +63408,37 @@ async function cmdPagesDiscover(p2) {
     })
   );
   return writeDiscoveredSample(p2, lang, proposeSamplePages(urls, titles), urls.length);
+}
+function stampRoutes(result, root, lang, extra = {}) {
+  const inventory = readRoutes(root);
+  if (!inventory) return;
+  let sample;
+  try {
+    sample = loadConfig(process.cwd())?.sample?.pages;
+  } catch {
+  }
+  const pages = extra.recorded === false ? [] : readSnapshots(root).map((s2) => ({ id: s2.meta.id, url: s2.meta.url, ...s2.meta.runner ? { runner: s2.meta.runner } : {} }));
+  for (const url of extra.scanned ?? []) pages.push({ url, runner: "scan" });
+  result.scope.routes = routeCoverage({
+    inventory,
+    ...sample ? { sample } : {},
+    pages,
+    refused: [...result.scope.redirected ?? [], ...extra.refused ?? []],
+    ...extra.bounded ? { bounded: extra.bounded } : {},
+    ...extra.max !== void 0 ? { max: extra.max } : {}
+  });
+  const n = routeCounts(result.scope.routes);
+  console.error(
+    lang === "fr" ? `ultra11y : ${result.scope.routes.length} route(s) \u2014 ${n.captured} captur\xE9e(s) (E2E), ${n.scanned} scann\xE9e(s), ${n.source} source seule, ${n["not-reached"]} non atteinte(s).` : `ultra11y: ${result.scope.routes.length} route(s) \u2014 ${n.captured} captured (E2E), ${n.scanned} scanned, ${n.source} source only, ${n["not-reached"]} not reached.`
+  );
+}
+function recordRouteInventory(p2, lang, urls, via) {
+  if (p2.flags.write !== true && p2.flags["routes-only"] !== true) return;
+  const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
+  const { file, added, total } = writeRoutes(root, urls, via);
+  console.error(
+    lang === "fr" ? `ultra11y pages discover : inventaire des routes \u2192 ${file} (${total} route(s), ${added} nouvelle(s)). \`ultra11y scan --sample --all-routes\` couvre l'\xE9chantillon puis le reste.` : `ultra11y pages discover: route inventory \u2192 ${file} (${total} route(s), ${added} new). \`ultra11y scan --sample --all-routes\` covers the sample, then the rest.`
+  );
 }
 function writeDiscoveredSample(p2, lang, proposed, found) {
   let existing;
@@ -63095,9 +63467,9 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
     }
     return 0;
   }
-  const file = join31(process.cwd(), ".ultra11yrc.json");
+  const file = join33(process.cwd(), ".ultra11yrc.json");
   let doc = {};
-  if (existsSync30(file)) {
+  if (existsSync32(file)) {
     try {
       doc = JSON.parse(readText(file));
     } catch {
@@ -63106,7 +63478,7 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
     }
   }
   doc.sample = v2.sample;
-  writeFileSync16(file, `${JSON.stringify(doc, null, 2)}
+  writeFileSync17(file, `${JSON.stringify(doc, null, 2)}
 `);
   if (!p2.flags.json)
     console.log(
@@ -63158,8 +63530,8 @@ async function cmdPages(p2) {
     console.log(json);
     const outDir2 = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : "";
     if (outDir2) {
-      mkdirSync16(outDir2, { recursive: true });
-      writeFileSync16(join31(outDir2, "pages.json"), `${json}
+      mkdirSync17(outDir2, { recursive: true });
+      writeFileSync17(join33(outDir2, "pages.json"), `${json}
 `);
     }
     return 0;
@@ -63185,27 +63557,27 @@ async function cmdPages(p2) {
   const derived = derivePages(result, scope);
   const split = p2.flags.split === "page";
   const outDir = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : void 0;
-  const shotOf = (id) => pageScreenshot(PAGES_DIR, id) ?? join31(PAGES_DIR, id, "screen.png");
+  const shotOf = (id) => pageScreenshot(PAGES_DIR, id) ?? join33(PAGES_DIR, id, "screen.png");
   const shotsRelative = (fileDir) => {
     const m3 = /* @__PURE__ */ new Map();
     for (const pg of derived) {
-      if (existsSync30(shotOf(pg.id))) m3.set(pg.id, relative9(fileDir, shotOf(pg.id)).split("\\").join("/"));
+      if (existsSync32(shotOf(pg.id))) m3.set(pg.id, relative9(fileDir, shotOf(pg.id)).split("\\").join("/"));
     }
     return m3;
   };
   const shotPaths = (pages) => {
     const m3 = /* @__PURE__ */ new Map();
-    for (const pg of pages) if (existsSync30(shotOf(pg.id))) m3.set(pg.id, shotOf(pg.id));
+    for (const pg of pages) if (existsSync32(shotOf(pg.id))) m3.set(pg.id, shotOf(pg.id));
     return m3;
   };
   const shotsCopiedInto = (dir) => {
     const m3 = /* @__PURE__ */ new Map();
-    const assets = join31(dir, "assets");
+    const assets = join33(dir, "assets");
     for (const pg of derived) {
       const src = shotOf(pg.id);
-      if (!existsSync30(src)) continue;
-      mkdirSync16(assets, { recursive: true });
-      copyFileSync4(src, join31(assets, `${pg.id}.png`));
+      if (!existsSync32(src)) continue;
+      mkdirSync17(assets, { recursive: true });
+      copyFileSync4(src, join33(assets, `${pg.id}.png`));
       m3.set(pg.id, `./assets/${pg.id}.png`);
     }
     return m3;
@@ -63222,7 +63594,7 @@ async function cmdPages(p2) {
     console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsRelative(".") }));
     return 0;
   }
-  mkdirSync16(outDir, { recursive: true });
+  mkdirSync17(outDir, { recursive: true });
   const manifest = wantEvidence ? writeEvidence(result, { outDir, ...evidenceCapsOf(p2) }) : void 0;
   const cropFor = manifest ? (f2) => {
     const c = manifest.crops.get(findingId(f2));
@@ -63231,7 +63603,7 @@ async function cmdPages(p2) {
   if (manifest) {
     const total = evidenceNotice(manifest, null, lang);
     console.error(
-      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join31(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join31(outDir, "assets")}.`
+      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join33(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join33(outDir, "assets")}.`
     );
     for (const line of total) console.error(line);
   }
@@ -63240,8 +63612,8 @@ async function cmdPages(p2) {
     ...manifest ? { evidenceNotice: (id) => evidenceNotice(manifest, id, lang) } : {}
   };
   if (!split) {
-    const file = join31(outDir, `pages-${result.date}.md`);
-    writeFileSync16(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
+    const file = join33(outDir, `pages-${result.date}.md`);
+    writeFileSync17(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
 `);
     const html2 = wantHtml ? emitHtml(result, {
       outDir,
@@ -63260,11 +63632,11 @@ async function cmdPages(p2) {
   const sheet = (id) => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    writeFileSync16(join31(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
+    writeFileSync17(join33(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
 `);
   }
-  const index = join31(outDir, "index.md");
-  writeFileSync16(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
+  const index = join33(outDir, "index.md");
+  writeFileSync17(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
 `);
   const html = wantHtml ? emitHtml(result, {
     outDir,
@@ -63315,7 +63687,7 @@ async function cmdSnapshot(p2) {
           2
         )
       );
-    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join31(root, PAGES_DIR)}.` : `No snapshot in ${join31(root, PAGES_DIR)}.`);
+    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join33(root, PAGES_DIR)}.` : `No snapshot in ${join33(root, PAGES_DIR)}.`);
     else for (const s2 of snaps) console.log(`${s2.meta.id}	${s2.meta.name}	${s2.meta.url}${s2.meta.auth ? "	[auth]" : ""}`);
     return 0;
   }
@@ -63371,7 +63743,7 @@ async function cmdSnapshot(p2) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
-  const result = runAudit({ inputs: [join31(dir, "dom.html")], onWarn: (m3) => console.error(m3) });
+  const result = runAudit({ inputs: [join33(dir, "dom.html")], onWarn: (m3) => console.error(m3) });
   const failOnRaw = p2.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
@@ -63418,7 +63790,7 @@ async function cmdCapture(p2) {
     console.error(`ultra11y capture write: could not write the capture: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
-  const result = runAudit({ inputs: [file], captureDir: join31(root, CAPTURES_DIR), onWarn: (m3) => console.error(m3) });
+  const result = runAudit({ inputs: [file], captureDir: join33(root, CAPTURES_DIR), onWarn: (m3) => console.error(m3) });
   const failOnRaw = p2.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
@@ -63521,8 +63893,9 @@ function browserPathOf(flags, env = process.env) {
 function cmdStatus(p2) {
   const rows = statusReport({ project: p2.flags.project === true });
   const browser = p2.flags.browser === true ? localTierStatus(typeof p2.flags.cwd === "string" && p2.flags.cwd ? p2.flags.cwd : ".", { browserPath: browserPathOf(p2.flags) }) : void 0;
+  const axe = browser ? axeStatus(typeof p2.flags.cwd === "string" && p2.flags.cwd ? p2.flags.cwd : ".") : void 0;
   if (p2.flags.json === true) {
-    console.log(JSON.stringify({ version: VERSION, targets: rows, ...browser ? { browser } : {} }, null, 2));
+    console.log(JSON.stringify({ version: VERSION, targets: rows, ...browser ? { browser } : {}, ...axe ? { axe } : {} }, null, 2));
     return 0;
   }
   console.log(`ultra11y ${VERSION}`);
@@ -63535,7 +63908,16 @@ function cmdStatus(p2) {
       `  ${"browser".padEnd(12)} ${browser.ok ? "available" : "unavailable"}  ${browser.ok ? "@playwright/test + @axe-core/playwright" : browser.reason}`
     );
   }
+  if (axe) console.log(`  ${"axe-core".padEnd(12)} ${axe.ok ? `${axe.version} (${axe.origin})` : "unavailable"}  ${axe.ok ? axe.path : axe.reason}`);
   return 0;
+}
+function axeStatus(cwd) {
+  try {
+    const e = resolveAxeEngine({ cwd });
+    return { ok: true, version: e.version, origin: e.origin, path: e.sourcePath };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
 }
 function cmdCriteria(p2) {
   if (p2.flags.generate === true) {
@@ -63776,8 +64158,8 @@ async function cmdTickets(p2) {
   const ticketsOut = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : void 0;
   let setPath;
   if (ticketsOut) {
-    mkdirSync16(ticketsOut, { recursive: true });
-    setPath = join31(ticketsOut, `issues-${result.date}.json`);
+    mkdirSync17(ticketsOut, { recursive: true });
+    setPath = join33(ticketsOut, `issues-${result.date}.json`);
     const payload = {
       tool: "ultra11y",
       kind: "issues",
@@ -63788,7 +64170,7 @@ async function cmdTickets(p2) {
       count: plan.tickets.length,
       issues: plan.tickets
     };
-    writeFileSync16(setPath, `${JSON.stringify(payload, null, 2)}
+    writeFileSync17(setPath, `${JSON.stringify(payload, null, 2)}
 `);
     if (!json) console.log(setPath);
   }
@@ -63883,7 +64265,7 @@ function cmdRender(p2) {
   if (p2.flags.scaffold === true) {
     const out = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : "ultra11y-render.tsx";
     try {
-      writeFileSync16(out, ssrHarness());
+      writeFileSync17(out, ssrHarness());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
@@ -63897,29 +64279,29 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out}), then: node scripts/ultra11y.mj
   }
   if (p2.flags.setup === true) {
     const rel = ".ultra11y/capture-setup.mjs";
-    const out = join31(root, rel);
+    const out = join33(root, rel);
     try {
-      mkdirSync16(dirname16(out), { recursive: true });
-      writeFileSync16(out, captureSetup());
+      mkdirSync17(dirname18(out), { recursive: true });
+      writeFileSync17(out, captureSetup());
     } catch (e) {
       console.error(`ultra11y render: could not write ${out}: ${e instanceof Error ? e.message : String(e)}`);
       return 1;
     }
     let setupDeps = {};
-    const setupPkg = join31(root, "package.json");
-    if (existsSync30(setupPkg)) {
+    const setupPkg = join33(root, "package.json");
+    if (existsSync32(setupPkg)) {
       try {
         const pkg = JSON.parse(readText(setupPkg));
         setupDeps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
       } catch {
       }
     }
-    const tr = detectTestRunner(setupDeps, (f2) => existsSync30(join31(root, f2)));
+    const tr = detectTestRunner(setupDeps, (f2) => existsSync32(join33(root, f2)));
     console.log(captureSetupPlan(tr, rel, lang));
     const gaLine = ".ultra11y/captures/*.html text eol=lf linguist-generated=true";
-    const gaPath = join31(root, ".gitattributes");
+    const gaPath = join33(root, ".gitattributes");
     try {
-      const existing = existsSync30(gaPath) ? readFileSync24(gaPath, "utf8") : "";
+      const existing = existsSync32(gaPath) ? readFileSync26(gaPath, "utf8") : "";
       if (!existing.includes(".ultra11y/captures/")) {
         appendFileSync(gaPath, (existing && !existing.endsWith("\n") ? "\n" : "") + gaLine + "\n");
         console.log(lang === "fr" ? `.gitattributes : ajout\xE9 \xAB ${gaLine} \xBB` : `.gitattributes: added "${gaLine}"`);
@@ -63927,8 +64309,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out}), then: node scripts/ultra11y.mj
     } catch {
     }
     try {
-      const giPath = join31(root, ".gitignore");
-      if (existsSync30(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync24(giPath, "utf8")))
+      const giPath = join33(root, ".gitignore");
+      if (existsSync32(giPath) && /^\s*\/?\.ultra11y(\/\**)?\/?\s*$/m.test(readFileSync26(giPath, "utf8")))
         console.error(
           lang === "fr" ? "\u26A0\uFE0F .ultra11y semble ignor\xE9 par .gitignore \u2014 les captures doivent \xEAtre committ\xE9es pour le gate (ajoutez \xAB !.ultra11y/captures/ \xBB)." : '\u26A0\uFE0F .ultra11y appears gitignored \u2014 captures must be committed for the gate (add "!.ultra11y/captures/").'
         );
@@ -63938,8 +64320,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out}), then: node scripts/ultra11y.mj
   }
   if (p2.flags.storybook === true || typeof p2.flags.storybook === "string") {
     const sbDir = p2.positionals[0] ?? "storybook-static";
-    const indexPath = existsSync30(join31(sbDir, "index.json")) ? join31(sbDir, "index.json") : join31(sbDir, "stories.json");
-    if (!existsSync30(indexPath)) {
+    const indexPath = existsSync32(join33(sbDir, "index.json")) ? join33(sbDir, "index.json") : join33(sbDir, "stories.json");
+    if (!existsSync32(indexPath)) {
       console.error(
         lang === "fr" ? `ultra11y render : aucun index Storybook (index.json/stories.json) dans ${sbDir}.` : `ultra11y render: no Storybook index (index.json/stories.json) in ${sbDir}.`
       );
@@ -63949,7 +64331,7 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out}), then: node scripts/ultra11y.mj
     const provById = new Map(stories.map((s2) => [s2.id, storyProvenance(s2)]));
     const capturesFlag = typeof p2.flags.captures === "string" && p2.flags.captures ? p2.flags.captures : void 0;
     const htmlDir = capturesFlag ?? sbDir;
-    const htmlFiles = existsSync30(htmlDir) ? discover([htmlDir]).files.filter((f2) => /\.html?$/i.test(f2)) : [];
+    const htmlFiles = existsSync32(htmlDir) ? discover([htmlDir]).files.filter((f2) => /\.html?$/i.test(f2)) : [];
     const outDir = ".ultra11y/captures";
     let attributed = 0;
     let skipped = 0;
@@ -63971,8 +64353,8 @@ Fill in COMPONENTS, run it (e.g. npx tsx ${out}), then: node scripts/ultra11y.mj
         continue;
       }
       try {
-        mkdirSync16(outDir, { recursive: true });
-        writeFileSync16(join31(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
+        mkdirSync17(outDir, { recursive: true });
+        writeFileSync17(join33(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
 ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
         attributed++;
       } catch {
@@ -63994,11 +64376,11 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   }
   if (p2.flags.coverage === true) {
     const capturesFlag = typeof p2.flags.captures === "string" && p2.flags.captures ? p2.flags.captures : void 0;
-    const capturesDir = capturesFlag ?? join31(root, ".ultra11y/captures");
+    const capturesDir = capturesFlag ?? join33(root, ".ultra11y/captures");
     const graphExt = [...GRAPH_ONLY_EXT, ...asList(p2.flags.ext) ?? []];
     const sourceFiles = discover([root], { include: asList(p2.flags.include), exclude: asList(p2.flags.exclude), ext: graphExt }).files;
     const graph = buildGraphStreaming(sourceFiles);
-    const capFiles = existsSync30(capturesDir) ? discover([capturesDir]).files : [];
+    const capFiles = existsSync32(capturesDir) ? discover([capturesDir]).files : [];
     const entries = capFiles.map((f2) => ({ file: toPosix2(f2), provenance: parseCaptureProvenance(readText(f2)) }));
     const cov = computeCaptureCoverage(graph, entries);
     if (p2.flags.json) console.log(JSON.stringify(cov, null, 2));
@@ -64006,15 +64388,15 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
     return 0;
   }
   let deps = {};
-  const pkgPath = join31(root, "package.json");
-  if (existsSync30(pkgPath)) {
+  const pkgPath = join33(root, "package.json");
+  if (existsSync32(pkgPath)) {
     try {
       const pkg = JSON.parse(readText(pkgPath));
       deps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
     } catch {
     }
   }
-  const detection = detectFrameworks(deps, (f2) => existsSync30(join31(root, f2)));
+  const detection = detectFrameworks(deps, (f2) => existsSync32(join33(root, f2)));
   if (p2.flags.json) console.log(JSON.stringify(detection, null, 2));
   else console.log(renderPlan(detection, lang));
   return 0;
@@ -64184,7 +64566,7 @@ function cmdVerify(p2) {
     const trial = conformityTrial(p2, standard, lang);
     const expected = [...expectedNc, ...buildConformityWorklist(trial.claims, expectedNc.length, Number.POSITIVE_INFINITY)];
     const r2 = applyVerdicts(items, expected);
-    const ctx = readVerifyContext(dirname16(resolve13(apply)));
+    const ctx = readVerifyContext(dirname18(resolve13(apply)));
     const absentItems = r2.failures.filter((f2) => !items.includes(f2));
     const absentC = absentItems.filter((f2) => f2.kind === "c").length;
     const sourceDiffers = ctx ? !sameConformitySource(ctx.conformities, trial.source) : absentC > 0 && !items.some((it) => it.kind === "c");
@@ -64302,9 +64684,9 @@ function cmdVerifySummary(p2) {
     return 0;
   }
   const out = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : ".";
-  mkdirSync16(out, { recursive: true });
-  const mdPath = join31(out, "TRIAL.md");
-  writeFileSync16(mdPath, formatTrialSummary(summary, lang));
+  mkdirSync17(out, { recursive: true });
+  const mdPath = join33(out, "TRIAL.md");
+  writeFileSync17(mdPath, formatTrialSummary(summary, lang));
   console.log(
     summary.validated ? lang === "fr" ? `\u2713 Bilan de contre-expertise \u2192 ${mdPath} \u2014 gate s\xE9mantique vert.` : `\u2713 Counter-review summary \u2192 ${mdPath} \u2014 semantic gate green.` : lang === "fr" ? `Bilan de contre-expertise \u2192 ${mdPath} \u2014 audit NON valid\xE9 (gate ${summary.gate.ok ? "vert" : "en \xE9chec"}, ${summary.contestedEngine.length} d\xE9cision(s) moteur contest\xE9e(s), ${summary.untried.length} jamais mise(s) \xE0 l'\xE9preuve, ${summary.foreign.length} \xE9trang\xE8re(s)).` : `Counter-review summary \u2192 ${mdPath} \u2014 audit NOT validated (gate ${summary.gate.ok ? "green" : "failing"}, ${summary.contestedEngine.length} contested engine decision(s), ${summary.untried.length} never tried, ${summary.foreign.length} foreign).`
   );
@@ -64330,7 +64712,7 @@ function applyPrune(p2, standard, items, lang, untried = []) {
   let ledgerRepair;
   if (ledgerFile) {
     let ledger = readLedger(ledgerFile);
-    if (!ledger && !existsSync30(ledgerFile)) {
+    if (!ledger && !existsSync32(ledgerFile)) {
       ledger = emptyLedger(standard);
       console.error(
         lang === "fr" ? `\u26A0 Aucun registre en ${ledgerFile} \u2014 un registre vide est cr\xE9\xE9. Les verdicts d\xE9j\xE0 repli\xE9s n'y figurent pas : repliez-les avec \`verify --apply <ADJUDICATE.todo.json> --ledger\` pour qu'ils soient rejouables.` : `\u26A0 No ledger at ${ledgerFile} \u2014 creating an empty one. Verdicts folded earlier are not in it: fold them with \`verify --apply <ADJUDICATE.todo.json> --ledger\` to make them replayable.`
@@ -64346,8 +64728,8 @@ function applyPrune(p2, standard, items, lang, untried = []) {
     ledgerRepair = pruneLedger(ledger, items, pruned.reopenedCriteria, pruned.clearedConformities, root);
   }
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
-  mkdirSync16(out, { recursive: true });
-  writeFileSync16(join31(out, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
+  mkdirSync17(out, { recursive: true });
+  writeFileSync17(join33(out, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
   if (ledgerFile && ledgerRepair) {
     writeLedger(ledgerFile, ledgerRepair.ledger);
     if (!p2.flags.json)
@@ -64508,7 +64890,7 @@ function conformityTrial(p2, standard, lang) {
   }
   const path = named3 ?? ledgerPath(standard);
   const source = { source: named3 ? "file" : "ledger", path: resolve13(path) };
-  if (!existsSync30(path)) {
+  if (!existsSync32(path)) {
     if (named3) {
       console.error(
         lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named3}.` : `ultra11y verify: --conformities file not found: ${named3}.`
@@ -64588,9 +64970,9 @@ function replayLedgerFile(p2, ledger, lang) {
     return 1;
   }
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
-  mkdirSync16(out, { recursive: true });
-  const auditPath = join31(out, "audit-latest.json");
-  writeFileSync16(auditPath, `${JSON.stringify(auditDocumentFor(r2.audit, standard, lang), null, 2)}
+  mkdirSync17(out, { recursive: true });
+  const auditPath = join33(out, "audit-latest.json");
+  writeFileSync17(auditPath, `${JSON.stringify(auditDocumentFor(r2.audit, standard, lang), null, 2)}
 `);
   if (p2.flags.json)
     console.log(
@@ -64678,9 +65060,9 @@ function applyAdjudicationFile(p2, adj, lang) {
   }
   if (!p2.flags.json) reportNotInWorklist(r2.notInWorklist, lang);
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
-  mkdirSync16(out, { recursive: true });
-  const auditPath = join31(out, "audit-latest.json");
-  writeFileSync16(auditPath, JSON.stringify(auditDocumentFor(r2.audit, adj.standard, lang), null, 2) + "\n");
+  mkdirSync17(out, { recursive: true });
+  const auditPath = join33(out, "audit-latest.json");
+  writeFileSync17(auditPath, JSON.stringify(auditDocumentFor(r2.audit, adj.standard, lang), null, 2) + "\n");
   const ledgerOut = ledgerTarget(p2, adj.standard);
   if (ledgerOut) {
     const blind = unreadableCaptures(r2.audit);
@@ -64788,7 +65170,7 @@ async function cmdScan(p2) {
   const mergeAudit = peekMergeAudit(p2.flags.merge);
   const lang = resolveLang(p2.flags, mergeAudit ? { audit: mergeAudit, standard } : { standard });
   for (const target of p2.positionals.filter((a2) => a2 !== "-")) {
-    if (/^https?:\/\//i.test(target) || existsSync30(target)) continue;
+    if (/^https?:\/\//i.test(target) || existsSync32(target)) continue;
     console.error(
       lang === "fr" ? `ultra11y scan : fichier introuvable (file not found) : ${target}. Passez une URL http(s):// ou un fichier HTML existant.` : `ultra11y scan: File not found: ${target}. Pass an http(s):// URL or an existing HTML file.`
     );
@@ -64832,9 +65214,45 @@ async function cmdScan(p2) {
     }
     sampleConfig = v2.sample;
   }
+  const allRoutes = p2.flags["all-routes"] === true;
+  const routesRoot = typeof p2.flags.root === "string" && p2.flags.root ? resolve13(p2.flags.root) : process.cwd();
+  let maxRoutes = ALL_ROUTES_MAX;
+  let routePlan;
+  if (allRoutes) {
+    const inventory = readRoutes(routesRoot);
+    if (!inventory) {
+      console.error(
+        lang === "fr" ? "ultra11y scan : --all-routes lit l'inventaire des routes (.ultra11y/routes.json) \u2014 cr\xE9ez-le d'abord avec `ultra11y pages discover --sitemap <url> | --crawl <url> | --from-snapshots --write` (ou `--routes-only`)." : "ultra11y scan: --all-routes reads the route inventory (.ultra11y/routes.json) \u2014 create it first with `ultra11y pages discover --sitemap <url> | --crawl <url> | --from-snapshots --write` (or `--routes-only`)."
+      );
+      return 2;
+    }
+    if (typeof p2.flags["max-routes"] === "string") {
+      const n = Number(p2.flags["max-routes"]);
+      if (!Number.isInteger(n) || n < 0) {
+        console.error(`ultra11y scan: --max-routes must be a non-negative integer (got "${p2.flags["max-routes"]}").`);
+        return 2;
+      }
+      maxRoutes = n;
+    }
+    const recorded = readSnapshots(routesRoot).map((s2) => ({ id: s2.meta.id, url: s2.meta.url, ...s2.meta.runner ? { runner: s2.meta.runner } : {} }));
+    routePlan = routesToScan(inventory, { ...useSample && sampleConfig ? { sample: sampleConfig.pages } : {}, captured: recorded, max: maxRoutes });
+    console.error(
+      lang === "fr" ? `ultra11y scan : ${inventory.routes.length} route(s) inventori\xE9e(s) \u2014 ${useSample && sampleConfig ? `${sampleConfig.pages.length} page(s) d'\xE9chantillon, puis ` : ""}${routePlan.scan.length} route(s) hors \xE9chantillon \xE0 scanner, ${routePlan.captured.length} d\xE9j\xE0 captur\xE9e(s) par les tests E2E${routePlan.bounded.length ? `, ${routePlan.bounded.length} au-del\xE0 de --max-routes ${maxRoutes} (list\xE9es \xAB non atteintes \xBB)` : ""}.` : `ultra11y scan: ${inventory.routes.length} inventoried route(s) \u2014 ${useSample && sampleConfig ? `${sampleConfig.pages.length} sample page(s), then ` : ""}${routePlan.scan.length} route(s) beyond the sample to scan, ${routePlan.captured.length} already captured by the E2E tests${routePlan.bounded.length ? `, ${routePlan.bounded.length} beyond --max-routes ${maxRoutes} (listed "not reached")` : ""}.`
+    );
+  }
   let dynamic;
   try {
-    if (useSample && sampleConfig) {
+    if (allRoutes && routePlan) {
+      const sampleRun = useSample && sampleConfig ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath }) : void 0;
+      const restRun = routePlan.scan.length ? await runScanManyLocal(routePlan.scan, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath }) : void 0;
+      if (!sampleRun && !restRun) {
+        console.error(
+          lang === "fr" ? "ultra11y scan : rien \xE0 scanner \u2014 chaque route de l'inventaire est d\xE9j\xE0 captur\xE9e par les tests E2E, ou exclue par --max-routes 0." : "ultra11y scan: nothing to scan \u2014 every inventory route is already captured by the E2E tests, or excluded by --max-routes 0."
+        );
+        return 0;
+      }
+      dynamic = combineDynamic(sampleRun, restRun);
+    } else if (useSample && sampleConfig) {
       dynamic = await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
     } else if (sitemap || crawl) {
       const depth = typeof p2.flags.depth === "string" ? Number(p2.flags.depth) : void 0;
@@ -64865,7 +65283,8 @@ async function cmdScan(p2) {
         lang === "fr" ? `\u26A0\uFE0F ultra11y scan : \xAB ${r2.name} \xBB (${r2.id}) non enregistr\xE9e \u2014 ${r2.requested} ${why}. L'enregistrer aurait d\xE9crit cet \xE9cran sous le nom demand\xE9.` : `\u26A0\uFE0F ultra11y scan: "${r2.name}" (${r2.id}) not recorded \u2014 ${r2.requested} ${why}. Recording it would have described that screen under the requested name.`
       );
     }
-    if (useSample && sampleConfig && dynamic.redirected.length === sampleConfig.pages.length) {
+    const sampleIds = new Set((sampleConfig?.pages ?? []).map((pg) => pg.id));
+    if (useSample && sampleConfig && dynamic.redirected.filter((r2) => sampleIds.has(r2.id)).length === sampleConfig.pages.length) {
       console.error(
         lang === "fr" ? `ultra11y scan : aucune des ${sampleConfig.pages.length} pages de l'\xE9chantillon n'a pu \xEAtre enregistr\xE9e \u2014 rien n'a \xE9t\xE9 mesur\xE9. V\xE9rifiez la session, l'URL de base et l'\xE9tat applicatif attendu par ces pages.` : `ultra11y scan: none of the ${sampleConfig.pages.length} sample pages could be recorded \u2014 nothing was measured. Check the session, the base URL, and the application state those pages expect.`
       );
@@ -64930,7 +65349,7 @@ async function cmdScan(p2) {
     }
     let merged = mergeDynamic(audit, dynamic, lang);
     if (dynamic.snapshots?.length) {
-      const doms = dynamic.snapshots.map((id) => join31(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f2) => existsSync30(f2));
+      const doms = dynamic.snapshots.map((id) => join33(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f2) => existsSync32(f2));
       if (doms.length) {
         const snapAudit = runAudit({ inputs: [...doms, ...documentFiles], onWarn: (m3) => console.error(m3) });
         merged = mergeSnapshotAudit(merged, snapAudit);
@@ -64941,9 +65360,16 @@ async function cmdScan(p2) {
         attributePages(merged, scope);
       }
     }
-    mkdirSync16(out, { recursive: true });
+    stampRoutes(merged, routesRoot, lang, {
+      ...dynamic.redirected ? { refused: dynamic.redirected } : {},
+      ...routePlan?.bounded.length ? { bounded: routePlan.bounded, max: maxRoutes } : {},
+      // What this run scanned, read from the run itself rather than from the snapshots on
+      // disk: under --no-snapshot there are none, and the routes it visited are still scanned.
+      ...dynamic.scanned?.length ? { scanned: dynamic.scanned } : {}
+    });
+    mkdirSync17(out, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);
-    writeFileSync16(join31(out, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
+    writeFileSync17(join33(out, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
     if (p2.flags.json)
       console.log(
         JSON.stringify(
@@ -64959,7 +65385,7 @@ async function cmdScan(p2) {
       );
     else {
       console.log(
-        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join31(out, "audit-latest.json")} (${merged.conformancePct}% de r\xE9ussite automatique, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join31(out, "audit-latest.json")} (${merged.conformancePct}% automatic pass rate, ${merged.findings.length} findings).`
+        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join33(out, "audit-latest.json")} (${merged.conformancePct}% de r\xE9ussite automatique, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join33(out, "audit-latest.json")} (${merged.conformancePct}% automatic pass rate, ${merged.findings.length} findings).`
       );
       if (dynamic.snapshots?.length)
         console.log(
@@ -65125,9 +65551,9 @@ function cmdOrchestrate(p2) {
     );
     return 2;
   }
-  const engineAbs = realpathSync6(fileURLToPath3(import.meta.url));
+  const engineAbs = realpathSync6(fileURLToPath4(import.meta.url));
   if (p2.flags.list === true) {
-    if (!existsSync30(runFlag)) {
+    if (!existsSync32(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }
@@ -65135,7 +65561,7 @@ function cmdOrchestrate(p2) {
     return 0;
   }
   if (p2.flags.manifest === true) {
-    if (!existsSync30(runFlag)) {
+    if (!existsSync32(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }
@@ -65167,7 +65593,7 @@ function cmdOrchestrate(p2) {
     );
   } else {
     console.log(
-      lang === "fr" ? `Suivez ${join31(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join31(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
+      lang === "fr" ? `Suivez ${join33(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join33(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
     );
   }
   if (p2.flags.phase === void 0 && workflows.length === 0 && p2.flags.eco !== true) {
@@ -65290,7 +65716,7 @@ async function main(argv) {
 function isInvokedDirectly() {
   const argv1 = process.argv[1];
   if (argv1 === void 0) return false;
-  const modulePath = fileURLToPath3(import.meta.url);
+  const modulePath = fileURLToPath4(import.meta.url);
   try {
     if (realpathSync6(argv1) === realpathSync6(modulePath)) return true;
   } catch {
@@ -65316,5 +65742,6 @@ export {
   browserPathOf,
   main,
   parseArgs,
-  scanSnapshotRoot
+  scanSnapshotRoot,
+  stampRoutes
 };

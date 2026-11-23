@@ -1,7 +1,7 @@
 // src/integrations/playwright.ts
-import { existsSync as existsSync2, readFileSync as readFileSync2 } from "fs";
-import { createRequire as createRequire2 } from "module";
-import { join as join2 } from "path";
+import { existsSync as existsSync3, readFileSync as readFileSync3 } from "fs";
+import { createRequire as createRequire3 } from "module";
+import { join as join3 } from "path";
 
 // src/collector.ts
 var COLLECTED_CSS = [
@@ -336,6 +336,100 @@ function storeDocument(root, url, bytes, pageIds) {
   writeFileSync(file, bytes);
   recordDocumentPages(file, url, pageIds);
   return file;
+}
+
+// src/axe-engine.ts
+import { existsSync as existsSync2, readFileSync as readFileSync2 } from "fs";
+import { createRequire } from "module";
+import { dirname, join as join2 } from "path";
+import { fileURLToPath } from "url";
+var AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
+var AXE_CORE_PIN = "4.13.0";
+var BUILDER_SPEC = "@axe-core/playwright";
+var SOURCE_SPEC = "axe-core/axe.min.js";
+var PACKAGE_SPEC = "axe-core/package.json";
+var sourceCache = /* @__PURE__ */ new Map();
+function locateSource(anchor) {
+  const tryFrom = (from) => {
+    try {
+      const req = createRequire(from);
+      const path = req.resolve(SOURCE_SPEC);
+      const version = req(PACKAGE_SPEC).version ?? "unknown";
+      return { path, version };
+    } catch {
+      return void 0;
+    }
+  };
+  const direct = tryFrom(anchor);
+  if (direct) return direct;
+  try {
+    return tryFrom(createRequire(anchor).resolve(BUILDER_SPEC));
+  } catch {
+    return void 0;
+  }
+}
+function loadBuilder(anchor) {
+  try {
+    const mod = createRequire(anchor)(BUILDER_SPEC);
+    const B = mod.default ?? mod.AxeBuilder ?? mod;
+    return typeof B === "function" ? B : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function insideUltra11y(anchor) {
+  let dir;
+  try {
+    dir = dirname(anchor.startsWith("file:") ? fileURLToPath(anchor) : anchor);
+  } catch {
+    return false;
+  }
+  for (; ; ) {
+    const manifest = join2(dir, "package.json");
+    if (existsSync2(manifest)) {
+      try {
+        return JSON.parse(readFileSync2(manifest, "utf8")).name === "ultra11y";
+      } catch {
+        return false;
+      }
+    }
+    const up = dirname(dir);
+    if (up === dir) return false;
+    dir = up;
+  }
+}
+function resolveAxeEngine(opts) {
+  const self = opts.self ?? import.meta.url;
+  const project = join2(opts.cwd, "package.json");
+  const AxeBuilder = loadBuilder(self) ?? loadBuilder(project);
+  if (!AxeBuilder) {
+    throw new Error(`${BUILDER_SPEC} resolves neither from ultra11y itself nor from ${opts.cwd}.`);
+  }
+  const own = locateSource(self);
+  const located = own ?? locateSource(project);
+  if (!located) throw new Error(`axe-core resolves neither from ultra11y itself nor from ${opts.cwd}.`);
+  let source = sourceCache.get(located.path);
+  if (source === void 0) {
+    source = readFileSync2(located.path, "utf8");
+    sourceCache.set(located.path, source);
+  }
+  const origin = own && insideUltra11y(self) ? located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned" : "project";
+  const note = origin === "project" ? `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here \u2014 running the audited project's axe-core ${located.version} (${located.path}). Results are recorded with that version; install ultra11y with its dependencies to run the pinned one.` : origin === "unpinned" ? `ultra11y: the axe-core resolved from ultra11y's own package is ${located.version}, not the pinned ${AXE_CORE_PIN} (${located.path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.` : void 0;
+  return {
+    AxeBuilder,
+    source,
+    sourcePath: located.path,
+    version: located.version,
+    origin,
+    ...note ? { note } : {}
+  };
+}
+async function runAxe(engine, page, runner) {
+  const res = await new engine.AxeBuilder({ page, axeSource: engine.source }).withTags([...AXE_TAGS]).analyze();
+  return {
+    violations: res.violations ?? [],
+    engine: { version: res.testEngine?.version ?? engine.version, origin: engine.origin, ...runner ? { runner } : {} }
+  };
 }
 
 // src/probes.ts
@@ -1315,7 +1409,7 @@ var UNREADABLE_BY_OLDER = [
 
 // src/integrations/core.ts
 import { spawnSync } from "child_process";
-import { createRequire } from "module";
+import { createRequire as createRequire2 } from "module";
 
 // src/integrations/payload.ts
 var RANK = { bloquant: 0, majeur: 1, mineur: 2 };
@@ -1415,7 +1509,7 @@ function gate(result, pageName, failOn) {
 function enginePath() {
   if (process.env.ULTRA11Y) return process.env.ULTRA11Y;
   try {
-    return createRequire(import.meta.url).resolve("ultra11y/scripts/ultra11y.mjs");
+    return createRequire2(import.meta.url).resolve("ultra11y/scripts/ultra11y.mjs");
   } catch {
     return new URL("../scripts/ultra11y.mjs", import.meta.url).pathname;
   }
@@ -1502,7 +1596,7 @@ ${url}`;
   let attempts = 0;
   for (const url of candidates) {
     const known = storedDocuments.get(inRoot(url));
-    if (known && existsSync2(known)) {
+    if (known && existsSync3(known)) {
       recordDocumentPages(known, url, [pageId]);
       files.push(known);
       continue;
@@ -1538,7 +1632,7 @@ function probeOptions(p) {
 }
 function fromConfig() {
   try {
-    const cfg = JSON.parse(readFileSync2(join2(process.cwd(), ".ultra11yrc.json"), "utf8"));
+    const cfg = JSON.parse(readFileSync3(join3(process.cwd(), ".ultra11yrc.json"), "utf8"));
     if (!cfg.probes) return {};
     const { only, ...limits } = cfg.probes;
     return { ...only ? { only } : {}, limits };
@@ -1546,31 +1640,32 @@ function fromConfig() {
     return {};
   }
 }
-async function runAxe(page, mode) {
+var notedAxe = /* @__PURE__ */ new Set();
+function resolveIntegrationAxe(cwd = process.cwd()) {
+  const engine = resolveAxeEngine({ cwd });
+  if (engine.note && !notedAxe.has(engine.sourcePath)) {
+    notedAxe.add(engine.sourcePath);
+    console.warn(engine.note);
+  }
+  return engine;
+}
+async function runAxePass(page, mode) {
   if (mode === false) return void 0;
   const demanded = mode === true;
-  let AxeBuilder;
-  let lastError;
-  for (const from of [join2(process.cwd(), "package.json"), import.meta.url]) {
-    try {
-      const mod = createRequire2(from)("@axe-core/playwright");
-      AxeBuilder = mod.default ?? mod;
-      break;
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  if (!AxeBuilder) {
+  let engine;
+  try {
+    engine = resolveIntegrationAxe();
+  } catch (e) {
     if (demanded) {
       console.warn(
-        `ultra11y: axe was requested but @axe-core/playwright could not be resolved from ${process.cwd()} nor from this package \u2014 ${lastError instanceof Error ? lastError.message : String(lastError)}. Install it, or set \`axe: false\`. The criteria axe decides stay to assess.`
+        `ultra11y: axe was requested but could not be resolved \u2014 ${e instanceof Error ? e.message : String(e)} Install ultra11y with its dependencies, or set \`axe: false\`. The criteria axe decides stay to assess.`
       );
     }
     return void 0;
   }
   try {
-    const res = await new AxeBuilder({ page }).analyze();
-    return { ran: true, violations: res.violations ?? [] };
+    const res = await runAxe(engine, page, "playwright");
+    return { ran: true, violations: res.violations, engine: res.engine };
   } catch (e) {
     console.warn(
       `ultra11y: the axe pass failed on this page \u2014 ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded; the criteria axe decides stay to assess.`
@@ -1625,7 +1720,7 @@ async function checkA11y(page, opts = {}) {
       );
     }
   }
-  const axe = await runAxe(page, opts.axe ?? "auto");
+  const axe = await runAxePass(page, opts.axe ?? "auto");
   const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe, fullShot);
   const result = auditSnapshot(payload);
   if (opts.pdf !== false) {
@@ -1640,7 +1735,7 @@ async function checkA11y(page, opts = {}) {
   return result;
 }
 var test = (() => {
-  const load = (from) => createRequire2(from)("@playwright/test");
+  const load = (from) => createRequire3(from)("@playwright/test");
   for (const from of [`${process.cwd()}/package.json`, import.meta.url]) {
     try {
       const base = load(from).test;
@@ -1660,7 +1755,7 @@ function samplePagesFor(opts = {}) {
   const cwd = opts.cwd ?? process.cwd();
   let declared;
   try {
-    const raw = readFileSync2(join2(cwd, ".ultra11yrc.json"), "utf8");
+    const raw = readFileSync3(join3(cwd, ".ultra11yrc.json"), "utf8");
     declared = JSON.parse(raw).sample?.pages ?? [];
   } catch {
     throw new Error(`ultra11y: no readable .ultra11yrc.json in ${cwd} \u2014 sweepSample reads the page sample from it.`);
@@ -1709,6 +1804,7 @@ function sweepSample(opts = {}) {
 export {
   checkA11y,
   downloadPageDocuments,
+  resolveIntegrationAxe,
   samplePagesFor,
   sweepCheckOptions,
   sweepSample,
