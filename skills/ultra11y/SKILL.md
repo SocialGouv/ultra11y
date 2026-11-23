@@ -20,6 +20,23 @@ criteria (computed contrast, visible focus, zoom/reflow, content-on-hover) fall 
 tier (axe-core in a real browser); a human is at most optional oversight. Gates stop any
 hallucinated non-conformity from surviving, and nothing is ever silently "conforming".
 
+**Running the engine.** Every command in this skill and its references is written
+`node scripts/ultra11y.mjs …`, where `scripts/ultra11y.mjs` lives **next to this SKILL.md**.
+Run it with the audited project as the working directory, and resolve the path per harness:
+
+- **Claude Code**: `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
+- **Codex**: the installed skill directory's `scripts/ultra11y.mjs` — the plugin's copy, or
+  `~/.codex/skills/ultra11y/scripts/ultra11y.mjs` (under `$CODEX_HOME` when set) after
+  `ultra11y install --codex`.
+- **OpenCode**: the installed skill directory's `scripts/ultra11y.mjs` —
+  `~/.config/opencode/skills/ultra11y/scripts/ultra11y.mjs` (under `$XDG_CONFIG_HOME` when
+  set) after `ultra11y install --opencode`, or the npm package's `skills/ultra11y/` when the
+  plugin is pinned in `opencode.json`.
+- **Anywhere else**, or when no skill directory resolves: `npx -y ultra11y <command>` is the
+  same engine. In the ultra11y repository itself, the root `scripts/ultra11y.mjs` is the same file.
+
+Per-harness deltas (hooks, install, how a block arrives): `references/harnesses.md`.
+
 **Do not confuse rules with criteria.** The bundle ships 102 static checks, WCAG AA has 55
 success criteria, and RGAA has 106 criteria. Several rules may evidence one criterion, one
 rule may contribute to several pack criteria, and most criteria remain open until a scan or
@@ -129,8 +146,8 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | Running the tool | |
 |---|---|
 | `references/runbook.md` | **The reliable run**: the one recipe, the transport to use and why, and what a pass costs. Read this before paying for an adjudication |
-| `references/claude-code-report.md` | Claude Code's detailed publication route: rendered scope, direct adjudication, adversarial verification, Markdown + HTML + per-page evidence |
-| `references/audit.md` | The audit loop end to end, and the normative page sample |
+| `references/full-audit.md` | **The full audit, on every harness**: rendered scope, adjudication (direct, fanned out or `judge`), adversarial verification, ledger, Markdown + HTML + per-page evidence, `check` gates |
+| `references/audit.md` | The quick audit (static pass → report → `check`), the normative page sample and PDF documents |
 | `references/judgment.md` | The adjudication + refutation worklists, verdict vocabulary, fail-closed fold |
 | `references/verify.md` | The `check`/`verify` gates |
 | `references/false-positives.md` | Where a finding may still be wrong, and how to refute it |
@@ -154,14 +171,19 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 
 ## Choose by situation
 
-- **"Produce a detailed audit/report in Claude Code"** → use the active Claude session as the
-  auditor, close the rendered and judgment criteria, challenge its claims, then publish the
-  dated Markdown report, printable HTML and evidenced per-page dossiers. Read
-  **`references/claude-code-report.md`**. This is the interactive publication profile; finish
-  with its full deliverable set. The compact summary is the CI branch below.
-- **"Audit / compliance report"** → `node scripts/ultra11y.mjs audit … --json`, then
-  `report` (synthesis table + one **auditor conformance block** per NC criterion — same
-  block `prd` and `tickets` use), then `check`; read **`references/audit.md`**.
+- **"Full / detailed audit", "compliance or conformance report", "RGAA audit"** — on any
+  harness (Claude Code, Codex, OpenCode or another) → the active session is the auditor:
+  scope, scan, adjudicate (directly, or fanned out to subagents), challenge its claims, fold
+  them into the ledger, then publish the dated Markdown report, printable HTML and evidenced
+  per-page dossiers and pass the `check` gates (`--require-decided=pages` included). Read
+  **`references/full-audit.md`** and finish with its full deliverable set. **When in doubt
+  between this and the quick path, take this one.** The compact summary is the CI branch below.
+- **"Quick audit / first look / what does the engine find"** → `node scripts/ultra11y.mjs
+  audit … --json`, then `report` (synthesis table + one **auditor conformance block** per NC
+  criterion — same block `prd` and `tickets` use), then `check`; read
+  **`references/audit.md`**. Use it only when the user explicitly wants a quick or static-only
+  pass: it has no ledger, no refutation, no per-page dossiers and no completeness gate, so say
+  so and never present it as a conformance report.
 - **"Code rendered by a library (DSFR, MUI…) or a `.vue`/`.svelte`/`.astro` SFC / avoid
   false negatives"** → audit the **produced HTML**, not the source template. Easiest:
   install the zero-touch **capture** harvester (`render --setup`) so your tests serialize
@@ -219,9 +241,9 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 - **"Automatic repo gate (hook / CI)"** → `init --hook` writes a git pre-commit gate over
   the **strict staged snapshot** (audits the exact index blobs, auto-applies safe fixes and
   re-stages them, blocks only on judgment issues); `init --baseline`/`--ci` is the opt-in
-  "block only NEW non-conformities" variant. Installed as a **Claude Code plugin**, a third
-  gate runs the `review-a11y` *skill* (not just the engine) on a pending commit/push/PR —
-  that one is shipped by the plugin, not by `init`. For library/SFC code, commit rendered
+  "block only NEW non-conformities" variant. Installed as a **Claude Code, Codex or OpenCode
+  plugin**, a third gate runs the `review-a11y` *skill* (not just the engine) on a pending
+  commit/push/PR — that one is shipped by the plugin (or `ultra11y install`), not by `init`. For library/SFC code, commit rendered
   **captures** (`render --setup`) and stage them so the real semantic HTML is what's
   checked (`audit --require-captures`); read **`references/automation.md`**.
 - **"Show me the problems while I build the page"** → `dev --next` writes a one-line overlay
@@ -455,8 +477,9 @@ This skill does the analysis end to end: audit, render, adjudicate, fix, re-audi
 When it has produced fixes, **dispatch `review-a11y` on the code under change as a subagent**,
 and report what it returns.
 
-Use the host's native subagent capability: Codex dispatches a subagent with the prompt below;
-Claude Code can use `Agent(...)`. If the host exposes neither, follow the sequential route below.
+Use the host's native subagent capability: Codex dispatches a subagent with the prompt below,
+OpenCode its Task tool, Claude Code its Agent tool (`Agent(...)`). If the host has no subagents,
+follow the sequential route below.
 
 ```
 Use the review-a11y skill on the working diff. Return its report verbatim.

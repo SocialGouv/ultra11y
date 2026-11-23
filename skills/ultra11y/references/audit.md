@@ -1,6 +1,13 @@
-# Audit existing code → WCAG report
+# Quick audit → WCAG report (and the page sample)
 
-Goal: produce a dated, reliable WCAG 2.2 AA compliance report. The engine decides the
+**This is the quick path**: a static audit, a dated report and the integrity `check` — a first
+map of a codebase. It has no verdict ledger, no adversarial refutation, no per-page dossiers and
+no `check --require-decided` completeness gate. When the user asks for a full or detailed audit,
+a compliance or conformance report, or an RGAA audit, follow **`references/full-audit.md`**
+instead — on every harness. This page stays the reference for the normative page sample and
+the PDF document checks, which the full audit relies on.
+
+Goal: a dated WCAG 2.2 AA report from the static pass. The engine decides the
 automatable subset; the **AI agent** adjudicates the judgment criteria (`verify --manual`,
 gated) and routes the rendering criteria to `scan`; the gates stop any hallucinated
 non-conformity.

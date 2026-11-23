@@ -19,7 +19,7 @@ node scripts/ultra11y.mjs orchestrate --run <dir> [--phase adjudicate|verify-rep
 
 `orchestrate --run <dir> --manifest --json` prints the same loop as data — each step's
 command/argv, inputs, outputs, exit-code contract and next step — for an orchestrator that is not
-Claude Code (see `references/orchestrators.md`). The RUNBOOK is one renderer of it.
+a coding-agent session, such as a workflow engine or a non-GitHub CI (see `references/orchestrators.md`). The RUNBOOK is one renderer of it.
 
 The `verify-report` commands it emits — generation, fold, the refuter's fold line and the
 semantic gate — all carry **one run context**: the run's audit (`--in <RUN>/audit-latest.json`,
@@ -34,8 +34,8 @@ repair a list generated from another claim source, only regenerating it can.
 
 | Your harness | How to run each judgment phase |
 |---|---|
-| Has the Workflow tool | `orchestrate --run <RUN> --phase <p>`, then run `<RUN>/orchestration/<p>.workflow.mjs`. Subagents RETURN verdict fragments; you fold them into the worklist, then `verify --apply` as usual. |
-| Subagents but no Workflow tool | Same `orchestrate`; dispatch one subagent per batch following `<RUN>/orchestration/agents/<role>.md` (the workflow script lists the batches and their prompts). One writer: you fold the results in. |
+| Has the Workflow tool (Claude Code only) | `orchestrate --run <RUN> --phase <p>`, then run `<RUN>/orchestration/<p>.workflow.mjs`. Subagents RETURN verdict fragments; you fold them into the worklist, then `verify --apply` as usual. |
+| Subagents but no Workflow tool (Claude Code's Agent tool, Codex subagents, OpenCode's Task tool) | Same `orchestrate`; dispatch one subagent per batch following `<RUN>/orchestration/agents/<role>.md` (the workflow script lists the batches and their prompts). One writer: you fold the results in. |
 | Eco mode, or no subagents | `orchestrate --run <RUN> --eco` → follow `<RUN>/orchestration/RUNBOOK.md` sequentially, playing each role yourself. Correctness-identical; only wall-clock differs. |
 
 ## The other dispatch: the review
