@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [5.59.0](https://github.com/SocialGouv/ultra11y/compare/v5.58.5...v5.59.0) (2026-11-23)
+
+
+### Features
+
+* **orchestrate:** harness-neutral batches and prompts, the Workflow script rendered from them ([#158](https://github.com/SocialGouv/ultra11y/issues/158)) ([#166](https://github.com/SocialGouv/ultra11y/issues/166)) ([b22eb8d](https://github.com/SocialGouv/ultra11y/commit/b22eb8d250a3e2331f5844d4fd8d79688f80d7c2))
+
 ## [5.58.5](https://github.com/SocialGouv/ultra11y/compare/v5.58.4...v5.58.5) (2026-11-23)
 
 
