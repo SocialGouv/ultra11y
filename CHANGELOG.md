@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [7.2.0](https://github.com/SocialGouv/ultra11y/compare/v7.1.0...v7.2.0) (2026-11-23)
+
+
+### Features
+
+* **scan:** one pinned axe-core for scan and ultra11y/playwright, and every discovered route accounted for ([#177](https://github.com/SocialGouv/ultra11y/issues/177)) ([d7dfc69](https://github.com/SocialGouv/ultra11y/commit/d7dfc69c1aec1bab1fcd8b75a5bdc0b4ea01c64a)), closes [#170](https://github.com/SocialGouv/ultra11y/issues/170) [#170](https://github.com/SocialGouv/ultra11y/issues/170)
+
 # [7.1.0](https://github.com/SocialGouv/ultra11y/compare/v7.0.0...v7.1.0) (2026-11-23)
 
 
