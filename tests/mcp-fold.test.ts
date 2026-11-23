@@ -66,6 +66,17 @@ describe("ultra11y_fold", () => {
     expect(existsSync(ledgerPath("rgaa", PROJECT))).toBe(false);
   });
 
+  it("names the automatic pass rate for what it is, and carries the standard's conformity rate beside it (#156)", async () => {
+    const { adjudication } = await verdicts();
+    const r = await json("ultra11y_fold", { cwd: PROJECT, adjudication });
+    // `conformancePct` is kept for the consumers that read it; it is the automatic rate.
+    expect(r.automaticPassRatePct).toBe(r.conformancePct);
+    expect(r.conformance).toMatchObject({ validated: expect.any(Number), applicable: expect.any(Number), open: expect.any(Number) });
+    expect(r.conformanceRatePct).toBe(r.conformance.applicable === 0 ? null : r.conformance.pct);
+    // The fold ruled conformities: the conformity rate moved, the frozen automatic one cannot tell.
+    expect(r.conformance.validated).toBeGreaterThan(0);
+  });
+
   it("folds partially, listing every refusal by criterion", async () => {
     const first = await verdicts();
     const { adjudication } = await verdicts(first.ruled);

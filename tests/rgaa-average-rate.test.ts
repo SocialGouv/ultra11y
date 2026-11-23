@@ -2,8 +2,8 @@
 //
 // The method (accessibilite.numerique.gouv.fr/methode) publishes two rates for an audited
 // sample: the GLOBAL rate, each criterion decided over the whole sample (`conformanceRate`),
-// and the AVERAGE of the per-page rates, each page's rate being the same formula — validated ÷
-// applicable — over that page alone. The declaration of accessibility reproduces both. The
+// and the AVERAGE of the per-page rates, each page's rate being conforming ÷ (conforming +
+// non-conforming) over that page alone (#156). The declaration of accessibility reproduces both. The
 // engine already decides every criterion page by page, and printed only the first: a bot
 // reading the report had to answer « non calculé » for the second.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -14,9 +14,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { runAudit } from "../src/audit.js";
 import { checkReport } from "../src/check.js";
 import { main } from "../src/cli.js";
-import { attributePages, derivePages, pageScopesFrom } from "../src/pages.js";
-import { pageCriterionRows, pageTally } from "../src/pages-report.js";
-import { averageConformanceRate, conformanceRate, renderPackReport, renderReport } from "../src/report.js";
+import { attributePages, derivePages, packPageRate, pageScopesFrom } from "../src/pages.js";
+import { formatPageRate, pageCriterionRows, pageTally } from "../src/pages-report.js";
+import { averageConformanceRate, renderPackReport, renderReport } from "../src/report.js";
 import { PAGES_DIR, readSnapshots } from "../src/snapshot.js";
 import { loadPack } from "../src/standards/index.js";
 import type { AuditResult } from "../src/types.js";
@@ -56,16 +56,23 @@ const derived = derivePages(audit, audit.scope.pages ?? []);
 describe("the average of the per-page rates", () => {
   const avg = averageConformanceRate(audit, derived, "rgaa", "fr");
 
-  it("rates each page with the global formula, over that page alone", () => {
+  it("rates each page with the page formula — conforming ÷ (conforming + non-conforming) — over that page alone", () => {
     expect(avg.pages.map((p) => p.id)).toEqual(derived.map((p) => p.id));
     expect(avg.pages).toHaveLength(3);
     for (const p of avg.pages) {
       const page = derived.find((d) => d.id === p.id)!;
-      const rate = conformanceRate(pageTally(pageCriterionRows(audit, page, "rgaa", "fr")));
-      expect(p).toMatchObject({ pct: rate.pct, validated: rate.validated, applicable: rate.applicable, open: rate.open });
+      const t = pageTally(pageCriterionRows(audit, page, "rgaa", "fr"));
+      const rate = packPageRate(t);
+      expect(p).toMatchObject({ pct: rate.pct, validated: rate.validated, applicable: rate.decided, open: rate.open });
+      // The criteria still to assess stay out of the denominator: they are counted beside it.
+      expect(p.applicable).toBe(t.c - t.na + t.nc);
     }
-    // The fixture is only useful if the pages really differ.
+    // The fixture is only useful if the pages really differ — and their RATES must, not only
+    // their operands: the home page fails two criteria, the help page none.
     expect(new Set(avg.pages.map((p) => p.validated)).size).toBeGreaterThan(1);
+    const pct = Object.fromEntries(avg.pages.map((p) => [p.id, p.pct]));
+    expect(pct.accueil).toBeLessThan(pct.contact!);
+    expect(pct.contact).toBeLessThan(pct.aide!);
   });
 
   it("is the mean of the exact per-page ratios, rounded once", () => {
@@ -73,7 +80,7 @@ describe("the average of the per-page rates", () => {
     expect(avg.pct).toBe(Math.round(mean * 100));
   });
 
-  it("is a floor while any averaged page has a criterion still open", () => {
+  it("is provisional while any averaged page has a criterion still open", () => {
     expect(avg.open).toBe(avg.pages.reduce((n, p) => n + p.open, 0));
     expect(avg.open).toBeGreaterThan(0);
   });
@@ -93,25 +100,30 @@ describe("the pack report prints it beside the global rate", () => {
     const global = lines.findIndex((l) => l.startsWith("- **Taux de conformité RGAA"));
     expect(global).toBeGreaterThan(-1);
     expect(lines[global + 1]).toBe(
-      `- **Taux moyen de conformité (provisoire)** : ${avg.pct}% — moyenne des taux de conformité (validés ÷ applicables) des 3 pages de l'échantillon`,
+      `- **Taux moyen de conformité (provisoire)** : ${avg.pct}% — moyenne des taux de conformité (conformes ÷ décidés) des 3 pages de l'échantillon ; ${avg.open} critère(s) encore à évaluer sur ces pages, hors des taux`,
     );
   });
 
   it("in the summary facts, which the HTML dashboard shares", () => {
-    expect(md).toContain(`- **Taux moyen de conformité** : ${avg.pct} % — moyenne des taux de conformité (validés ÷ applicables) des 3 pages de l'échantillon`);
+    expect(md).toContain(
+      `- **Taux moyen de conformité** : ${avg.pct} % — moyenne des taux de conformité (conformes ÷ décidés) des 3 pages de l'échantillon ; ${avg.open} critère(s) encore à évaluer sur ces pages, hors des taux`,
+    );
   });
 
-  it("with each page's own rate and operands in the per-page table", () => {
+  it("with each page's own rate, operands and open count in the per-page table — its sheet's very string", () => {
     for (const p of avg.pages) {
-      const row = md.split("\n").find((l) => l.startsWith(`| ${p.id[0]!.toUpperCase()}${p.id.slice(1)} |`) && l.includes("÷"));
-      expect(row, p.id).toContain(`| ${p.pct} % (${p.validated} ÷ ${p.applicable}) |`);
+      const page = derived.find((d) => d.id === p.id)!;
+      const cell = formatPageRate(pageCriterionRows(audit, page, "rgaa", "fr"), "rgaa", "fr");
+      expect(cell).toBe(`${p.pct} % (${p.validated}/${p.applicable}) · provisoire, ${p.open} à évaluer`);
+      const row = md.split("\n").find((l) => l.startsWith(`| ${p.id[0]!.toUpperCase()}${p.id.slice(1)} |`) && l.includes("à évaluer"));
+      expect(row, p.id).toContain(`| ${cell} |`);
     }
   });
 
   it("in English too", () => {
     const en = renderPackReport(audit, loadPack("rgaa"), "en");
     expect(en).toContain(
-      `- **Average conformity rate (provisional)** : ${avg.pct}% — mean of the per-page conformity rates (validated ÷ applicable) over the 3 sampled pages`,
+      `- **Average conformity rate (provisional)** : ${avg.pct}% — mean of the per-page conformity rates (conforming ÷ decided) over the 3 sampled pages; ${avg.open} criteria still to assess across these pages, left out of the rates`,
     );
   });
 
@@ -152,6 +164,6 @@ describe("`pages`", () => {
     const avg = averageConformanceRate(audit, derived, "rgaa", "fr");
     const grid = await pages("--format", "grid");
     expect(grid).toContain(`**Taux moyen de conformité (provisoire)** : ${avg.pct}% — moyenne`);
-    for (const p of avg.pages) expect(grid).toContain(`${p.pct} % (${p.validated} ÷ ${p.applicable})`);
+    for (const p of avg.pages) expect(grid).toContain(`${p.pct} % (${p.validated}/${p.applicable}) · provisoire, ${p.open} à évaluer`);
   });
 });

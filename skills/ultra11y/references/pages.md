@@ -186,13 +186,21 @@ conformancePct, decided, total }], unattributed, averageRate }`.
 
 `averageRate` (under a pack only) is the RGAA **« taux moyen de conformité »** — the second
 figure the method asks of a sample, beside the global rate: `{ pct, pages: [{ id, name, url,
-pct, validated, applicable, open }], excluded, open }`. Each page is rated with the global
-formula over that page alone (validated ÷ applicable), `pct` is the mean of those exact
-ratios rounded once, a page with no applicable criterion is listed in `excluded` and left out
-of the mean (never counted as 100 %), and `open > 0` means every rate — and so the mean — is a
-floor. The grid prints the same line under its table, followed by each page's
-`NN % (validated ÷ applicable)`; `report` prints it under its headline rate, in its summary and
-as the last column of « Taux par page ».
+pct, validated, applicable, open }], excluded, open }`. Each page is rated with the page formula
+over that page alone — conforming ÷ (conforming + non-conforming), so a page's `applicable` is
+its decided criteria, the not-applicable ones excluded, as the RGAA method counts them — `pct` is
+the mean of those exact ratios rounded once, a page with no decided criterion is listed in
+`excluded` and left out of the mean (never counted as 100 %), and `open` counts the criteria
+still to assess on those pages: while it is above zero every rate — and so the mean — is
+provisional. The grid prints the same line under its table, followed by each page's rate as its
+sheet prints it; `report` prints it under its headline rate, in its summary and as the last
+column of « Taux par page ».
+
+Until #156 the page rate was the global formula over the page (validated ÷ validated + NC + to
+assess). On pages judged from source a criterion non-conforming on another page is « à évaluer »
+there, and run-wide verdicts land on every page, so an open criterion weighed exactly like a
+non-conformity and every page printed the overall rate. The global rate keeps that formula: it
+is a floor over the whole sample, and its open criteria are part of the claim it makes.
 
 One row per criterion (the pack's own under `--standard`), one column per page:
 `C` conforming · `NC` non-conforming · `—` not applicable · `?` to assess. The same grid is
@@ -316,10 +324,12 @@ switches itself off exactly when it matters). An audit written before that field
 it undefined, is read as "unknown", and keeps its recorded basis.
 
 **A rate over nothing is not a rate.** Under the WCAG core the per-page rate is `C ÷ (C + NC)`
-over the criteria that page decided. Under a country standard it is the overall rate's formula,
-validated ÷ applicable: a criterion with no subject on the page leaves it, and one still to
-assess stays in the denominator, so the rate is a floor. It is **null** when nothing was
-decided — rendered `—`, never a number, and always beside its denominator: `79 % (53/67)`, `— (0/106)`. Returning 100
+over the criteria that page decided. Under a country standard it is the RGAA page formula,
+conforming ÷ (conforming + non-conforming): a criterion with no subject on the page leaves it,
+and so does one still to assess — those are counted beside the rate, which is marked provisional
+while any remain: `96 % (70/73) · provisional, 9 to assess`. It is **null** when nothing was
+decided — rendered `—`, never a number, and always beside its denominator: `— (0/106)` under the
+core, `— (0/0) · 12 to assess` under a pack. Returning 100
 there is how thirty-eight sheets reported a perfect page for an app a human auditor had just
 found sixteen non-conformities in: the criteria were all « à évaluer », so nothing was decided,
 so the rate was 100. The index cell carries the same bracket as the sheet's rate line, from one shared computation, so the artefact people paste into a pull

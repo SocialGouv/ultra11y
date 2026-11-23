@@ -221,7 +221,13 @@ Read exit codes from the process, **not** from a pipeline — `cmd --json | head
   stable `findingId`, `criteriaId`, `severity`, `file`, `line`; `residualRisks[]`;
   `conformancePct` — the **automatic static pass rate**, not a conformance rate.
 - `verify --apply --json` → `{ ok, auditPath, applied, stillManual, rejected, rejectedCriteria[], notInWorklist[],
-  issues[], conformancePct, findings, grounding }`; `ok: false` when nothing landed. `rejected` counts only
+  issues[], conformancePct, automaticPassRatePct, conformanceRatePct?, conformance?, findings, grounding }`;
+  `ok: false` when nothing landed. `conformancePct` is kept as it was — the WCAG core's **automatic**
+  static pass rate, which judgements never move — and `automaticPassRatePct` is the same number
+  under its real name. Under a pack standard, `conformance` is the standard's own conformity rate
+  with its operands (the object `report --json` carries) and `conformanceRatePct` its
+  percentage, `null` when nothing is applicable: that is the rate an adjudication moves. The MCP
+  `ultra11y_fold` tool returns the same fields. `rejected` counts only
   the verdicts the gate refused; the open criteria the file never mentioned (a lot, a truncated
   sweep) are `notInWorklist[]`. Count on `applied + stillManual + rejected + notInWorklist.length`,
   never on the exit code alone.
@@ -237,7 +243,8 @@ Read exit codes from the process, **not** from a pipeline — `cmd --json | head
   counted as `failed`.
 - Under a pack standard (`--standard rgaa`), `audit-latest.json` is a `pack-audit` document:
   its root `conformancePct` is the automatic pass rate for that standard, `core` is the WCAG
-  audit, and `verify --apply --json` echoes the **core** rate. `report --json` says what the
+  audit, and `verify --apply --json` echoes the **core** rate as `conformancePct` /
+  `automaticPassRatePct`, beside the pack's `conformance`. `report --json` says what the
   report says: `conformancePct` is the standard's own conformance rate (validated ÷ validated
   + NC + à évaluer, NA excluded; `null` when nothing is applicable), `conformance` its operands
   (`validated`, `applicable`, `na`, `open`, `decided`, `total`), `automaticPct` / `automatic`
