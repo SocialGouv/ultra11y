@@ -1,28 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { deflateSync } from "node:zlib";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { decodePng, averageColor, dominantBackground, encodePng, cropImage, strokeRect, fillRect } from "../src/pixel.js";
-import type { Image, Raster } from "../src/pixel.js";
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-
-/** A decoded image back into a writable raster — what the encoder round-trip needs. */
-function rasterOf(img: Image): Raster {
-  const data = Buffer.alloc(img.width * img.height * 4);
-  let i = 0;
-  for (let y = 0; y < img.height; y++) {
-    for (let x = 0; x < img.width; x++) {
-      const p = img.at(x, y);
-      data[i++] = p?.r ?? 0;
-      data[i++] = p?.g ?? 0;
-      data[i++] = p?.b ?? 0;
-      data[i++] = Math.round((p?.a ?? 1) * 255);
-    }
-  }
-  return { width: img.width, height: img.height, data };
-}
+import type { Raster } from "../src/pixel.js";
 
 // A minimal, valid PNG built by hand so the test owns its own fixture: no binary blob in the
 // repo, and the expectations are computable from the pixels we wrote.
@@ -159,19 +138,6 @@ describe("measuring a region", () => {
 // ---- the write side ---------------------------------------------------------------------
 
 describe("encoding a PNG with no dependencies", () => {
-  // The load-bearing test. A decode/encode round-trip only proves the pair agrees with
-  // itself; these four files were drawn by a script, committed, and are loaded by a real
-  // browser — so matching them byte for byte proves the encoder is PNG-correct, and pins the
-  // reproducibility contract (filter 0, deflate level 9) that `--check` depends on.
-  it("reproduces the committed extension icons byte for byte", () => {
-    for (const size of [16, 32, 48, 128]) {
-      const committed = readFileSync(join(ROOT, "extension", "icons", `icon-${size}.png`));
-      const img = decodePng(committed);
-      expect(img, `icon-${size}.png must decode`).not.toBeNull();
-      expect(encodePng(rasterOf(img!)).equals(committed), `icon-${size}.png must re-encode identically`).toBe(true);
-    }
-  });
-
   it("round-trips through decodePng, alpha included", () => {
     const src: Raster = { width: 7, height: 5, data: Buffer.alloc(7 * 5 * 4) };
     for (let y = 0; y < 5; y++) {
@@ -203,15 +169,6 @@ describe("encoding a PNG with no dependencies", () => {
   it("refuses a raster whose data length disagrees with its dimensions", () => {
     expect(() => encodePng({ width: 2, height: 2, data: Buffer.alloc(4) })).toThrow(/needs 16 bytes/);
     expect(() => encodePng({ width: 0, height: 4, data: Buffer.alloc(0) })).toThrow(/refusing/);
-  });
-
-  // The icon script imports this module directly through Node's type-stripping. A value
-  // import of anything outside `node:` would break `pnpm check:build` for a reason nobody
-  // would connect back to this file.
-  it("src/pixel.ts stays a leaf — one runtime import, node:zlib", () => {
-    const src = readFileSync(join(ROOT, "src", "pixel.ts"), "utf8");
-    const runtime = [...src.matchAll(/^import\s+(?!type\b)[^;]+from\s+"([^"]+)"/gm)].map((m) => m[1]);
-    expect(runtime).toEqual(["node:zlib"]);
   });
 });
 

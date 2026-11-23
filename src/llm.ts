@@ -3,8 +3,8 @@
 // Of the 55 WCAG 2.2 AA criteria the static engine decides a handful; 38 are judgment calls,
 // and under RGAA 58 of 106 criteria sit in the judgment tier. Inside a coding agent
 // those are adjudicated by the agent itself (`verify --manual` → `--apply`). Outside one —
-// a CI job, a browser extension, an E2E run — nobody rules on them, so they stay « à
-// évaluer » forever: honest, and unusable on its own.
+// a CI job, an E2E run — nobody rules on them, so they stay « à évaluer »
+// forever: honest, and unusable on its own.
 //
 // This module closes that gap WITHOUT adding a second adjudication path. It reuses:
 //   • `buildAdjudicationWorklist` for the items and their harvested evidence,
