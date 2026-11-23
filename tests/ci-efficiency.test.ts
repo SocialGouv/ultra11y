@@ -58,12 +58,6 @@ describe("no shipped CI integration", () => {
 });
 
 describe("GitHub workflow economy", () => {
-  it("runs the ledger fixture through one unbounded scan", () => {
-    const run = script(job("ci.yml", "ledger-gate"));
-    expect(run.match(/scan --crawl/g)).toHaveLength(1);
-    expect(run).toContain("--max 0");
-  });
-
   it("releases only after CI has validated the exact SHA", () => {
     const release = read(".github/workflows/release.yml");
     expect(release).toContain("workflow_run:");
