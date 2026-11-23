@@ -11,6 +11,15 @@ content on hover (1.4.13), target size (2.5.8). The dynamic tier decides them by
   pins its own Playwright keeps it, because `--cwd` is tried first. It adds the
   residual-criteria **probes** (below). `--runtime local` (or its alias `--local`) still names it
   explicitly; there is no other runtime.
+- **A pinned axe-core, the same one everywhere.** Playwright is resolved project first; axe is
+  not. `scan` and `ultra11y/playwright` inject ultra11y's own `axe-core` (an exact dependency of
+  the package, read from `axe-core/axe.min.js` and passed as `axeSource`) with the same rule
+  tags (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`, `best-practice`), whatever
+  version the audited project installs. The project's copy is used only when ultra11y's
+  cannot be resolved (the standalone skill bundle with no `node_modules` beside it). That
+  fallback prints a note. The version that ran is recorded in every result (`DynamicResult.axe`,
+  each capture's `axe.json`) and in the report annex. `status --browser` shows which copy
+  would run.
 - **`--browser-path <file>`** (or `ULTRA11Y_BROWSER_PATH`): launch **this** executable with the
   local runtime instead of the browser Playwright resolves — a distribution's Chromium
   (`/usr/bin/chromium` on Debian, what a sandboxed runner image ships), which Playwright's own
@@ -170,6 +179,13 @@ malformed block would break every later `scan --sample` with no hint of what cau
 
 A client-rendered SPA does not expose its routes in the served HTML; use a sitemap there.
 
+**The route inventory.** `--write` also records every discovered URL in `.ultra11y/routes.json`
+(union across runs, keyed by path, so the sitemap's production host and the E2E run's
+`localhost` are the same route). `--routes-only` records the inventory alone and leaves the
+sample untouched. Once the inventory exists, `audit` and `scan --merge` set `scope.routes`, and
+the annex lists every route (section F) as captured (E2E), scanned, source code only, or not
+reached.
+
 ## Scan a normative page sample (`scan --sample`)
 
 A real country-standard audit runs over a declared **page sample** (échantillon), not one
@@ -206,6 +222,20 @@ The issue that prompted this also floated a `via` recipe on a sample page (auth 
 named interaction steps). It is deliberately **not** implemented: nothing in the engine could
 execute it — every browser path is `goto`-only — so a JSON step DSL would reimplement, worse,
 what a Playwright spec calling `checkA11y` already does.
+
+### The sample, then every other route (`--all-routes`)
+
+```
+node scripts/ultra11y.mjs scan --sample --all-routes --max-routes 100 --merge audits/audit-latest.json --out audits
+```
+
+`--all-routes` reads the inventory and scans, after the sample, each route the sample does not
+hold. It skips a route the E2E run already captured, because that capture holds the state the
+tests built. At most `--max-routes` routes are scanned (default 50). Without `--sample` it scans
+the inventory alone. The extra routes are recorded and audited as pages, but they do not join
+the declared sample. Each one is labelled « hors échantillon » in the annex. A route the bound
+left out, or that the scan refused (redirect, HTTP error, browser failure), is listed as not
+reached with its reason.
 
 ### Cover the whole site: the crawl is unbounded by default
 

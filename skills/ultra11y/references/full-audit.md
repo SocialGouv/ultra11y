@@ -17,6 +17,7 @@ first look; never hand its output over as a conformance deliverable.
 The completion criterion is a **defensible deliverable**, not merely a clean static scan:
 
 - every declared page was captured, or the missing page is named;
+- every discovered route is captured, scanned, or listed as not reached in the annex;
 - every criterion on every captured page is `C`, `NC`, `NA`, or explicitly undecidable;
 - every `NC` has a resolvable occurrence and every `C`/`NA` has grounded justification;
 - the conformance report and per-page dossiers pass `check`;
@@ -30,18 +31,39 @@ country standard, prefer `sample check` plus `scan --sample`; otherwise crawl wi
 cap (`--max 0`). A source-only country-standard report is partial and must say so. The `sample`
 block of `.ultra11yrc.json` and the PDF document checks are described in `references/audit.md`.
 
+**Start from the application's routes, not only the sample.** Record the route inventory
+(`.ultra11y/routes.json`) from every source the project has: the sitemap, a crawl, and the
+pages the E2E suite already captured.
+
+```sh
+node scripts/ultra11y.mjs pages discover --sitemap <url> --routes-only   # or --crawl <url> --max 0
+node scripts/ultra11y.mjs pages discover --from-snapshots --routes-only  # routes the E2E run reached
+```
+
+`--routes-only` leaves the chosen RGAA sample untouched; `--write` merges the routes into the
+sample as well. Once an inventory exists, every `audit` and `scan --merge` lists each route in
+the annex (section F): captured by the E2E tests, scanned, source code only, or not reached.
+None is left out. A client-rendered SPA exposes no links in its served HTML, so give it a
+sitemap or let its E2E captures supply the routes.
+
 ## 2. Audit source and rendered pages
 
 Inventory the render sources the project already has, and use **all** of them — each sees
-what the others cannot:
+what the others cannot. **Playwright comes first**: when the project has Playwright tests, wire
+`ultra11y/playwright` into them (`checkA11y`, or `sweepSample` for the sample,
+`references/e2e.md`), or reuse the `.ultra11y/pages` captures they already wrote, before you
+fall back on the crawler. Those captures carry the state the tests built (a session, a filled
+form, an open dialog), and `scan --all-routes` never rescans a route they hold.
 
-- unit-test snapshots (`__snapshots__/*.snap`) — read by `audit` as they are;
-- unit-test captures (`.ultra11y/captures/`, from `ultra11y/vitest`/`ultra11y/jest` or
-  `render --setup`) — run the test suite to refresh them;
 - E2E captures (`.ultra11y/pages/`, from `ultra11y/playwright`/`ultra11y/cypress`) — run the
   E2E suite to refresh them;
-- an SSR harness or a static build (`render`, `references/rendered.md`);
-- the browser pass on the sample or a crawl (`scan`, below).
+- the browser pass on the sample, then on the rest of the inventory (`scan --sample
+  --all-routes`, below);
+- unit-test snapshots (`__snapshots__/*.snap`) — read by `audit` as they are;
+- unit-test captures (`.ultra11y/captures/`, from `ultra11y/vitest`/`ultra11y/jest` or
+  `render --setup`) — run the test suite to refresh them. Together with the snapshots they
+  cover components that no route shows in every state;
+- an SSR harness or a static build (`render`, `references/rendered.md`).
 
 Name in the coverage annex which sources ran and which were absent. The report already states
 what `audit` read (`scope.unitSnapshots`, `scope.captures`, the pages); add the ones you could
@@ -50,13 +72,20 @@ components, never page-level or rendering criteria.
 
 ```sh
 node scripts/ultra11y.mjs audit <paths> --graph --standard <standard> --lang <lang> --out audits --json
-node scripts/ultra11y.mjs scan --sample --cwd . \
+node scripts/ultra11y.mjs scan --sample --all-routes --cwd . \
   --standard <standard> --merge audits/audit-latest.json --out audits
 ```
 
-Use `--crawl <url> --max 0` instead of `--sample` when the project has no declared sample. A
-rendering criterion stays undecidable when no browser measurement exists; source inspection
-does not replace the scan.
+`--all-routes` scans the sample, then every inventory route the sample does not hold, bounded
+by `--max-routes` (default 50). A route the bound leaves out is listed as not reached, with
+the reason. Use `--crawl <url> --max 0` instead when the project has neither a sample nor an
+inventory. A rendering criterion stays undecidable when no browser measurement exists; source
+inspection does not replace the scan.
+
+`scan` and `ultra11y/playwright` run the same axe: ultra11y's own pinned `axe-core` and rule
+tags, whatever version the project installs. The annex names the version that ran. If it says
+« copie du projet audité », ultra11y's own copy could not be resolved; reinstall ultra11y with
+its dependencies before you publish.
 
 What the scan does with a rendering criterion depends on the standard. Under the WCAG core a
 clean scan concludes `C` (`decidedBy: "scan"`). **Under RGAA it does not**: 3.2, 3.3, 10.4,

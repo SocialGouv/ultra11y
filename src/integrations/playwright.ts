@@ -35,6 +35,7 @@ import {
   recordDocumentPages,
   storeDocument,
 } from "../document-store.js";
+import { type AxeEngine, type AxeEngineInfo, resolveAxeEngine, runAxe } from "../axe-engine.js";
 import { runLiveProbes } from "../probes.js";
 import { type AuditLike, type CheckOptions, type ProbeTuning, auditSnapshot, buildPayload, gate, stayedOnPage, writePagesReport } from "./core.js";
 
@@ -197,49 +198,50 @@ function fromConfig(): { only?: string[]; limits?: Omit<ProbeTuning, "only"> } {
   }
 }
 
+const notedAxe = new Set<string>();
+
+/** The axe engine this integration runs — exported so a test can check it is the one `scan`
+ *  resolves. Prints the fallback note once per worker. */
+export function resolveIntegrationAxe(cwd = process.cwd()): AxeEngine {
+  const engine = resolveAxeEngine({ cwd });
+  if (engine.note && !notedAxe.has(engine.sourcePath)) {
+    notedAxe.add(engine.sourcePath);
+    console.warn(engine.note);
+  }
+  return engine;
+}
+
 /** THE AXE PASS, RUN INSIDE THE CALLER'S OWN TEST.
  *
- *  `@axe-core/playwright` belongs to the AUDITED project, never to this package: resolved at
- *  runtime from the caller's cwd first (the same order `enginePath` and the Playwright fixture
- *  use), so a repo that has it gets the pass and a repo that does not is untouched.
+ *  The SAME axe `scan` runs (src/axe-engine.ts): ultra11y's own pinned `axe-core`, injected as
+ *  `axeSource`, with the same rule tags — so an axe verdict means the same thing whichever tier
+ *  produced it, and does not change with the version the audited project happens to install.
+ *  ultra11y's copy resolves from this module (it is a dependency of the installed package);
+ *  the project's copy is used only when it does not, and that fallback is printed and recorded.
  *
- *  Returns `undefined` when it did not run, and `{ ran: true, violations }` when it did. The
- *  difference matters downstream: `ran` is what lets an empty violation list COUNT — silence
+ *  Returns `undefined` when it did not run, and `{ ran: true, violations, engine }` when it did.
+ *  The difference matters downstream: `ran` is what lets an empty violation list COUNT — silence
  *  from a rule engine that ran is a measurement, silence from one that never started is not. */
-async function runAxe(page: PlaywrightPage, mode: boolean | "auto" | undefined): Promise<{ ran: true; violations: unknown[] } | undefined> {
+async function runAxePass(
+  page: PlaywrightPage,
+  mode: boolean | "auto" | undefined,
+): Promise<{ ran: true; violations: unknown[]; engine: AxeEngineInfo } | undefined> {
   if (mode === false) return undefined;
   const demanded = mode === true;
-  // `any`: the builder's shape is axe's, which is not a dependency here.
-  let AxeBuilder: any;
-  // PROJECT FIRST, then relative to this module — the same order the Playwright fixture above
-  // and `scan --runtime local` use, and for the same reason: module-relative alone works for an
-  // ordinary `node_modules/ultra11y` install but yields nothing whenever the package is linked,
-  // pnpm-hoisted elsewhere, or in a monorepo. Anchoring on the cwd ALONE is just as wrong in the
-  // other direction — a suite that changes directory to write its snapshot then resolves nothing
-  // at all, and the pass evaporates silently because the default is `auto`.
-  let lastError: unknown;
-  for (const from of [join(process.cwd(), "package.json"), import.meta.url]) {
-    try {
-      const mod = createRequire(from)("@axe-core/playwright");
-      AxeBuilder = mod.default ?? mod;
-      break;
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  if (!AxeBuilder) {
+  let engine: AxeEngine;
+  try {
+    engine = resolveIntegrationAxe();
+  } catch (e) {
     if (demanded) {
       console.warn(
-        `ultra11y: axe was requested but @axe-core/playwright could not be resolved from ${process.cwd()} nor from this package — ${
-          lastError instanceof Error ? lastError.message : String(lastError)
-        }. Install it, or set \`axe: false\`. The criteria axe decides stay to assess.`,
+        `ultra11y: axe was requested but could not be resolved — ${e instanceof Error ? e.message : String(e)} Install ultra11y with its dependencies, or set \`axe: false\`. The criteria axe decides stay to assess.`,
       );
     }
     return undefined;
   }
   try {
-    const res = (await new AxeBuilder({ page }).analyze()) as { violations?: unknown[] };
-    return { ran: true, violations: res.violations ?? [] };
+    const res = await runAxe(engine, page, "playwright");
+    return { ran: true, violations: res.violations, engine: res.engine };
   } catch (e) {
     // Loud, for the same reason a failed probe is: a swallowed failure is indistinguishable
     // from a clean page, and the criteria simply stay to assess with nobody able to tell why.
@@ -344,7 +346,7 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
   // After the probes, and after the snapshot: axe reads the page, it does not stress it, so
   // its position only has to be somewhere the page is settled. Running it last keeps the
   // recorded DOM the one the test built.
-  const axe = await runAxe(page, opts.axe ?? "auto");
+  const axe = await runAxePass(page, opts.axe ?? "auto");
 
   const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe, fullShot);
   const result = auditSnapshot(payload);

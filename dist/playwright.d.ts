@@ -1,4 +1,28 @@
-import { C as CheckOptions, A as AuditLike } from './payload-BrdH5eEV.js';
+import { C as CheckOptions, A as AuditLike } from './payload-BPGhg2sa.js';
+
+/** The axe-core build a result was measured with (src/axe-engine.ts). */
+interface AxeEngineInfo {
+    version: string;
+    /** "ultra11y": its own pinned copy; "project": the audited project's, used as a fallback. */
+    origin: "ultra11y" | "project";
+    /** The tier(s) that ran it, comma-separated: "scan", "playwright". */
+    runner?: string;
+}
+
+/** Whose copy of axe-core ran: ultra11y's own (the pinned one), or the audited project's. */
+type AxeOrigin = AxeEngineInfo["origin"];
+/** A resolved, ready-to-run axe: the builder class, the source it injects, and where both came from. */
+interface AxeEngine {
+    AxeBuilder: any;
+    /** The text of `axe-core/axe.min.js`, injected as `axeSource`. */
+    source: string;
+    /** Where that source was read from. */
+    sourcePath: string;
+    version: string;
+    origin: AxeOrigin;
+    /** Set when the project's copy had to be used — the visible half of the fallback. */
+    note?: string;
+}
 
 interface PlaywrightPage {
     evaluate(script: string): Promise<unknown>;
@@ -72,6 +96,9 @@ declare function downloadPageDocuments(page: PlaywrightPage, pageId: string, opt
     maxPdf?: number;
     root?: string;
 }): Promise<string[]>;
+/** The axe engine this integration runs — exported so a test can check it is the one `scan`
+ *  resolves. Prints the fallback note once per worker. */
+declare function resolveIntegrationAxe(cwd?: string): AxeEngine;
 /** Collect the current page, persist it as a snapshot, audit it, and fail on the threshold. */
 declare function checkA11y(page: PlaywrightPage, opts?: PlaywrightCheckOptions): Promise<AuditLike>;
 /** Optional fixture form. Import `test` from here instead of `@playwright/test`.
@@ -159,4 +186,4 @@ declare function sweepCheckOptions(check?: SweepOptions["check"]): SweepOptions[
 };
 declare function sweepSample(opts?: SweepOptions): void;
 
-export { AuditLike, CheckOptions, type PlaywrightCheckOptions, type SamplePageLike, type SweepOptions, checkA11y, downloadPageDocuments, samplePagesFor, sweepCheckOptions, sweepSample, sweepTarget, test };
+export { AuditLike, CheckOptions, type PlaywrightCheckOptions, type SamplePageLike, type SweepOptions, checkA11y, downloadPageDocuments, resolveIntegrationAxe, samplePagesFor, sweepCheckOptions, sweepSample, sweepTarget, test };

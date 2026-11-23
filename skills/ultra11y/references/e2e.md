@@ -124,6 +124,20 @@ test("home page is accessible", async ({ page, ultra11y }) => {
 await checkA11y(page, { as: "contact", failOn: "major" });
 ```
 
+**Wire it first.** When the project has Playwright tests, this is the main rendered tier of a
+full audit (`references/full-audit.md`). Add `checkA11y` to the specs that reach a page in a
+state (logged in, form filled, dialog open), and `sweepSample` for the declared sample. Reuse
+the `.ultra11y/pages` captures the suite already wrote before you fall back on `scan`. Then
+`pages discover --from-snapshots --routes-only` adds the routes the suite reached to the
+inventory, and `scan --all-routes` never rescans them.
+
+**The axe pass is ultra11y's**, not the project's. The pass (`axe`, default `auto`) injects the
+pinned `axe-core` that ships with ultra11y, with the same rule tags as `scan`, so a capture
+and a scan of the same page are measured by the same engine. The version that ran is written to
+the capture's `axe.json` (`engine`) and named in the report annex. The project's own
+`@axe-core/playwright`/`axe-core` is used only when ultra11y's cannot be resolved, and a note
+says so.
+
 ## Cypress
 
 Cypress test code runs in the **browser**, which cannot write to disk, so the collected page
@@ -142,6 +156,11 @@ import "ultra11y/cypress";
 cy.visit("/");
 cy.ultra11y({ as: "accueil" });
 ```
+
+**No axe pass on Cypress.** `cy.ultra11y()` records the page (DOM, styles, boxes, screenshot)
+and the engine's static and rendered rules audit it, but it injects no axe-core and runs no live
+probe. The criteria axe decides (computed contrast above all) therefore stay « à évaluer » on
+Cypress-only pages. Reach them with `ultra11y/playwright` or with `scan` on the same routes.
 
 ## Options
 

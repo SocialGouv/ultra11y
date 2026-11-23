@@ -8,6 +8,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, resolve as resolvePath } from "node:path";
 import type {
   AuditResult,
+  AxeEngineInfo,
   CriterionResult,
   DocumentAudit,
   DynamicEngine,
@@ -30,6 +31,7 @@ import { isFullDocument } from "./rules/rule.js";
 import { renderedRulesFor, renderedRulesRan, renderedTestedScs } from "./rules/rendered.js";
 import { renderedProvesOn } from "./coverage.js";
 import { AXE_DECIDES, PROBE_SEVERITY, PROBE_WCAG, axeNodeTreatment, scForAxe } from "./axe-map.js";
+import { unionAxeEngines } from "./axe-engine.js";
 import { subjectsAbsent, subjectsForSc, subjectsPresentIn } from "./adjudicate-subjects.js";
 import { runRules } from "./rules/registry.js";
 import { runCrossRules } from "./rules/cross-registry.js";
@@ -440,6 +442,8 @@ interface Accum {
   // because — the same rule as everywhere in this tier — a rule engine that did not run has
   // measured nothing, and its silence must never read as a clean page.
   axeRan: Set<string>;
+  // The axe-core builds those passes recorded (src/axe-engine.ts) — what the report names.
+  axeEngines: AxeEngineInfo[];
 }
 
 // Precompute the static success criteria + their applicability predicates once.
@@ -514,6 +518,7 @@ function newAccum(): Accum {
     renderedRan: new Map(),
     probedScs: new Map(),
     axeRan: new Set(),
+    axeEngines: [],
     subjectsSeen: new Set(),
     pageSubjects: new Map(),
   };
@@ -727,6 +732,7 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
     const axe = doc.signals?.axe;
     if (axe?.ran) {
       if (!placeholder) acc.axeRan.add(pageId);
+      if (axe.engine) acc.axeEngines.push(axe.engine);
       for (const sc of Object.keys(AXE_DECIDES)) acc.renderedScs.add(sc);
       for (const f of axeFindings(axe.violations ?? [], doc.file, pageId)) {
         const list = acc.byCriterion.get(f.criteriaId) ?? [];
@@ -1187,6 +1193,8 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
       // What each page was MEASURED by. Omitted when no snapshot was folded, so a source-only
       // audit is byte-for-byte unchanged — and, per PageCoverage, absence closes nothing.
       ...(acc.pageIds.size ? { pageCoverage: pageCoverageOf(acc) } : {}),
+      // Which axe-core produced the axe verdicts read from the captures. Omitted when none says.
+      ...(acc.axeEngines.length ? { axe: unionAxeEngines(acc.axeEngines) } : {}),
     },
     guidelines,
     criteria,

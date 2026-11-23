@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { AuditResult, DynamicEngine, DynamicFinding, DynamicResult, Finding, Lang, SamplePage, ScanRedirect, Severity } from "./types.js";
+import type { AuditResult, AxeEngineInfo, DynamicEngine, DynamicFinding, DynamicResult, Finding, Lang, SamplePage, ScanRedirect, Severity } from "./types.js";
 import { isAdjudicated } from "./types.js";
 import { lineStartsOf, lineColAt } from "./parse/html.js";
 import { allGuidelines } from "./wcag.js";
 import { PROBE_SEVERITY, PROBE_WCAG, axeNodeTreatment, scForAxe } from "./axe-map.js";
+import { unionAxeEngines } from "./axe-engine.js";
 import { parseSitemapUrls, crawlUrls, crawlBound, nameFromUrl } from "./crawl.js";
 import {
   PAGES_DIR,
@@ -49,6 +50,8 @@ export function reflowWidening(reflow: { widening?: { selector: string }[] } | u
 export interface RunnerOutput {
   url: string;
   violations: { id: string; impact: string | null; help: string; tags?: string[]; nodes: { target: string[]; html: string }[] }[];
+  /** The axe-core build that produced `violations` (src/axe-engine.ts). */
+  axe?: AxeEngineInfo;
   /** `widening`: the outermost boxes wider than the viewport, when the producer looked. */
   reflow: { horizontalScroll: boolean; widening?: ProbeHit[] };
   // Residual-criteria probes — populated by the local runtime (scan-local.ts). Optional so
@@ -230,7 +233,7 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
       // `ran: true` is the axe counterpart of `probed`: the pass happened, so its silence on
       // the criteria AXE_DECIDES is usable. A RunnerOutput always carries `violations` because
       // a runner always runs axe — that is the one instrument neither runtime skips.
-      axe: { violations: out.violations, ran: true },
+      axe: { violations: out.violations, ran: true, ...(out.axe ? { engine: out.axe } : {}) },
       ...(collected.screenshot ? { screenshotBase64: collected.screenshot } : {}),
       ...(collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {}),
     });
@@ -333,7 +336,7 @@ export function toDynamicResult(out: RunnerOutput, target: string, lang: Lang = 
       });
     }
   }
-  return { tool: "ultra11y", engine, target, date: today(), findings };
+  return { tool: "ultra11y", engine, target, date: today(), findings, ...(out.axe ? { axe: out.axe } : {}) };
 }
 
 /** Fetch a URL's served HTML (zero-dep, Node global fetch). Empty string on error. */
@@ -456,6 +459,27 @@ export function scanPageSummary(dynamic: DynamicResult, sampleSize?: number): Sc
   };
 }
 
+/** Two scan runs of one `scan --all-routes` (the sample, then the rest of the inventory) as one
+ *  result. The SAMPLE is the first run's alone: the rest of the routes are recorded and audited
+ *  as pages, but they never join the declared RGAA sample. */
+export function combineDynamic(sample: DynamicResult | undefined, rest: DynamicResult | undefined): DynamicResult {
+  if (!sample) return rest!;
+  if (!rest) return sample;
+  const tested = [...new Set([...(sample.testedScs ?? []), ...(rest.testedScs ?? [])])].sort();
+  const snapshots = [...(sample.snapshots ?? []), ...(rest.snapshots ?? [])];
+  const redirected = [...(sample.redirected ?? []), ...(rest.redirected ?? [])];
+  const axe = sample.axe ?? rest.axe;
+  return {
+    ...sample,
+    target: `${sample.target} + ${rest.target}`,
+    findings: [...sample.findings, ...rest.findings],
+    ...(tested.length ? { testedScs: tested } : {}),
+    ...(snapshots.length ? { snapshots } : {}),
+    ...(redirected.length ? { redirected } : {}),
+    ...(axe ? { axe } : {}),
+  };
+}
+
 /** Fold dynamic findings into a static AuditResult: a needs-rendering/manual or
  *  clean criterion that axe flags becomes NC; tallies + conformance recompute. */
 export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: Lang = "en"): AuditResult {
@@ -483,6 +507,9 @@ export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: L
     const tested = new Set([...(merged.scope.scan?.testedScs ?? []), ...dynamic.testedScs]);
     merged.scope.scan = { testedScs: [...tested].sort() };
   }
+  // The axe-core build this scan injected, beside the ones already on record (a capture run, an
+  // earlier scan): the report names every engine its axe verdicts came from.
+  if (dynamic.axe) merged.scope.axe = unionAxeEngines(merged.scope.axe, [dynamic.axe]);
   const byId = new Map(merged.criteria.map((c) => [c.id, c]));
   const remediation =
     lang === "fr" ? "Vérifié au rendu par axe-core ; corrigez l'élément cité." : "Verified at render time by axe-core; fix the cited element.";
@@ -652,6 +679,8 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
   // entry, and the snapshot half must add to it rather than speak over it.
   const scs = new Set([...(base.scope.scan?.testedScs ?? []), ...(snap.scope.scan?.testedScs ?? [])]);
   if (scs.size) merged.scope.scan = { testedScs: [...scs].sort() };
+  const axeEngines = unionAxeEngines(base.scope.axe, snap.scope.axe);
+  if (axeEngines.length) merged.scope.axe = axeEngines;
   const byId = new Map(merged.criteria.map((c) => [c.id, c]));
   const snapById = new Map(snap.criteria.map((c) => [c.id, c]));
 

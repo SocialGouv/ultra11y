@@ -178,11 +178,15 @@ export interface CheckOptions {
    *  reaches a page behind a login and a state machine, which is exactly where the criteria
    *  axe decides (computed contrast above all) were left « to assess » run after run.
    *
-   *  Default `auto`: axe runs when `@axe-core/playwright` resolves from your project, and is
-   *  silently skipped when it does not — so adding this costs nothing to a repo that has not
-   *  installed it. `false` turns it off; `true` demands it and reports loudly if it cannot be
-   *  resolved, which is what you want in CI where a silent downgrade is indistinguishable from
-   *  a clean page. */
+   *  The axe that runs is ultra11y's own (src/axe-engine.ts): its pinned `axe-core` and rule
+   *  tags, the same as `scan`, whatever version your project installs. Your project's copy is
+   *  used only when ultra11y's cannot be resolved, with a printed note; the version that ran
+   *  is recorded with the capture (`axe.json`) and shown in the report.
+   *
+   *  Default `auto`: axe runs whenever it resolves, and is silently skipped when nothing does.
+   *  `false` turns it off; `true` demands it and reports loudly if it cannot be resolved, which
+   *  is what you want in CI where a silent downgrade is indistinguishable from a clean page.
+   *  PLAYWRIGHT ONLY: `ultra11y/cypress` records the page without an axe pass. */
   axe?: boolean | "auto";
 }
 

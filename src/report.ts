@@ -6,7 +6,7 @@
 // (never silently C).
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import type { AuditResult, Auditor, DecidedBy, Finding, Lang, PageResult, Severity, Status } from "./types.js";
+import type { AuditResult, Auditor, DecidedBy, Finding, Lang, PageResult, RouteCoverage, Severity, Status } from "./types.js";
 import { isAdjudicated } from "./types.js";
 import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits, type PrdUnit } from "./prd.js";
@@ -327,6 +327,32 @@ const L = {
     annexPagesTitle: "C. Pages — base de jugement et constats",
     annexManualTitle: "D. Critères à évaluer — marche à suivre",
     annexGridTitle: "E. Grille exhaustive des critères",
+    axeEngine: "Moteur axe-core",
+    axeOrigin: (origin: string) => (origin === "ultra11y" ? "copie épinglée d'ultra11y" : "copie du projet audité — celle d'ultra11y n'était pas résolvable"),
+    axeMixed:
+      "Plusieurs versions d'axe-core ont produit les verdicts axe de cet audit : d'un niveau à l'autre, leurs résultats ne sont pas strictement comparables.",
+    annexRoutesTitle: "F. Routes de l'application — couverture",
+    routesIntro: (n: number) =>
+      `${n} route(s) connue(s) : l'inventaire (\`.ultra11y/routes.json\`), l'échantillon et les pages enregistrées. Chacune est listée avec la façon dont elle a été observée ; aucune n'est omise.`,
+    routesHead: "| Route | Échantillon | Observée | Page | Remarque |",
+    routeInSample: "échantillon RGAA",
+    routeOutOfSample: "hors échantillon",
+    routeObserved: {
+      captured: "capturée (tests E2E)",
+      scanned: "scannée (navigateur ultra11y)",
+      source: "code source seulement",
+      "not-reached": "non atteinte",
+    } as Record<string, string>,
+    routeWhy: (reason: string, detail?: string) =>
+      reason === "redirect"
+        ? `redirigée vers ${detail ?? "une autre adresse"}`
+        : reason === "http-status"
+          ? `a répondu HTTP ${detail ?? "?"}`
+          : reason === "error"
+            ? `échec du navigateur${detail ? ` : ${detail}` : ""}`
+            : `au-delà de --max-routes${detail ? ` ${detail}` : ""}`,
+    routesTodo: (n: number) =>
+      `${n} route(s) non atteinte(s). Pour les couvrir : \`ultra11y scan --sample --all-routes --merge <audit.json>\`, ou un test Playwright avec \`ultra11y/playwright\` pour celles qui exigent un état (session, parcours).`,
   },
   en: {
     title: (std: string) => `Accessibility audit report — ${std}`,
@@ -562,6 +588,31 @@ const L = {
     annexPagesTitle: "C. Pages — basis of judgment and findings",
     annexManualTitle: "D. Criteria to assess — procedure",
     annexGridTitle: "E. Exhaustive criteria grid",
+    axeEngine: "axe-core engine",
+    axeOrigin: (origin: string) => (origin === "ultra11y" ? "ultra11y's pinned copy" : "the audited project's copy — ultra11y's own was not resolvable"),
+    axeMixed: "More than one axe-core version produced this audit's axe verdicts: from one tier to another, their results are not strictly comparable.",
+    annexRoutesTitle: "F. Application routes — coverage",
+    routesIntro: (n: number) =>
+      `${n} known route(s): the inventory (\`.ultra11y/routes.json\`), the sample and the recorded pages. Each is listed with how it was observed; none is omitted.`,
+    routesHead: "| Route | Sample | Observed | Page | Note |",
+    routeInSample: "RGAA sample",
+    routeOutOfSample: "beyond the sample",
+    routeObserved: {
+      captured: "captured (E2E tests)",
+      scanned: "scanned (ultra11y browser)",
+      source: "source code only",
+      "not-reached": "not reached",
+    } as Record<string, string>,
+    routeWhy: (reason: string, detail?: string) =>
+      reason === "redirect"
+        ? `redirected to ${detail ?? "another address"}`
+        : reason === "http-status"
+          ? `answered HTTP ${detail ?? "?"}`
+          : reason === "error"
+            ? `the browser failed${detail ? `: ${detail}` : ""}`
+            : `beyond --max-routes${detail ? ` ${detail}` : ""}`,
+    routesTodo: (n: number) =>
+      `${n} route(s) not reached. To cover them: \`ultra11y scan --sample --all-routes --merge <audit.json>\`, or a Playwright test with \`ultra11y/playwright\` for those that need a state (a session, a funnel).`,
   },
 } as const;
 
@@ -1859,6 +1910,10 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
     ax.push(`- **${s.rate}** : ${opts.headerRatePct ?? r.conformancePct}% — ${s.autoRateNote(autoValidated, autoDecided)}`);
   }
   ax.push(`- **${s.renderedPages(pagesRead)}**${pagesRead === 0 ? ` — ${s.noRenderedPages}` : ""}`);
+  // Which axe-core produced the axe verdicts — the pinned copy, or a visible fallback. Written
+  // `axe-core@<version> (…)`, never `<version> —`: `check` reads "<x.y.z> —" as a cited criterion.
+  for (const e of r.scope.axe ?? [])
+    ax.push(`- **${s.axeEngine}** : \`axe-core@${e.version}\` (${s.axeOrigin(e.origin)}${e.runner ? ` ; ${e.runner.split(",").join(", ")}` : ""})`);
   const automation = automationOverview(opts.standard);
   if (automation) {
     ax.push(
@@ -1897,6 +1952,7 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
     ax.push(`> 🧪 ${s.unitSnapshots(entries, files, skipped, inline)}`, "");
   }
   if (r.scope.captureCoverage?.blindSpots.length) ax.push(`> ⚠️ ${s.blindSpots(r.scope.captureCoverage.blindSpots.length)}`, "");
+  if (new Set((r.scope.axe ?? []).map((e) => e.version)).size > 1) ax.push(`> ⚠️ ${s.axeMixed}`, "");
 
   // A. every non-conformity with its occurrence checklist — the lines `verify` adjudicates.
   ax.push(`## ${s.annexNcTitle}`, "");
@@ -1968,8 +2024,26 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   }
   // E. the index a criterion is looked up in.
   ax.push(...exhaustiveGrid(opts.groups, opts.standard, lang, s.annexGridTitle));
+  // F. every route of the application and how it was observed — never silently omitted.
+  if (r.scope.routes?.length) ax.push("", ...renderRoutes(r.scope.routes, lang));
 
   return { report: out.join("\n"), annex: ax.join("\n"), reportFile, annexFile };
+}
+
+/** The annex's route table: every route of `scope.routes`, sample first. Worklist-inert (no
+ *  checkbox) and criterion-free, so `check` reads nothing into it. */
+export function renderRoutes(routes: readonly RouteCoverage[], lang: Lang): string[] {
+  const s = L[lang];
+  const cell = (t: string) => t.replace(/\|/g, "\\|");
+  const out = [`## ${s.annexRoutesTitle}`, "", s.routesIntro(routes.length), "", s.routesHead, "|---|---|---|---|---|"];
+  for (const r of routes)
+    out.push(
+      `| \`${cell(r.path)}\` | ${r.sample ? s.routeInSample : s.routeOutOfSample} | ${s.routeObserved[r.observed] ?? r.observed} | ${r.page ? `\`${cell(r.page)}\`` : "—"} | ${r.why ? cell(s.routeWhy(r.why.reason, r.why.detail)) : ""} |`,
+    );
+  const missing = routes.filter((r) => r.observed === "not-reached").length;
+  out.push("");
+  if (missing) out.push(`> ${s.routesTodo(missing)}`, "");
+  return out;
 }
 
 /** The canonical, gated WCAG 2.2 AA report — both documents. */

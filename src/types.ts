@@ -503,6 +503,8 @@ export interface RenderSignals {
   axe?: {
     violations?: { id: string; impact?: string | null; help?: string; tags?: string[]; nodes?: { target?: string[]; html?: string }[] }[];
     ran?: boolean;
+    /** The axe-core build that ran (src/axe-engine.ts). Absent on a capture that predates it. */
+    engine?: AxeEngineInfo;
   };
   /** The page's doctype declaration, from the snapshot's meta. Absent when the capture
    *  predates the field — a different statement from an empty string ("the page had none"),
@@ -756,6 +758,16 @@ export interface AuditResult {
     // at. Carried here instead so the report can say what is missing rather than hide it.
     // Optional/additive — absent when every page was reached.
     redirected?: ScanRedirect[];
+    // The axe-core builds that produced this audit's axe verdicts, one per (version, origin),
+    // with the tiers that ran each — from the scan results merged in and from the captures read.
+    // More than one entry means two tiers measured with different engines, and the report says
+    // so. Optional/additive — absent when no axe pass is on record.
+    axe?: AxeEngineInfo[];
+    // EVERY ROUTE the run knows of — the discovered inventory (`.ultra11y/routes.json`, written
+    // by `pages discover --write`), the declared sample and the captured pages — each with how
+    // it was observed. Set only when an inventory exists, so the annex lists every route and
+    // never silently omits one. Optional/additive.
+    routes?: RouteCoverage[];
   };
   guidelines: GuidelineTally[];
   criteria: CriterionResult[];
@@ -826,6 +838,42 @@ export type DynamicEngine =
   | "input-overflow-spacing"
   | "live-region";
 
+/** The axe-core build a result was measured with (src/axe-engine.ts). */
+export interface AxeEngineInfo {
+  version: string;
+  /** "ultra11y": its own pinned copy; "project": the audited project's, used as a fallback. */
+  origin: "ultra11y" | "project";
+  /** The tier(s) that ran it, comma-separated: "scan", "playwright". */
+  runner?: string;
+}
+
+/** How one route of the application was observed. */
+export type RouteObservation =
+  // Recorded by the project's own E2E run (`ultra11y/playwright`, `ultra11y/cypress`).
+  | "captured"
+  // Visited by ultra11y's browser (`scan`).
+  | "scanned"
+  // Never rendered, but the sample names the source files that render it: only the static
+  // rules saw it.
+  | "source"
+  // Known, and observed by nothing.
+  | "not-reached";
+
+/** One route of the application and how it was observed (`scope.routes`). */
+export interface RouteCoverage {
+  /** The route's path (pathname + query) — the key routes are matched on across hosts. */
+  path: string;
+  url: string;
+  /** In the declared RGAA sample (`.ultra11yrc.json` `sample.pages`), or one of the rest. */
+  sample: boolean;
+  observed: RouteObservation;
+  /** The page id it was recorded under, when it was. */
+  page?: string;
+  /** Why a route was not reached, when that is known: a refusal by the scan (the
+   *  ScanRedirect reasons), or the `scan --all-routes` bound. */
+  why?: { reason: "redirect" | "http-status" | "error" | "max-routes"; detail?: string };
+}
+
 export interface DynamicFinding {
   criteriaId: string;
   axeRule: string;
@@ -871,6 +919,9 @@ export interface DynamicResult {
   // Sample pages dropped because the browser landed on a different path than the one asked
   // for. Absent when every page was reached. Optional/additive — see ScanRedirect.
   redirected?: ScanRedirect[];
+  // The axe-core build this run injected (src/axe-engine.ts): its version, and whether it was
+  // ultra11y's pinned copy or the audited project's fallback. Optional/additive.
+  axe?: AxeEngineInfo;
 }
 
 // ---- the pack-keyed audit DOCUMENT -------------------------------------------------------

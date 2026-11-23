@@ -1,6 +1,6 @@
 import { U as UnitCheckOptions, R as Renderable, T as TestContext } from './unit-C7c8k68J.js';
-import { A as AuditLike } from './payload-BrdH5eEV.js';
-export { F as FindingLike } from './payload-BrdH5eEV.js';
+import { A as AuditLike } from './payload-BPGhg2sa.js';
+export { F as FindingLike } from './payload-BPGhg2sa.js';
 
 /** Audit a rendered component; throws when a finding reaches `failOn` (default `blocking`). */
 declare const checkA11y: (target: Renderable, opts?: UnitCheckOptions) => Promise<AuditLike>;
