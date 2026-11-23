@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { AXE_TAGS, type AxeEngine, resolveAxeEngine, runAxe, unionAxeEngines } from "../src/axe-engine.js";
+import { AXE_CORE_PIN, AXE_TAGS, type AxeEngine, resolveAxeEngine, runAxe, unionAxeEngines } from "../src/axe-engine.js";
 import { resolveIntegrationAxe } from "../src/integrations/playwright.js";
 import { resolveLocalDeps } from "../src/scan-local.js";
 
@@ -15,10 +15,11 @@ const REPO = join(import.meta.dirname, "..");
 const pinned = (JSON.parse(readFileSync(join(REPO, "package.json"), "utf8")) as { dependencies: Record<string, string> }).dependencies["axe-core"];
 const installed = (createRequire(join(REPO, "package.json"))("axe-core/package.json") as { version: string }).version;
 
-/** A project carrying its OWN @axe-core/playwright and axe-core, at a version ultra11y never pins. */
-function projectWithItsOwnAxe(): string {
+/** A project carrying its OWN @axe-core/playwright and axe-core — by default at a version
+ *  ultra11y never pins. `name` "ultra11y" fakes ultra11y's own package instead. */
+function projectWithItsOwnAxe(axeVersion = "9.9.9-project", name = "p"): string {
   const root = mkdtempSync(join(tmpdir(), "u11y-axe-"));
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "p", version: "1.0.0" }));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name, version: "1.0.0" }));
   const mods: [string, string, string][] = [
     ["@axe-core/playwright", "index.js", "module.exports = class ProjectAxeBuilder {};"],
     ["axe-core", "axe.min.js", "/* the project's axe */"],
@@ -26,7 +27,7 @@ function projectWithItsOwnAxe(): string {
   for (const [name, main, body] of mods) {
     const dir = join(root, "node_modules", ...name.split("/"));
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name, version: "9.9.9-project", main }));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name, version: axeVersion, main }));
     writeFileSync(join(dir, main), body);
   }
   return root;
@@ -72,6 +73,37 @@ describe("the pinned axe-core", () => {
     expect(e.origin).toBe("project");
     expect(e.version).toBe("9.9.9-project");
     expect(e.note).toMatch(/audited project's axe-core 9\.9\.9-project/);
+  });
+
+  it("bakes the pinned version into the source, in lockstep with package.json", () => {
+    expect(AXE_CORE_PIN).toBe(pinned);
+  });
+
+  it("the skill bundle inside a project's skills dir runs the PROJECT's axe — and says so, even at the pinned version", () => {
+    // `.codex/skills/ultra11y/scripts/ultra11y.mjs`: resolving from the bundle walks up to the
+    // project's node_modules. Same version as the pin or not, that copy is not ultra11y's.
+    for (const dir of [".codex", ".opencode"]) {
+      for (const version of [AXE_CORE_PIN, "4.10.0"]) {
+        const project = projectWithItsOwnAxe(version);
+        const self = join(project, dir, "skills", "ultra11y", "scripts", "ultra11y.mjs");
+        const e = withoutNodePath(() => resolveAxeEngine({ cwd: project, self }));
+        expect(e.origin).toBe("project");
+        expect(e.version).toBe(version);
+        expect(e.note).toContain(`audited project's axe-core ${version}`);
+      }
+    }
+  });
+
+  it("ultra11y's own package at the pinned version is the pinned copy; at another version it is not", () => {
+    const own = projectWithItsOwnAxe(AXE_CORE_PIN, "ultra11y");
+    const atPin = withoutNodePath(() => resolveAxeEngine({ cwd: projectWithItsOwnAxe(), self: join(own, "dist", "playwright.mjs") }));
+    expect(atPin).toMatchObject({ origin: "ultra11y", version: AXE_CORE_PIN });
+    expect(atPin.note).toBeUndefined();
+
+    const drifted = projectWithItsOwnAxe("4.10.0", "ultra11y");
+    const off = withoutNodePath(() => resolveAxeEngine({ cwd: projectWithItsOwnAxe(), self: join(drifted, "dist", "playwright.mjs") }));
+    expect(off).toMatchObject({ origin: "unpinned", version: "4.10.0" });
+    expect(off.note).toContain(`is 4.10.0, not the pinned ${AXE_CORE_PIN}`);
   });
 
   it("throws when neither resolves, rather than running nothing silently", () => {

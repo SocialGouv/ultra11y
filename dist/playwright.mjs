@@ -1,5 +1,5 @@
 // src/integrations/playwright.ts
-import { existsSync as existsSync2, readFileSync as readFileSync3 } from "fs";
+import { existsSync as existsSync3, readFileSync as readFileSync3 } from "fs";
 import { createRequire as createRequire3 } from "module";
 import { join as join3 } from "path";
 
@@ -339,10 +339,12 @@ function storeDocument(root, url, bytes, pageIds) {
 }
 
 // src/axe-engine.ts
-import { readFileSync as readFileSync2 } from "fs";
+import { existsSync as existsSync2, readFileSync as readFileSync2 } from "fs";
 import { createRequire } from "module";
-import { join as join2 } from "path";
+import { dirname, join as join2 } from "path";
+import { fileURLToPath } from "url";
 var AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
+var AXE_CORE_PIN = "4.13.0";
 var BUILDER_SPEC = "@axe-core/playwright";
 var SOURCE_SPEC = "axe-core/axe.min.js";
 var PACKAGE_SPEC = "axe-core/package.json";
@@ -375,6 +377,27 @@ function loadBuilder(anchor) {
     return void 0;
   }
 }
+function insideUltra11y(anchor) {
+  let dir;
+  try {
+    dir = dirname(anchor.startsWith("file:") ? fileURLToPath(anchor) : anchor);
+  } catch {
+    return false;
+  }
+  for (; ; ) {
+    const manifest = join2(dir, "package.json");
+    if (existsSync2(manifest)) {
+      try {
+        return JSON.parse(readFileSync2(manifest, "utf8")).name === "ultra11y";
+      } catch {
+        return false;
+      }
+    }
+    const up = dirname(dir);
+    if (up === dir) return false;
+    dir = up;
+  }
+}
 function resolveAxeEngine(opts) {
   const self = opts.self ?? import.meta.url;
   const project = join2(opts.cwd, "package.json");
@@ -390,16 +413,15 @@ function resolveAxeEngine(opts) {
     source = readFileSync2(located.path, "utf8");
     sourceCache.set(located.path, source);
   }
-  const origin = own ? "ultra11y" : "project";
+  const origin = own && insideUltra11y(self) ? located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned" : "project";
+  const note = origin === "project" ? `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here \u2014 running the audited project's axe-core ${located.version} (${located.path}). Results are recorded with that version; install ultra11y with its dependencies to run the pinned one.` : origin === "unpinned" ? `ultra11y: the axe-core resolved from ultra11y's own package is ${located.version}, not the pinned ${AXE_CORE_PIN} (${located.path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.` : void 0;
   return {
     AxeBuilder,
     source,
     sourcePath: located.path,
     version: located.version,
     origin,
-    ...origin === "project" ? {
-      note: `ultra11y: its own axe-core is not resolvable here \u2014 running the audited project's axe-core ${located.version} (${located.path}). Results are recorded with that version; install ultra11y with its dependencies to run the pinned one.`
-    } : {}
+    ...note ? { note } : {}
   };
 }
 async function runAxe(engine, page, runner) {
@@ -1574,7 +1596,7 @@ ${url}`;
   let attempts = 0;
   for (const url of candidates) {
     const known = storedDocuments.get(inRoot(url));
-    if (known && existsSync2(known)) {
+    if (known && existsSync3(known)) {
       recordDocumentPages(known, url, [pageId]);
       files.push(known);
       continue;

@@ -3,13 +3,16 @@ import { C as CheckOptions, A as AuditLike } from './payload-BPGhg2sa.js';
 /** The axe-core build a result was measured with (src/axe-engine.ts). */
 interface AxeEngineInfo {
     version: string;
-    /** "ultra11y": its own pinned copy; "project": the audited project's, used as a fallback. */
-    origin: "ultra11y" | "project";
+    /** "ultra11y": its own copy, at the pinned version (src/axe-engine.ts AXE_CORE_PIN);
+     *  "unpinned": resolved from ultra11y's own package but at another version; "project": the
+     *  audited project's, used as a fallback. */
+    origin: "ultra11y" | "unpinned" | "project";
     /** The tier(s) that ran it, comma-separated: "scan", "playwright". */
     runner?: string;
 }
 
-/** Whose copy of axe-core ran: ultra11y's own (the pinned one), or the audited project's. */
+/** Whose copy of axe-core ran: ultra11y's own pinned one, ultra11y's own at another version
+ *  ("unpinned"), or the audited project's. */
 type AxeOrigin = AxeEngineInfo["origin"];
 /** A resolved, ready-to-run axe: the builder class, the source it injects, and where both came from. */
 interface AxeEngine {
@@ -20,7 +23,7 @@ interface AxeEngine {
     sourcePath: string;
     version: string;
     origin: AxeOrigin;
-    /** Set when the project's copy had to be used — the visible half of the fallback. */
+    /** Set when the copy is not ultra11y's pinned one — the visible half of the fallback. */
     note?: string;
 }
 

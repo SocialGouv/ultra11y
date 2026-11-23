@@ -328,7 +328,12 @@ const L = {
     annexManualTitle: "D. Critères à évaluer — marche à suivre",
     annexGridTitle: "E. Grille exhaustive des critères",
     axeEngine: "Moteur axe-core",
-    axeOrigin: (origin: string) => (origin === "ultra11y" ? "copie épinglée d'ultra11y" : "copie du projet audité — celle d'ultra11y n'était pas résolvable"),
+    axeOrigin: (origin: string) =>
+      origin === "ultra11y"
+        ? "copie épinglée d'ultra11y"
+        : origin === "unpinned"
+          ? "copie d'ultra11y, mais pas à la version épinglée"
+          : "copie du projet audité — celle d'ultra11y n'était pas résolvable",
     axeMixed:
       "Plusieurs versions d'axe-core ont produit les verdicts axe de cet audit : d'un niveau à l'autre, leurs résultats ne sont pas strictement comparables.",
     annexRoutesTitle: "F. Routes de l'application — couverture",
@@ -589,7 +594,12 @@ const L = {
     annexManualTitle: "D. Criteria to assess — procedure",
     annexGridTitle: "E. Exhaustive criteria grid",
     axeEngine: "axe-core engine",
-    axeOrigin: (origin: string) => (origin === "ultra11y" ? "ultra11y's pinned copy" : "the audited project's copy — ultra11y's own was not resolvable"),
+    axeOrigin: (origin: string) =>
+      origin === "ultra11y"
+        ? "ultra11y's pinned copy"
+        : origin === "unpinned"
+          ? "ultra11y's own copy, but not at the pinned version"
+          : "the audited project's copy — ultra11y's own was not resolvable",
     axeMixed: "More than one axe-core version produced this audit's axe verdicts: from one tier to another, their results are not strictly comparable.",
     annexRoutesTitle: "F. Application routes — coverage",
     routesIntro: (n: number) =>

@@ -99,7 +99,7 @@ import {
 } from "./ledger.js";
 import { combineDynamic, mergeDynamic, mergeSnapshotAudit, scanPageSummary } from "./scan.js";
 import { resolveAxeEngine } from "./axe-engine.js";
-import { ALL_ROUTES_MAX, type RouteSource, readRoutes, routeCounts, routeCoverage, routesToScan, writeRoutes } from "./routes.js";
+import { ALL_ROUTES_MAX, type ObservedPage, type RouteSource, readRoutes, routeCounts, routeCoverage, routesToScan, writeRoutes } from "./routes.js";
 import { DOCUMENTS_DIR, downloadSnapshotDocuments } from "./documents.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
@@ -1125,7 +1125,9 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
     }
   }
   // Every route of the inventory, when there is one, with how it was observed.
-  stampRoutes(result, ".", lang);
+  // Only the snapshots this audit actually read count as observations: under --no-captures or a
+  // diff scope they were left out, and a route must not read « capturée » / « scannée » then.
+  stampRoutes(result, ".", lang, { recorded: pagesInScope });
 
   // Only persist audit-latest.json when an output dir is explicitly requested. A plain
   // `audit` streams to stdout (--json / text summary) and must NOT litter the CWD with an
@@ -1307,7 +1309,21 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
 /** Stamp `scope.routes` — every route of the inventory, the sample and the recorded pages, with
  *  how each was observed (src/routes.ts). A no-op without an inventory, so an audit of a project
  *  that never ran `pages discover --write` is unchanged. */
-function stampRoutes(result: AuditResult, root: string, lang: Lang, extra: { refused?: ScanRedirect[]; bounded?: string[]; max?: number } = {}): void {
+export interface StampRoutesExtra {
+  refused?: ScanRedirect[];
+  bounded?: string[];
+  max?: number;
+  /** Read the pages recorded under `<root>/.ultra11y/pages` as observations. Default true. False
+   *  when this audit left the snapshots out (`--no-captures`, `--changed`/`--staged`/`--since`):
+   *  a route is then never labelled captured or scanned on the strength of a page nothing in
+   *  this run measured — it is source-only or not reached. */
+  recorded?: boolean;
+  /** The URLs this run's browser actually scanned (DynamicResult.scanned), labelled scanned
+   *  whether or not a snapshot was persisted for them (`scan --no-snapshot`). */
+  scanned?: readonly string[];
+}
+
+export function stampRoutes(result: AuditResult, root: string, lang: Lang, extra: StampRoutesExtra = {}): void {
   const inventory = readRoutes(root);
   if (!inventory) return;
   let sample: SamplePage[] | undefined;
@@ -1316,7 +1332,9 @@ function stampRoutes(result: AuditResult, root: string, lang: Lang, extra: { ref
   } catch {
     /* an unreadable config has no sample to label — every route is then « hors échantillon » */
   }
-  const pages = readSnapshots(root).map((s) => ({ id: s.meta.id, url: s.meta.url, ...(s.meta.runner ? { runner: s.meta.runner } : {}) }));
+  const pages: ObservedPage[] =
+    extra.recorded === false ? [] : readSnapshots(root).map((s) => ({ id: s.meta.id, url: s.meta.url, ...(s.meta.runner ? { runner: s.meta.runner } : {}) }));
+  for (const url of extra.scanned ?? []) pages.push({ url, runner: "scan" });
   result.scope.routes = routeCoverage({
     inventory,
     ...(sample ? { sample } : {}),
@@ -3880,7 +3898,9 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
   // (that capture holds the state the tests built, and wins). Bounded by --max-routes, and a
   // route the bound leaves out is listed in the report as not reached, never dropped.
   const allRoutes = p.flags["all-routes"] === true;
-  const routesRoot = snapshotRoot ?? ".";
+  // From --root whether or not this run snapshots: `pages discover --root <dir>` wrote the
+  // inventory there, and `--no-snapshot` changes what is persisted, not where the project is.
+  const routesRoot = typeof p.flags.root === "string" && p.flags.root ? resolve(p.flags.root) : process.cwd();
   let maxRoutes = ALL_ROUTES_MAX;
   let routePlan: ReturnType<typeof routesToScan> | undefined;
   if (allRoutes) {
@@ -4092,6 +4112,9 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     stampRoutes(merged, routesRoot, lang, {
       ...(dynamic.redirected ? { refused: dynamic.redirected } : {}),
       ...(routePlan?.bounded.length ? { bounded: routePlan.bounded, max: maxRoutes } : {}),
+      // What this run scanned, read from the run itself rather than from the snapshots on
+      // disk: under --no-snapshot there are none, and the routes it visited are still scanned.
+      ...(dynamic.scanned?.length ? { scanned: dynamic.scanned } : {}),
     });
     mkdirSync(out, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);

@@ -19,9 +19,10 @@
 //
 // Node builtins only — this file is bundled into the zero-dep engine and into the published
 // integration, and must never pull a browser dependency in statically.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { AxeEngineInfo } from "./types.js";
 
 export type { AxeEngineInfo };
@@ -32,7 +33,17 @@ export type { AxeEngineInfo };
  *  `color-contrast`, the rule AXE_DECIDES relies on (src/axe-map.ts), is tagged `wcag2aa`. */
 export const AXE_TAGS: readonly string[] = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 
-/** Whose copy of axe-core ran: ultra11y's own (the pinned one), or the audited project's. */
+/** The axe-core version ultra11y pins — the exact `axe-core` dependency in package.json, baked
+ *  into the source (and so into every bundle) the way `VERSION` is, and held in lockstep with
+ *  package.json by tests/axe-engine.test.ts. It is what « ultra11y's pinned copy » is checked
+ *  against: a copy that merely resolves from ultra11y's code is not, by that alone, the pinned
+ *  one — the standalone skill bundle runs from `<project>/.codex/skills/…` or
+ *  `.opencode/skills/…`, and from there module resolution walks up into the PROJECT's
+ *  node_modules. */
+export const AXE_CORE_PIN = "4.13.0";
+
+/** Whose copy of axe-core ran: ultra11y's own pinned one, ultra11y's own at another version
+ *  ("unpinned"), or the audited project's. */
 export type AxeOrigin = AxeEngineInfo["origin"];
 
 /** A resolved, ready-to-run axe: the builder class, the source it injects, and where both came from. */
@@ -45,7 +56,7 @@ export interface AxeEngine {
   sourcePath: string;
   version: string;
   origin: AxeOrigin;
-  /** Set when the project's copy had to be used — the visible half of the fallback. */
+  /** Set when the copy is not ultra11y's pinned one — the visible half of the fallback. */
   note?: string;
 }
 
@@ -93,6 +104,31 @@ function loadBuilder(anchor: string): any {
   }
 }
 
+/** Whether `anchor` lies inside ultra11y's own package: the nearest package.json above it is
+ *  ultra11y's. False for the standalone skill bundle copied into a project's skills directory —
+ *  its nearest package.json is the project's, and whatever it resolves is the project's. */
+function insideUltra11y(anchor: string): boolean {
+  let dir: string;
+  try {
+    dir = dirname(anchor.startsWith("file:") ? fileURLToPath(anchor) : anchor);
+  } catch {
+    return false;
+  }
+  for (;;) {
+    const manifest = join(dir, "package.json");
+    if (existsSync(manifest)) {
+      try {
+        return (JSON.parse(readFileSync(manifest, "utf8")) as { name?: unknown }).name === "ultra11y";
+      } catch {
+        return false;
+      }
+    }
+    const up = dirname(dir);
+    if (up === dir) return false;
+    dir = up;
+  }
+}
+
 export interface ResolveAxeOptions {
   /** The audited project's directory — the fallback anchor. */
   cwd: string;
@@ -118,18 +154,23 @@ export function resolveAxeEngine(opts: ResolveAxeOptions): AxeEngine {
     source = readFileSync(located.path, "utf8");
     sourceCache.set(located.path, source);
   }
-  const origin: AxeOrigin = own ? "ultra11y" : "project";
+  // « ultra11y's pinned copy » only when both hold: the copy was resolved from ultra11y's own
+  // package, AND it is the version ultra11y pins. Resolving from this module's URL is not enough
+  // — from a skills directory inside a project it reaches the project's node_modules.
+  const origin: AxeOrigin = own && insideUltra11y(self) ? (located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned") : "project";
+  const note =
+    origin === "project"
+      ? `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here — running the audited project's axe-core ${located.version} (${located.path}). Results are recorded with that version; install ultra11y with its dependencies to run the pinned one.`
+      : origin === "unpinned"
+        ? `ultra11y: the axe-core resolved from ultra11y's own package is ${located.version}, not the pinned ${AXE_CORE_PIN} (${located.path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.`
+        : undefined;
   return {
     AxeBuilder,
     source,
     sourcePath: located.path,
     version: located.version,
     origin,
-    ...(origin === "project"
-      ? {
-          note: `ultra11y: its own axe-core is not resolvable here — running the audited project's axe-core ${located.version} (${located.path}). Results are recorded with that version; install ultra11y with its dependencies to run the pinned one.`,
-        }
-      : {}),
+    ...(note ? { note } : {}),
   };
 }
 

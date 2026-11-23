@@ -2,13 +2,13 @@
 // observed — captured by the E2E run, scanned, seen in source — or listed as not reached, with
 // the reason. Never silently omitted. And the axe-core build that produced the axe verdicts is
 // recorded with the captures and the scans, and named in the annex.
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { runAudit } from "../src/audit.js";
-import { main } from "../src/cli.js";
+import { main, stampRoutes } from "../src/cli.js";
 import { renderReportDocuments } from "../src/report.js";
 import { ALL_ROUTES_MAX, readRoutes, routeCoverage, routePath, routesToScan, writeRoutes } from "../src/routes.js";
 import { combineDynamic, mergeDynamic } from "../src/scan.js";
@@ -156,6 +156,61 @@ describe("the annex lists every route and the axe-core that ran", () => {
     const fr = renderReportDocuments(audit, "fr").annex;
     expect(fr).toContain("## F. Routes de l'application — couverture");
     expect(fr).toContain("non atteinte");
+  });
+
+  it("claims no route captured or scanned when the audit left the snapshots out (--no-captures)", async () => {
+    const root = mkdtempSync(join(tmpdir(), "u11y-nocapt-"));
+    for (const [id, url, runner] of [
+      ["accueil", "http://localhost:3000/", "playwright"],
+      ["tarifs", "http://localhost:3000/tarifs", "scan"],
+    ] as const) {
+      writeSnapshot(root, { meta: { v: SNAPSHOT_VERSION, id, name: id, url, runner }, dom: DOM(id), axe: { ran: true, violations: [], engine: ENGINE } });
+    }
+    writeFileSync(join(root, "index.html"), DOM("source"));
+    writeRoutes(root, ["https://prod.example/", "https://prod.example/tarifs"], "sitemap");
+
+    const cwd = process.cwd();
+    const out: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => void out.push(a.join(" ")));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    let code: number;
+    try {
+      process.chdir(root);
+      code = await main(["audit", "index.html", "--no-captures", "--json"]);
+    } finally {
+      process.chdir(cwd);
+    }
+    expect(code).toBe(0);
+    const audit = JSON.parse(out.join("\n"));
+    const obs = Object.fromEntries(audit.scope.routes.map((r: { path: string; observed: string }) => [r.path, r.observed]));
+    // The snapshots are on disk, but nothing in THIS audit measured them.
+    expect(obs).toEqual({ "/": "not-reached", "/tarifs": "not-reached" });
+  });
+
+  it("stampRoutes: skips the recorded pages on request, and labels the URLs a run scanned without snapshotting", () => {
+    const root = mkdtempSync(join(tmpdir(), "u11y-stamp-"));
+    writeSnapshot(root, {
+      meta: { v: SNAPSHOT_VERSION, id: "accueil", name: "accueil", url: "http://localhost:3000/", runner: "playwright" },
+      dom: DOM("accueil"),
+      axe: { ran: true, violations: [], engine: ENGINE },
+    });
+    writeRoutes(root, ["https://prod.example/", "https://prod.example/aide", "https://prod.example/plan"], "sitemap");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fixture = () => runAudit({ inputs: [join(import.meta.dirname, "fixtures", "non-conforming", "bad.html")] });
+    const obs = (r: ReturnType<typeof runAudit>) => Object.fromEntries(r.scope.routes!.map((x) => [x.path, [x.observed, x.page]]));
+
+    const all = fixture();
+    stampRoutes(all, root, "en");
+    expect(obs(all)).toEqual({ "/": ["captured", "accueil"], "/aide": ["not-reached", undefined], "/plan": ["not-reached", undefined] });
+
+    const skipped = fixture();
+    stampRoutes(skipped, root, "en", { recorded: false });
+    expect(obs(skipped)).toEqual({ "/": ["not-reached", undefined], "/aide": ["not-reached", undefined], "/plan": ["not-reached", undefined] });
+
+    const scanned = fixture();
+    stampRoutes(scanned, root, "en", { recorded: false, scanned: ["http://127.0.0.1:4000/aide"] });
+    // Scanned, but with no page id: no snapshot was written for it.
+    expect(obs(scanned)).toEqual({ "/": ["not-reached", undefined], "/aide": ["scanned", undefined], "/plan": ["not-reached", undefined] });
   });
 
   it("leaves an audit with no inventory unchanged", () => {

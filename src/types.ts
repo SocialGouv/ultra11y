@@ -841,8 +841,10 @@ export type DynamicEngine =
 /** The axe-core build a result was measured with (src/axe-engine.ts). */
 export interface AxeEngineInfo {
   version: string;
-  /** "ultra11y": its own pinned copy; "project": the audited project's, used as a fallback. */
-  origin: "ultra11y" | "project";
+  /** "ultra11y": its own copy, at the pinned version (src/axe-engine.ts AXE_CORE_PIN);
+   *  "unpinned": resolved from ultra11y's own package but at another version; "project": the
+   *  audited project's, used as a fallback. */
+  origin: "ultra11y" | "unpinned" | "project";
   /** The tier(s) that ran it, comma-separated: "scan", "playwright". */
   runner?: string;
 }
@@ -916,6 +918,11 @@ export interface DynamicResult {
   // static rules never ran against its DOM, so src/pages.ts keeps it `manual` forever).
   // Empty/absent when snapshotting was off or every collection failed. Optional/additive.
   snapshots?: string[];
+  // The URLs this run actually scanned (requested, reached, not refused), whether or not a
+  // snapshot was persisted for them. What the route coverage (src/routes.ts) labels « scanned »
+  // for this run: under `--no-snapshot` there is no snapshot to read it back from.
+  // Optional/additive — absent when nothing was scanned.
+  scanned?: string[];
   // Sample pages dropped because the browser landed on a different path than the one asked
   // for. Absent when every page was reached. Optional/additive — see ScanRedirect.
   redirected?: ScanRedirect[];

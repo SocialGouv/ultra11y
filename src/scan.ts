@@ -469,12 +469,14 @@ export function combineDynamic(sample: DynamicResult | undefined, rest: DynamicR
   const snapshots = [...(sample.snapshots ?? []), ...(rest.snapshots ?? [])];
   const redirected = [...(sample.redirected ?? []), ...(rest.redirected ?? [])];
   const axe = sample.axe ?? rest.axe;
+  const scanned = [...(sample.scanned ?? []), ...(rest.scanned ?? [])];
   return {
     ...sample,
     target: `${sample.target} + ${rest.target}`,
     findings: [...sample.findings, ...rest.findings],
     ...(tested.length ? { testedScs: tested } : {}),
     ...(snapshots.length ? { snapshots } : {}),
+    ...(scanned.length ? { scanned } : {}),
     ...(redirected.length ? { redirected } : {}),
     ...(axe ? { axe } : {}),
   };

@@ -970,7 +970,12 @@ export async function runScanLocal(opts: LocalScanOpts): Promise<DynamicResult> 
       snapshot: Boolean(opts.snapshotRoot),
     });
     const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, opts.target) : undefined;
-    return { ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE), testedScs: measuredScs([out], interact), ...(id ? { snapshots: [id] } : {}) };
+    return {
+      ...toDynamicResult(out, opts.target, lang, LOCAL_ENGINE),
+      testedScs: measuredScs([out], interact),
+      scanned: [opts.target],
+      ...(id ? { snapshots: [id] } : {}),
+    };
   } finally {
     await browser.close();
   }
@@ -1000,6 +1005,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
   // rather than from what this runtime is capable of measuring — see `measuredScs`.
   const outs: RunnerOutput[] = [];
   const redirected: ScanRedirect[] = [];
+  const scanned: string[] = [];
   try {
     for (const url of urls) {
       // ONE BAD PAGE COSTS ITS OWN PAGE, NOT THE RUN.
@@ -1061,6 +1067,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
       }
       findings.push(...toDynamicResult(out, url, lang, LOCAL_ENGINE).findings);
       outs.push(out);
+      scanned.push(url);
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, url) : undefined;
       if (id) snapshots.push(id);
     }
@@ -1075,6 +1082,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
     findings,
     testedScs: measuredScs(outs, interact),
     axe: axeInfo(outs, axe),
+    ...(scanned.length ? { scanned } : {}),
     ...(snapshots.length ? { snapshots } : {}),
     ...(redirected.length ? { redirected } : {}),
   };
@@ -1098,6 +1106,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
   // rather than from what this runtime is capable of measuring — see `measuredScs`.
   const outs: RunnerOutput[] = [];
   const redirected: ScanRedirect[] = [];
+  const scannedUrls: string[] = [];
   try {
     for (const page of pages) {
       const storageState = page.storageState ?? opts.storageState; // per-page override
@@ -1146,6 +1155,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
       }
       findings.push(...tagSampleFindings(toDynamicResult(out, page.url, lang, LOCAL_ENGINE).findings, page));
       outs.push(out);
+      scannedUrls.push(page.url);
       // The sample page's declared id/name/auth/notes win over anything derived from the
       // URL: that identity is what the report and the per-page grid speak.
       const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, page.url, page) : undefined;
@@ -1170,6 +1180,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
     sample: sampleScope({ pages: scanned }),
     testedScs: measuredScs(outs, interact),
     axe: axeInfo(outs, axe),
+    ...(scannedUrls.length ? { scanned: scannedUrls } : {}),
     ...(snapshots.length ? { snapshots } : {}),
     ...(redirected.length ? { redirected } : {}),
   };

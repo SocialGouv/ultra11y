@@ -1300,3 +1300,60 @@ describe("the Playwright fixture does not record a placeholder as a page (#135)"
     expect(png(join(endless.dir, "screen-full.png")).height).toBe(FULL_SCREENSHOT_MAX_HEIGHT);
   }, 120_000);
 });
+
+// `scan --all-routes --no-snapshot --root <dir>`: the inventory `pages discover --root <dir>`
+// wrote is read from --root even though nothing is snapshotted, and the routes this run scanned
+// are labelled scanned from the run itself — there is no snapshot on disk to read them back from.
+describe("scan --all-routes --no-snapshot reads --root and labels what it scanned", () => {
+  const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+  it("finds the inventory under --root, and reports the scanned routes as scanned", async () => {
+    if (!browserAvailable) return;
+    const { main } = await import("../src/cli.js");
+    const { writeRoutes } = await import("../src/routes.js");
+    const project = mkdtempSync(join(tmpdir(), "u11y-allroutes-"));
+    writeRoutes(project, [`${origin}/`, `${origin}/aide`, `${origin}/introuvable`], "crawl");
+    const auditFile = join(mkdtempSync(join(tmpdir(), "u11y-allroutes-base-")), "audit.json");
+    writeFileSync(auditFile, JSON.stringify(runAudit({ inputs: [join(root, "page.html")] })));
+    // Run from ANOTHER directory: the inventory must come from --root, not from the cwd.
+    const elsewhere = mkdtempSync(join(tmpdir(), "u11y-allroutes-cwd-"));
+    const out: string[] = [];
+    const log = console.log;
+    const err = console.error;
+    console.log = (...a: unknown[]) => void out.push(a.join(" "));
+    console.error = () => {};
+    const cwd = process.cwd();
+    let code: number;
+    try {
+      process.chdir(elsewhere);
+      code = await main([
+        "scan",
+        "--all-routes",
+        "--no-snapshot",
+        "--no-interact",
+        "--root",
+        project,
+        "--cwd",
+        REPO,
+        "--merge",
+        auditFile,
+        "--out",
+        join(elsewhere, "audits"),
+        "--json",
+      ]);
+    } finally {
+      process.chdir(cwd);
+      console.log = log;
+      console.error = err;
+    }
+    expect(code).toBe(0);
+    expect(existsSync(join(project, PAGES_DIR)), "--no-snapshot persisted nothing").toBe(false);
+    const doc = JSON.parse(out.join("\n"));
+    const by = Object.fromEntries((doc.scope.routes as { path: string; observed: string; page?: string; why?: { reason: string } }[]).map((r) => [r.path, r]));
+    expect(by["/"]).toMatchObject({ observed: "scanned" });
+    expect(by["/aide"]).toMatchObject({ observed: "scanned" });
+    // No snapshot was written, so no page id is claimed for them.
+    expect(by["/"]!.page).toBeUndefined();
+    expect(by["/introuvable"]).toMatchObject({ observed: "not-reached", why: { reason: "http-status" } });
+  }, 180_000);
+});

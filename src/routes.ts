@@ -89,7 +89,9 @@ export function writeRoutes(root: string, urls: readonly string[], via: RouteSou
 /** A recorded page, to exactly what the classification reads. `runner` is the snapshot's
  *  producer: "scan" for ultra11y's browser, anything else for the project's own run. */
 export interface ObservedPage {
-  id: string;
+  /** The snapshot id under `.ultra11y/pages`, when one was recorded — absent for a page a
+   *  `scan --no-snapshot` visited without persisting it. */
+  id?: string;
   url: string;
   runner?: string;
 }
@@ -138,7 +140,7 @@ export function routeCoverage(input: RouteCoverageInput): RouteCoverage[] {
     // reported as captured, the state the project's own tests built.
     if (ORDER[observed] < ORDER[row.observed] || (observed === row.observed && !row.page)) {
       row.observed = observed;
-      row.page = p.id;
+      if (p.id) row.page = p.id;
     }
   }
   for (const r of input.refused ?? []) {
