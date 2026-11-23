@@ -70,13 +70,36 @@ describe("the repository tracks no artefact one of its own runs left behind", ()
     "/adjudicate/",
     "/VERIFY.md",
     "/VERIFY.todo.json",
-    ".ultra11y/",
-    ".impeccable/",
+    "/.ultra11y/",
+    "/.impeccable/",
   ])("anchors %s in .gitignore", (entry) => {
     const lines = readFileSync(join(ROOT, ".gitignore"), "utf8")
       .split("\n")
       .map((l) => l.trim());
     expect(lines).toContain(entry);
+    // Unanchored, the same rule would match at any depth and hide committed fixtures.
+    expect(lines).not.toContain(entry.slice(1));
+  });
+
+  /** `git check-ignore` exits 0 when the path is ignored, 1 when it is not. */
+  const ignored = (path: string): boolean => {
+    try {
+      execFileSync("git", ["check-ignore", "-q", "--no-index", path], { cwd: ROOT, stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // The root `.ultra11y/` is a run's output; a fixture's `.ultra11y/` is committed test input
+  // (scripts/record-rgaa-golden.mjs writes the golden captures there). The ignore must tell
+  // them apart, which is what the leading slash is for.
+  it("ignores the root .ultra11y/ and .impeccable/ but not a fixture's .ultra11y/", () => {
+    expect(ignored(".ultra11y/pages/x/dom.html")).toBe(true);
+    expect(ignored(".impeccable/config.json")).toBe(true);
+    const fixtureDirs = [...new Set(trackedAtRoot().flatMap((f) => /^(.+\/\.ultra11y)\//.exec(f)?.[1] ?? []))];
+    expect(fixtureDirs).toEqual(expect.arrayContaining(["tests/fixtures/capture-project/.ultra11y", "tests/fixtures/rgaa-golden/rendered/.ultra11y"]));
+    for (const dir of fixtureDirs) expect(ignored(`${dir}/x`), `${dir} is ignored`).toBe(false);
   });
 });
 

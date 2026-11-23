@@ -3,7 +3,7 @@ node_modules/
 /tmp/
 audits/
 # Engine output (snapshots, ledgers, worklists), written relative to the current directory.
-.ultra11y/
+/.ultra11y/
 coverage/
 .DS_Store
 # Claude Code session dir — the harness locks .claude/workflows/ against external
@@ -27,4 +27,4 @@ coverage/
 /adjudicate/
 
 # Local artefacts of the impeccable skill (review captures, reports).
-.impeccable/
+/.impeccable/
