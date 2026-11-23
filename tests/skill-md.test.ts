@@ -175,7 +175,7 @@ describe("skill docs stay in sync with the CLI", () => {
       ["SKILL.md", skills.ultra11y!.raw], // the claim is in the frontmatter description
       ["README.md", README],
     ] as const) {
-      const m = text.match(/(\d+)\s+(?:machine-detectable\s+)?static check/);
+      const m = text.match(/(\d+)\s+(?:(?:machine-detectable\s+)?static check|vérifications statiques)/);
       expect(m, `${name} states no 'N static checks' claim`).not.toBeNull();
       expect(Number(m![1]), `${name} static-check count is stale`).toBe(count);
     }

@@ -18,8 +18,6 @@
       <ul>
         <li><a href="index.html">Accueil</a></li>
         <li><a href="installation.html">Installer</a></li>
-        <li><a href="principes.html">Principes</a></li>
-        <li><a href="workflow.html">Intégration</a></li>
         <li><a href="audit.html">Audit</a></li>
         <li><a href="couverture.html" aria-current="page">Couverture</a></li>
         <li><a href="fiabilite.html">Fiabilité</a></li>
@@ -39,6 +37,27 @@
   <li class="tile"><span class="v"><span data-gen="rgaa.levels.nc">22</span> <small>/ <span data-gen="rgaa.criteria">106</span></small></span><span class="l">où une règle peut <strong>prouver</strong> une non-conformité ; le « conforme » reste un jugement</span></li>
   <li class="tile"><span class="v"><span data-gen="rgaa.levels.hint">30</span> <small>/ <span data-gen="rgaa.criteria">106</span></small></span><span class="l">où des règles donnent des indices ; l’IA tranche</span></li>
   <li class="tile"><span class="v"><span data-gen="rgaa.levels.llm">52</span> <small>/ <span data-gen="rgaa.criteria">106</span></small></span><span class="l">sans aucune règle : jugement de l’IA ou d’un humain seul</span></li>
+</ul>
+
+<h2>Le RGAA se juge plus qu’il ne se mesure</h2>
+<p>Le RGAA compte <span data-gen="rgaa.criteria">106</span> critères, regroupés en <span data-gen="rgaa.themes.length">13</span> thématiques (images, couleurs, formulaires…). Chaque critère se décompose en tests numérotés : <span data-gen="rgaa.tests.total">258</span> au total. Le test 1.3.1, par exemple, demande si l’alternative d’une image « est pertinente » : une règle vérifie qu’un attribut <code>alt</code> existe, elle ne peut pas savoir si « logo » décrit vraiment l’image.</p>
+<div class="card">
+  <h3>Ce que demandent les <span data-gen="rgaa.tests.total">258</span> tests officiels</h3>
+  <!-- gen:tests-bar -->
+<div class="stack stack-lg" role="img" aria-label="Les 258 tests du RGAA : 30 tranchés par le code, 3 demandent la page affichée, 225 demandent un jugement"><div class="t-static" style="flex:30 1 0">30</div><div class="t-rendered" style="flex:3 1 0">3</div><div class="t-judgment" style="flex:225 1 0">225</div></div>
+  <ul class="legend legend-col">
+    <li><span class="sw t-static"></span><span><strong>30 tests tranchés par le code</strong> — une règle du moteur peut prouver l’échec en lisant le code source</span></li>
+    <li><span class="sw t-rendered"></span><span><strong>3 tests demandent la page affichée</strong> — une règle peut prouver l’échec, mais sur la page rendue</span></li>
+    <li><span class="sw t-judgment"></span><span><strong>225 tests demandent un jugement</strong> — pertinence, cohérence, contenu : l’IA ou un humain décide</span></li>
+  </ul>
+<!-- /gen:tests-bar -->
+  <p class="cap">Classement tiré de la matrice générée dans le dépôt (<a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/rgaa-automation.md"><code>rgaa-automation.md</code></a>). Un test « tranché par le code » peut prouver une non-conformité ; il ne suffit pas toujours à prouver la conformité.</p>
+</div>
+<p>Les <span data-gen="engine.staticRules">102</span> vérifications du moteur ne sont donc pas <span data-gen="engine.staticRules">102</span> tests RGAA. Une règle a l’un de trois effets sur un critère :</p>
+<ul>
+  <li><strong>Décisive</strong> : le défaut observé suffit à faire échouer un test précis. Le critère passe en NC sans intervention de l’IA.</li>
+  <li><strong>Indice</strong> : la règle signale un candidat (une image dont l’<code>alt</code> semble générique, par exemple). L’IA tranche.</li>
+  <li><strong>Recommandation non normative</strong> : une bonne pratique qu’aucun test officiel n’exige. Elle apparaît à part dans le rapport et ne fait jamais passer un critère en NC.</li>
 </ul>
 
 <h2>Le niveau d’automatisation</h2>
