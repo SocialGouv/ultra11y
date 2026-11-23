@@ -1126,9 +1126,9 @@ var require_parse = __commonJS({
                 const idx = prev.value.lastIndexOf("[");
                 const pre = prev.value.slice(0, idx);
                 const rest2 = prev.value.slice(idx + 2);
-                const posix3 = POSIX_REGEX_SOURCE[rest2];
-                if (posix3) {
-                  prev.value = pre + posix3;
+                const posix4 = POSIX_REGEX_SOURCE[rest2];
+                if (posix4) {
+                  prev.value = pre + posix4;
                   state.backtrack = true;
                   advance();
                   if (!bos.output && tokens.indexOf(prev) === 1) {
@@ -1644,7 +1644,7 @@ var require_picomatch = __commonJS({
         throw new TypeError("Expected pattern to be a non-empty string");
       }
       const opts = options || {};
-      const posix3 = opts.windows;
+      const posix4 = opts.windows;
       const regex = isState ? picomatch2.compileRe(glob, options) : picomatch2.makeRe(glob, options, false, true);
       const state = regex.state;
       delete regex.state;
@@ -1654,8 +1654,8 @@ var require_picomatch = __commonJS({
         isIgnored2 = picomatch2(opts.ignore, ignoreOpts, returnState);
       }
       const matcher = (input, returnObject = false) => {
-        const { isMatch, match, output } = picomatch2.test(input, regex, options, { glob, posix: posix3 });
-        const result = { glob, state, regex, posix: posix3, input, output, match, isMatch };
+        const { isMatch, match, output } = picomatch2.test(input, regex, options, { glob, posix: posix4 });
+        const result = { glob, state, regex, posix: posix4, input, output, match, isMatch };
         if (typeof opts.onResult === "function") {
           opts.onResult(result);
         }
@@ -1680,7 +1680,7 @@ var require_picomatch = __commonJS({
       }
       return matcher;
     };
-    picomatch2.test = (input, regex, options, { glob, posix: posix3 } = {}) => {
+    picomatch2.test = (input, regex, options, { glob, posix: posix4 } = {}) => {
       if (typeof input !== "string") {
         throw new TypeError("Expected input to be a string");
       }
@@ -1688,7 +1688,7 @@ var require_picomatch = __commonJS({
         return { isMatch: false, output: "" };
       }
       const opts = options || {};
-      const format = opts.format || (posix3 ? utils.toPosixSlashes : null);
+      const format = opts.format || (posix4 ? utils.toPosixSlashes : null);
       let match = input === glob;
       let output = match && format ? format(input) : input;
       if (match === false) {
@@ -1697,7 +1697,7 @@ var require_picomatch = __commonJS({
       }
       if (match === false || opts.capture === true) {
         if (opts.matchBase === true || opts.basename === true) {
-          match = picomatch2.matchBase(input, regex, options, posix3);
+          match = picomatch2.matchBase(input, regex, options, posix4);
         } else {
           match = regex.exec(output);
         }
@@ -22584,10 +22584,10 @@ function isLinkableUrl(url) {
 }
 function repoRelative(file, baseDir) {
   if (typeof file !== "string" || !file) return "";
-  const posix3 = file.split("\\").join("/").replace(/^\.\//, "");
+  const posix4 = file.split("\\").join("/").replace(/^\.\//, "");
   const base = baseDir.split("\\").join("/").replace(/\/+$/, "");
-  if (base && posix3.startsWith(`${base}/`)) return posix3.slice(base.length + 1);
-  return posix3;
+  if (base && posix4.startsWith(`${base}/`)) return posix4.slice(base.length + 1);
+  return posix4;
 }
 async function readStdin() {
   const chunks = [];
@@ -24836,8 +24836,8 @@ function alignedBoxes(dom, boxes, doc) {
   return out;
 }
 function isSnapshotDom(file) {
-  const posix3 = file.split("\\").join("/");
-  return posix3.endsWith("/dom.html") && posix3.includes(`${PAGES_DIR}/`);
+  const posix4 = file.split("\\").join("/");
+  return posix4.endsWith("/dom.html") && posix4.includes(`${PAGES_DIR}/`);
 }
 function snapshotPageId(file) {
   if (!file) return void 0;
@@ -37869,11 +37869,30 @@ var scriptsAriaRules = [
   ariaProhibitedAttr
 ];
 
+// src/rules/next-metadata.ts
+var NEXT_METADATA = /export\s+(?:const\s+(?:metadata|generateMetadata)\b|(?:async\s+)?function\s+generateMetadata\b)/;
+var TITLE_KEY = /\btitle\s*:/;
+function exportsMetadataTitle(source) {
+  return NEXT_METADATA.test(source) && TITLE_KEY.test(source);
+}
+var APP_ROUTE_FILE = /(?:^|\/)app\/(?:.+\/)?(?:layout|page)\.(?:tsx|jsx|ts|js)$/;
+var APP_LAYOUT_FILE = /(?:^|\/)app\/(?:.+\/)?layout\.(?:tsx|jsx|ts|js)$/;
+var UNDER_APP_DIR = /(?:^|\/)app\//;
+var posix = (file) => file.replace(/\\/g, "/");
+function isAppRouteFile(file) {
+  return APP_ROUTE_FILE.test(posix(file));
+}
+function isAppLayoutFile(file) {
+  return APP_LAYOUT_FILE.test(posix(file));
+}
+function isUnderAppDir(file) {
+  return UNDER_APP_DIR.test(posix(file));
+}
+
 // src/rules/mandatory.ts
-var NEXT_METADATA = /export\s+(const\s+metadata\b|(async\s+)?function\s+generateMetadata\b)/;
 function titleSetByFramework(doc) {
   if (doc.kind === "html") return false;
-  return NEXT_METADATA.test(doc.source) && /\btitle\s*:/.test(doc.source);
+  return exportsMetadataTitle(doc.source);
 }
 function doctypeOf(doc) {
   if (doc.signals?.doctype !== void 0) return doc.signals.doctype;
@@ -38102,6 +38121,10 @@ function governsText(el) {
   };
   return el.children.some(walk3);
 }
+function boundToExpression(doc, value) {
+  const expressive = doc.kind === "jsx-ast" || doc.kind === "jsx-lossy" || doc.kind === "sfc";
+  return expressive && value.startsWith("{") && value.endsWith("}");
+}
 var langInvalid = {
   id: "lang-invalid",
   criteria: ["3.1.1", "3.1.2"],
@@ -38111,6 +38134,7 @@ var langInvalid = {
     for (const el of doc.elements) {
       const lang = (attr(el, "lang") ?? "").trim();
       if (!lang) continue;
+      if (boundToExpression(doc, lang)) continue;
       if (BCP47.test(lang) && !primarySubtagUnregistered(lang)) continue;
       if (el.tag !== "html" && !governsText(el)) continue;
       out.push({
@@ -40252,7 +40276,7 @@ function crossToFinding(doc, ruleId, def, cf) {
 }
 
 // src/graph/spec-resolve.ts
-import { resolve as absPath, basename as basename2, dirname as dirname5, posix } from "path";
+import { resolve as absPath, basename as basename2, dirname as dirname5, posix as posix2 } from "path";
 
 // node_modules/get-tsconfig/dist/index.mjs
 import m2 from "path";
@@ -41305,7 +41329,7 @@ var JS_INDEX = ["index.ts", "index.tsx", "index.js", "index.jsx", "index.mjs", "
 var JS_TS = /* @__PURE__ */ new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 var SFC_HTML = /* @__PURE__ */ new Set([".vue", ".svelte", ".astro", ".html", ".htm"]);
 var CONFIG_NAMES = /* @__PURE__ */ new Set(["tsconfig.json", "jsconfig.json"]);
-var norm = (p2) => posix.normalize(p2).replace(/\/$/, "");
+var norm = (p2) => posix2.normalize(p2).replace(/\/$/, "");
 function patternMatches(pattern, spec) {
   const star = pattern.indexOf("*");
   if (star === -1) return pattern === spec;
@@ -41342,7 +41366,7 @@ function makeSpecResolver(known, aliases = [], startDir) {
       if (backMap.has(c)) return c;
     }
     for (const i of JS_INDEX) {
-      const c = norm(posix.join(p2, i));
+      const c = norm(posix2.join(p2, i));
       if (backMap.has(c)) return c;
     }
     return void 0;
@@ -41354,7 +41378,7 @@ function makeSpecResolver(known, aliases = [], startDir) {
     return noJs !== p2 ? probe(noJs) : void 0;
   };
   const resolveJs = (fromAbs, spec) => {
-    if (spec.startsWith(".")) return tryResolve(norm(posix.join(posix.dirname(fromAbs), spec)));
+    if (spec.startsWith(".")) return tryResolve(norm(posix2.join(posix2.dirname(fromAbs), spec)));
     for (const cfg of configs) {
       if (fromAbs !== cfg.dir && !fromAbs.startsWith(`${cfg.dir}/`)) continue;
       if (!cfg.patterns.some((p2) => patternMatches(p2, spec))) continue;
@@ -41402,8 +41426,8 @@ function buildGraph(nodes, aliases = [], tsconfigStartDir) {
   return { nodes: map, known, allIds: allIds2, resolveSpec: makeSpecResolver(known, aliases, tsconfigStartDir), usageCache: /* @__PURE__ */ new Map() };
 }
 function resolveUsage(graph, file, localName, seen = /* @__PURE__ */ new Set()) {
-  const posix3 = toPosix2(file);
-  const visitKey = `${posix3}#${localName}`;
+  const posix4 = toPosix2(file);
+  const visitKey = `${posix4}#${localName}`;
   const memoized = seen.size === 0;
   if (memoized) {
     const hit = graph.usageCache.get(visitKey);
@@ -41412,14 +41436,14 @@ function resolveUsage(graph, file, localName, seen = /* @__PURE__ */ new Set()) 
   if (seen.has(visitKey)) return void 0;
   seen.add(visitKey);
   if (memoized) {
-    const out = resolveUsageUncached(graph, posix3, localName, seen);
+    const out = resolveUsageUncached(graph, posix4, localName, seen);
     graph.usageCache.set(visitKey, out ?? null);
     return out;
   }
-  return resolveUsageUncached(graph, posix3, localName, seen);
+  return resolveUsageUncached(graph, posix4, localName, seen);
 }
-function resolveUsageUncached(graph, posix3, localName, seen) {
-  const node = graph.nodes.get(posix3);
+function resolveUsageUncached(graph, posix4, localName, seen) {
+  const node = graph.nodes.get(posix4);
   if (!node) return void 0;
   if (localName.includes(".")) {
     const dot = localName.indexOf(".");
@@ -41427,14 +41451,14 @@ function resolveUsageUncached(graph, posix3, localName, seen) {
     const member = localName.slice(dot + 1);
     const nsImp = node.imports.find((i) => i.imported === "*" && i.local === ns);
     if (!nsImp) return void 0;
-    const target = graph.resolveSpec(posix3, nsImp.source);
+    const target = graph.resolveSpec(posix4, nsImp.source);
     if (!target) return void 0;
     return graph.nodes.get(target)?.components.get(member) ?? resolveUsage(graph, target, member, seen);
   }
   const imp = node.imports.find((i) => i.local === localName);
   if (imp) {
     if (imp.imported === "*") return void 0;
-    const target = graph.resolveSpec(posix3, imp.source);
+    const target = graph.resolveSpec(posix4, imp.source);
     if (!target) return void 0;
     const direct = graph.nodes.get(target)?.components.get(imp.imported);
     if (direct) return direct;
@@ -41443,7 +41467,7 @@ function resolveUsageUncached(graph, posix3, localName, seen) {
   const local = node.components.get(localName);
   if (local) return local;
   for (const src of node.starReexports) {
-    const target = graph.resolveSpec(posix3, src);
+    const target = graph.resolveSpec(posix4, src);
     if (!target) continue;
     const hit = resolveUsage(graph, target, localName, seen);
     if (hit) return hit;
@@ -41471,6 +41495,62 @@ function htmlLangProvidedFor(graph, file) {
     }
   }
   return false;
+}
+function importersOf(graph, file) {
+  if (!graph.importedBy) {
+    const rev = /* @__PURE__ */ new Map();
+    for (const [from, node] of graph.nodes) {
+      const targets = /* @__PURE__ */ new Set();
+      for (const imp of node.imports) {
+        const t3 = graph.resolveSpec(from, imp.source);
+        if (t3) targets.add(t3);
+      }
+      for (const src of node.starReexports) {
+        const t3 = graph.resolveSpec(from, src);
+        if (t3) targets.add(t3);
+      }
+      for (const t3 of targets) {
+        if (t3 === from) continue;
+        const arr2 = rev.get(t3) ?? [];
+        arr2.push(from);
+        rev.set(t3, arr2);
+      }
+    }
+    graph.importedBy = rev;
+  }
+  return graph.importedBy.get(file) ?? [];
+}
+var ROUTE_SCRIPT_EXTS = [".tsx", ".jsx", ".ts", ".js"];
+function routeHasMetadataTitle(graph, route2) {
+  if (graph.nodes.get(route2)?.exportsMetadataTitle) return true;
+  const segs = route2.split("/");
+  const appAt = segs.lastIndexOf("app");
+  for (let end = segs.length - 1; end > appAt; end--) {
+    const dir = segs.slice(0, end).join("/");
+    for (const e of ROUTE_SCRIPT_EXTS) if (graph.nodes.get(`${dir}/layout${e}`)?.exportsMetadataTitle) return true;
+  }
+  return false;
+}
+function titleSetByImportingRoute(graph, file) {
+  const start = toPosix2(file);
+  if (isAppRouteFile(start)) return routeHasMetadataTitle(graph, start);
+  const seen = /* @__PURE__ */ new Set([start]);
+  const queue = [start];
+  let routes = 0;
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const importer of importersOf(graph, cur)) {
+      if (seen.has(importer)) continue;
+      seen.add(importer);
+      if (isAppRouteFile(importer)) {
+        if (!routeHasMetadataTitle(graph, importer)) return false;
+        routes++;
+        continue;
+      }
+      queue.push(importer);
+    }
+  }
+  return routes > 0;
 }
 
 // src/rules/cross-registry.ts
@@ -41528,6 +41608,24 @@ var crossPageLang = {
     const html = doc.elements.find((e) => e.tag === "html");
     if (html && (attr(html, "lang") ?? "") === "" && htmlLangProvidedFor(graph, doc.file)) {
       suppress.push({ ruleId: "html-lang-missing", line: html.line, reason: "lang fourni par un layout/wrapper import\xE9" });
+    }
+    return { findings: [], suppress };
+  }
+};
+var crossNextMetadataTitle = {
+  id: "cross-next-metadata-title",
+  criteria: ["2.4.2"],
+  severity: "bloquant",
+  run(doc, graph) {
+    const suppress = [];
+    if (doc.kind !== "jsx-ast" && doc.kind !== "jsx-lossy" || !isFullDocument(doc)) return { findings: [], suppress };
+    const anchor = elementsByTag(doc, "head")[0] ?? elementsByTag(doc, "html")[0] ?? doc.elements[0];
+    if (anchor && titleSetByImportingRoute(graph, doc.file)) {
+      suppress.push({
+        ruleId: "title-missing-empty",
+        line: anchor.line,
+        reason: "title injected by the Next.js metadata of every App Router route rendering this shell"
+      });
     }
     return { findings: [], suppress };
   }
@@ -41662,6 +41760,7 @@ var crossNameRefCrossFile = {
 var CROSS_RULES = [
   crossIconOnlyUnnamed,
   crossPageLang,
+  crossNextMetadataTitle,
   crossAriaForwarding,
   crossSkipLinkTarget,
   crossPropDrilledNameLost,
@@ -41965,8 +42064,8 @@ function analyzeComponent(name, file, fnNode) {
     readsProps: readsProps(fnNode)
   };
 }
-function pascalCaseBasename(posix3) {
-  const base = (posix3.split("/").pop() ?? posix3).replace(/\.[^.]+$/, "");
+function pascalCaseBasename(posix4) {
+  const base = (posix4.split("/").pop() ?? posix4).replace(/\.[^.]+$/, "");
   const name = base.split(/[^A-Za-z0-9]+/).filter(Boolean).map((seg) => seg[0].toUpperCase() + seg.slice(1)).join("");
   return name || "Component";
 }
@@ -41995,7 +42094,7 @@ function declComponents(decl, file) {
   return out;
 }
 function extractGraphNode(ast, doc, file, opts = {}) {
-  const posix3 = toPosix2(file);
+  const posix4 = toPosix2(file);
   const imports = [];
   const starReexports = [];
   const components = /* @__PURE__ */ new Map();
@@ -42026,13 +42125,14 @@ function extractGraphNode(ast, doc, file, opts = {}) {
     if (el.tag === "html" && hasAttr(el, "lang") && (attr(el, "lang") ?? "") !== "") providesHtmlLang = true;
   }
   const opaqueComponents = doc.opaqueComponents ?? [];
+  const metadataTitle = exportsMetadataTitle(doc.source);
   const finish = () => {
     if (opts.sfc) {
-      const name = pascalCaseBasename(posix3);
+      const name = pascalCaseBasename(posix4);
       if (!components.has(name)) {
         const def = {
           name,
-          file: posix3,
+          file: posix4,
           line: 1,
           col: 1,
           hasControl: true,
@@ -42046,7 +42146,7 @@ function extractGraphNode(ast, doc, file, opts = {}) {
         if (!components.has("default")) components.set("default", def);
       }
     }
-    return { file: posix3, imports, components, definesIds, providesHtmlLang, starReexports, opaqueComponents };
+    return { file: posix4, imports, components, definesIds, providesHtmlLang, exportsMetadataTitle: metadataTitle, starReexports, opaqueComponents };
   };
   if (!ast) return finish();
   const body2 = asNodes((asNode(ast.program) ?? ast).body);
@@ -42070,10 +42170,10 @@ function extractGraphNode(ast, doc, file, opts = {}) {
         }
       }
     } else if (stmt.type === "FunctionDeclaration" || stmt.type === "VariableDeclaration") {
-      for (const def of declComponents(stmt, posix3)) register2(def);
+      for (const def of declComponents(stmt, posix4)) register2(def);
     } else if (stmt.type === "ExportNamedDeclaration") {
       const decl = asNode(stmt.declaration);
-      if (decl) for (const def of declComponents(decl, posix3)) register2(def);
+      if (decl) for (const def of declComponents(decl, posix4)) register2(def);
       const src = asNode(stmt.source);
       const reExportSpec = src && typeof src.value === "string" ? src.value : void 0;
       for (const s2 of asNodes(stmt.specifiers)) {
@@ -42098,11 +42198,11 @@ function extractGraphNode(ast, doc, file, opts = {}) {
       if (decl.type === "FunctionDeclaration") {
         const id = asNode(decl.id);
         const name = id && typeof id.name === "string" ? id.name : "default";
-        const def = analyzeComponent(name === "default" ? "default" : name, posix3, decl);
+        const def = analyzeComponent(name === "default" ? "default" : name, posix4, decl);
         register2(def);
         if (!components.has("default")) components.set("default", def);
       } else if (decl.type === "ArrowFunctionExpression" || decl.type === "FunctionExpression") {
-        const def = analyzeComponent("default", posix3, decl);
+        const def = analyzeComponent("default", posix4, decl);
         if (!components.has("default")) components.set("default", def);
       } else if (decl.type === "Identifier") {
         const ref = typeof decl.name === "string" ? components.get(decl.name) : void 0;
@@ -43939,6 +44039,7 @@ function newAccum() {
     byCriterion: /* @__PURE__ */ new Map(),
     applicable: /* @__PURE__ */ new Map(),
     uncertainStatic: /* @__PURE__ */ new Map(),
+    metadataTitleShells: /* @__PURE__ */ new Set(),
     allFindings: [],
     packFindings: [],
     documents: [],
@@ -43963,6 +44064,26 @@ function primarySubtag(lang) {
   const m3 = lang.trim().match(/^[a-z]{1,8}/i);
   return m3 ? m3[0].toLowerCase() : void 0;
 }
+function findMetadataTitleLayout(files, source) {
+  for (const file of files) {
+    if (!isAppLayoutFile(file)) continue;
+    const text = source(file);
+    if (text !== void 0 && exportsMetadataTitle(text)) return file;
+  }
+  return void 0;
+}
+function holdBackFrameworkTitle(acc, doc, findings) {
+  const layout = acc.metadataTitleLayout;
+  if (!layout || doc.kind !== "jsx-ast" && doc.kind !== "jsx-lossy" || !/\.[jt]sx$/i.test(doc.file) || isUnderAppDir(doc.file)) return findings;
+  if (!findings.some((f2) => f2.ruleId === "title-missing-empty")) return findings;
+  acc.metadataTitleShells.add(doc.file);
+  const shells = [...acc.metadataTitleShells].sort().join(", ");
+  acc.uncertainStatic.set(
+    "2.4.2",
+    `The <head> rendered by ${shells} has no <title>, but the App Router layout ${layout} sets one through the Next.js metadata API and may render it. Re-run the audit with --graph to prove which routes render it, or check the rendered page title.`
+  );
+  return findings.filter((f2) => f2.ruleId !== "title-missing-empty");
+}
 function foldDoc(acc, doc, graph) {
   if (doc.kind === "pdf") {
     foldDocument(acc, doc);
@@ -43973,6 +44094,7 @@ function foldDoc(acc, doc, graph) {
     if (id) doc.capture = { v: 1, ...doc.capture ?? {}, page: id };
   }
   let findings = runRules(doc);
+  if (!graph) findings = holdBackFrameworkTitle(acc, doc, findings);
   if (graph) {
     const cross = runCrossRules(doc, graph);
     if (cross.suppress.length) {
@@ -44425,6 +44547,15 @@ function runAudit(opts) {
     const built = buildGraphAndDocs(graphFiles, { carryDocs: !useStaged && !opts.forceJsx });
     graph = built.graph;
     if (built.docs.size) carried = built.docs;
+  } else {
+    acc.metadataTitleLayout = findMetadataTitleLayout(files, (file) => {
+      if (useStaged) return stagedContent2?.get(file);
+      try {
+        return readText(file);
+      } catch {
+        return void 0;
+      }
+    });
   }
   for (let i = 0; i < files.length; i++) {
     if (opts.maxFiles && opts.maxFiles > 0 && acc.fileCount >= opts.maxFiles) {
@@ -53747,10 +53878,10 @@ function formatWorklist(items, semantic, standard = "wcag", lang = "en") {
   return out.join("\n");
 }
 var canonicalFile = (file) => {
-  const posix3 = file.replace(/\\/g, "/");
+  const posix4 = file.replace(/\\/g, "/");
   const marker = ".ultra11y/pages/";
-  const at = posix3.lastIndexOf(marker);
-  return at >= 0 ? posix3.slice(at) : posix3;
+  const at = posix4.lastIndexOf(marker);
+  return at >= 0 ? posix4.slice(at) : posix4;
 };
 var citationKey = (cite) => {
   const file = canonicalFile(cite.file);
@@ -55501,11 +55632,11 @@ function auditFiles(audit2, cwd) {
   }
 }
 function canonicalEvidenceFile(file) {
-  const posix3 = file.replace(/\\/g, "/");
+  const posix4 = file.replace(/\\/g, "/");
   const marker = `${PAGES_DIR}/`;
-  const at = posix3.lastIndexOf(marker);
-  if (at >= 0) return posix3.slice(at);
-  return /^https?:\/\//i.test(posix3) ? posix3 : resolve9(posix3).replace(/\\/g, "/");
+  const at = posix4.lastIndexOf(marker);
+  if (at >= 0) return posix4.slice(at);
+  return /^https?:\/\//i.test(posix4) ? posix4 : resolve9(posix4).replace(/\\/g, "/");
 }
 function worklistPath(file) {
   if (!isAbsolute3(file)) return file;
@@ -56670,10 +56801,10 @@ function ledgerPath(standard, root = ".") {
 }
 var norm3 = (s2) => s2.replace(/\s+/g, " ").trim();
 var canonicalFile2 = (file) => {
-  const posix3 = file.replace(/\\/g, "/");
+  const posix4 = file.replace(/\\/g, "/");
   const marker = `${PAGES_DIR}/`;
-  const at = posix3.lastIndexOf(marker);
-  return at >= 0 ? posix3.slice(at) : posix3;
+  const at = posix4.lastIndexOf(marker);
+  return at >= 0 ? posix4.slice(at) : posix4;
 };
 function identityFile(file, root) {
   const canonical = canonicalFile2(file);
@@ -57915,10 +58046,10 @@ function kindLabel(kind, locale = "fr") {
 
 // src/scan.ts
 var portableFindingId = (finding) => {
-  const posix3 = finding.file.replace(/\\/g, "/");
+  const posix4 = finding.file.replace(/\\/g, "/");
   const marker = `${PAGES_DIR}/`;
-  const at = posix3.lastIndexOf(marker);
-  return findingId(at >= 0 ? { ...finding, file: posix3.slice(at) } : finding);
+  const at = posix4.lastIndexOf(marker);
+  return findingId(at >= 0 ? { ...finding, file: posix4.slice(at) } : finding);
 };
 var IMAGE_TAG = "ultra11y-dyn:1";
 var MOUNT = "/work/input.html";
@@ -58475,9 +58606,9 @@ function recomputeTallies2(merged) {
 function mergeSnapshotAudit(base, snap) {
   const merged = JSON.parse(JSON.stringify(base));
   const inputIdentity = (input) => {
-    const posix3 = input.replace(/\\/g, "/");
-    const at = posix3.lastIndexOf(PAGES_DIR);
-    return at >= 0 ? posix3.slice(at) : posix3;
+    const posix4 = input.replace(/\\/g, "/");
+    const at = posix4.lastIndexOf(PAGES_DIR);
+    return at >= 0 ? posix4.slice(at) : posix4;
   };
   const knownInputs = new Set(base.scope.inputs.map(inputIdentity));
   const snapshotRootCovered = knownInputs.has(PAGES_DIR);
@@ -60004,7 +60135,7 @@ function renderDiffMarkdown(diff, lang = "en", max = 50) {
 // src/affected.ts
 import { execFileSync as execFileSync7 } from "child_process";
 import { existsSync as existsSync23, readFileSync as readFileSync14, realpathSync as realpathSync4 } from "fs";
-import { join as join22, posix as posix2, relative as relative8, resolve as resolve13 } from "path";
+import { join as join22, posix as posix3, relative as relative8, resolve as resolve13 } from "path";
 var GRAPH_EXT = /* @__PURE__ */ new Set([
   ".ts",
   ".tsx",
@@ -60033,7 +60164,7 @@ var extOf = (f2) => {
   const i = b.lastIndexOf(".");
   return i <= 0 ? "" : b.slice(i).toLowerCase();
 };
-var norm5 = (p2) => posix2.normalize(toPosix2(p2)).replace(/^\.\//, "");
+var norm5 = (p2) => posix3.normalize(toPosix2(p2)).replace(/^\.\//, "");
 var ROUTE_FILES = [
   // Next.js App Router: app/**/page.* — at any depth, so a config at a workspace root still sees
   // `apps/web/src/app/**`. A `page.*` file under an `app/` directory is a route almost everywhere;
@@ -60136,18 +60267,18 @@ var packageOf = (spec) => {
   return spec.startsWith("@") ? segs.slice(0, 2).join("/") : segs[0];
 };
 function styleCandidates(dir, spec) {
-  const base = posix2.join(dir, spec);
-  const d2 = posix2.dirname(base);
-  const b = posix2.basename(base);
+  const base = posix3.join(dir, spec);
+  const d2 = posix3.dirname(base);
+  const b = posix3.basename(base);
   const out = [base];
   for (const e of [".scss", ".sass", ".css", ".less"])
-    out.push(`${base}${e}`, posix2.join(d2, `_${b}${e}`), posix2.join(base, `_index${e}`), posix2.join(base, `index${e}`));
+    out.push(`${base}${e}`, posix3.join(d2, `_${b}${e}`), posix3.join(base, `_index${e}`), posix3.join(base, `index${e}`));
   return out;
 }
 var EMPTY_MODULE = () => ({ imports: [], reexports: [], stars: [], locals: /* @__PURE__ */ new Set(), types: /* @__PURE__ */ new Set() });
 function buildAffectedGraph(root, files) {
   const rootRel = toPosix2(relative8(process.cwd(), resolve13(root))) || ".";
-  const toFull = (rel) => rootRel === "." ? rel : posix2.join(rootRel, rel);
+  const toFull = (rel) => rootRel === "." ? rel : posix3.join(rootRel, rel);
   const listed = files ?? walk(root).files.map((f2) => f2.rel);
   const known = /* @__PURE__ */ new Set();
   for (const f2 of listed) {
@@ -60171,7 +60302,7 @@ function buildAffectedGraph(root, files) {
     if (!spec || /^(?:[a-z]+:|\/\/|#)/i.test(spec)) return null;
     if (STYLE_EXT.has(extOf(file))) {
       if (spec.startsWith("~")) return null;
-      return styleCandidates(posix2.dirname(file), spec).map(norm5).find((c) => known.has(c)) ?? null;
+      return styleCandidates(posix3.dirname(file), spec).map(norm5).find((c) => known.has(c)) ?? null;
     }
     const relative11 = spec.startsWith(".") || spec.startsWith("/");
     if (!relative11 && !aliased(spec) && deps.has(packageOf(spec))) return null;
@@ -61934,10 +62065,10 @@ var MARK3 = { r: 179, g: 38, b: 30, a: 1 };
 var RING = 3;
 function pageIdOfSnapshot(file) {
   if (!isSnapshotDom(file)) return null;
-  const posix3 = file.split("\\").join("/");
-  const at = posix3.lastIndexOf(`${PAGES_DIR}/`);
+  const posix4 = file.split("\\").join("/");
+  const at = posix4.lastIndexOf(`${PAGES_DIR}/`);
   if (at < 0) return null;
-  const rest = posix3.slice(at + PAGES_DIR.length + 1);
+  const rest = posix4.slice(at + PAGES_DIR.length + 1);
   const id = rest.slice(0, rest.indexOf("/"));
   return id || null;
 }

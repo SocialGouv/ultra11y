@@ -18,9 +18,9 @@ node scripts/ultra11y.mjs audit --changed --graph     # git diff, graph over the
   their case (per-file rules ignore them; only cross-file rules resolve them); native
   elements stay lowercase.
 - **Two passes, bounded memory**: pass 1 — read each file, extract a small *graph node*
-  (imports, components + render-control signals, ids, `<html lang>`), then **drop** the
-  AST/Doc. Pass 2 — the usual audit loop, which also runs the cross-file rules with the graph
-  in hand. The whole repo is never held in memory: O(number of files) small nodes.
+  (imports, components + render-control signals, ids, `<html lang>`, a Next.js metadata
+  title), then **drop** the AST/Doc. Pass 2 — the usual audit loop, which also runs the
+  cross-file rules with the graph in hand. The whole repo is never held in memory: O(number of files) small nodes.
 - **`--changed --graph`**: the graph indexes the **whole** scope (to resolve a reference into
   an unchanged definition), but only the diffed files are audited.
 - **Plain `.ts`/`.js` modules are graphed, never audited.** The graph's own discovery widens
@@ -67,6 +67,13 @@ node scripts/ultra11y.mjs audit --changed --graph     # git diff, graph over the
   anchor". A target missing everywhere stays a true positive.
 - **`cross-page-lang`** (WCAG 3.1.1, *suppression*): an `<html>` without `lang` whose imported
   layout/wrapper declares the language → suppresses the false positive.
+- **`cross-next-metadata-title`** (WCAG 2.4.2, *suppression*): a shell component whose
+  `<head>` has no `<title>`, rendered by Next.js App Router routes (`app/**/layout|page`,
+  directly or through components and barrels) that **all** get a title from the metadata API
+  (`metadata.title` / `generateMetadata`, in the route or a layout above it) → suppresses the
+  false `title-missing-empty`. A shell no route renders, or rendered by one route with no
+  metadata title, keeps its finding. Without `--graph`, a metadata layout in scope leaves 2.4.2
+  open (manual, residual risk) for a title-less shell outside `app/` instead of failing it.
 - **`cross-name-ref-cross-file`** (WCAG 1.3.1, *suppression*): a `<label for="id">` or a
   heading/`aria-labelledby` whose target id is **defined in another** file → suppresses the
   false `label-for-dangling` / empty-heading. Suppressed only when the id resolves elsewhere.

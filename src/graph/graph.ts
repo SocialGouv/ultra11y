@@ -5,6 +5,7 @@ import type { FileGraphNode, ComponentDef } from "./imports.js";
 import { makeSpecResolver, type SpecResolver } from "./spec-resolve.js";
 import type { AliasMap } from "./tsconfig.js";
 import { toPosix } from "../glob.js";
+import { isAppRouteFile } from "../rules/next-metadata.js";
 
 export interface DepGraph {
   nodes: Map<string, FileGraphNode>; // posix file -> node
@@ -16,6 +17,9 @@ export interface DepGraph {
   // Memo for `resolveUsage` top-level lookups (`file#name` -> def, null = "no such
   // component"). Read-only graph, so a hit is always correct; see resolveUsage.
   usageCache: Map<string, ComponentDef | null>;
+  // Reverse import edges (`file` -> the files importing or re-exporting it), built on first
+  // use by `importersOf`. Most audits never ask, so the graph does not pay for it up front.
+  importedBy?: Map<string, string[]>;
 }
 
 export function buildGraph(nodes: FileGraphNode[], aliases: AliasMap = [], tsconfigStartDir?: string): DepGraph {
@@ -123,4 +127,76 @@ export function htmlLangProvidedFor(graph: DepGraph, file: string): boolean {
     }
   }
   return false;
+}
+
+/** The files that import (or re-export) `file` directly, over every resolvable specifier. */
+function importersOf(graph: DepGraph, file: string): string[] {
+  if (!graph.importedBy) {
+    const rev = new Map<string, string[]>();
+    for (const [from, node] of graph.nodes) {
+      const targets = new Set<string>();
+      for (const imp of node.imports) {
+        const t = graph.resolveSpec(from, imp.source);
+        if (t) targets.add(t);
+      }
+      for (const src of node.starReexports) {
+        const t = graph.resolveSpec(from, src);
+        if (t) targets.add(t);
+      }
+      for (const t of targets) {
+        if (t === from) continue;
+        const arr = rev.get(t) ?? [];
+        arr.push(from);
+        rev.set(t, arr);
+      }
+    }
+    graph.importedBy = rev;
+  }
+  return graph.importedBy.get(file) ?? [];
+}
+
+const ROUTE_SCRIPT_EXTS = [".tsx", ".jsx", ".ts", ".js"];
+
+/** Does Next.js give the pages of App Router route file `route` a <title> from metadata?
+ *  Metadata merges from the root layout down, so the route's own export or that of any
+ *  `layout` above it, up to its `app/` directory, sets one. */
+function routeHasMetadataTitle(graph: DepGraph, route: string): boolean {
+  if (graph.nodes.get(route)?.exportsMetadataTitle) return true;
+  const segs = route.split("/");
+  const appAt = segs.lastIndexOf("app");
+  for (let end = segs.length - 1; end > appAt; end--) {
+    const dir = segs.slice(0, end).join("/");
+    for (const e of ROUTE_SCRIPT_EXTS) if (graph.nodes.get(`${dir}/layout${e}`)?.exportsMetadataTitle) return true;
+  }
+  return false;
+}
+
+/** Is the document <title> of `file` set by the Next.js metadata API of the App Router
+ *  routes that render it? `file` holds a <head> with no title of its own (a root shell
+ *  component); the routes are the App Router `layout`/`page` files importing it, directly
+ *  or through any chain of components and barrels. True only when at least one such route
+ *  exists and EVERY one of them gets a metadata title: one route rendering the shell with
+ *  no title anywhere above it is a page without a title. */
+export function titleSetByImportingRoute(graph: DepGraph, file: string): boolean {
+  const start = toPosix(file);
+  // The <head> sits in a route file itself (a nested layout rendering the document shell).
+  if (isAppRouteFile(start)) return routeHasMetadataTitle(graph, start);
+  const seen = new Set<string>([start]);
+  const queue: string[] = [start];
+  let routes = 0;
+  while (queue.length) {
+    const cur = queue.shift() as string;
+    for (const importer of importersOf(graph, cur)) {
+      if (seen.has(importer)) continue;
+      seen.add(importer);
+      if (isAppRouteFile(importer)) {
+        // Rendering starts at a route: whatever imports a route file does not wrap its pages.
+        if (!routeHasMetadataTitle(graph, importer)) return false;
+        routes++;
+        continue;
+      }
+      queue.push(importer);
+    }
+  }
+  return routes > 0;
 }
