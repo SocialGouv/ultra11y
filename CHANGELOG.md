@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [6.0.0](https://github.com/SocialGouv/ultra11y/compare/v5.59.0...v6.0.0) (2026-11-23)
+
+
+* feat!: remove the GitHub Action and the GitLab CI path, CI audits run through iterion ([#165](https://github.com/SocialGouv/ultra11y/issues/165)) ([#167](https://github.com/SocialGouv/ultra11y/issues/167)) ([06039ba](https://github.com/SocialGouv/ultra11y/commit/06039bab05b486947094d1ddc17755a3b69f8fe1))
+
+
+### BREAKING CHANGES
+
+* the GitHub Action (`uses: SocialGouv/ultra11y@vN`) and the
+GitLab CI template are no longer shipped. Existing pins on older tags keep
+working; new CI setups should run iterion's rgaa-audit bot.
+
 # [5.59.0](https://github.com/SocialGouv/ultra11y/compare/v5.58.5...v5.59.0) (2026-11-23)
 
 
