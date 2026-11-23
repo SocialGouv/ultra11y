@@ -34,7 +34,7 @@ describe("the buckets partition the standard", () => {
 describe("the WCAG census reproduces the coverage arithmetic the tool quotes everywhere", () => {
   it("is 3 decided from source, 14 needing a rendered page or a browser, 38 judgment", () => {
     const by = census("wcag");
-    // The 3/14/38 split is stated in COVERAGE_NOTE, in the prompts and in the README. If
+    // The 3/14/38 split is stated in COVERAGE_NOTE and in the prompts. If
     // this derivation disagreed with it, one of the two would be lying to an auditor.
     expect(by.source).toBe(3);
     expect((by["rendered-page"] ?? 0) + (by.browser ?? 0)).toBe(14);

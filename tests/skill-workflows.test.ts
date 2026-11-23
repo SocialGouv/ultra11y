@@ -240,7 +240,7 @@ describe("verify.md teaches the verify gate", () => {
 // pin would resolve to a release that no longer carries one — or to nothing at all.
 describe("no doc still points at the removed action", () => {
   const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-  for (const doc of ["README.md", "skills/ultra11y/references/ci.md", "site/workflow.html"]) {
+  for (const doc of ["README.md", "skills/ultra11y/references/ci.md", "site/audit.html", "site/installation.html"]) {
     it(`has no \`uses: SocialGouv/ultra11y@\` in ${doc}`, () => {
       expect(readFileSync(join(ROOT, doc), "utf8")).not.toMatch(/SocialGouv\/ultra11y@/);
     });
