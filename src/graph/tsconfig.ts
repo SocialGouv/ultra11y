@@ -42,11 +42,11 @@ function findTsconfig(startDir: string): string | null {
 }
 
 /** The nearest tsconfig.json above `startDir` plus its transitive relative
- *  `extends` chain (absolute paths, existing files only, cycle-guarded). The
- *  engine's resolve context only sees files it is handed — the graph's file set
- *  never contains a tsconfig — so the whole chain is injected explicitly (the
- *  engine follows `extends` itself, but only through files present in its set).
- *  Bare package specifiers (e.g. "@tsconfig/strictest") stay out, as before. */
+ *  `extends` chain (absolute paths, existing files only, cycle-guarded). Used by
+ *  src/graph/spec-resolve.ts to pick the CANDIDATE configs (each chain member
+ *  named tsconfig.json/jsconfig.json, scoped to its own directory); each
+ *  candidate's effective options are then read by get-tsconfig. Bare package
+ *  specifiers (e.g. "@tsconfig/strictest") are not chain members here. */
 export function tsconfigChain(startDir: string): string[] {
   const first = findTsconfig(startDir);
   if (!first) return [];
@@ -64,8 +64,8 @@ export function tsconfigChain(startDir: string): string[] {
     const dir = dirname(p);
     for (const e of exts) {
       if (typeof e !== "string") continue;
-      // Mirror the engine's `extends` candidates: "<e>" when it names a .json
-      // file, else "<e>.json" then "<e>/tsconfig.json".
+      // `extends` candidates: "<e>" when it names a .json file, else
+      // "<e>.json" then "<e>/tsconfig.json".
       const cands = e.endsWith(".json") ? [resolve(dir, e)] : [resolve(dir, `${e}.json`), resolve(dir, e, "tsconfig.json")];
       const hit = cands.find((c) => existsSync(c));
       if (hit) queue.push(hit);

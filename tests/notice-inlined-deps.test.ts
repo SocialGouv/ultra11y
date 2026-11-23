@@ -2,8 +2,8 @@
 //
 // tsup inlines a handful of packages into scripts/ultra11y.mjs so the engine installs
 // standalone. Three of them are BSD-2-Clause, whose binary-redistribution clause requires the
-// copyright notice to travel with the distribution — and the NOTICE named none of them, nor
-// the vendored codeindex engine. The list below is not typed by hand: it is read from the
+// copyright notice to travel with the distribution — and the NOTICE once named none of
+// them. The list below is not typed by hand: it is read from the
 // bundle itself (esbuild's module path comments), so a newly inlined package that nobody
 // added to the NOTICE fails here before it ships.
 import { readFileSync } from "node:fs";
@@ -28,7 +28,17 @@ describe("NOTICE names every package inlined into the engine bundle", () => {
     expect(inlined.length).toBeGreaterThanOrEqual(5);
   });
 
-  it.each(["domhandler", "domelementtype", "entities", "htmlparser2", "@babel/parser"])("%s is inlined and carried by the NOTICE with its licence", (pkg) => {
+  it.each([
+    "domhandler",
+    "domelementtype",
+    "entities",
+    "htmlparser2",
+    "@babel/parser",
+    "fdir",
+    "picomatch",
+    "ignore",
+    "get-tsconfig",
+  ])("%s is inlined and carried by the NOTICE with its licence", (pkg) => {
     expect(inlined).toContain(pkg);
     const line = notice.split("\n").find((l) => l.trim().startsWith(pkg));
     expect(line, `${pkg} has a line in NOTICE`).toBeDefined();
@@ -45,8 +55,8 @@ describe("NOTICE names every package inlined into the engine bundle", () => {
     expect(notice).toMatch(/Copyright \(c\) Felix Böhm/);
   });
 
-  it("names the vendored codeindex engine and its licence", () => {
-    expect(notice).toMatch(/src\/vendor\/codeindex-engine\.mjs/);
-    expect(notice).toMatch(/@maxgfr\/codeindex \(MIT/);
+  it("no longer claims a vendored engine that does not ship", () => {
+    expect(notice).not.toMatch(/src\/vendor\//);
+    expect(notice).not.toMatch(/codeindex/);
   });
 });

@@ -6,17 +6,12 @@
 //   - an import into a .gitignored tree         (walker ignore semantics)
 //   - an extensionless import of a .vue SFC     (.vue candidate probing)
 //   - comma-separated --exclude globs           (glob dialect + splitting)
-// Captured BEFORE the codeindex-engine adoption; every post-migration diff in
-// these snapshots must be adjudicated per codeindex docs/MIGRATION.md (better
-// ignore rules / strictly-richer resolution = accept + document in the commit
-// body; anything else = investigate).
-//
-// ADJUDICATED at adoption (engine v2.0.1): the ONLY diff vs the pre-engine
-// goldens is src/generated/Ignored.tsx (a .gitignored tree) dropping out of
-// discovery, the graph and the findings — the engine walk honours .gitignore
-// (MIGRATION.md "better ignore rules": accept + document). Alias, barrel,
-// extensionless-.vue resolution and the comma-split exclude globs are
-// byte-identical.
+// The goldens predate every change to the walker, the glob matcher and the
+// resolver: a diff here is a behaviour change to investigate, never a snapshot
+// to refresh. The one adjudicated diff since capture: src/generated/Ignored.tsx
+// (a .gitignored tree) is out of discovery, the graph and the findings, because
+// the walk (src/walk.ts) honours .gitignore. Alias, barrel, extensionless-.vue
+// resolution and the comma-split exclude globs are byte-identical.
 import { describe, expect, it } from "vitest";
 import { runAudit } from "../src/audit.js";
 import { discover } from "../src/discover.js";

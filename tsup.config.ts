@@ -26,7 +26,7 @@ export default defineConfig([
     // tsup externalises packages listed in `dependencies` by default; force them
     // into the bundle so the shipped .mjs is truly standalone (no node_modules at
     // skill-use time). domhandler is type-only but listed for safety.
-    noExternal: ["htmlparser2", "domhandler", "@babel/parser"],
+    noExternal: ["htmlparser2", "domhandler", "@babel/parser", "fdir", "picomatch", "ignore", "get-tsconfig"],
     clean: false,
     minify: false,
     splitting: false,

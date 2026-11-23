@@ -2,7 +2,7 @@
 // plus the queries the cross-file rules need. Built once (pass 1) over the full
 // discovered scope; consumed (read-only) during the audit pass.
 import type { FileGraphNode, ComponentDef } from "./imports.js";
-import { makeSpecResolver, type SpecResolver } from "./engine-resolve.js";
+import { makeSpecResolver, type SpecResolver } from "./spec-resolve.js";
 import type { AliasMap } from "./tsconfig.js";
 import { toPosix } from "../glob.js";
 
