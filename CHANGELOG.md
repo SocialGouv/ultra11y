@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [8.1.0](https://github.com/SocialGouv/ultra11y/compare/v8.0.0...v8.1.0) (2026-11-24)
+
+
+### Features
+
+* **adjudicate:** RGAA guidance for 9.4, 10.10, 10.11, 6.1, 12.3, a severity rubric and 8.7 candidates ([#183](https://github.com/SocialGouv/ultra11y/issues/183)) ([#186](https://github.com/SocialGouv/ultra11y/issues/186)) ([cfa2385](https://github.com/SocialGouv/ultra11y/commit/cfa23856a64f84c53479794e2f9437d00d195076))
+
 # [8.0.0](https://github.com/SocialGouv/ultra11y/compare/v7.2.0...v8.0.0) (2026-11-24)
 
 
