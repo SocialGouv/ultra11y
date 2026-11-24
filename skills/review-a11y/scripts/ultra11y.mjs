@@ -23625,6 +23625,776 @@ function parseSourceWithAst(source, file, opts = {}) {
 import { existsSync as existsSync2, mkdirSync, readFileSync as readFileSync3, readdirSync as readdirSync2, writeFileSync } from "fs";
 import { dirname as dirname2, join as join3 } from "path";
 
+// src/consent.ts
+var CONSENT_MARKERS = [
+  // DSFR (système de design de l'État): the consent placeholder and the consent banner.
+  { vendor: "dsfr", kind: "placeholder", cls: "fr-consent-placeholder" },
+  { vendor: "dsfr", kind: "banner", cls: "fr-consent-banner" },
+  // EU Cookie Compliance (Drupal).
+  { vendor: "eu-cookie-compliance", kind: "banner", id: "sliding-popup" },
+  { vendor: "eu-cookie-compliance", kind: "banner", cls: "eu-cookie-compliance-banner" },
+  // tarteaucitron: its root and the « activate » box it puts where a blocked service was.
+  { vendor: "tarteaucitron", kind: "banner", id: "tarteaucitron", idPrefix: true },
+  { vendor: "tarteaucitron", kind: "placeholder", cls: "tac_activate", classPrefix: true },
+  // Didomi.
+  { vendor: "didomi", kind: "banner", id: "didomi-host" },
+  { vendor: "didomi", kind: "banner", id: "didomi-notice" },
+  { vendor: "didomi", kind: "placeholder", cls: "didomi-content-placeholder", classPrefix: true },
+  // Axeptio.
+  { vendor: "axeptio", kind: "banner", id: "axeptio_overlay" },
+  { vendor: "axeptio", kind: "banner", cls: "axeptio_mount" },
+  { vendor: "axeptio", kind: "placeholder", cls: "axeptio-placeholder", classPrefix: true }
+];
+var GENERIC_PLACEHOLDER = /consent.*(?:placeholder|blocked|disabled|fallback)|(?:placeholder|blocked).*consent/i;
+var GENERIC_BANNER = /(?:cookie|consent).*(?:banner|popup|notice|modal|overlay|bar)$|^(?:cookie-?)?consent-?(?:banner|popup|notice|modal|overlay|bar)/i;
+function consentMarkerFor(id, classes) {
+  for (const m3 of CONSENT_MARKERS) {
+    if (m3.id !== void 0 && id && (m3.idPrefix ? id.startsWith(m3.id) : id === m3.id)) return { vendor: m3.vendor, kind: m3.kind };
+    if (m3.cls !== void 0 && classes.some((c) => m3.classPrefix ? c.startsWith(m3.cls) : c === m3.cls)) return { vendor: m3.vendor, kind: m3.kind };
+  }
+  for (const c of classes) {
+    if (!/consent/i.test(c)) continue;
+    if (GENERIC_PLACEHOLDER.test(c)) return { vendor: "generic", kind: "placeholder" };
+    if (GENERIC_BANNER.test(c)) return { vendor: "generic", kind: "banner" };
+  }
+  return void 0;
+}
+function consentContainerOf(el) {
+  for (let n = el; n; n = n.parent) {
+    const m3 = consentMarkerFor(n.attribs.id ?? "", (n.attribs.class ?? "").split(/\s+/).filter(Boolean));
+    if (m3) return { el: n, ...m3 };
+  }
+  return void 0;
+}
+function consentNote(kind, vendor) {
+  return kind === "placeholder" ? `[\xE9tat sans consentement \u2014 consent placeholder (${vendor}): the capture refused cookies, so this stands in for blocked third-party content; it is not the page's own content and is not to be judged as such (e.g. not a heading)]` : `[\xE9tat sans consentement \u2014 consent banner (${vendor}) shown because the capture gave no consent]`;
+}
+var CONSENT_STATE = `(() => {
+  const MARKERS = ${JSON.stringify(CONSENT_MARKERS)};
+  const GP = ${GENERIC_PLACEHOLDER.toString()};
+  const GB = ${GENERIC_BANNER.toString()};
+  const match = (id, classes) => {
+    for (const m of MARKERS) {
+      if (m.id !== undefined && id && (m.idPrefix ? id.indexOf(m.id) === 0 : id === m.id)) return m;
+      if (m.cls !== undefined && classes.some((c) => (m.classPrefix ? c.indexOf(m.cls) === 0 : c === m.cls))) return m;
+    }
+    for (const c of classes) {
+      if (!/consent/i.test(c)) continue;
+      if (GP.test(c)) return { vendor: 'generic', kind: 'placeholder' };
+      if (GB.test(c)) return { vendor: 'generic', kind: 'banner' };
+    }
+    return null;
+  };
+  const out = [];
+  const seen = new Set();
+  for (const e of Array.from(document.querySelectorAll('[id],[class]'))) {
+    const classes = typeof e.className === 'string' ? e.className.split(/\\s+/).filter(Boolean) : Array.from(e.classList || []);
+    const m = match(e.id || '', classes);
+    if (!m) continue;
+    // The outermost container only: the children of a banner are the banner.
+    let inner = false;
+    for (let p = e.parentElement; p; p = p.parentElement) if (seen.has(p)) { inner = true; break; }
+    seen.add(e);
+    if (inner) continue;
+    const sel = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (classes[0] ? '.' + classes[0] : '');
+    out.push(m.kind + ' ' + m.vendor + ' ' + sel);
+    if (out.length >= 10) break;
+  }
+  return out;
+})()`;
+
+// src/collector.ts
+var COLLECTED_CSS = [
+  "color",
+  "backgroundColor",
+  "backgroundImage",
+  "fontSize",
+  "fontWeight",
+  "fontStyle",
+  "textDecorationLine",
+  "textTransform",
+  "lineHeight",
+  "letterSpacing",
+  "wordSpacing",
+  "whiteSpace",
+  "display",
+  "visibility",
+  "opacity",
+  "position",
+  "overflowX",
+  "overflowY",
+  "outlineStyle",
+  "outlineWidth",
+  "outlineColor",
+  // All four borders + the box shadow: WCAG 1.4.11 asks whether a control's BOUNDARY is
+  // perceivable, and a boundary can be drawn by any side, by the fill, by an outline or by a
+  // shadow. Collecting only one side would manufacture non-conformities on the other three.
+  "borderTopStyle",
+  "borderRightStyle",
+  "borderBottomStyle",
+  "borderLeftStyle",
+  "borderTopWidth",
+  "borderRightWidth",
+  "borderBottomWidth",
+  "borderLeftWidth",
+  "borderTopColor",
+  "borderRightColor",
+  "borderBottomColor",
+  "borderLeftColor",
+  "boxShadow",
+  "cursor"
+];
+var COLLECT_MAX_ELEMENTS = 5e3;
+var LOADING_STATE = `(() => {
+  const out = [];
+  const shown = (e) => {
+    const r = e.getBoundingClientRect();
+    if (r.width <= 0 && r.height <= 0) return false;
+    const s = getComputedStyle(e);
+    return s.display !== 'none' && s.visibility !== 'hidden';
+  };
+  const name = (e) => e.localName + (e.id ? '#' + e.id : '');
+  for (const e of Array.from(document.querySelectorAll('[aria-busy="true"]'))) if (shown(e)) out.push('aria-busy="true" ' + name(e));
+  for (const e of Array.from(document.querySelectorAll('[role="progressbar"]:not([aria-valuenow]), progress:not([value])'))) if (shown(e)) out.push('indeterminate progress ' + name(e));
+  const PHRASE = /^(chargement( en cours)?|veuillez patienter|loading|please wait)\\s*(\\.{1,3}|\u2026)?$/i;
+  const text = (e) => (e.textContent || '').replace(/\\s+/g, ' ').trim();
+  if (document.body) for (const e of Array.from(document.body.querySelectorAll('p,span,div,li,h1,h2,h3,h4,h5,h6,strong,em,output,[role="status"]'))) {
+    const t = text(e);
+    if (t.length > 40 || !PHRASE.test(t)) continue;
+    if (Array.from(e.children).some((c) => PHRASE.test(text(c)))) continue;
+    if (shown(e)) out.push('text "' + t + '" ' + name(e));
+  }
+  return out.slice(0, 10);
+})()`;
+async function waitForLoaded(page, timeoutMs, intervalMs = 150) {
+  const started = Date.now();
+  for (; ; ) {
+    let markers = [];
+    try {
+      const r2 = await page.evaluate(LOADING_STATE);
+      markers = Array.isArray(r2) ? r2.filter((m3) => typeof m3 === "string") : [];
+    } catch {
+      return { markers: [], waitedMs: Date.now() - started };
+    }
+    const waitedMs = Date.now() - started;
+    if (!markers.length || waitedMs >= timeoutMs) return { markers, waitedMs };
+    await new Promise((resolve16) => setTimeout(resolve16, Math.min(intervalMs, Math.max(1, timeoutMs - waitedMs))));
+  }
+}
+var LOADING_TIMEOUT_MS = 1e4;
+var FULL_SCREENSHOT_MAX_HEIGHT = 8e3;
+var ELEMENT_WALK = `(root) => {
+  const RAW_TEXT = new Set(['script', 'style', 'title', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes']);
+  const els = [];
+  const walkElements = (parent) => {
+    for (const child of parent.children) {
+      els.push(child);
+      const name = child.localName;
+      if (RAW_TEXT.has(name)) continue;
+      // With scripting on, a <noscript>'s content is raw TEXT to the browser, while the reparse
+      // reads it as elements (#112). Parse that text with the page's own parser and count what
+      // it yields, in place, so every later ordinal still lines up. The inert parsed nodes have
+      // no computed style and an empty box, which the rules read as \xAB nothing measured \xBB.
+      if (name === 'noscript' && child.children.length === 0 && (child.textContent || '').includes('<')) {
+        const parsed = document.createElement('template');
+        parsed.innerHTML = child.textContent || '';
+        walkElements(parsed.content);
+        continue;
+      }
+      walkElements(name === 'template' && child.content ? child.content : child);
+    }
+  };
+  walkElements(root);
+  return els;
+}`;
+var COLLECT_SNAPSHOT = `(() => {
+  const PROPS = ${JSON.stringify(COLLECTED_CSS)};
+  const MAX = ${COLLECT_MAX_ELEMENTS};
+  const els = (${ELEMENT_WALK})(document);
+  const styles = [];
+  const boxes = [];
+  const n = Math.min(els.length, MAX);
+  for (let i = 0; i < n; i++) {
+    const el = els[i];
+    const tag = el.tagName.toLowerCase();
+    const cs = getComputedStyle(el);
+    const css = {};
+    for (const p of PROPS) {
+      const v = cs[p];
+      if (v !== undefined && v !== null && v !== '') css[p] = String(v);
+    }
+    styles.push({ i: i, tag: tag, css: css });
+    const r = el.getBoundingClientRect();
+    boxes.push({ i: i, tag: tag, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+  }
+  // The page's own stylesheets. Some criteria are properties of the STYLESHEET rather than of
+  // any element's computed style \u2014 focus styling removed with no replacement (2.4.7), a media
+  // query that locks the orientation (1.3.4) \u2014 and this is the only place they exist.
+  // A cross-origin sheet throws on .cssRules: COUNT those instead of ignoring them, so a rule
+  // reading this digest can tell "nothing there" apart from "I could not look".
+  // The cap is on the ORDINARY pool only, and the traversal never stops early.
+  //
+  // It used to return the moment the pool filled, which abandoned every remaining sheet \u2014
+  // and on a design-system app the pool fills long before the end. Measured on a real capture
+  // of 38 pages: all 38 came back truncated, so rendered-focus-not-visible declined on every
+  // one of them and 2.4.7 could never be decided by any number of scans. The rule was right to
+  // decline (a :focus rule might have been among the dropped ones); the collector was wrong to
+  // make that unavoidable.
+  //
+  // So the rules a rendered criterion actually READS \u2014 :focus styling, orientation locks,
+  // pinned positioning, animation \u2014 are kept whatever the pool is doing, and truncated now
+  // means "some ordinary rule was dropped", which is a much weaker statement. A rule can then
+  // ask for what it needs instead of refusing on a cap that never concerned it.
+  const cssRules = [];
+  let unreadable = 0;
+  let dropped = 0;
+  const MAXR = 4000;
+  const camel = (p) => p.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const KEEP_SELECTOR = /:focus|:target|:active/i;
+  const KEEP_PROP = /^(?:outline|position|animation|transition|transform)/;
+  const walk = (list, media) => {
+    for (const r of list) {
+      if (typeof r.selectorText === 'string' && r.style) {
+        const decls = {};
+        for (let i = 0; i < r.style.length; i++) {
+          const prop = r.style[i];
+          decls[camel(prop)] = r.style.getPropertyValue(prop);
+        }
+        const keep = KEEP_SELECTOR.test(r.selectorText) || Object.keys(decls).some((k) => KEEP_PROP.test(k));
+        if (cssRules.length >= MAXR && !keep) { dropped++; continue; }
+        cssRules.push(media ? { selector: r.selectorText, media: media, decls: decls } : { selector: r.selectorText, decls: decls });
+      } else if (r.cssRules) {
+        const cond = r.conditionText || (r.media && r.media.mediaText) || media;
+        walk(r.cssRules, cond);
+      }
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try {
+      walk(sheet.cssRules, undefined);
+    } catch (e) {
+      unreadable++;
+    }
+  }
+
+  const truncated = els.length > MAX;
+  return {
+    dom: document.documentElement.outerHTML,
+    css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: dropped > 0, dropped: dropped },
+    title: document.title,
+    // The doctype is NOT part of documentElement.outerHTML, so a capture that records only
+    // the DOM drops it \u2014 and RGAA 8.1 (is a doctype present, valid, and before <html>?) then
+    // has nothing to look at. Recorded as its own field for that reason.
+    doctype: document.doctype ? '<!DOCTYPE ' + document.doctype.name + (document.doctype.publicId ? ' PUBLIC "' + document.doctype.publicId + '"' : '') + (document.doctype.systemId ? ' "' + document.doctype.systemId + '"' : '') + '>' : '',
+    lang: document.documentElement.getAttribute('lang') || '',
+    url: location.href,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    // The document's full height, so the producer knows whether a full-page screenshot adds
+    // anything to the viewport one.
+    docHeight: Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0),
+    // Still loading at the instant of collection: the markers, or none. Every producer runs
+    // this same collector, so every producer can say so \u2014 see LOADING_STATE.
+    loading: ${LOADING_STATE},
+    // The consent placeholders and banners on the page (#184): a headless capture never
+    // accepts cookies, so what they show is \xAB \xE9tat sans consentement \xBB, not content.
+    consent: ${CONSENT_STATE},
+    styles: { v: 1, entries: styles, truncated: truncated },
+    boxes: { v: 1, entries: boxes, truncated: truncated }
+  };
+})()`;
+
+// src/behaviour.ts
+var SCRIPTS_VERSION = 1;
+var BEHAVIOUR_WINDOW_MS = 2e3;
+var BEHAVIOUR_CAPS = {
+  listeners: 200,
+  inline: 200,
+  ariaMutations: 100,
+  liveRegions: 50,
+  updates: 50,
+  motion: 30,
+  animations: 30,
+  resources: 100,
+  intervals: 50
+};
+var ACTIVATION_EVENTS = ["click", "dblclick", "auxclick", "mousedown", "mouseup", "pointerdown", "pointerup", "touchstart", "touchend"];
+var HOVER_EVENTS = ["mouseover", "mouseenter", "mouseout", "mouseleave", "pointerover", "pointerenter", "pointerout", "pointerleave"];
+var KEY_EVENTS = ["keydown", "keyup", "keypress"];
+var FOCUS_EVENTS = ["focus", "blur", "focusin", "focusout"];
+var WATCHED = /* @__PURE__ */ new Set([...ACTIVATION_EVENTS, ...HOVER_EVENTS, ...KEY_EVENTS, ...FOCUS_EVENTS]);
+var TIMER_HOOK_BODY = (since) => `
+  if (!window.__ultra11yTimers) {
+    const t = { since: '${since}', intervals: new Map(), timeouts: 0, long: [], orig: { si: window.setInterval, ci: window.clearInterval, st: window.setTimeout } };
+    window.setInterval = function (fn, delay, ...rest) {
+      const id = t.orig.si.call(this, fn, delay, ...rest);
+      if (t.intervals.size < 500) t.intervals.set(id, Number(delay) || 0);
+      return id;
+    };
+    window.clearInterval = function (id) {
+      t.intervals.delete(id);
+      return t.orig.ci.call(this, id);
+    };
+    window.setTimeout = function (fn, delay, ...rest) {
+      t.timeouts++;
+      const d = Number(delay) || 0;
+      if (d >= 20000 && t.long.length < 20) t.long.push(d);
+      return t.orig.st.call(this, fn, delay, ...rest);
+    };
+    Object.defineProperty(window, '__ultra11yTimers', { value: t, configurable: true, enumerable: false, writable: true });
+  }`;
+var TIMER_HOOK = `(() => {${TIMER_HOOK_BODY("init")}
+})()`;
+var BEHAVIOUR_START = `(() => {
+  if (window.__ultra11yBehaviour) return true;
+  const els = (${ELEMENT_WALK})(document);
+  const idx = new Map();
+  for (let i = 0; i < els.length; i++) idx.set(els[i], i);
+  const installedTimers = !window.__ultra11yTimers;
+  ${TIMER_HOOK_BODY("window")}
+  const B = { idx: idx, els: els, phase: 'idle', t0: performance.now(), idleMs: undefined, changed: new Map(), aria: new Map(), installedTimers: installedTimers, overflow: { changed: 0, aria: 0 }, batch: 0 };
+  const inHead = (n) => !!(document.head && (n === document.head || document.head.contains(n)));
+  const OWN = /^(STYLE|SCRIPT|LINK)$/;
+  const track = (el, kind) => {
+    if (!el || el.nodeType !== 1 || inHead(el)) return;
+    let r = B.changed.get(el);
+    if (!r) {
+      if (B.changed.size >= 500) { B.overflow.changed++; return; }
+      r = { idle: new Set(), interaction: 0, kinds: new Set() };
+      B.changed.set(el, r);
+    }
+    if (B.phase === 'idle') r.idle.add(B.batch);
+    else r.interaction++;
+    r.kinds.add(kind);
+  };
+  B.mo = new MutationObserver((records) => {
+    B.batch++;
+    for (const m of records) {
+      if (m.type === 'attributes') {
+        const n = m.attributeName || '';
+        // The probes tag what they measure; their own marks are not the page's behaviour.
+        if (n.indexOf('data-u11y') === 0) continue;
+        const el = m.target;
+        if (n.indexOf('aria-') === 0 || n === 'role') {
+          let a = B.aria.get(el);
+          if (!a) {
+            if (B.aria.size >= 300) { B.overflow.aria++; continue; }
+            a = new Map();
+            B.aria.set(el, a);
+          }
+          let rec = a.get(n);
+          if (!rec) { rec = { from: m.oldValue, values: [], count: 0, phases: new Set() }; a.set(n, rec); }
+          rec.count++;
+          rec.phases.add(B.phase);
+          if (rec.values.length < 6) rec.values.push(el.getAttribute(n));
+        }
+        track(el, 'attr:' + n);
+      } else if (m.type === 'childList') {
+        let real = false;
+        for (const a of m.addedNodes) if (!(a.nodeType === 1 && OWN.test(a.nodeName))) real = true;
+        for (const a of m.removedNodes) if (!(a.nodeType === 1 && OWN.test(a.nodeName))) real = true;
+        if (real) track(m.target, 'children');
+      } else if (m.type === 'characterData') {
+        track(m.target.parentElement, 'text');
+      }
+    }
+  });
+  B.mo.observe(document.documentElement, { subtree: true, attributes: true, attributeOldValue: true, childList: true, characterData: true });
+  const NATIVE = new Set(['button', 'select', 'textarea', 'summary', 'option', 'label', 'iframe']);
+  B.native = (el) => {
+    const t = el.localName;
+    if (t === 'a' || t === 'area') return el.hasAttribute('href');
+    if (t === 'input') return (el.getAttribute('type') || '').toLowerCase() !== 'hidden';
+    if (t === 'video' || t === 'audio') return el.hasAttribute('controls');
+    return NATIVE.has(t) || el.isContentEditable === true;
+  };
+  B.selector = (el) => {
+    if (el.id) return el.localName + '#' + el.id;
+    const parts = [];
+    let e = el;
+    for (let depth = 0; e && e.nodeType === 1 && depth < 4; depth++) {
+      if (e.id) { parts.unshift(e.localName + '#' + e.id); break; }
+      let p = e.localName;
+      const cls = (e.getAttribute('class') || '').trim().split(/\\s+/)[0];
+      if (cls) p += '.' + cls;
+      const parent = e.parentElement;
+      if (parent) {
+        const same = Array.from(parent.children).filter((c) => c.localName === e.localName);
+        if (same.length > 1) p += ':nth-of-type(' + (same.indexOf(e) + 1) + ')';
+      }
+      parts.unshift(p);
+      e = parent;
+    }
+    return parts.join(' > ');
+  };
+  B.openTag = (el) => {
+    let s = '<' + el.localName;
+    for (const a of Array.from(el.attributes)) {
+      if (a.name.indexOf('data-u11y') === 0) continue;
+      s += ' ' + a.name + (a.value === '' ? '' : '="' + a.value.slice(0, 60) + '"');
+      if (s.length > 160) break;
+    }
+    return (s + '>').slice(0, 160);
+  };
+  B.describe = (el) => {
+    if (!el) return null;
+    if (el.nodeType === 9) return { i: -1, tag: '#document', selector: 'document', root: true };
+    if (el.nodeType !== 1) return null;
+    const i = B.idx.has(el) ? B.idx.get(el) : -1;
+    const role = el.getAttribute('role');
+    const tabindex = el.getAttribute('tabindex');
+    return {
+      i: i,
+      tag: el.localName,
+      selector: B.selector(el),
+      html: B.openTag(el),
+      native: B.native(el),
+      ...(role !== null ? { role: role } : {}),
+      ...(tabindex !== null ? { tabindex: tabindex } : {}),
+      root: el === document.documentElement || el === document.body,
+    };
+  };
+  Object.defineProperty(window, '__ultra11yBehaviour', { value: B, configurable: true, enumerable: false, writable: true });
+  return true;
+})()`;
+var BEHAVIOUR_MARK = `(() => {
+  const B = window.__ultra11yBehaviour;
+  if (!B) return false;
+  B.phase = 'interaction';
+  B.idleMs = Math.round(performance.now() - B.t0);
+  // The probes schedule timeouts of their own once the page is in their hands: counted here, the
+  // page's are not mixed with ours.
+  B.timeoutsAtMark = window.__ultra11yTimers ? window.__ultra11yTimers.timeouts : 0;
+  return true;
+})()`;
+var behaviourFinishExpr = (domListeners) => `(() => {
+  const B = window.__ultra11yBehaviour;
+  if (!B) return null;
+  try { B.mo.disconnect(); } catch (e) {}
+  const CAPS = ${JSON.stringify(BEHAVIOUR_CAPS)};
+  const truncated = {};
+  const cap = (name, list) => {
+    if (list.length > CAPS[name]) { truncated[name] = list.length; return list.slice(0, CAPS[name]); }
+    return list;
+  };
+  const el$ = (el) => { const d = B.describe(el); return { i: d.i, tag: d.tag, selector: d.selector, html: d.html }; };
+  const byI = (a, b) => (a.i - b.i) || (a.selector < b.selector ? -1 : a.selector > b.selector ? 1 : 0);
+  const live = Array.from(B.els).filter((e) => e.isConnected);
+  // Inline handlers, on what was serialized.
+  const inline = [];
+  for (const e of live) {
+    const attrs = Array.from(e.attributes).map((a) => a.name.toLowerCase()).filter((n) => n.indexOf('on') === 0 && n.length > 2).sort();
+    if (attrs.length) inline.push({ ...el$(e), attrs: attrs });
+  }
+  // The listeners the DOM alone can show.
+  let domL = null;
+  if (${domListeners ? "true" : "false"}) {
+    const EVENTS = ${JSON.stringify([...WATCHED])};
+    domL = [];
+    const read = (target) => {
+      const ev = new Set();
+      if (target.attributes) for (const a of Array.from(target.attributes)) {
+        const n = a.name.toLowerCase();
+        if (n.indexOf('on') === 0 && EVENTS.indexOf(n.slice(2)) >= 0) ev.add(n.slice(2));
+      }
+      for (const t of EVENTS) { try { if (typeof target['on' + t] === 'function') ev.add(t); } catch (e) {} }
+      return Array.from(ev).sort();
+    };
+    for (const e of live) {
+      const events = read(e);
+      if (events.length) domL.push({ facts: B.describe(e), events: events });
+    }
+    const de = read(document);
+    if (de.length) domL.push({ facts: B.describe(document), events: de });
+    const we = [];
+    for (const t of EVENTS) { try { if (typeof window['on' + t] === 'function') we.push(t); } catch (e) {} }
+    if (we.length) domL.push({ facts: { i: -1, tag: '#window', selector: 'window', root: true }, events: we });
+  }
+  // ARIA mutations.
+  const ariaMutations = [];
+  for (const [el, attrs] of B.aria) {
+    for (const [name, rec] of attrs) {
+      const phase = rec.phases.size > 1 ? 'both' : rec.phases.has('idle') ? 'idle' : 'interaction';
+      ariaMutations.push({ ...el$(el), attr: name, from: rec.from === undefined ? null : rec.from, values: rec.values, count: rec.count, phase: phase });
+    }
+  }
+  ariaMutations.sort((a, b) => byI(a, b) || (a.attr < b.attr ? -1 : 1));
+  // Live regions, and whether what they hold changed.
+  const REGION = '[aria-live],[role~="status"],[role~="alert"],[role~="log"],[role~="marquee"],[role~="timer"],output';
+  const changedEls = Array.from(B.changed.keys());
+  const liveRegions = [];
+  for (const r of Array.from(document.querySelectorAll(REGION))) {
+    const changed = changedEls.some((c) => r === c || r.contains(c));
+    const lv = r.getAttribute('aria-live');
+    const role = r.getAttribute('role');
+    const atomic = r.getAttribute('aria-atomic');
+    liveRegions.push({ ...el$(r), ...(lv !== null ? { live: lv } : {}), ...(role !== null ? { role: role } : {}), ...(atomic !== null ? { atomic: atomic } : {}), changed: changed });
+  }
+  liveRegions.sort(byI);
+  // Content updated on interaction outside any live region, and what moved on its own.
+  const updates = [];
+  const motion = [];
+  for (const [el, r] of B.changed) {
+    if (!el.isConnected) continue;
+    const kinds = Array.from(r.kinds).sort();
+    if (r.interaction > 0 && (r.kinds.has('children') || r.kinds.has('text')) && !el.closest(REGION)) updates.push({ ...el$(el), kinds: kinds });
+    if (r.idle.size >= 2) motion.push({ ...el$(el), changes: r.idle.size, kinds: kinds });
+  }
+  updates.sort(byI);
+  motion.sort(byI);
+  // Long CSS animations \u2014 moving content by the stylesheet's own declaration.
+  const animations = [];
+  try {
+    for (const a of document.getAnimations ? document.getAnimations() : []) {
+      const target = a.effect && a.effect.target;
+      if (!target || target.nodeType !== 1) continue;
+      const t = a.effect.getComputedTiming ? a.effect.getComputedTiming() : {};
+      const iterations = t.iterations === Infinity ? 'infinite' : Number(t.iterations) || 1;
+      const durationMs = Math.round(Number(t.duration) || 0);
+      if (iterations !== 'infinite' && durationMs * iterations <= 5000) continue;
+      animations.push({ ...el$(target), name: String(a.animationName || a.transitionProperty || a.id || 'animation'), iterations: iterations, durationMs: durationMs });
+    }
+  } catch (e) {}
+  animations.sort(byI);
+  // Timers.
+  const T = window.__ultra11yTimers;
+  const inlineText = Array.from(document.scripts).filter((s) => !s.src).map((s) => s.textContent || '').join('\\n');
+  const count = (re) => (inlineText.match(re) || []).length;
+  const refresh = document.querySelector('meta[http-equiv="refresh" i]');
+  const timers = {
+    source: T ? T.since : 'none',
+    intervals: T ? cap('intervals', Array.from(T.intervals.values()).sort((a, b) => a - b)) : [],
+    timeouts: T ? (B.timeoutsAtMark !== undefined ? B.timeoutsAtMark : T.timeouts) : 0,
+    longTimeouts: T ? T.long.slice().sort((a, b) => a - b) : [],
+    inlineSetInterval: count(/\\bsetInterval\\s*\\(/g),
+    inlineSetTimeout: count(/\\bsetTimeout\\s*\\(/g),
+    ...(refresh ? { metaRefresh: refresh.getAttribute('content') || '' } : {}),
+  };
+  if (T && B.installedTimers) {
+    window.setInterval = T.orig.si;
+    window.clearInterval = T.orig.ci;
+    window.setTimeout = T.orig.st;
+    try { delete window.__ultra11yTimers; } catch (e) {}
+  }
+  // The scripts and stylesheets loaded \u2014 the ones the page had when the window opened.
+  const sizeOf = (url) => {
+    try {
+      const e = performance.getEntriesByName(url)[0];
+      const n = e ? (e.encodedBodySize || e.transferSize || e.decodedBodySize || 0) : 0;
+      return n > 0 ? { size: n } : {};
+    } catch (e) { return {}; }
+  };
+  const originOf = (url) => { try { return new URL(url, location.href).origin === location.origin ? 'same-origin' : 'cross-origin'; } catch (e) { return 'cross-origin'; } };
+  const resources = [];
+  for (const e of live) {
+    const t = e.localName;
+    if (t === 'script') {
+      const src = e.getAttribute('src');
+      if (src) resources.push({ kind: 'script', origin: originOf(e.src), url: e.src, ...sizeOf(e.src) });
+      else if ((e.textContent || '').trim()) resources.push({ kind: 'script', origin: 'inline', size: (e.textContent || '').length });
+    } else if (t === 'link' && /(^|\\s)stylesheet(\\s|$)/i.test(e.getAttribute('rel') || '') && e.getAttribute('href')) {
+      resources.push({ kind: 'stylesheet', origin: originOf(e.href), url: e.href, ...sizeOf(e.href) });
+    } else if (t === 'style' && (e.textContent || '').trim()) {
+      resources.push({ kind: 'stylesheet', origin: 'inline', size: (e.textContent || '').length });
+    }
+  }
+  const idleMs = B.idleMs !== undefined ? B.idleMs : Math.round(performance.now() - B.t0);
+  const windowMs = Math.round(performance.now() - B.t0);
+  if (B.overflow.changed) truncated.changed = B.changed.size + B.overflow.changed;
+  if (B.overflow.aria) truncated.ariaElements = B.aria.size + B.overflow.aria;
+  try { delete window.__ultra11yBehaviour; } catch (e) {}
+  return {
+    windowMs: windowMs,
+    idleMs: idleMs,
+    inline: cap('inline', inline),
+    domListeners: domL,
+    ariaMutations: cap('ariaMutations', ariaMutations),
+    liveRegions: cap('liveRegions', liveRegions),
+    updates: cap('updates', updates),
+    motion: cap('motion', motion),
+    animations: cap('animations', animations),
+    timers: timers,
+    resources: cap('resources', resources),
+    truncated: truncated,
+  };
+})()`;
+function classifyListener(facts, events) {
+  const has2 = (list) => events.some((e) => list.includes(e));
+  const activation = has2(ACTIVATION_EVENTS);
+  const hover = has2(HOVER_EVENTS);
+  const key2 = has2(KEY_EVENTS);
+  const focus = has2(FOCUS_EVENTS);
+  const native = facts.native === true;
+  const role = facts.role !== void 0 && facts.role.trim() !== "" ? facts.role : void 0;
+  const tabindex = facts.tabindex !== void 0 ? facts.tabindex : void 0;
+  return {
+    i: facts.i,
+    tag: facts.tag,
+    selector: facts.selector,
+    ...facts.html ? { html: facts.html } : {},
+    events: [...events].sort(),
+    native,
+    ...role !== void 0 ? { role } : {},
+    ...tabindex !== void 0 ? { tabindex } : {},
+    flagged: activation && !native && role === void 0 && tabindex === void 0,
+    // An activation a keyboard cannot fire (a native control's click IS keyboard-fired), or a
+    // hover reaction with neither a focus nor a key counterpart.
+    mouseOnly: activation && !native && !key2 || hover && !focus && !key2
+  };
+}
+function assembleDigest(raw, targets, collected, why) {
+  if (!raw) return noDigest("the capture window closed before it could be read (the page navigated or reloaded during it)");
+  const listeners = [];
+  const delegated = [];
+  for (const t3 of targets ?? []) {
+    const events = [...new Set(t3.events.filter((e) => WATCHED.has(e)))].sort();
+    if (!events.length) continue;
+    if (t3.facts.root) delegated.push({ target: t3.facts.selector === "window" || t3.facts.selector === "document" ? t3.facts.selector : t3.facts.tag, events });
+    else listeners.push(classifyListener(t3.facts, events));
+  }
+  listeners.sort((a2, b) => a2.i - b.i || a2.selector.localeCompare(b.selector));
+  delegated.sort((a2, b) => a2.target.localeCompare(b.target));
+  const truncated = { ...raw.truncated ?? {} };
+  const capped = (name, list) => {
+    if (list.length <= BEHAVIOUR_CAPS[name]) return list;
+    truncated[name] = list.length;
+    return list.slice(0, BEHAVIOUR_CAPS[name]);
+  };
+  const ranked = [...listeners.filter((l) => l.flagged || l.mouseOnly), ...listeners.filter((l) => !l.flagged && !l.mouseOnly)];
+  const kept = capped("listeners", ranked).sort((a2, b) => a2.i - b.i || a2.selector.localeCompare(b.selector));
+  return {
+    v: SCRIPTS_VERSION,
+    collected,
+    ...why ? { why } : {},
+    ...typeof raw.windowMs === "number" ? { windowMs: raw.windowMs } : {},
+    ...typeof raw.idleMs === "number" ? { idleMs: raw.idleMs } : {},
+    listeners: kept,
+    delegated,
+    inline: raw.inline ?? [],
+    ariaMutations: raw.ariaMutations ?? [],
+    liveRegions: raw.liveRegions ?? [],
+    updates: raw.updates ?? [],
+    motion: raw.motion ?? [],
+    animations: raw.animations ?? [],
+    ...raw.timers ? { timers: raw.timers } : {},
+    resources: raw.resources ?? [],
+    caps: { ...BEHAVIOUR_CAPS },
+    ...Object.keys(truncated).length ? { truncated } : {}
+  };
+}
+function noDigest(why) {
+  return { v: SCRIPTS_VERSION, collected: "none", why, caps: { ...BEHAVIOUR_CAPS } };
+}
+var DESCRIBE_THIS = `function () { const B = window.__ultra11yBehaviour; return B ? B.describe(this) : null; }`;
+var sleep = (page, ms) => page.waitForTimeout ? page.waitForTimeout(ms) : new Promise((resolve16) => setTimeout(resolve16, ms));
+var firstLine = (e) => (e instanceof Error ? e.message : String(e)).split("\n")[0].slice(0, 200);
+function pageListeners(list) {
+  const instrumentation = new Set(list.filter((l) => l.type.startsWith("__playwright")).map((l) => l.scriptId));
+  return list.filter((l) => !(l.scriptId !== void 0 && instrumentation.has(l.scriptId)));
+}
+async function cdpListeners(s2) {
+  const group = "ultra11y-behaviour";
+  const evaluate = async (expression) => (await s2.send("Runtime.evaluate", { expression, objectGroup: group })).result?.objectId;
+  try {
+    await s2.send("DOM.getDocument", { depth: 0 });
+    const docId = await evaluate("document");
+    if (!docId) throw new Error("no document object");
+    const all = pageListeners(
+      (await s2.send("DOMDebugger.getEventListeners", { objectId: docId, depth: -1, pierce: false })).listeners ?? []
+    );
+    const byNode = /* @__PURE__ */ new Map();
+    for (const l of all) {
+      if (l.backendNodeId === void 0 || !WATCHED.has(l.type)) continue;
+      const set = byNode.get(l.backendNodeId) ?? /* @__PURE__ */ new Set();
+      set.add(l.type);
+      byNode.set(l.backendNodeId, set);
+    }
+    const out = [];
+    const nodes = [...byNode.entries()].slice(0, BEHAVIOUR_CAPS.listeners * 3);
+    for (const [backendNodeId, events] of nodes) {
+      try {
+        const resolved = await s2.send("DOM.resolveNode", { backendNodeId, objectGroup: group });
+        const objectId = resolved.object?.objectId;
+        if (!objectId) continue;
+        const r2 = await s2.send("Runtime.callFunctionOn", { objectId, functionDeclaration: DESCRIBE_THIS, returnByValue: true });
+        const facts = r2.result?.value;
+        if (facts) out.push({ facts, events: [...events] });
+      } catch {
+      }
+    }
+    const winId = await evaluate("window");
+    if (winId) {
+      const w2 = pageListeners((await s2.send("DOMDebugger.getEventListeners", { objectId: winId })).listeners ?? []);
+      const events = [...new Set(w2.map((l) => l.type).filter((t3) => WATCHED.has(t3)))];
+      if (events.length) out.push({ facts: { i: -1, tag: "#window", selector: "window", root: true }, events });
+    }
+    return out;
+  } finally {
+    await s2.send("Runtime.releaseObjectGroup", { objectGroup: group }).catch(() => {
+    });
+  }
+}
+async function startBehaviour(page, opts = {}) {
+  let opened = false;
+  let why = "";
+  try {
+    opened = await page.evaluate(BEHAVIOUR_START) === true;
+    if (!opened) why = "the page refused the capture script";
+  } catch (e) {
+    why = `the capture script failed: ${firstLine(e)}`;
+  }
+  let marked = false;
+  let targets;
+  let fallback = "";
+  const readListeners = async () => {
+    const ctx = opts.cdp === false ? void 0 : page.context?.();
+    const newSession = ctx?.newCDPSession;
+    if (!ctx || !newSession) {
+      targets = null;
+      fallback = opts.cdp === false ? "CDP disabled by the producer" : "no CDP session on this page object";
+      return;
+    }
+    let session;
+    try {
+      session = await newSession.call(ctx, page);
+      targets = await cdpListeners(session);
+    } catch (e) {
+      targets = null;
+      fallback = `CDP unavailable: ${firstLine(e)}`;
+    } finally {
+      await session?.detach?.().catch(() => {
+      });
+    }
+  };
+  return {
+    async idle(ms = BEHAVIOUR_WINDOW_MS) {
+      if (!opened || marked) return;
+      await sleep(page, ms);
+      marked = true;
+      await page.evaluate(BEHAVIOUR_MARK).catch(() => {
+      });
+      await readListeners();
+    },
+    async finish() {
+      if (!opened) return noDigest(why);
+      if (!marked) {
+        marked = true;
+        await page.evaluate(BEHAVIOUR_MARK).catch(() => {
+        });
+      }
+      if (targets === void 0) await readListeners();
+      const found = targets ?? null;
+      let raw;
+      try {
+        raw = await page.evaluate(behaviourFinishExpr(found === null));
+      } catch (e) {
+        return noDigest(`the capture window could not be read: ${firstLine(e)}`);
+      }
+      if (found !== null) return assembleDigest(raw, found, "cdp");
+      return assembleDigest(raw, raw?.domListeners ?? [], "dom", `${fallback} \u2014 listeners attached with addEventListener are invisible to the DOM`);
+    }
+  };
+}
+
 // src/probes.ts
 var PROBES_VERSION = 2;
 var WALK_DEPENDENT_SCS = ["1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
@@ -24700,289 +25470,6 @@ var UNREADABLE_BY_OLDER = [
   ["liveRegion", "4.1.3"]
 ];
 
-// src/consent.ts
-var CONSENT_MARKERS = [
-  // DSFR (système de design de l'État): the consent placeholder and the consent banner.
-  { vendor: "dsfr", kind: "placeholder", cls: "fr-consent-placeholder" },
-  { vendor: "dsfr", kind: "banner", cls: "fr-consent-banner" },
-  // EU Cookie Compliance (Drupal).
-  { vendor: "eu-cookie-compliance", kind: "banner", id: "sliding-popup" },
-  { vendor: "eu-cookie-compliance", kind: "banner", cls: "eu-cookie-compliance-banner" },
-  // tarteaucitron: its root and the « activate » box it puts where a blocked service was.
-  { vendor: "tarteaucitron", kind: "banner", id: "tarteaucitron", idPrefix: true },
-  { vendor: "tarteaucitron", kind: "placeholder", cls: "tac_activate", classPrefix: true },
-  // Didomi.
-  { vendor: "didomi", kind: "banner", id: "didomi-host" },
-  { vendor: "didomi", kind: "banner", id: "didomi-notice" },
-  { vendor: "didomi", kind: "placeholder", cls: "didomi-content-placeholder", classPrefix: true },
-  // Axeptio.
-  { vendor: "axeptio", kind: "banner", id: "axeptio_overlay" },
-  { vendor: "axeptio", kind: "banner", cls: "axeptio_mount" },
-  { vendor: "axeptio", kind: "placeholder", cls: "axeptio-placeholder", classPrefix: true }
-];
-var GENERIC_PLACEHOLDER = /consent.*(?:placeholder|blocked|disabled|fallback)|(?:placeholder|blocked).*consent/i;
-var GENERIC_BANNER = /(?:cookie|consent).*(?:banner|popup|notice|modal|overlay|bar)$|^(?:cookie-?)?consent-?(?:banner|popup|notice|modal|overlay|bar)/i;
-function consentMarkerFor(id, classes) {
-  for (const m3 of CONSENT_MARKERS) {
-    if (m3.id !== void 0 && id && (m3.idPrefix ? id.startsWith(m3.id) : id === m3.id)) return { vendor: m3.vendor, kind: m3.kind };
-    if (m3.cls !== void 0 && classes.some((c) => m3.classPrefix ? c.startsWith(m3.cls) : c === m3.cls)) return { vendor: m3.vendor, kind: m3.kind };
-  }
-  for (const c of classes) {
-    if (!/consent/i.test(c)) continue;
-    if (GENERIC_PLACEHOLDER.test(c)) return { vendor: "generic", kind: "placeholder" };
-    if (GENERIC_BANNER.test(c)) return { vendor: "generic", kind: "banner" };
-  }
-  return void 0;
-}
-function consentContainerOf(el) {
-  for (let n = el; n; n = n.parent) {
-    const m3 = consentMarkerFor(n.attribs.id ?? "", (n.attribs.class ?? "").split(/\s+/).filter(Boolean));
-    if (m3) return { el: n, ...m3 };
-  }
-  return void 0;
-}
-function consentNote(kind, vendor) {
-  return kind === "placeholder" ? `[\xE9tat sans consentement \u2014 consent placeholder (${vendor}): the capture refused cookies, so this stands in for blocked third-party content; it is not the page's own content and is not to be judged as such (e.g. not a heading)]` : `[\xE9tat sans consentement \u2014 consent banner (${vendor}) shown because the capture gave no consent]`;
-}
-var CONSENT_STATE = `(() => {
-  const MARKERS = ${JSON.stringify(CONSENT_MARKERS)};
-  const GP = ${GENERIC_PLACEHOLDER.toString()};
-  const GB = ${GENERIC_BANNER.toString()};
-  const match = (id, classes) => {
-    for (const m of MARKERS) {
-      if (m.id !== undefined && id && (m.idPrefix ? id.indexOf(m.id) === 0 : id === m.id)) return m;
-      if (m.cls !== undefined && classes.some((c) => (m.classPrefix ? c.indexOf(m.cls) === 0 : c === m.cls))) return m;
-    }
-    for (const c of classes) {
-      if (!/consent/i.test(c)) continue;
-      if (GP.test(c)) return { vendor: 'generic', kind: 'placeholder' };
-      if (GB.test(c)) return { vendor: 'generic', kind: 'banner' };
-    }
-    return null;
-  };
-  const out = [];
-  const seen = new Set();
-  for (const e of Array.from(document.querySelectorAll('[id],[class]'))) {
-    const classes = typeof e.className === 'string' ? e.className.split(/\\s+/).filter(Boolean) : Array.from(e.classList || []);
-    const m = match(e.id || '', classes);
-    if (!m) continue;
-    // The outermost container only: the children of a banner are the banner.
-    let inner = false;
-    for (let p = e.parentElement; p; p = p.parentElement) if (seen.has(p)) { inner = true; break; }
-    seen.add(e);
-    if (inner) continue;
-    const sel = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (classes[0] ? '.' + classes[0] : '');
-    out.push(m.kind + ' ' + m.vendor + ' ' + sel);
-    if (out.length >= 10) break;
-  }
-  return out;
-})()`;
-
-// src/collector.ts
-var COLLECTED_CSS = [
-  "color",
-  "backgroundColor",
-  "backgroundImage",
-  "fontSize",
-  "fontWeight",
-  "fontStyle",
-  "textDecorationLine",
-  "textTransform",
-  "lineHeight",
-  "letterSpacing",
-  "wordSpacing",
-  "whiteSpace",
-  "display",
-  "visibility",
-  "opacity",
-  "position",
-  "overflowX",
-  "overflowY",
-  "outlineStyle",
-  "outlineWidth",
-  "outlineColor",
-  // All four borders + the box shadow: WCAG 1.4.11 asks whether a control's BOUNDARY is
-  // perceivable, and a boundary can be drawn by any side, by the fill, by an outline or by a
-  // shadow. Collecting only one side would manufacture non-conformities on the other three.
-  "borderTopStyle",
-  "borderRightStyle",
-  "borderBottomStyle",
-  "borderLeftStyle",
-  "borderTopWidth",
-  "borderRightWidth",
-  "borderBottomWidth",
-  "borderLeftWidth",
-  "borderTopColor",
-  "borderRightColor",
-  "borderBottomColor",
-  "borderLeftColor",
-  "boxShadow",
-  "cursor"
-];
-var COLLECT_MAX_ELEMENTS = 5e3;
-var LOADING_STATE = `(() => {
-  const out = [];
-  const shown = (e) => {
-    const r = e.getBoundingClientRect();
-    if (r.width <= 0 && r.height <= 0) return false;
-    const s = getComputedStyle(e);
-    return s.display !== 'none' && s.visibility !== 'hidden';
-  };
-  const name = (e) => e.localName + (e.id ? '#' + e.id : '');
-  for (const e of Array.from(document.querySelectorAll('[aria-busy="true"]'))) if (shown(e)) out.push('aria-busy="true" ' + name(e));
-  for (const e of Array.from(document.querySelectorAll('[role="progressbar"]:not([aria-valuenow]), progress:not([value])'))) if (shown(e)) out.push('indeterminate progress ' + name(e));
-  const PHRASE = /^(chargement( en cours)?|veuillez patienter|loading|please wait)\\s*(\\.{1,3}|\u2026)?$/i;
-  const text = (e) => (e.textContent || '').replace(/\\s+/g, ' ').trim();
-  if (document.body) for (const e of Array.from(document.body.querySelectorAll('p,span,div,li,h1,h2,h3,h4,h5,h6,strong,em,output,[role="status"]'))) {
-    const t = text(e);
-    if (t.length > 40 || !PHRASE.test(t)) continue;
-    if (Array.from(e.children).some((c) => PHRASE.test(text(c)))) continue;
-    if (shown(e)) out.push('text "' + t + '" ' + name(e));
-  }
-  return out.slice(0, 10);
-})()`;
-async function waitForLoaded(page, timeoutMs, intervalMs = 150) {
-  const started = Date.now();
-  for (; ; ) {
-    let markers = [];
-    try {
-      const r2 = await page.evaluate(LOADING_STATE);
-      markers = Array.isArray(r2) ? r2.filter((m3) => typeof m3 === "string") : [];
-    } catch {
-      return { markers: [], waitedMs: Date.now() - started };
-    }
-    const waitedMs = Date.now() - started;
-    if (!markers.length || waitedMs >= timeoutMs) return { markers, waitedMs };
-    await new Promise((resolve16) => setTimeout(resolve16, Math.min(intervalMs, Math.max(1, timeoutMs - waitedMs))));
-  }
-}
-var LOADING_TIMEOUT_MS = 1e4;
-var FULL_SCREENSHOT_MAX_HEIGHT = 8e3;
-var COLLECT_SNAPSHOT = `(() => {
-  const PROPS = ${JSON.stringify(COLLECTED_CSS)};
-  const MAX = ${COLLECT_MAX_ELEMENTS};
-  // The ordinal is a JOIN KEY against parseHtml(dom), so the walk must enumerate elements
-  // exactly as a reparse of the serialisation below will (#101). querySelectorAll('*') did not:
-  //  - an element appended INSIDE a raw-text element (Next's dev overlay puts <nextjs-portal>
-  //    in a <script>) is serialised as that element's raw text, and a reparse reads text \u2014
-  //    one ordinal too many, and every digest refused from there on;
-  //  - <template> contents are serialised and reparsed as elements, but live in
-  //    template.content, which querySelectorAll never traverses \u2014 one ordinal too few.
-  // Pre-order, children of the raw-text elements HTML parsers (htmlparser2 included) treat as
-  // text skipped, template.content descended.
-  const RAW_TEXT = new Set(['script', 'style', 'title', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes']);
-  const els = [];
-  const walkElements = (parent) => {
-    for (const child of parent.children) {
-      els.push(child);
-      const name = child.localName;
-      if (RAW_TEXT.has(name)) continue;
-      // With scripting on, a <noscript>'s content is raw TEXT to the browser, while the reparse
-      // reads it as elements (#112). Parse that text with the page's own parser and count what
-      // it yields, in place, so every later ordinal still lines up. The inert parsed nodes have
-      // no computed style and an empty box, which the rules read as \xAB nothing measured \xBB.
-      if (name === 'noscript' && child.children.length === 0 && (child.textContent || '').includes('<')) {
-        const parsed = document.createElement('template');
-        parsed.innerHTML = child.textContent || '';
-        walkElements(parsed.content);
-        continue;
-      }
-      walkElements(name === 'template' && child.content ? child.content : child);
-    }
-  };
-  walkElements(document);
-  const styles = [];
-  const boxes = [];
-  const n = Math.min(els.length, MAX);
-  for (let i = 0; i < n; i++) {
-    const el = els[i];
-    const tag = el.tagName.toLowerCase();
-    const cs = getComputedStyle(el);
-    const css = {};
-    for (const p of PROPS) {
-      const v = cs[p];
-      if (v !== undefined && v !== null && v !== '') css[p] = String(v);
-    }
-    styles.push({ i: i, tag: tag, css: css });
-    const r = el.getBoundingClientRect();
-    boxes.push({ i: i, tag: tag, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
-  }
-  // The page's own stylesheets. Some criteria are properties of the STYLESHEET rather than of
-  // any element's computed style \u2014 focus styling removed with no replacement (2.4.7), a media
-  // query that locks the orientation (1.3.4) \u2014 and this is the only place they exist.
-  // A cross-origin sheet throws on .cssRules: COUNT those instead of ignoring them, so a rule
-  // reading this digest can tell "nothing there" apart from "I could not look".
-  // The cap is on the ORDINARY pool only, and the traversal never stops early.
-  //
-  // It used to return the moment the pool filled, which abandoned every remaining sheet \u2014
-  // and on a design-system app the pool fills long before the end. Measured on a real capture
-  // of 38 pages: all 38 came back truncated, so rendered-focus-not-visible declined on every
-  // one of them and 2.4.7 could never be decided by any number of scans. The rule was right to
-  // decline (a :focus rule might have been among the dropped ones); the collector was wrong to
-  // make that unavoidable.
-  //
-  // So the rules a rendered criterion actually READS \u2014 :focus styling, orientation locks,
-  // pinned positioning, animation \u2014 are kept whatever the pool is doing, and truncated now
-  // means "some ordinary rule was dropped", which is a much weaker statement. A rule can then
-  // ask for what it needs instead of refusing on a cap that never concerned it.
-  const cssRules = [];
-  let unreadable = 0;
-  let dropped = 0;
-  const MAXR = 4000;
-  const camel = (p) => p.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-  const KEEP_SELECTOR = /:focus|:target|:active/i;
-  const KEEP_PROP = /^(?:outline|position|animation|transition|transform)/;
-  const walk = (list, media) => {
-    for (const r of list) {
-      if (typeof r.selectorText === 'string' && r.style) {
-        const decls = {};
-        for (let i = 0; i < r.style.length; i++) {
-          const prop = r.style[i];
-          decls[camel(prop)] = r.style.getPropertyValue(prop);
-        }
-        const keep = KEEP_SELECTOR.test(r.selectorText) || Object.keys(decls).some((k) => KEEP_PROP.test(k));
-        if (cssRules.length >= MAXR && !keep) { dropped++; continue; }
-        cssRules.push(media ? { selector: r.selectorText, media: media, decls: decls } : { selector: r.selectorText, decls: decls });
-      } else if (r.cssRules) {
-        const cond = r.conditionText || (r.media && r.media.mediaText) || media;
-        walk(r.cssRules, cond);
-      }
-    }
-  };
-  for (const sheet of document.styleSheets) {
-    try {
-      walk(sheet.cssRules, undefined);
-    } catch (e) {
-      unreadable++;
-    }
-  }
-
-  const truncated = els.length > MAX;
-  return {
-    dom: document.documentElement.outerHTML,
-    css: { v: 1, rules: cssRules, unreadable: unreadable, truncated: dropped > 0, dropped: dropped },
-    title: document.title,
-    // The doctype is NOT part of documentElement.outerHTML, so a capture that records only
-    // the DOM drops it \u2014 and RGAA 8.1 (is a doctype present, valid, and before <html>?) then
-    // has nothing to look at. Recorded as its own field for that reason.
-    doctype: document.doctype ? '<!DOCTYPE ' + document.doctype.name + (document.doctype.publicId ? ' PUBLIC "' + document.doctype.publicId + '"' : '') + (document.doctype.systemId ? ' "' + document.doctype.systemId + '"' : '') + '>' : '',
-    lang: document.documentElement.getAttribute('lang') || '',
-    url: location.href,
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-    // The document's full height, so the producer knows whether a full-page screenshot adds
-    // anything to the viewport one.
-    docHeight: Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0),
-    // Still loading at the instant of collection: the markers, or none. Every producer runs
-    // this same collector, so every producer can say so \u2014 see LOADING_STATE.
-    loading: ${LOADING_STATE},
-    // The consent placeholders and banners on the page (#184): a headless capture never
-    // accepts cookies, so what they show is \xAB \xE9tat sans consentement \xBB, not content.
-    consent: ${CONSENT_STATE},
-    styles: { v: 1, entries: styles, truncated: truncated },
-    boxes: { v: 1, entries: boxes, truncated: truncated }
-  };
-})()`;
-
 // src/snapshot.ts
 var SNAPSHOT_VERSION = 1;
 var PAGES_DIR = ".ultra11y/pages";
@@ -25095,6 +25582,8 @@ ${snap.dom}
 `);
   if (snap.axe) writeFileSync(join3(dir, "axe.json"), `${JSON.stringify(snap.axe)}
 `);
+  if (snap.scripts) writeFileSync(join3(dir, "scripts.json"), `${JSON.stringify(snap.scripts)}
+`);
   if (snap.screenshotBase64) {
     try {
       writeFileSync(join3(dir, "screen.png"), Buffer.from(snap.screenshotBase64, "base64"));
@@ -25139,6 +25628,7 @@ function readSnapshot(dir) {
   const css = readJson(join3(dir, "css.json"));
   const probes = readJson(join3(dir, "probes.json"));
   const axe = readJson(join3(dir, "axe.json"));
+  const scripts = readScripts(dir);
   const shot = join3(dir, "screen.png");
   const full = join3(dir, "screen-full.png");
   const narrow = join3(dir, "screen-320.png");
@@ -25151,10 +25641,21 @@ function readSnapshot(dir) {
     ...css ? { css } : {},
     ...probes ? { probes } : {},
     ...axe ? { axe } : {},
+    ...scripts ? { scripts } : {},
     ...existsSync2(shot) ? { screenshot: "screen.png" } : {},
     ...existsSync2(full) ? { screenshotFull: "screen-full.png" } : {},
     ...existsSync2(narrow) ? { screenshot320: "screen-320.png" } : {}
   };
+}
+function readScripts(dir) {
+  return asScriptsDigest(readJson(join3(dir, "scripts.json")));
+}
+function asScriptsDigest(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return void 0;
+  const raw = input;
+  if (typeof raw.v !== "number" || raw.v < 1 || raw.v > SCRIPTS_VERSION) return void 0;
+  if (raw.collected !== "cdp" && raw.collected !== "dom" && raw.collected !== "none") return void 0;
+  return { ...raw, caps: raw.caps ?? {} };
 }
 function pageScreenshot(pagesDir, id) {
   for (const f2 of ["screen-full.png", "screen.png"]) {
@@ -25223,6 +25724,7 @@ function attachSignals(doc) {
   const loading = Array.isArray(meta2?.loading) ? meta2.loading.filter((m3) => typeof m3 === "string") : [];
   const probes = readJson(join3(dir, "probes.json"));
   const axe = readJson(join3(dir, "axe.json"));
+  const scripts = readScripts(dir);
   const shot = join3(dir, "screen.png");
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
   const alignedBoxMap = boxes ? align(doc, boxes.entries) : null;
@@ -25237,6 +25739,9 @@ function attachSignals(doc) {
     ...meta2?.doctype !== void 0 ? { doctype: meta2.doctype } : {},
     ...probes ? { probes } : {},
     ...axe ? { axe } : {},
+    // Not aligned wholesale like the styles: its reader verifies each entry's tag against the
+    // DOM, because an element the page created during the window legitimately has no ordinal.
+    ...scripts ? { scripts } : {},
     ...truncated ? { truncated } : {},
     ...loading.length ? { capturedLoading: loading } : {}
   };
@@ -36898,6 +37403,196 @@ var SUBJECTS = {
   ])
 };
 for (const sc of MEASURED_SCS) SUBJECTS[`rendered:${sc}`] = measured(sc);
+function behaviourAnchor(d2, e, note, cls) {
+  const el = e.i >= 0 ? d2.elements[e.i] : void 0;
+  if (el && el.tag === e.tag) return h(d2, el, note, cls);
+  return hAt(d2, 1, e.selector, `${note} [${e.selector}${e.html ? ` ${e.html.slice(0, 100)}` : ""} \u2014 not in the serialized DOM]`, cls);
+}
+function behaviourCoverage(d2, page, s2, subject, found, listeners, lists) {
+  const how = s2.collected === "none" ? `could NOT be collected (${s2.why ?? "no reason recorded"}) \u2014 nothing here was looked at, and the absence of ${found} proves nothing` : `collected via ${s2.collected === "cdp" ? "CDP (every listener, however attached)" : "the DOM only"} over ${s2.windowMs ?? "?"} ms (${s2.idleMs ?? "?"} ms with nothing touching the page)`;
+  const caveats = [];
+  if (s2.collected === "dom" && listeners)
+    caveats.push(
+      `DOM fallback (${s2.why ?? "no CDP session"}): only inline on* handlers and on* properties are visible, so the absence of ${found} proves nothing`
+    );
+  if (listeners && s2.delegated?.length)
+    caveats.push(
+      `listeners delegated to ${s2.delegated.map((g) => `${g.target} (${g.events.join(",")})`).join("; ")}: a framework that delegates events (React) declares its handlers there, invisible on the elements`
+    );
+  const cut = lists.filter((l) => s2.truncated?.[l] !== void 0).map((l) => `${l} capped at ${s2.caps?.[l] ?? "?"} of ${s2.truncated?.[l]}`);
+  if (cut.length) caveats.push(cut.join(", "));
+  return hAt(
+    d2,
+    1,
+    `scripts:${subject}`,
+    `page="${page}" behaviour digest (scripts.json) ${how}${s2.collected === "none" ? "" : `: ${found}`}${caveats.length ? ` \u2014 ${caveats.join("; ")}` : ""}`,
+    `behaviourcov|${subject}|${s2.collected}|${s2.collected === "none" ? "" : found}`
+  );
+}
+function behaviourSubject(subject, listeners, lists, anchors, found) {
+  return (docs) => docs.flatMap((d2) => {
+    const page = pageOfDoc(d2.file);
+    const s2 = d2.signals?.scripts;
+    if (page === void 0 || !s2) return [];
+    const items = s2.collected === "none" ? [] : anchors(d2, s2);
+    return [behaviourCoverage(d2, page, s2, subject, found(items.length), listeners, lists), ...items];
+  });
+}
+var plural = (n, one2, many = `${one2}s`) => `${n} ${n === 1 ? one2 : many}`;
+var listenerVia = (s2) => s2.collected === "cdp" ? "CDP" : "DOM";
+var STATE_ARIA = ["aria-expanded", "aria-pressed", "aria-selected", "aria-checked", "aria-current", "aria-hidden"];
+var BEHAVIOUR_SUBJECTS = {
+  // RGAA 7.1 / WCAG 4.1.2 — a scripted control the keyboard cannot reach and assistive
+  // technology cannot name: an activation listener on an element that is not natively
+  // interactive and carries neither a role nor a tabindex.
+  "behaviour:clickable": behaviourSubject(
+    "clickable",
+    true,
+    ["listeners"],
+    (d2, s2) => (s2.listeners ?? []).filter((l) => l.flagged).map(
+      (l) => behaviourAnchor(
+        d2,
+        l,
+        `<${l.tag}> listens for ${l.events.join(", ")} (${listenerVia(s2)}) but is not natively interactive and has neither role nor tabindex \u2014 out of the tab order and unknown to assistive technology`,
+        `bclickable|${l.tag}|${l.selector}|${l.events.join(",")}`
+      )
+    ),
+    (n) => `${plural(n, "clickable element")} without role or tabindex`
+  ),
+  // RGAA 7.3 / WCAG 2.1.1 — a behaviour reachable by pointer only.
+  "behaviour:keyboard": behaviourSubject(
+    "keyboard",
+    true,
+    ["listeners"],
+    (d2, s2) => (s2.listeners ?? []).filter((l) => l.mouseOnly).map(
+      (l) => behaviourAnchor(
+        d2,
+        l,
+        `<${l.tag}${l.role ? ` role="${l.role}"` : ""}${l.tabindex !== void 0 ? ` tabindex="${l.tabindex}"` : ""}> listens for ${l.events.join(", ")} (${listenerVia(s2)}) and for no keyboard event${l.native ? "" : " \u2014 and is not a native control, so Enter/Space do not fire its click"}: is the same action available from the keyboard?`,
+        `bkeyboard|${l.tag}|${l.selector}|${l.events.join(",")}`
+      )
+    ),
+    (n) => plural(n, "mouse-only listener target")
+  ),
+  // RGAA 7.1 / WCAG 4.1.2 — an ARIA state the script keeps (or fails to keep) in step: what it
+  // changed during the window, and the stateful controls carrying a listener it was not seen to
+  // change.
+  "behaviour:aria": behaviourSubject(
+    "aria",
+    true,
+    ["ariaMutations", "listeners"],
+    (d2, s2) => {
+      const mutated = new Set((s2.ariaMutations ?? []).map((m3) => `${m3.i}|${m3.selector}|${m3.attr}`));
+      return [
+        ...(s2.ariaMutations ?? []).map(
+          (m3) => behaviourAnchor(
+            d2,
+            m3,
+            `script changed ${m3.attr} on <${m3.tag}> ${m3.phase === "idle" ? "with nothing touching the page" : m3.phase === "interaction" ? "on interaction" : "on its own and on interaction"}: ${JSON.stringify(m3.from)} \u2192 ${m3.values.map((v2) => JSON.stringify(v2)).join(" \u2192 ")} (${plural(m3.count, "change")}) \u2014 does the state announced match the state shown?`,
+            `baria|${m3.tag}|${m3.selector}|${m3.attr}`
+          )
+        ),
+        ...(s2.listeners ?? []).flatMap((l) => {
+          const el = l.i >= 0 ? d2.elements[l.i] : void 0;
+          if (!el || el.tag !== l.tag) return [];
+          const states = STATE_ARIA.filter((a2) => attr(el, a2) !== void 0 && !mutated.has(`${l.i}|${l.selector}|${a2}`));
+          if (!states.length || !l.events.some((e) => /click|pointer|mouse|key|touch/.test(e))) return [];
+          return [
+            h(
+              d2,
+              el,
+              `<${l.tag}> carries ${states.map((a2) => `${a2}="${attr(el, a2)}"`).join(" ")} and listens for ${l.events.join(", ")} (${listenerVia(s2)}) \u2014 the state is the script's to toggle; it was not seen changing during the capture`,
+              `bariastate|${l.tag}|${l.selector}|${states.join(",")}`
+            )
+          ];
+        })
+      ];
+    },
+    (n) => plural(n, "scripted ARIA state")
+  ),
+  // RGAA 7.5 / WCAG 4.1.3 — status messages: the live regions and whether they spoke, and the
+  // content a script updated on interaction where no live region would announce it.
+  "behaviour:live": behaviourSubject(
+    "live",
+    false,
+    ["liveRegions", "updates"],
+    (d2, s2) => [
+      ...(s2.liveRegions ?? []).map(
+        (r2) => behaviourAnchor(
+          d2,
+          r2,
+          `live region <${r2.tag}>${r2.role ? ` role="${r2.role}"` : ""}${r2.live !== void 0 ? ` aria-live="${r2.live}"` : ""}${r2.atomic !== void 0 ? ` aria-atomic="${r2.atomic}"` : ""} \u2014 its content ${r2.changed ? "CHANGED during the capture" : "did not change during the capture"}`,
+          `blive|${r2.tag}|${r2.selector}|${r2.changed}`
+        )
+      ),
+      ...(s2.updates ?? []).map(
+        (u2) => behaviourAnchor(
+          d2,
+          u2,
+          `<${u2.tag}> content updated by script on interaction (${u2.kinds.join(", ")}) OUTSIDE any live region \u2014 a status message nobody is told about?`,
+          `bupdate|${u2.tag}|${u2.selector}`
+        )
+      )
+    ],
+    (n) => plural(n, "live region or unannounced update", "live regions and unannounced updates")
+  ),
+  // RGAA 13.8 / WCAG 2.2.2 — content that moves or updates on its own.
+  "behaviour:motion": behaviourSubject(
+    "motion",
+    false,
+    ["motion", "animations"],
+    (d2, s2) => [
+      ...(s2.motion ?? []).map(
+        (m3) => behaviourAnchor(
+          d2,
+          m3,
+          `<${m3.tag}> changed ${plural(m3.changes, "time")} in ${s2.idleMs ?? "?"} ms with nothing touching the page (${m3.kinds.join(", ")}) \u2014 moving or auto-updating content: can it be paused, stopped or hidden?`,
+          `bmotion|${m3.tag}|${m3.selector}`
+        )
+      ),
+      ...(s2.animations ?? []).map(
+        (a2) => behaviourAnchor(
+          d2,
+          a2,
+          `CSS animation "${a2.name}" on <${a2.tag}> runs ${a2.iterations === "infinite" ? "forever" : `${a2.iterations} \xD7 ${a2.durationMs} ms`} \u2014 moving for more than 5 s: can it be stopped?`,
+          `banim|${a2.tag}|${a2.selector}|${a2.name}`
+        )
+      )
+    ],
+    (n) => plural(n, "moving element")
+  ),
+  // RGAA 13.1 / WCAG 2.2.1 — time limits: the timers running, and the long ones.
+  "behaviour:timers": behaviourSubject(
+    "timers",
+    false,
+    ["intervals"],
+    (d2, s2) => {
+      const t3 = s2.timers;
+      if (!t3) return [];
+      const any = t3.intervals.length || t3.timeouts || t3.longTimeouts.length || t3.inlineSetInterval || t3.inlineSetTimeout || t3.metaRefresh !== void 0;
+      if (!any) return [];
+      const seen = t3.source === "init" ? "since the page started" : t3.source === "window" ? "scheduled during the capture window only" : "not hooked";
+      const parts = [
+        `${plural(t3.intervals.length, "interval")} running${t3.intervals.length ? ` (every ${[...new Set(t3.intervals)].slice(0, 8).join(", ")} ms)` : ""}`,
+        `${plural(t3.timeouts, "timeout")} scheduled`,
+        ...t3.longTimeouts.length ? [`long timeouts of ${t3.longTimeouts.join(", ")} ms \u2014 a session or time limit?`] : [],
+        `inline scripts call setInterval \xD7${t3.inlineSetInterval}, setTimeout \xD7${t3.inlineSetTimeout}`,
+        ...t3.metaRefresh !== void 0 ? [`<meta http-equiv="refresh" content="${t3.metaRefresh}">`] : []
+      ];
+      return [
+        hAt(
+          d2,
+          1,
+          "scripts:timers",
+          `timers (${seen}): ${parts.join("; ")}`,
+          `btimers|${t3.intervals.length > 0}|${t3.longTimeouts.join(",")}|${t3.metaRefresh ?? ""}`
+        )
+      ];
+    },
+    (n) => n ? "timers recorded" : "no timer recorded"
+  )
+};
+Object.assign(SUBJECTS, BEHAVIOUR_SUBJECTS);
 var SC_SUBJECTS = {
   "1.1.1": ["images"],
   "1.2.1": ["motion"],
@@ -36920,11 +37615,11 @@ var SC_SUBJECTS = {
   // Content on Hover or Focus. Its subject IS the additional content — `aria` and `stickies`
   // were standing in for a harvester that did not exist yet.
   "1.4.13": ["additionalContent", "aria", "stickies"],
-  "2.1.1": ["pointerHandlers", "focusables"],
+  "2.1.1": ["pointerHandlers", "focusables", "behaviour:keyboard", "behaviour:clickable"],
   "2.1.2": ["focusables", "pointerHandlers"],
   "2.1.4": ["shortcuts"],
-  "2.2.1": ["timers"],
-  "2.2.2": ["motion", "timers"],
+  "2.2.1": ["timers", "behaviour:timers"],
+  "2.2.2": ["motion", "timers", "behaviour:motion", "behaviour:timers"],
   "2.3.1": ["flashes"],
   "2.4.1": ["landmarks"],
   "2.4.3": ["focusOrder"],
@@ -36951,8 +37646,8 @@ var SC_SUBJECTS = {
   "3.3.4": ["controls", "errors"],
   "3.3.7": ["controls"],
   "3.3.8": ["controls"],
-  "4.1.2": ["aria"],
-  "4.1.3": ["liveRegions"]
+  "4.1.2": ["aria", "behaviour:clickable", "behaviour:aria"],
+  "4.1.3": ["liveRegions", "behaviour:live"]
 };
 var PACK_SUBJECTS = {
   rgaa: {
@@ -37056,11 +37751,13 @@ var PACK_SUBJECTS = {
     "3.3": ["colourPairs", "colourDecls", "rendered:1.4.11", "controls", "buttons", "stylesheets"],
     // Theme 7 — scripts. "Is each script operable by keyboard AND pointer?" is about the
     // handlers and the focusable surface, never about the page's headings and lists.
-    "7.1": ["aria", "pointerHandlers"],
+    // The behaviour digest (scripts.json, #190) is what these are judged on in a capture: a
+    // listener on a `<div>`, an `aria-expanded` the script toggles, a status that is announced.
+    "7.1": ["aria", "pointerHandlers", "behaviour:clickable", "behaviour:aria"],
     "7.2": ["scriptAlternatives"],
-    "7.3": ["pointerHandlers", "pointerActions", "focusables"],
+    "7.3": ["pointerHandlers", "pointerActions", "focusables", "behaviour:keyboard", "behaviour:clickable"],
     "7.4": ["contextChange"],
-    "7.5": ["liveRegions", "rendered:4.1.3"],
+    "7.5": ["liveRegions", "rendered:4.1.3", "behaviour:live"],
     // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
     // reorders, and what is hidden on purpose.
     //
@@ -37088,7 +37785,7 @@ var PACK_SUBJECTS = {
     "10.13": ["additionalContent", "rendered:1.4.13", "aria", "stickies"],
     "10.14": ["additionalContent", "rendered:1.4.13", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
-    "13.1": ["timers", "externalScripts"],
+    "13.1": ["timers", "externalScripts", "behaviour:timers"],
     // 13.2 asks about a window OPENING, which is not the context-change question it inherited
     // from WCAG 3.2.1. See `newWindow`.
     "13.2": ["newWindow"],
@@ -37097,7 +37794,7 @@ var PACK_SUBJECTS = {
     "13.5": ["cryptic"],
     "13.6": ["cryptic"],
     "13.7": ["flashes"],
-    "13.8": ["motion", "timers", "externalScripts"],
+    "13.8": ["motion", "timers", "externalScripts", "behaviour:motion"],
     "13.9": ["orientation", "rendered:1.3.4", "stylesheets"],
     "13.10": ["pointerHandlers", "externalScripts"],
     "13.12": ["pointerHandlers", "externalScripts"],
@@ -53509,7 +54206,7 @@ function reasonFrom(detail) {
 }
 async function requestJson(url, opts = {}) {
   const doFetch = opts.fetchImpl ?? fetch;
-  const sleep = opts.sleep ?? defaultSleep;
+  const sleep2 = opts.sleep ?? defaultSleep;
   const retries = opts.retries ?? 2;
   const headers = {
     Accept: "application/json",
@@ -53532,7 +54229,7 @@ async function requestJson(url, opts = {}) {
     const retryable = res.status === 429 || res.status === 503;
     if (!retryable || attempt2 >= retries) throw new HttpError(res.status, detail, url);
     const after = Number.parseInt(res.headers.get("retry-after") ?? "", 10);
-    await sleep(Math.min(Number.isFinite(after) ? after * 1e3 : 1e3 * 2 ** attempt2, 3e4));
+    await sleep2(Math.min(Number.isFinite(after) ? after * 1e3 : 1e3 * 2 ** attempt2, 3e4));
   }
 }
 
@@ -54118,7 +54815,7 @@ function classifyRenderFailure(f2) {
   if (PROPS.test(m3) || f2.name === "TypeError" && /is not a function/.test(m3)) return "props";
   return "error";
 }
-var firstLine = (s2) => {
+var firstLine2 = (s2) => {
   const line = s2?.split("\n").find((l) => l.trim())?.trim();
   return line ? line.length > 240 ? `${line.slice(0, 237)}\u2026` : line : void 0;
 };
@@ -54451,14 +55148,14 @@ async function renderFile(runner, tmp, job, unitMs) {
       }
       if (a2.done) break;
       if (a2.hung === "load" || !a2.units && !a2.hung) {
-        out.fileFailure = a2.hung === "load" ? { message: `loading the module did not finish within ${loadMs} ms`, timeout: true } : { message: firstLine(a2.stderr) ?? `the render process exited with code ${a2.exitCode}` };
+        out.fileFailure = a2.hung === "load" ? { message: `loading the module did not finish within ${loadMs} ms`, timeout: true } : { message: firstLine2(a2.stderr) ?? `the render process exited with code ${a2.exitCode}` };
         break;
       }
       const stuck = a2.hung ?? a2.current ?? (a2.units ?? []).find((u2) => !u2.props && !skip.has(u2.export))?.export;
       if (!stuck) break;
       out.results.set(
         stuck,
-        a2.hung ? { ok: false, timeout: true } : { ok: false, failure: { message: firstLine(a2.stderr) ?? `the render process exited with code ${a2.exitCode}` } }
+        a2.hung ? { ok: false, timeout: true } : { ok: false, failure: { message: firstLine2(a2.stderr) ?? `the render process exited with code ${a2.exitCode}` } }
       );
       skip.add(stuck);
     }
@@ -54562,7 +55259,7 @@ async function runRenderEngine(opts) {
     for (const t3 of runnable) {
       const o = outcomes.get(t3);
       if (o.fileFailure && !o.units.length) {
-        units.push(fileLevel(t3, "skipped", o.fileFailure.timeout ? "timeout" : classifyRenderFailure(o.fileFailure), firstLine(o.fileFailure.message)));
+        units.push(fileLevel(t3, "skipped", o.fileFailure.timeout ? "timeout" : classifyRenderFailure(o.fileFailure), firstLine2(o.fileFailure.message)));
         continue;
       }
       const source = t3.kind === "stories" ? storySource(root, t3.file) : t3.file;
@@ -54586,7 +55283,7 @@ async function runRenderEngine(opts) {
           units.push({
             ...base,
             reason: classifyRenderFailure(r2.failure ?? {}),
-            ...firstLine(r2.failure?.message) ? { detail: firstLine(r2.failure?.message) } : {}
+            ...firstLine2(r2.failure?.message) ? { detail: firstLine2(r2.failure?.message) } : {}
           });
         else if (!r2.html?.trim()) units.push({ ...base, reason: "empty" });
         else {
@@ -54604,7 +55301,7 @@ ${r2.html.trim()}
           units.push({ ...base, status: "rendered", capture: `${CAPTURES_DIR}/${id}.html` });
         }
       }
-      if (o.fileFailure) units.push(fileLevel(t3, "skipped", classifyRenderFailure(o.fileFailure), firstLine(o.fileFailure.message)));
+      if (o.fileFailure) units.push(fileLevel(t3, "skipped", classifyRenderFailure(o.fileFailure), firstLine2(o.fileFailure.message)));
     }
   }
   const capDir = join14(root, CAPTURES_DIR);
@@ -57643,6 +58340,7 @@ var CAPTURE_FILES = [
   "css.json",
   "probes.json",
   "axe.json",
+  "scripts.json",
   "axtree.json",
   "screen.png",
   "screen-full.png",
@@ -57656,6 +58354,7 @@ var CAPTURE_FILE_LABEL = {
     "css.json": "les r\xE8gles CSS lues dans les feuilles de style",
     "probes.json": "les mesures des sondes en direct",
     "axe.json": "les r\xE9sultats axe-core de la page",
+    "scripts.json": "le comportement JavaScript de la page (\xE9couteurs, mutations ARIA, r\xE9gions live, minuteurs, contenus en mouvement)",
     "axtree.json": "l'arbre d'accessibilit\xE9",
     "screen.png": "la capture d'\xE9cran",
     "screen-full.png": "la page enti\xE8re en capture d'\xE9cran",
@@ -57668,6 +58367,7 @@ var CAPTURE_FILE_LABEL = {
     "css.json": "the CSS rules read from the stylesheets",
     "probes.json": "the live probes' measurements",
     "axe.json": "axe-core's results on the page",
+    "scripts.json": "the page's JavaScript behaviour (listeners, ARIA mutations, live regions, timers, moving content)",
     "axtree.json": "the accessibility tree",
     "screen.png": "the screenshot",
     "screen-full.png": "the whole page as a screenshot",
@@ -58696,6 +59396,11 @@ function writeRunnerSnapshot(root, out, target, page, extra = {}) {
       // the criteria AXE_DECIDES is usable. A RunnerOutput always carries `violations` because
       // a runner always runs axe — that is the one instrument neither runtime skips.
       axe: { violations: out.violations, ran: true, ...out.axe ? { engine: out.axe } : {} },
+      // What the page's scripts did during the capture window (#190). Written whatever it says —
+      // `collected: "none"` included: a producer that looked and could not is not one that never
+      // looked. The journey runner (#189) goes through this same function, so it only has to set
+      // `snapshot.scripts` from src/behaviour.ts to write the same file.
+      ...collected.scripts ? { scripts: collected.scripts } : {},
       ...collected.screenshot ? { screenshotBase64: collected.screenshot } : {},
       ...collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {},
       ...collected.screenshot320 ? { screenshot320Base64: collected.screenshot320 } : {}
@@ -60235,6 +60940,8 @@ async function runOnPage(browser, axe, target, isFile, opts) {
   const context = await browser.newContext(opts.storageState ? { storageState: opts.storageState } : {});
   const page = await context.newPage();
   const empty2 = [];
+  if (opts.snapshot !== false) await page.addInitScript(TIMER_HOOK).catch(() => {
+  });
   try {
     const url = isFile ? "file://" + resolve12(target) : target;
     const response = await page.goto(url, { waitUntil: "load", timeout: 45e3 });
@@ -60267,6 +60974,8 @@ async function runOnPage(browser, axe, target, isFile, opts) {
         }
       }
     }
+    const behaviour = snapshot ? await startBehaviour(page) : void 0;
+    await behaviour?.idle();
     const axeRun = await runAxe(axe, page, "scan");
     const violations = axeRun.violations.map((v2) => ({
       id: v2.id,
@@ -60372,6 +61081,7 @@ async function runOnPage(browser, axe, target, isFile, opts) {
       why: String(e?.message ?? e).slice(0, 160)
     })) : { hits: empty2, complete: false, why: "stateful probes are off (`scan --no-interact`)" };
     const liveRegion = liveWalk.hits;
+    const scripts = behaviour ? await behaviour.finish() : void 0;
     if (liveWalk.complete) probed.push("4.1.3");
     else skipped.push({ sc: "4.1.3", why: liveWalk.why ?? "the live-region pass did not exercise the whole page" });
     return {
@@ -60403,7 +61113,8 @@ async function runOnPage(browser, axe, target, isFile, opts) {
           ...snapshot,
           ...screenshot ? { screenshot } : {},
           ...screenshotFull ? { screenshotFull } : {},
-          ...screenshot320 ? { screenshot320 } : {}
+          ...screenshot320 ? { screenshot320 } : {},
+          ...scripts ? { scripts } : {}
         }
       } : {}
     };
@@ -62980,7 +63691,7 @@ var WORKLIST_RULE = `THE WORKLIST IS THE RESIDUAL. Return exactly one verdict fo
 var ABSENCE_RULE = `AN NC SHAPED LIKE AN ABSENCE IS STILL ANCHORED. \xAB No second navigation system \xBB, \xAB no search engine \xBB, \xAB no error message suggests the expected format \xBB \u2014 an absence is OBSERVED somewhere: cite the element and the page you observed it on. And when the criterion's subject exists nowhere in the audited scope, the verdict is \`NA\` with its justification, never \`NC\`.
 
 AND CITE FROM THIS CRITERION'S OWN ANCHORS, NOT THE THING YOU ARE RULING OUT. An absence pulls you toward the element you are arguing ABOUT \u2014 the search form that is not a site search engine, the menu that is not a second navigation system \u2014 and that element is, precisely because it is off-topic, absent from what this criterion was harvested. A citation on one of the criterion's own anchors is vouched for by the harvest; one outside it has its snippet verified LITERALLY, character for character, and a retyping then fails. Cite the region you inspected \u2014 the \`header\`, the \`nav\`, the \`footer\` the brief listed \u2014 and say in the justification what you did not find in it.`;
-var CAPTURE_RULE = `THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\` is there to read, beside whichever digests its producer captured (\`styles.json\`, \`boxes.json\`, \`css.json\`, \`probes.json\`, \`screen.png\`\u2026) \u2014 the brief names the ones that exist, and only those. \`needs-rendered-dom\` is refused on such a criterion \u2014 decide it from those files, or answer \`undecidable\` and say what the capture does not settle.`;
+var CAPTURE_RULE = `THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidence is anchored under \`.ultra11y/pages/<id>/\`, the browser already ran: \`dom.html\` is there to read, beside whichever digests its producer captured (\`styles.json\`, \`boxes.json\`, \`css.json\`, \`probes.json\`, \`scripts.json\`, \`screen.png\`\u2026) \u2014 the brief names the ones that exist, and only those. \`needs-rendered-dom\` is refused on such a criterion \u2014 decide it from those files, or answer \`undecidable\` and say what the capture does not settle.`;
 var NEVER_GUESS_RULE = `Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason \u2014 that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
 var SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce another \u2014 a verdict for a criterion nobody asked about is dropped, and under the fold it would otherwise overwrite what the deterministic engine already decided.`;
 var CONFORMITY_RULE = `A \`C\` WILL BE ATTACKED, exactly as an \`NC\` is. Every conformity you record goes into an adversarial worklist where a second reader opens your citations and asks whether they ESTABLISH the criterion or merely show that its subject exists \u2014 a present \`alt\` is not a relevant \`alt\`, a present \`<title>\` is not a title that describes the page. Cite the evidence that answers the criterion's own question, and when the evidence only proves presence, the honest verdict is \`manual\`.`;
@@ -64373,7 +65084,7 @@ function locatorFor(page, t3) {
   if ("text" in t3) return page.getByText(t3.text, t3.exact ? { exact: true } : {});
   return page.locator(t3.css);
 }
-var firstLine2 = (e) => String(e?.message ?? e).split("\n")[0].slice(0, 200);
+var firstLine3 = (e) => String(e?.message ?? e).split("\n")[0].slice(0, 200);
 async function resolveTarget(page, step, timeout) {
   const loc = locatorFor(page, step.target);
   try {
@@ -64497,7 +65208,7 @@ async function capture(page, axe, lang) {
     textSpacing: [],
     reflow: { horizontalScroll: false },
     probed: [],
-    skipped: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11"].map((sc) => ({ sc, why: `the live probes failed: ${firstLine2(e)}` })),
+    skipped: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11"].map((sc) => ({ sc, why: `the live probes failed: ${firstLine3(e)}` })),
     focusObscured: void 0
   }));
   await page.evaluate("window.__u11yJ && window.__u11yJ.restore()").catch(() => {
@@ -64600,7 +65311,7 @@ async function runOne(browser, axe, journey, file, opts, result, tested) {
         try {
           response = await page.goto(target, { waitUntil: "load", timeout: Math.max(timeout, 3e4) });
         } catch (e) {
-          return fail(rec, `navigation failed: ${firstLine2(e)}`);
+          return fail(rec, `navigation failed: ${firstLine3(e)}`);
         }
         await settle(page);
         const status = typeof response?.status === "function" ? response.status() : void 0;
@@ -64665,7 +65376,7 @@ async function runOne(browser, axe, journey, file, opts, result, tested) {
           try {
             await perform(page, loc, def, pointer, timeout);
           } catch (e) {
-            return fail(rec, `${def.action} failed: ${firstLine2(e)}`);
+            return fail(rec, `${def.action} failed: ${firstLine3(e)}`);
           }
           await settle(page);
           if (await page.evaluate(HAS_LIB).catch(() => false) === true) {
@@ -64750,7 +65461,7 @@ async function runOne(browser, axe, journey, file, opts, result, tested) {
     return record;
   } catch (e) {
     const open = record.steps.find((s2) => s2.status === "not-run");
-    return open ? fail(open, `the browser failed: ${firstLine2(e)}`) : record;
+    return open ? fail(open, `the browser failed: ${firstLine3(e)}`) : record;
   } finally {
     await context.close().catch(() => {
     });
@@ -66227,6 +66938,10 @@ async function cmdSnapshot(p2) {
       // Same reason, for the axe pass: what a rule engine found in the browser has to survive
       // the process that found it, or the offline re-audit sees a page nobody ran axe on.
       ...payload.axe ? { axe: payload.axe } : {},
+      // And for the behaviour digest (#190): what the page's scripts did during the capture
+      // window. Checked first — a producer is untrusted input, and a digest this engine cannot
+      // read is not written as if it could.
+      ...asScriptsDigest(payload.scripts) ? { scripts: asScriptsDigest(payload.scripts) } : {},
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command,
       // `scan` — writes it the one same way.

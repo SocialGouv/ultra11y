@@ -1,4 +1,4 @@
-import { C as CheckOptions, A as AuditLike } from './payload-BPGhg2sa.js';
+import { C as CheckOptions, A as AuditLike } from './payload-Dh8zlYiV.js';
 
 /** The axe-core build a result was measured with (src/axe-engine.ts). */
 interface AxeEngineInfo {
@@ -9,6 +9,12 @@ interface AxeEngineInfo {
     origin: "ultra11y" | "unpinned" | "project";
     /** The tier(s) that ran it, comma-separated: "scan", "playwright". */
     runner?: string;
+}
+
+/** A CDP session, structurally — Playwright's `CDPSession`. */
+interface CdpSessionLike {
+    send(method: string, params?: Record<string, unknown>): Promise<unknown>;
+    detach?(): Promise<void>;
 }
 
 /** Whose copy of axe-core ran: ultra11y's own pinned one, ultra11y's own at another version
@@ -60,6 +66,7 @@ interface PlaywrightPage {
     };
     context?(): {
         request?: PlaywrightRequest;
+        newCDPSession?(page: unknown): Promise<CdpSessionLike>;
     };
 }
 /** Playwright's APIRequestContext, to exactly what the document download uses. */

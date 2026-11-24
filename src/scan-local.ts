@@ -36,6 +36,7 @@ import {
   TEXT_SPACING_PROBE,
 } from "./probes.js";
 import { type AxeEngine, resolveAxeEngine, runAxe } from "./axe-engine.js";
+import { TIMER_HOOK, behaviourSources, startBehaviour } from "./behaviour.js";
 import { sampleScope } from "./sample.js";
 import { CONSENT_STATE } from "./consent.js";
 import {
@@ -651,6 +652,8 @@ export function probeSources(): Record<string, string> {
     COLLECT_SNAPSHOT,
     LOADING_STATE,
     CONSENT_STATE,
+    // The behaviour digest's window (src/behaviour.ts), evaluated by the same producers.
+    ...behaviourSources(),
   };
 }
 
@@ -665,6 +668,10 @@ async function runOnPage(
   const context = await browser.newContext(opts.storageState ? { storageState: opts.storageState } : {});
   const page = await context.newPage();
   const empty: ProbeHit[] = [];
+  // The timer hook BEFORE the page's own scripts run, so the behaviour digest counts the interval
+  // a carousel starts at load and not only what is scheduled during its window (src/behaviour.ts).
+  // Only when a snapshot is taken: the hook exists for scripts.json and nothing else.
+  if (opts.snapshot !== false) await page.addInitScript(TIMER_HOOK).catch(() => {});
   try {
     const url = isFile ? "file://" + resolve(target) : target;
     const response = await page.goto(url, { waitUntil: "load", timeout: 45000 });
@@ -727,6 +734,13 @@ async function runOnPage(
         }
       }
     }
+
+    // THE BEHAVIOUR WINDOW (#190) opens on the DOM just serialized, so what it reports joins to
+    // it. Its idle half runs now, before axe and the probes touch anything — what changes then
+    // changed on its own (a carousel, a ticker). The probes below are its interaction half: a
+    // button the live-region pass clicks toggles its `aria-expanded` under the observer.
+    const behaviour = snapshot ? await startBehaviour(page) : undefined;
+    await behaviour?.idle();
 
     // The controlled axe run (src/axe-engine.ts): ultra11y's pinned axe-core and rule tags.
     const axeRun = await runAxe(axe, page, "scan");
@@ -912,6 +926,9 @@ async function runOnPage(
         }))
       : { hits: empty, complete: false, why: "stateful probes are off (`scan --no-interact`)" };
     const liveRegion = liveWalk.hits;
+    // Closed last, after every probe has had its turn at the page. Never fatal: a window that
+    // could not be read is recorded as such (`collected: "none"`), never dropped.
+    const scripts = behaviour ? await behaviour.finish() : undefined;
     if (liveWalk.complete) probed.push("4.1.3");
     else skipped.push({ sc: "4.1.3", why: liveWalk.why ?? "the live-region pass did not exercise the whole page" });
     return {
@@ -945,6 +962,7 @@ async function runOnPage(
               ...(screenshot ? { screenshot } : {}),
               ...(screenshotFull ? { screenshotFull } : {}),
               ...(screenshot320 ? { screenshot320 } : {}),
+              ...(scripts ? { scripts } : {}),
             },
           }
         : {}),

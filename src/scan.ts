@@ -264,6 +264,11 @@ export function writeRunnerSnapshot(
       // the criteria AXE_DECIDES is usable. A RunnerOutput always carries `violations` because
       // a runner always runs axe — that is the one instrument neither runtime skips.
       axe: { violations: out.violations, ran: true, ...(out.axe ? { engine: out.axe } : {}) },
+      // What the page's scripts did during the capture window (#190). Written whatever it says —
+      // `collected: "none"` included: a producer that looked and could not is not one that never
+      // looked. The journey runner (#189) goes through this same function, so it only has to set
+      // `snapshot.scripts` from src/behaviour.ts to write the same file.
+      ...(collected.scripts ? { scripts: collected.scripts } : {}),
       ...(collected.screenshot ? { screenshotBase64: collected.screenshot } : {}),
       ...(collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {}),
       ...(collected.screenshot320 ? { screenshot320Base64: collected.screenshot320 } : {}),

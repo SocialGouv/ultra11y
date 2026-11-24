@@ -132,21 +132,24 @@ export const LOADING_TIMEOUT_MS = 10_000;
  *  judges, but an infinite feed would otherwise produce an image nobody can open. */
 export const FULL_SCREENSHOT_MAX_HEIGHT = 8000;
 
-// Browser-context source, evaluated as a STRING (the engine's tsconfig ships no DOM lib —
-// see src/scan-local.ts). Registered in probeSources() so a typo fails CI instead of being
-// swallowed at run time. Returns { dom, styles, boxes } for the CURRENT page.
-export const COLLECT_SNAPSHOT = `(() => {
-  const PROPS = ${JSON.stringify(COLLECTED_CSS)};
-  const MAX = ${COLLECT_MAX_ELEMENTS};
-  // The ordinal is a JOIN KEY against parseHtml(dom), so the walk must enumerate elements
-  // exactly as a reparse of the serialisation below will (#101). querySelectorAll('*') did not:
-  //  - an element appended INSIDE a raw-text element (Next's dev overlay puts <nextjs-portal>
-  //    in a <script>) is serialised as that element's raw text, and a reparse reads text —
-  //    one ordinal too many, and every digest refused from there on;
-  //  - <template> contents are serialised and reparsed as elements, but live in
-  //    template.content, which querySelectorAll never traverses — one ordinal too few.
-  // Pre-order, children of the raw-text elements HTML parsers (htmlparser2 included) treat as
-  // text skipped, template.content descended.
+/** THE DOCUMENT-ORDER WALK — the join key every element-indexed digest shares.
+ *
+ *  A function expression, as source: `(root) => Element[]`. COLLECT_SNAPSHOT enumerates the
+ *  elements it measures with it, and the behaviour digest (src/behaviour.ts) indexes the
+ *  elements it reports with the very same walk, so `scripts.json` joins to `dom.html` exactly as
+ *  `styles.json` and `boxes.json` do. One definition: a second copy would drift, and a drifted
+ *  ordinal attributes one element's behaviour to another.
+ *
+ *  The ordinal is a JOIN KEY against parseHtml(dom), so the walk must enumerate elements
+ *  exactly as a reparse of the serialisation will (#101). querySelectorAll('*') did not:
+ *   - an element appended INSIDE a raw-text element (Next's dev overlay puts <nextjs-portal>
+ *     in a <script>) is serialised as that element's raw text, and a reparse reads text —
+ *     one ordinal too many, and every digest refused from there on;
+ *   - <template> contents are serialised and reparsed as elements, but live in
+ *     template.content, which querySelectorAll never traverses — one ordinal too few.
+ *  Pre-order, children of the raw-text elements HTML parsers (htmlparser2 included) treat as
+ *  text skipped, template.content descended. */
+export const ELEMENT_WALK = `(root) => {
   const RAW_TEXT = new Set(['script', 'style', 'title', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes']);
   const els = [];
   const walkElements = (parent) => {
@@ -167,7 +170,17 @@ export const COLLECT_SNAPSHOT = `(() => {
       walkElements(name === 'template' && child.content ? child.content : child);
     }
   };
-  walkElements(document);
+  walkElements(root);
+  return els;
+}`;
+
+// Browser-context source, evaluated as a STRING (the engine's tsconfig ships no DOM lib —
+// see src/scan-local.ts). Registered in probeSources() so a typo fails CI instead of being
+// swallowed at run time. Returns { dom, styles, boxes } for the CURRENT page.
+export const COLLECT_SNAPSHOT = `(() => {
+  const PROPS = ${JSON.stringify(COLLECTED_CSS)};
+  const MAX = ${COLLECT_MAX_ELEMENTS};
+  const els = (${ELEMENT_WALK})(document);
   const styles = [];
   const boxes = [];
   const n = Math.min(els.length, MAX);

@@ -12,6 +12,9 @@
 //     styles.json   computed-style digest, joined to the DOM by document-order index
 //     boxes.json    bounding boxes, same join key
 //     axtree.json   accessibility tree as the browser computed it
+//     scripts.json  what the page's scripts DID during the capture window — listeners, inline
+//                   handlers, ARIA mutations, live regions, timers, moving content, scripts and
+//                   stylesheets loaded (src/behaviour.ts); same join key, verified per entry
 //     screen.png    viewport screenshot (pixel tier — shares boxes.json's coordinates)
 //     screen-320.png   the page at the 320px reflow viewport, as the probe measured it (#184)
 //     screen-full.png  the whole page, height-bounded, when it is taller than the viewport —
@@ -32,14 +35,18 @@
 // whole digest is refused rather than silently mis-attributing a style to the wrong element.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { SCRIPTS_VERSION } from "./behaviour.js";
 import { formatCaptureComment } from "./capture.js";
 import { parseHtml } from "./parse/html.js";
 import type { Doc } from "./parse/html.js";
-import type { AxNode, BoxDigest, BoxEntry, CssDigest, ReflowClipped, RenderSignals, StyleDigest, StyleEntry } from "./types.js";
+import type { AxNode, BoxDigest, BoxEntry, CssDigest, ReflowClipped, RenderSignals, ScriptsDigest, StyleDigest, StyleEntry } from "./types.js";
 
-export type { AxNode, BoxDigest, BoxEntry, CssDigest, RenderSignals, StyleDigest, StyleEntry };
+export type { AxNode, BoxDigest, BoxEntry, CssDigest, RenderSignals, ScriptsDigest, StyleDigest, StyleEntry };
 
 export const SNAPSHOT_VERSION = 1;
+
+// The format of `scripts.json` lives with its collector (src/behaviour.ts), like PROBES_VERSION.
+export { SCRIPTS_VERSION };
 
 // The coverage contract that travels inside `probes.json` lives with the probes that write it
 // (src/probes.ts) and is re-exported here, where the format is defined, so a reader of either
@@ -157,6 +164,9 @@ export interface Snapshot {
   probes?: SnapshotProbes;
   /** What axe-core found on this page, when the producer ran it. See RenderSignals.axe. */
   axe?: RenderSignals["axe"];
+  /** What the page's scripts did during the capture window (`scripts.json`), when the producer
+   *  recorded it. See ScriptsDigest. */
+  scripts?: ScriptsDigest;
   /** Path of the screenshot on disk, relative to the snapshot dir. Set on READ. */
   screenshot?: string;
   /** The screenshot's bytes, base64, as a producer hands them over. Set on WRITE — a
@@ -198,6 +208,9 @@ export interface CollectedPage {
   consent?: string[];
   /** The document's scroll height — whether a full-page screenshot adds anything. */
   docHeight?: number;
+  /** The behaviour digest, when the producer opened a capture window after collecting
+   *  (src/behaviour.ts) — not part of COLLECT_SNAPSHOT itself, which is synchronous. */
+  scripts?: ScriptsDigest;
 }
 
 // ---- page identity --------------------------------------------------------------------
@@ -353,6 +366,7 @@ export function writeSnapshot(root: string, snap: Snapshot): string {
   if (snap.css) writeFileSync(join(dir, "css.json"), `${JSON.stringify(snap.css)}\n`);
   if (snap.probes) writeFileSync(join(dir, "probes.json"), `${JSON.stringify(snap.probes)}\n`);
   if (snap.axe) writeFileSync(join(dir, "axe.json"), `${JSON.stringify(snap.axe)}\n`);
+  if (snap.scripts) writeFileSync(join(dir, "scripts.json"), `${JSON.stringify(snap.scripts)}\n`);
   // The screenshot rides in as base64 (a producer has bytes, not a path). It powers the
   // pixel tier — contrast over a gradient or a background image, where the CSSOM has no
   // answer. A screenshot that cannot be decoded/written must NEVER fail the snapshot: the
@@ -412,6 +426,7 @@ export function readSnapshot(dir: string): Snapshot | null {
   // page that had never been probed. Read what we write.
   const probes = readJson<SnapshotProbes>(join(dir, "probes.json"));
   const axe = readJson<NonNullable<RenderSignals["axe"]>>(join(dir, "axe.json"));
+  const scripts = readScripts(dir);
   const shot = join(dir, "screen.png");
   const full = join(dir, "screen-full.png");
   const narrow = join(dir, "screen-320.png");
@@ -424,10 +439,27 @@ export function readSnapshot(dir: string): Snapshot | null {
     ...(css ? { css } : {}),
     ...(probes ? { probes } : {}),
     ...(axe ? { axe } : {}),
+    ...(scripts ? { scripts } : {}),
     ...(existsSync(shot) ? { screenshot: "screen.png" } : {}),
     ...(existsSync(full) ? { screenshotFull: "screen-full.png" } : {}),
     ...(existsSync(narrow) ? { screenshot320: "screen-320.png" } : {}),
   };
+}
+
+/** Read `scripts.json`, or undefined when it is absent or not a behaviour digest this engine
+ *  understands. A digest from a future format is refused rather than half-read, and a digest
+ *  whose `collected` is not one of the three known values is not trusted to say what it saw. */
+export function readScripts(dir: string): ScriptsDigest | undefined {
+  return asScriptsDigest(readJson<unknown>(join(dir, "scripts.json")));
+}
+
+/** The same check for a digest arriving from a producer (`snapshot write` reads it off stdin). */
+export function asScriptsDigest(input: unknown): ScriptsDigest | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const raw = input as Partial<ScriptsDigest>;
+  if (typeof raw.v !== "number" || raw.v < 1 || raw.v > SCRIPTS_VERSION) return undefined;
+  if (raw.collected !== "cdp" && raw.collected !== "dom" && raw.collected !== "none") return undefined;
+  return { ...raw, caps: raw.caps ?? {} } as ScriptsDigest;
 }
 
 /** The screenshot a READER of the report should see for a page: the whole page when the
@@ -577,6 +609,7 @@ export function attachSignals(doc: Doc): void {
   const loading = Array.isArray(meta?.loading) ? meta.loading.filter((m): m is string => typeof m === "string") : [];
   const probes = readJson<SnapshotProbes>(join(dir, "probes.json"));
   const axe = readJson<NonNullable<RenderSignals["axe"]>>(join(dir, "axe.json"));
+  const scripts = readScripts(dir);
   const shot = join(dir, "screen.png");
 
   const alignedStyleMap = styles ? align(doc, styles.entries) : null;
@@ -593,6 +626,9 @@ export function attachSignals(doc: Doc): void {
     ...(meta?.doctype !== undefined ? { doctype: meta.doctype } : {}),
     ...(probes ? { probes } : {}),
     ...(axe ? { axe } : {}),
+    // Not aligned wholesale like the styles: its reader verifies each entry's tag against the
+    // DOM, because an element the page created during the window legitimately has no ordinal.
+    ...(scripts ? { scripts } : {}),
     ...(truncated ? { truncated } : {}),
     ...(loading.length ? { capturedLoading: loading } : {}),
   };

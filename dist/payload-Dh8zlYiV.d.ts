@@ -27,6 +27,8 @@ interface SnapshotPayload {
     probes?: unknown;
     /** What axe-core found on this page, when the caller ran it. */
     axe?: unknown;
+    /** What the page's scripts did during the capture window — `scripts.json` (src/behaviour.ts). */
+    scripts?: unknown;
 }
 /** Same slug rule as the engine (src/snapshot.ts slugifyPageId): accent-folded URL path. */
 declare function slugify(url: string): string;
@@ -113,6 +115,20 @@ interface CheckOptions {
      *  is what you want in CI where a silent downgrade is indistinguishable from a clean page.
      *  PLAYWRIGHT ONLY: `ultra11y/cypress` records the page without an axe pass. */
     axe?: boolean | "auto";
+    /** Record what the page's SCRIPTS do — `scripts.json` (#190): the elements carrying click, key
+     *  or pointer listeners (flagged when nothing makes them keyboard-reachable), inline handlers,
+     *  the ARIA attributes changed during the capture, live regions, timers, content that moves on
+     *  its own, and the scripts and stylesheets loaded. It is what the script criteria (RGAA 7.x,
+     *  13.1, 13.8; WCAG 4.1.2, 4.1.3) are judged on, and markup alone does not show it.
+     *
+     *  On by default. It costs a short window after the page is collected (`windowMs`, default
+     *  2 000 ms) during which nothing touches the page — whatever changes then changed on its own —
+     *  followed by the probes, when they run, whose interactions are recorded too. `false` skips it.
+     *  Listeners are read through a CDP session on Chromium (Playwright); `ultra11y/cypress` and
+     *  other browsers fall back to what the DOM shows, and the file says so (`collected`). */
+    behaviour?: boolean | {
+        windowMs?: number;
+    };
 }
 /** The bounds a repository may put on the live probes. Stated once, here, because the same
  *  list is read from `.ultra11yrc.json`, accepted at the call site and handed to the engine —
