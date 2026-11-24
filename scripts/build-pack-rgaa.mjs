@@ -14,7 +14,7 @@
 //   node scripts/build-pack-rgaa.mjs --check     # rebuild in memory and byte-compare vs the committed
 //                                                 # pack; no writes; exit 1 on drift (CI gate)
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { biomeFormat } from "./biome-format.mjs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,7 +22,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(root, "src", "data", "standards");
 const AUTOMATION_REF = join(root, "skills", "ultra11y", "references", "rgaa-automation.md");
 const VENDOR = join(root, "scripts", "vendor", "rgaa");
-const BIOME = join(root, "node_modules", ".bin", "biome");
 const BASE = "https://raw.githubusercontent.com/DISIC/accessibilite.numerique.gouv.fr/main/RGAA";
 const doFetch = process.argv.includes("--fetch");
 const doCheck = process.argv.includes("--check");
@@ -32,9 +31,6 @@ const doCheck = process.argv.includes("--check");
 // both the write path and the --check comparison through biome so the two can never
 // disagree over whitespace alone; `relPath` (project-relative, e.g.
 // "src/data/standards/rgaa.json") only picks the JSON formatter, no file is touched.
-function biomeFormat(text, relPath) {
-  return execFileSync(BIOME, ["format", `--stdin-file-path=${relPath}`], { input: text, encoding: "utf8" });
-}
 
 async function source(name) {
   if (doFetch) {

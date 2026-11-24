@@ -1,0 +1,229 @@
+{
+  "about": "The scripted auditor of tests/full-audit.e2e.test.ts: one verdict per RGAA criterion the worklist of tests/fixtures/full-audit-app hands over. `cite: \"all\"` cites every evidence anchor the worklist harvested for that criterion (copied from the worklist, never retyped); `except` leaves out the anchors a verdict does not clear; `at` names the evidence anchor an NC finding is drawn from (by file, selector, snippet or note; `from` reads it in another criterion's evidence). A criterion missing here fails the test by name, so a worklist that changes shape is seen, not silently filled.",
+  "verdicts": {
+    "1.1": {
+      "verdict": "NC",
+      "findings": [
+        {
+          "at": { "file": ".ultra11y/pages/actualites-101/dom.html", "selector": "img", "noteIncludes": "alt=" },
+          "message": "The opening-hours image carries information and has no text alternative.",
+          "normativeRef": "1.1.1",
+          "severity": "bloquant"
+        },
+        {
+          "at": { "file": "src/components/SiteLogo.tsx", "selector": "img" },
+          "message": "The logo image, the only content of the home link, has no text alternative.",
+          "normativeRef": "1.1.1",
+          "severity": "bloquant"
+        }
+      ]
+    },
+    "1.2": { "verdict": "NA", "justification": "Both images carry information (see 1.1); no image is decorative.", "cite": "all" },
+    "1.3": { "verdict": "NA", "justification": "No image carries a text alternative whose relevance could be judged; the other anchors are landmarks, not images.", "cite": "all" },
+    "1.4": { "verdict": "NA", "justification": "No CAPTCHA or test image.", "cite": "all" },
+    "1.5": { "verdict": "NA", "justification": "No CAPTCHA.", "cite": "all" },
+    "1.6": { "verdict": "NA", "justification": "No image needs a detailed description: neither is a chart, a map or a diagram.", "cite": "all" },
+    "1.7": { "verdict": "NA", "justification": "No image has a detailed description.", "cite": "all" },
+    "1.8": {
+      "verdict": "manual",
+      "reason": "undecidable",
+      "justification": "The opening-hours image file is not served, so whether it is an image of text cannot be seen; a human has to open the original asset."
+    },
+    "1.9": { "verdict": "NA", "justification": "No image has a caption (no figure, no figcaption).", "cite": "all" },
+    "2.2": { "verdict": "NA", "justification": "No frame or iframe on any page." },
+    "3.1": { "verdict": "C", "justification": "Every link sits in a list or keeps its default underline; no information relies on colour alone.", "cite": "all" },
+    "3.2": { "verdict": "C", "justification": "Measured pairs: #1e1e1e and #000091 on white, white on #000091 — all above 4.5:1.", "cite": "all" },
+    "3.3": { "verdict": "C", "justification": "The focus outline (#000091 on white) and the button background (#000091) are above 3:1 against their surroundings.", "cite": "all" },
+    "4.1": { "verdict": "NA", "justification": "No time-based media." },
+    "4.2": { "verdict": "NA", "justification": "No time-based media." },
+    "4.3": { "verdict": "NA", "justification": "No synchronised media." },
+    "4.4": { "verdict": "NA", "justification": "No synchronised media." },
+    "4.5": { "verdict": "NA", "justification": "No time-based media." },
+    "4.6": { "verdict": "NA", "justification": "No time-based media." },
+    "4.7": { "verdict": "NA", "justification": "No time-based media." },
+    "4.8": { "verdict": "NA", "justification": "No non-time-based media (no canvas, object or embed)." },
+    "4.9": { "verdict": "NA", "justification": "No non-time-based media." },
+    "4.10": { "verdict": "NA", "justification": "No sound." },
+    "4.11": { "verdict": "NA", "justification": "No time-based media." },
+    "4.12": { "verdict": "NA", "justification": "No non-time-based media." },
+    "4.13": { "verdict": "NA", "justification": "No media of any kind." },
+    "5.1": { "verdict": "NA", "justification": "No table on any page." },
+    "5.2": { "verdict": "NA", "justification": "No table on any page." },
+    "5.3": { "verdict": "NA", "justification": "No layout table." },
+    "5.4": { "verdict": "NA", "justification": "No data table." },
+    "5.5": { "verdict": "NA", "justification": "No data table." },
+    "5.6": { "verdict": "NA", "justification": "No data table." },
+    "5.7": { "verdict": "NA", "justification": "No data table." },
+    "6.1": {
+      "verdict": "C",
+      "justification": "Each named link is explicit from its own text (« Aide », « Plan du site », « page de contact »…); the unnamed logo link is a 6.2 failure.",
+      "cite": "all",
+      "except": [{ "file": "src/components/SiteLogo.tsx" }, { "file": ".ultra11y/captures/src-components-SiteLogo__SiteLogo.html" }]
+    },
+    "6.2": {
+      "verdict": "C",
+      "justification": "The engine proved the unnamed home link of the SiteLogo component (6.2.1); no page renders that component, and every link on the pages has a name.",
+      "cite": "all",
+      "except": [{ "file": "src/components/SiteLogo.tsx" }, { "file": ".ultra11y/captures/src-components-SiteLogo__SiteLogo.html" }]
+    },
+    "7.1": { "verdict": "C", "justification": "Two scripts: the home menu disclosure, a native button that keeps aria-expanded in step, and the contact form check; both act on native controls the assistive technologies already expose.", "cite": "all" },
+    "7.2": { "verdict": "NA", "justification": "Neither script has an alternative: they enhance native controls that work as such.", "cite": "all" },
+    "7.3": { "verdict": "C", "justification": "The scripted controls are native buttons, reached and activated with the keyboard (the keyboard journeys replay both).", "cite": "all" },
+    "7.4": { "verdict": "NA", "justification": "Neither script changes the context: the menu opens in place and the form check stays on the page.", "cite": "all" },
+    "7.5": {
+      "verdict": "NC",
+      "findings": [
+        {
+          "at": { "selector": "p#erreur" },
+          "from": "11.10",
+          "message": "The invalid-address error appears after the submit with no role=\"alert\": it is not announced.",
+          "normativeRef": "7.5.2",
+          "severity": "majeur"
+        }
+      ]
+    },
+    "8.1": { "verdict": "C", "justification": "Every page, source and rendered, starts with <!doctype html>.", "cite": "all" },
+    "8.2": {
+      "verdict": "manual",
+      "reason": "undecidable",
+      "justification": "Validity of the generated source needs a validator run on each page; none was run in this audit."
+    },
+    "8.4": { "verdict": "C", "justification": "lang=\"fr\" matches the content language.", "cite": "all" },
+    "8.6": { "verdict": "C", "justification": "Each title names the page, then the site.", "cite": "all" },
+    "8.7": { "verdict": "NA", "justification": "All content is in French: no change of language.", "cite": "all" },
+    "8.8": { "verdict": "NA", "justification": "No change of language.", "cite": "all" },
+    "8.9": { "verdict": "C", "justification": "Headings head sections and lists hold lists; no tag is used for presentation only.", "cite": "all" },
+    "8.10": { "verdict": "NA", "justification": "No right-to-left content.", "cite": "all" },
+    "9.1": { "verdict": "C", "justification": "One h1 per page, then h2 sections, in order.", "cite": "all" },
+    "9.2": { "verdict": "C", "justification": "header, nav, main and footer frame every page, with a skip link to main.", "cite": "all" },
+    "9.3": { "verdict": "C", "justification": "Every list is a ul of li.", "cite": "all" },
+    "9.4": { "verdict": "NA", "justification": "No quotation." },
+    "10.1": { "verdict": "C", "justification": "Presentation comes from a stylesheet; no presentational attribute.", "cite": "all" },
+    "10.2": { "verdict": "C", "justification": "Every piece of content is in the markup; nothing is injected by CSS.", "cite": "all" },
+    "10.3": { "verdict": "C", "justification": "The source order (header, nav, main, footer) reads the same without CSS.", "cite": "all" },
+    "10.4": { "verdict": "C", "justification": "Sizes are in rem and the 200 % probe found nothing.", "cite": "all" },
+    "10.5": { "verdict": "C", "justification": "body declares both colour and background; the button declares both.", "cite": "all" },
+    "10.6": { "verdict": "C", "justification": "Links in running text keep their default underline.", "cite": "all" },
+    "10.7": { "verdict": "C", "justification": "A 3px #000091 outline on every focusable element; the focus probe found nothing.", "cite": "all" },
+    "10.8": { "verdict": "C", "justification": "The off-screen skip link is meant to be read and shows on focus; nothing else is hidden.", "cite": "all" },
+    "10.9": { "verdict": "C", "justification": "The instructions name the steps in words, never by shape or position.", "cite": "all" },
+    "10.10": { "verdict": "C", "justification": "The instructions name the steps in words, never by shape or position.", "cite": "all" },
+    "10.11": { "verdict": "C", "justification": "The 320px probe found no horizontal scrolling.", "cite": "all" },
+    "10.12": { "verdict": "C", "justification": "The text-spacing probe found no loss of content.", "cite": "all" },
+    "10.13": { "verdict": "C", "justification": "No content appears on hover or focus apart from the skip link, which stays until focus leaves.", "cite": "all" },
+    "10.14": { "verdict": "C", "justification": "The only CSS-revealed content is the skip link, revealed on keyboard focus.", "cite": "all" },
+    "11.1": {
+      "verdict": "C",
+      "justification": "The engine proved the unlabelled email field of the contact page (11.1.1); every other field, on every other page, has a label.",
+      "cite": "all",
+      "except": [{ "selector": "input", "snippetIncludes": "name=\"courriel\"" }]
+    },
+    "11.2": {
+      "verdict": "C",
+      "justification": "Each existing label names its field (« Nom », « Identifiant », « Mot de passe », « Message »…).",
+      "cite": "all",
+      "except": [{ "selector": "input", "snippetIncludes": "name=\"courriel\"" }]
+    },
+    "11.3": { "verdict": "C", "justification": "No two fields with the same function carry different labels.", "cite": "all" },
+    "11.4": {
+      "verdict": "C",
+      "justification": "Each label sits right above its field.",
+      "cite": "all",
+      "except": [{ "selector": "input", "snippetIncludes": "name=\"courriel\"" }]
+    },
+    "11.5": { "verdict": "C", "justification": "Each form is short and single-purpose: no group of same-nature fields needs a fieldset.", "cite": "all" },
+    "11.6": { "verdict": "NA", "justification": "No group of fields.", "cite": "all" },
+    "11.7": { "verdict": "NA", "justification": "No group of fields, so no legend.", "cite": "all" },
+    "11.8": { "verdict": "NA", "justification": "No select list.", "cite": "all" },
+    "11.9": { "verdict": "C", "justification": "Each button says what it does (« Se connecter », « Envoyer le message », « Rechercher »…).", "cite": "all" },
+    "11.10": {
+      "verdict": "NC",
+      "findings": [
+        {
+          "at": { "selector": "p#erreur" },
+          "message": "The format error of the email field is tied to no field (no aria-describedby, no aria-errormessage).",
+          "normativeRef": "11.10.6",
+          "severity": "majeur"
+        }
+      ]
+    },
+    "11.11": { "verdict": "NA", "justification": "No input control, so no error message to suggest from.", "cite": "all" },
+    "11.12": { "verdict": "NA", "justification": "No form has legal, financial or personal-data consequences.", "cite": "all" },
+    "11.13": {
+      "verdict": "NC",
+      "findings": [
+        {
+          "at": { "selector": "input", "snippetIncludes": "name=\"courriel\"" },
+          "message": "The email field asks for the user's own address and has no autocomplete=\"email\".",
+          "normativeRef": "11.13.1",
+          "severity": "majeur"
+        }
+      ]
+    },
+    "12.1": { "verdict": "C", "justification": "A main menu, a site map and a search page.", "cite": "all" },
+    "12.2": { "verdict": "C", "justification": "Header, menu and footer appear in the same place and order on every page.", "cite": "all" },
+    "12.3": { "verdict": "C", "justification": "The site map lists every section and each link reaches it.", "cite": "all" },
+    "12.4": { "verdict": "C", "justification": "The footer links the site map on every page.", "cite": "all" },
+    "12.5": { "verdict": "C", "justification": "The menu links the search page on every page.", "cite": "all" },
+    "12.6": { "verdict": "C", "justification": "header, nav, main and footer are landmarks.", "cite": "all" },
+    "12.7": { "verdict": "C", "justification": "A skip link to #contenu opens every page.", "cite": "all" },
+    "12.8": { "verdict": "C", "justification": "Tab order follows the DOM, which follows the reading order.", "cite": "all" },
+    "12.9": { "verdict": "C", "justification": "The keyboard-trap probe found nothing and no widget captures focus.", "cite": "all" },
+    "12.10": { "verdict": "NA", "justification": "No keyboard shortcut." },
+    "12.11": { "verdict": "C", "justification": "No additional content on hover or focus beyond the skip link.", "cite": "all" },
+    "13.1": { "verdict": "NA", "justification": "No time limit, no refresh, no redirect." },
+    "13.2": { "verdict": "NA", "justification": "No link opens a new window." },
+    "13.3": {
+      "verdict": "NC",
+      "findings": [
+        {
+          "at": { "file": ".ultra11y/pages/documents/dom.html", "selector": "a", "snippetIncludes": "formulaire.pdf" },
+          "message": "The paper form PDF is untagged and has no accessible version.",
+          "normativeRef": "13.3.1",
+          "severity": "majeur"
+        }
+      ]
+    },
+    "13.4": { "verdict": "NA", "justification": "No document offers an accessible version to compare.", "cite": "all" },
+    "13.5": { "verdict": "NA", "justification": "No cryptic content." },
+    "13.6": { "verdict": "NA", "justification": "No cryptic content." },
+    "13.7": {
+      "verdict": "manual",
+      "reason": "undecidable",
+      "justification": "The image files are not served, so whether they flash cannot be seen; a human has to open the original assets."
+    },
+    "13.8": { "verdict": "NA", "justification": "No moving or blinking content." },
+    "13.9": { "verdict": "C", "justification": "No orientation lock; the orientation probe found nothing.", "cite": "all" },
+    "13.10": { "verdict": "NA", "justification": "No gesture-driven feature." },
+    "13.11": { "verdict": "C", "justification": "The only pointer action is a native button, which fires on release.", "cite": "all" },
+    "13.12": { "verdict": "NA", "justification": "No motion-driven feature." }
+  },
+  "trial": {
+    "about": "The refuter of step 4: every claim is checked at its cited anchor and upheld, except the ones listed under `refuted`, which go back to « à évaluer » through --prune.",
+    "note": "Checked at the cited anchor.",
+    "refuted": {
+      "1.3": "The cited anchors are images with no alternative and landmarks: nothing here shows the criterion is out of scope."
+    }
+  },
+  "undecidable": {
+    "about": "Written to .ultra11y/undecidable-rgaa.json for `check --require-decided=pages --allow-undecided`: the criteria a human still has to rule, each with its reason.",
+    "entries": [
+      { "criteriaId": "1.3", "reason": "The trial refuted the « non applicable » claim; a human has to rule the relevance of the alternatives once the images carry one." },
+      { "criteriaId": "1.8", "reason": "The image file is not served, so whether it is an image of text needs the original asset." },
+      { "criteriaId": "8.2", "reason": "Validity of the generated source needs a validator run on each page." },
+      {
+        "criteriaId": "11.13",
+        "reason": "Ruled non-conforming on the contact page; the login and search fields of the other pages are not ruled one page at a time by a scope-wide verdict."
+      },
+      {
+        "criteriaId": "7.5",
+        "reason": "Ruled non-conforming on the state the contact journey reached after its invalid submit; the other pages are not ruled one page at a time by a scope-wide verdict."
+      },
+      {
+        "criteriaId": "11.10",
+        "reason": "Ruled non-conforming on the state the contact journey reached after its invalid submit; the other forms are not ruled one page at a time by a scope-wide verdict."
+      },
+      { "criteriaId": "13.7", "reason": "The image files are not served, so whether they flash needs the original assets." }
+    ]
+  }
+}

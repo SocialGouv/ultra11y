@@ -496,6 +496,18 @@ export function derivePackResults(audit: AuditResult, packKey: string, pageId?: 
         ...ruler(decided),
       };
     }
+    // …and a CLEARING verdict may not erase it either. The worklist hands an NC the engine
+    // proved back to the adjudicator when page cells are still open (buildAdjudicationWorklist):
+    // the deterministic finding settles the run and the pages it fired on, and the verdict
+    // is asked for the pages it did not. Applied run-wide, a `C` there replaced the proof
+    // with the verdict: the unlabelled field the engine had found on one page vanished from
+    // the report, the grid and that page's own sheet. So where this view still carries the
+    // proven NC, the NC stands with its findings and the verdict's recommendations; on a page
+    // view without it (pageView keeps only that page's findings), the verdict applies there.
+    if (decided && decided.status !== "NC" && measured.status === "NC") {
+      const advisory = decided.findings.filter((f) => f.advisory);
+      return { ...measured, findings: [...measured.findings, ...advisory] };
+    }
     if (decided) {
       // A recorded `NA` — from a ledger written before this engine stopped reporting a third
       // column, or from a model that still speaks it — means "nothing of that kind is in

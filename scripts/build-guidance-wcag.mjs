@@ -27,7 +27,7 @@
 //   node scripts/build-guidance-wcag.mjs             # emit the dataset from the snapshot
 //   node scripts/build-guidance-wcag.mjs --check     # verify the committed dataset matches
 import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { biomeFormat } from "./biome-format.mjs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -37,7 +37,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const VENDOR = join(root, "scripts", "vendor", "wcag-2.2-techniques.json");
 const SNAPSHOT = join(root, "scripts", "vendor", "wcag-2.2-sc.json");
 const OUT = join(root, "src", "data", "guidance", "wcag.json");
-const BIOME = join(root, "node_modules", ".bin", "biome");
 const RAW = "https://raw.githubusercontent.com/w3c/wcag/main";
 const VER_OF = { "2.0": "20", "2.1": "21", "2.2": "22" };
 
@@ -63,9 +62,6 @@ function techDir(id) {
   return TECH_DIR[prefix];
 }
 
-function biomeFormat(text, relPath) {
-  return execFileSync(BIOME, ["format", `--stdin-file-path=${relPath}`], { input: text, encoding: "utf8" });
-}
 
 async function fetchText(path) {
   const r = await fetch(`${RAW}/${path}`);

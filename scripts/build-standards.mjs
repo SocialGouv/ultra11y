@@ -17,7 +17,7 @@
 //   node scripts/build-standards.mjs --refresh-fr    # re-fetch (network) the vendored French SC/guideline/principle titles
 //   node scripts/build-standards.mjs --refresh-text  # re-fetch (network) the vendored NORMATIVE SC text + the WCAG glossary
 import { writeFileSync, readFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { biomeFormat } from "./biome-format.mjs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sameButForTheDate, withPreviousStamp } from "./vendor-stamp.mjs";
@@ -29,7 +29,6 @@ const VENDOR_UNIVERSE = join(root, "scripts", "vendor", "wcag-2.2-sc-universe.js
 const VENDOR_FR = join(root, "scripts", "vendor", "wcag-2.2-fr.json");
 const VENDOR_TEXT = join(root, "scripts", "vendor", "wcag-2.2-text.json");
 const PACKS_DIR = join(DATA, "standards");
-const BIOME = join(root, "node_modules", ".bin", "biome");
 
 const VER_DIR = { 20: "2.0", 21: "2.1", 22: "2.2" };
 
@@ -39,9 +38,6 @@ const VER_DIR = { 20: "2.0", 21: "2.1", 22: "2.2" };
 // Route every write through biome so a bare rebuild is byte-stable vs the committed
 // files; `relPath` (project-relative, e.g. "src/data/wcag.json") only picks the JSON
 // formatter, no file is touched.
-function biomeFormat(text, relPath) {
-  return execFileSync(BIOME, ["format", `--stdin-file-path=${relPath}`], { input: text, encoding: "utf8" });
-}
 
 // CHECK MODE — the gate this generator was the only one of the three to lack.
 //

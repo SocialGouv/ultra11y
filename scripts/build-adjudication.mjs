@@ -21,13 +21,12 @@
 //   node scripts/build-adjudication.mjs           # emit src/data/adjudication.json
 //   node scripts/build-adjudication.mjs --check   # rebuild in memory, exit 1 on drift
 import { writeFileSync, readFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { biomeFormat } from "./biome-format.mjs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(root, "src", "data", "adjudication.json");
-const BIOME = join(root, "node_modules", ".bin", "biome");
 
 const q = (fr, en) => ({ fr, en });
 
@@ -489,9 +488,6 @@ const ADJUDICATION = {
   },
 };
 
-function biomeFormat(text, relPath) {
-  return execFileSync(BIOME, ["format", `--stdin-file-path=${relPath}`], { input: text, encoding: "utf8" });
-}
 
 const json = biomeFormat(`${JSON.stringify(ADJUDICATION, null, 2)}\n`, "src/data/adjudication.json");
 

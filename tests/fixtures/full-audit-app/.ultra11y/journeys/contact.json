@@ -1,0 +1,12 @@
+{
+  "name": "contact",
+  "description": "Send the contact form with an invalid email address.",
+  "startUrl": "/contact",
+  "steps": [
+    { "action": "fill", "target": { "label": "Nom" }, "value": "Exemple" },
+    { "action": "fill", "target": { "css": "input[name=courriel]" }, "value": "pas-une-adresse" },
+    { "action": "fill", "target": { "label": "Message" }, "value": "Message de test." },
+    { "action": "click", "target": { "role": "button", "name": "Envoyer le message" }, "note": "invalid submit" },
+    { "action": "expect", "target": { "text": "Adresse électronique invalide." } }
+  ]
+}

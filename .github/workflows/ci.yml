@@ -274,7 +274,15 @@ jobs:
       - name: checkA11y, the probes and axe against real Chromium
         env:
           ULTRA11Y_REQUIRE_BROWSER: "1"
-        run: pnpm run test:browser
+        run: pnpm run test:browser tests/browser-tier.e2e.test.ts
+      # THE REFERENCE RUN of references/full-audit.md (#171): the whole chain — proposed sample,
+      # render, audit, scan, worklist, scripted verdicts, fold, trial with --prune, report, page
+      # dossiers and every `check` gate — on tests/fixtures/full-audit-app. No model is called:
+      # the verdicts come from a committed script that cites the evidence the engine harvested.
+      - name: The full RGAA audit, end to end on a fixture application
+        env:
+          ULTRA11Y_REQUIRE_BROWSER: "1"
+        run: pnpm run test:browser tests/full-audit.e2e.test.ts
 
   # THE OPENCODE PLUGIN, IN A REAL OPENCODE — BOTH MAJORS.
   #

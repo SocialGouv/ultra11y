@@ -660,7 +660,15 @@ function adjudicationOnPage(
     if (c.status === "C" && absentHere(c.id)) return [{ ...c, status: "NA" as const, justification: NOTHING_ON_THIS_PAGE }];
     if (c.status !== "NC") return [c];
     const findings = c.findings.filter(onPage);
-    return findings.some((f) => !f.advisory) ? [{ ...c, findings }] : [];
+    if (findings.some((f) => !f.advisory)) return [{ ...c, findings }];
+    // The same exception for an NC ruled elsewhere: the adjudicator ruled the criterion over
+    // its whole harvest, and on a page with none of its subject there is nothing left to rule.
+    // Falling back on the page's own derivation left a judgment criterion « à évaluer » on
+    // every such page for ever — no verdict could reach it, since the run's NC already closed
+    // the worklist item. Measured on the full-audit e2e run: an image NC on one news page kept
+    // 1.1 open on the ten pages that carry no image at all.
+    if (absentHere(c.id)) return [{ ...c, status: "NA" as const, findings: [], justification: NOTHING_ON_THIS_PAGE }];
+    return [];
   });
   return { ...adjudication, criteria };
 }
