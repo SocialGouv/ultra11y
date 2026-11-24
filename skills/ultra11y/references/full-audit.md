@@ -41,7 +41,27 @@ node scripts/ultra11y.mjs pages discover --from-snapshots --routes-only  # route
 ```
 
 `--routes-only` leaves the chosen RGAA sample untouched; `--write` merges the routes into the
-sample as well. Once an inventory exists, every `audit` and `scan --merge` lists each route in
+sample as well.
+
+**Then build the RGAA sample from the proposal, never by hand.** Two runs that hand-pick pages
+audit different pages, and their verdicts cannot be compared:
+
+```sh
+node scripts/ultra11y.mjs pages discover --sitemap <url> --propose --write   # or --crawl <url> / --from-snapshots
+node scripts/ultra11y.mjs sample check --standard rgaa
+```
+
+The proposal is deterministic: the required kinds (accueil, contact, mentions légales,
+accessibilité, plan du site, aide, authentification, recherche, documents) matched by keyword
+on the sorted URLs and titles, the search page with the fixed query `information`
+(`--search-query` to change it), then one page per template cluster — URL pattern with ids,
+slugs and dates normalized, or the DOM skeleton when a snapshot exists — largest first, ties
+broken by URL, bounded by `--sample-size` (default 20). Each pick records its reason in
+`notes`; a kind with no page is written to `sample.absent` with the reason. **Keep it.** Edit
+it only with a recorded reason: a page you add carries its `notes`, a kind you remove gets a
+`sample.absent` entry. `sample check` reports a kind dropped without a reason as missing.
+
+Once an inventory exists, every `audit` and `scan --merge` lists each route in
 the annex (section F): captured by the E2E tests, scanned, source code only, or not reached.
 None is left out. A client-rendered SPA exposes no links in its served HTML, so give it a
 sitemap or let its E2E captures supply the routes.

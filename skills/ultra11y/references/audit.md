@@ -87,10 +87,18 @@ repo. Declare that sample once in `.ultra11yrc.json`:
   `storageState`); `transverse` names the elements audited on **every** page (header, nav,
   footer, modals…). The `storageState` **path** is used but its content is never read into
   any output.
+- **Propose it, do not hand-pick it**: `pages discover --sitemap <url> | --crawl <url> |
+  --from-snapshots --propose --write` writes a deterministic sample — the same site gives the
+  same pages whatever model runs it. Each pick carries its reason in `notes`; a required kind
+  with no page goes to `"absent": [{ "kind": "recherche", "reason": "…" }]`. Keep the
+  proposal; a hand edit records its reason (a page's `notes`, or an `absent` entry for a kind
+  taken out).
 - **Lint the coverage**: `node scripts/ultra11y.mjs sample check` reports which **required
   page kinds** the active standard's `sampleMethodology` expects but the sample lacks (RGAA:
   accueil, contact, mentions légales, déclaration d'accessibilité, plan du site, aide,
-  authentification…). Advisory (exit 0) unless the `sample` block is malformed (exit 2).
+  authentification, recherche, documents téléchargeables, pages représentatives…). A kind
+  listed in `sample.absent` is reported with its reason instead; a kind dropped without one is
+  missing. Advisory (exit 0) unless the `sample` block is malformed (exit 2).
 - **Scan the sample**: `scan --sample --merge audits/audit-latest.json` iterates every page,
   keeps each finding's page name + auth flag as provenance, and merges the rendered verdicts
   in (see `references/dynamic.md`).

@@ -681,6 +681,7 @@ describe("sample check + scan --sample + partial-audit advisory (Task 5)", () =>
             { id: "aide", name: "Aide", url: "https://example.fr/aide" },
             { id: "auth", name: "Connexion", url: "https://example.fr/login" },
             { id: "rep", name: "Formulaire de recherche", url: "https://example.fr/recherche" },
+            { id: "docs", name: "Publications", url: "https://example.fr/publications" },
           ],
           transverse: ["En-tête", "Navigation", "Pied de page"],
         },

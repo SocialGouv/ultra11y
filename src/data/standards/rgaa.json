@@ -111,11 +111,25 @@
         "keywords": ["authentification", "authentication", "connexion", "identification", "login", "log in", "sign in", "se connecter", "auth"]
       },
       {
+        "id": "recherche",
+        "label": {
+          "fr": "Recherche"
+        },
+        "keywords": ["recherche", "search", "resultats de recherche", "search results"]
+      },
+      {
+        "id": "documents",
+        "label": {
+          "fr": "Documents téléchargeables"
+        },
+        "keywords": ["documents", "telechargement", "telecharger", "publications", "download", "pdf"]
+      },
+      {
         "id": "pages-representatives",
         "label": {
           "fr": "Pages représentatives"
         },
-        "keywords": ["representative", "representatif", "representatives", "gabarit", "template", "modele", "formulaire", "recherche", "resultats"]
+        "keywords": ["representative", "representatif", "representatives", "gabarit", "template", "modele", "formulaire"]
       },
       {
         "id": "elements-transverses",

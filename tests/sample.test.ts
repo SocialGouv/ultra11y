@@ -78,18 +78,30 @@ describe("lintSample — which required page kinds a sample lacks (fuzzy, accent
     expect(lintSample(sample, methodology).missing.map((k) => k.id)).not.toContain("plan-du-site");
   });
 
-  // Fix round 1 — a multi-page sample de facto carries representative pages (documented
-  // heuristic: ≥ 2 pages credit the kind), so it stops being a constant false nag.
-  it("credits pages-representatives once the sample holds ≥ 2 pages, not for a single page", () => {
+  // A page beyond the required kinds credits the representative kind. Counting pages did not:
+  // a home page plus a contact page held two pages and no representative one (#185).
+  it("credits pages-representatives for a page that is none of the other required kinds", () => {
     const one: SampleConfig = { pages: [{ id: "a", name: "Accueil", url: "https://example.fr/" }] };
     expect(lintSample(one, methodology).missing.map((k) => k.id)).toContain("pages-representatives");
-    const two: SampleConfig = {
+    const requiredOnly: SampleConfig = {
       pages: [
         { id: "a", name: "Accueil", url: "https://example.fr/" },
         { id: "b", name: "Contact", url: "https://example.fr/contact" },
       ],
     };
-    expect(lintSample(two, methodology).missing.map((k) => k.id)).not.toContain("pages-representatives");
+    expect(lintSample(requiredOnly, methodology).missing.map((k) => k.id)).toContain("pages-representatives");
+    const withArticle: SampleConfig = { pages: [...requiredOnly.pages, { id: "c", name: "Fête du village", url: "https://example.fr/actualites/fete" }] };
+    expect(lintSample(withArticle, methodology).missing.map((k) => k.id)).not.toContain("pages-representatives");
+  });
+
+  it("does not let a host that spells a keyword hide the representative kind", () => {
+    const sample: SampleConfig = {
+      pages: [
+        { id: "a", name: "Accueil", url: "https://aide.example.fr/" },
+        { id: "b", name: "Horaires", url: "https://aide.example.fr/horaires" },
+      ],
+    };
+    expect(lintSample(sample, methodology).missing.map((k) => k.id)).not.toContain("pages-representatives");
   });
 });
 
