@@ -836,10 +836,19 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
           label: { fr: "Authentification" },
           keywords: ["authentification", "authentication", "connexion", "identification", "login", "log in", "sign in", "se connecter", "auth"],
         },
+        // The search results page and the pages carrying downloadable documents are their own
+        // kinds: the RGAA methodology lists both, and folding search into « representative »
+        // let any page called « recherche » stand in for every template of the site.
+        { id: "recherche", label: { fr: "Recherche" }, keywords: ["recherche", "search", "resultats de recherche", "search results"] },
+        {
+          id: "documents",
+          label: { fr: "Documents téléchargeables" },
+          keywords: ["documents", "telechargement", "telecharger", "publications", "download", "pdf"],
+        },
         {
           id: "pages-representatives",
           label: { fr: "Pages représentatives" },
-          keywords: ["representative", "representatif", "representatives", "gabarit", "template", "modele", "formulaire", "recherche", "resultats"],
+          keywords: ["representative", "representatif", "representatives", "gabarit", "template", "modele", "formulaire"],
         },
         {
           id: "elements-transverses",

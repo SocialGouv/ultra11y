@@ -96,9 +96,18 @@ export interface SampleConfig {
   // each with the reason — a reason is required, so an exemption says why it was granted.
   // Validated and preserved, like `global`.
   exempt?: SampleExempt[];
+  // Required page KINDS (a standard's sampleMethodology ids) the sample deliberately does not
+  // hold, each with the reason: the site has no search, the login sits behind MFA. Written by
+  // `pages discover --propose` for a kind it found no page for, and by hand when a page is
+  // dropped from the proposal. `sample check` reports a kind listed here as waived, not missing.
+  absent?: SampleAbsent[];
 }
 export interface SampleExempt {
   path: string; // glob, relative to the project root
+  reason: string;
+}
+export interface SampleAbsent {
+  kind: string; // a required kind id, e.g. "recherche"
   reason: string;
 }
 // The sample as recorded in an AuditResult / DynamicResult. The `storageState` PATH is

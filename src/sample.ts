@@ -13,7 +13,7 @@
 // The required-kinds LIST is standard-specific and lives in the pack
 // (src/standards/types.ts SampleMethodology), never in this core module.
 import { existsSync } from "node:fs";
-import type { SampleConfig, SamplePage, SampleScope } from "./types.js";
+import type { SampleAbsent, SampleConfig, SamplePage, SampleScope } from "./types.js";
 import type { SampleMethodology, SampleRequiredKind } from "./standards/types.js";
 import { nameFromUrl } from "./crawl.js";
 import { slugifyPageId } from "./snapshot.js";
@@ -122,6 +122,23 @@ export function validateSample(raw: unknown): SampleValidation {
     }
   }
 
+  if (s.absent !== undefined) {
+    if (!Array.isArray(s.absent)) {
+      err("sample.absent", "absent must be an array of { kind, reason }");
+    } else {
+      (s.absent as unknown[]).forEach((e, i) => {
+        const x = e as Record<string, unknown> | null;
+        if (typeof x !== "object" || x === null || Array.isArray(x)) {
+          err(`sample.absent[${i}]`, "each entry must be an object { kind, reason }");
+          return;
+        }
+        if (typeof x.kind !== "string" || x.kind.trim() === "") err(`sample.absent[${i}].kind`, "kind must be a required page kind id");
+        if (typeof x.reason !== "string" || x.reason.trim() === "")
+          err(`sample.absent[${i}].reason`, "reason is required — say why the sample holds no page of this kind");
+      });
+    }
+  }
+
   const ok = issues.length === 0;
   return { ok, issues, warnings, sample: ok ? normalizeSample(s) : undefined };
 }
@@ -141,7 +158,21 @@ function normalizeSample(s: Record<string, unknown>): SampleConfig {
   const exempt = Array.isArray(s.exempt)
     ? (s.exempt as { path: string; reason: string }[]).map((e) => ({ path: String(e.path), reason: String(e.reason) }))
     : undefined;
-  return { pages, ...(transverse?.length ? { transverse } : {}), ...(global?.length ? { global } : {}), ...(exempt?.length ? { exempt } : {}) };
+  const absent = Array.isArray(s.absent)
+    ? (s.absent as { kind: string; reason: string }[]).map((e) => ({ kind: String(e.kind), reason: String(e.reason) }))
+    : undefined;
+  return {
+    pages,
+    ...(transverse?.length ? { transverse } : {}),
+    ...(global?.length ? { global } : {}),
+    ...(exempt?.length ? { exempt } : {}),
+    ...carryAbsent(absent),
+  };
+}
+
+/** The `absent` block, carried over only when it says something. */
+export function carryAbsent(absent: SampleAbsent[] | undefined): { absent?: SampleAbsent[] } {
+  return absent?.length ? { absent } : {};
 }
 
 /** Project a validated sample to the storageState-free shape recorded on an AuditResult /
@@ -159,13 +190,18 @@ export function sampleScope(sample: SampleConfig): SampleScope {
   };
 }
 
+export interface SampleWaived {
+  kind: SampleRequiredKind;
+  reason: string; // from `sample.absent`
+}
 export interface SampleLint {
-  missing: SampleRequiredKind[]; // required kinds not covered by any configured page
+  missing: SampleRequiredKind[]; // required kinds no configured page covers, and no reason given
+  waived: SampleWaived[]; // required kinds not covered, with the reason `sample.absent` records
 }
 
 // Accent-insensitive, case-folded normalization for fuzzy matching (RGAA labels carry
 // diacritics and apostrophes; a user's page names rarely match verbatim).
-const norm = (s: string): string =>
+export const norm = (s: string): string =>
   s
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
@@ -177,9 +213,34 @@ const norm = (s: string): string =>
 // Longer keywords keep substring matching so a stem still hits ("contact" → "contactez-nous").
 const SHORT_KEYWORD = 5;
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-function keywordMatches(haystack: string, keyword: string): boolean {
+export function keywordMatches(haystack: string, keyword: string): boolean {
   if (keyword.length > SHORT_KEYWORD) return haystack.includes(keyword);
   return new RegExp(`(^|[^a-z0-9])${escapeRe(keyword)}($|[^a-z0-9])`).test(haystack);
+}
+
+/** The kinds that are not a page of their own: the transverse elements (audited on every page)
+ *  and the representative pages (any page beyond the other kinds). */
+export const isTransverseKind = (kind: SampleRequiredKind): boolean => /transverse/.test(kind.id);
+export const isRepresentativeKind = (kind: SampleRequiredKind): boolean => /representative|representatif/.test(kind.id);
+
+/** The path (and query) of a URL, without its host: a host that happens to spell a keyword
+ *  (`aide-sociale.gouv.fr`) must not make every page of the site look like one kind. */
+function pathOf(url: string): string {
+  try {
+    const u = new URL(url);
+    return safeDecode(u.pathname) + u.search;
+  } catch {
+    return url;
+  }
+}
+
+/** Percent-decode, keeping the raw form when a sequence is malformed. */
+export function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
 }
 
 /** Lint a configured sample against a standard's normative methodology: which required page
@@ -187,23 +248,39 @@ function keywordMatches(haystack: string, keyword: string): boolean {
  *  page's name/notes/url/id (accent-insensitive; whole-word for short keywords). Two
  *  documented heuristic credits: the "transverse" kind is covered when the sample declares
  *  any transverse element, and the "representative pages" kind is covered when the sample
- *  holds ≥ 2 pages (any multi-page sample de facto carries representative pages beyond a
- *  single entry point — this stops a constant false nag). Advisory output, never a gate. */
+ *  holds a page that is none of the other required kinds (its name, path and id match none
+ *  of their keywords). Counting pages was not enough: a sample of a home page and a contact
+ *  page held two pages and no representative one.
+ *
+ *  A kind the sample does not cover but `sample.absent` gives a reason for is WAIVED, not
+ *  missing: the omission is recorded and says why. A kind dropped without a reason is
+ *  missing, whoever dropped it. Advisory output, never a gate. */
 export function lintSample(sample: SampleConfig, methodology: SampleMethodology): SampleLint {
   const haystacks = sample.pages.map((p) => norm([p.name, p.notes ?? "", p.url, p.id].join(" ")));
   const transverseHay = norm((sample.transverse ?? []).join(" "));
   const hasTransverse = (sample.transverse ?? []).length > 0;
+  const pageKinds = methodology.requiredKinds.filter((k) => !isTransverseKind(k) && !isRepresentativeKind(k));
+  const beyondKinds = sample.pages.some((p) => {
+    const h = norm([p.name, pathOf(p.url), p.id].join(" "));
+    return !pageKinds.some((kind) => kind.keywords.map(norm).some((k) => k && keywordMatches(h, k)));
+  });
+  const reasons = new Map<string, string>();
+  for (const a of sample.absent ?? []) if (!reasons.has(a.kind)) reasons.set(a.kind, a.reason);
   const missing: SampleRequiredKind[] = [];
+  const waived: SampleWaived[] = [];
   for (const kind of methodology.requiredKinds) {
     const kws = kind.keywords.map(norm).filter(Boolean);
     const covered =
       haystacks.some((h) => kws.some((k) => keywordMatches(h, k))) ||
       (transverseHay !== "" && kws.some((k) => keywordMatches(transverseHay, k))) ||
-      (hasTransverse && /transverse/.test(kind.id)) ||
-      (/representative|representatif/.test(kind.id) && sample.pages.length >= 2);
-    if (!covered) missing.push(kind);
+      (hasTransverse && isTransverseKind(kind)) ||
+      (isRepresentativeKind(kind) && beyondKinds);
+    if (covered) continue;
+    const reason = reasons.get(kind.id);
+    if (reason) waived.push({ kind, reason });
+    else missing.push(kind);
   }
-  return { missing };
+  return { missing, waived };
 }
 
 // ---- proposing a sample from discovered URLs --------------------------------------------
@@ -260,6 +337,7 @@ export function mergeSample(existing: SampleConfig | undefined, proposed: Sample
       ...(existing?.transverse?.length ? { transverse: existing.transverse } : {}),
       ...(existing?.global?.length ? { global: existing.global } : {}),
       ...(existing?.exempt?.length ? { exempt: existing.exempt } : {}),
+      ...carryAbsent(existing?.absent),
     },
     added,
     kept: pages.length - added.length,
@@ -311,6 +389,7 @@ export function unionSample(declared: SampleConfig | undefined, snapshotted: Sam
       ...(declared?.transverse?.length ? { transverse: declared.transverse } : {}),
       ...(declared?.global?.length ? { global: declared.global } : {}),
       ...(declared?.exempt?.length ? { exempt: declared.exempt } : {}),
+      ...carryAbsent(declared?.absent),
     },
     undeclared,
     uncaptured,

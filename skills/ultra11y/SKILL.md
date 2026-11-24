@@ -278,9 +278,15 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   report), so a page sheet and the compliance report cannot disagree. `check` gates it against
   invented criteria like any other report; read **`references/pages.md`**.
 - **"Which pages should I even audit?"** → `pages discover --crawl http://localhost:3000
-  --write` (or `--sitemap <url>`) writes the `sample.pages` block for you, taking each page's
-  name from its served `<title>` and NEVER overwriting the auth/storageState/notes already
-  declared. Then `sample check` lints the coverage and `scan --sample` scans and snapshots it.
+  --propose --write` (or `--sitemap <url>`, or `--from-snapshots`) writes a **deterministic**
+  `sample.pages` block: the required page kinds matched by keyword on the sorted URLs and
+  titles, the search page with a fixed query, then one page per template cluster, bounded by
+  `--sample-size` (default 20). The same site gives the same sample whatever model runs it, so
+  **do not pick the pages yourself: run the proposal and keep it.** Edit it only with a recorded
+  reason — a page you add carries its reason in `notes`, a required kind you take out gets
+  `sample.absent: [{ "kind", "reason" }]`; `sample check` flags a kind dropped without one.
+  Auth/storageState/sources/notes already declared are kept. Then `sample check` lints the
+  coverage and `scan --sample` scans and snapshots it.
   A client-rendered SPA exposes no routes in its served HTML — use a sitemap there; read
   **`references/dynamic.md`**.
 - **"Audit in CI" / "audit these URLs page by page, in CI"** → ultra11y ships no CI

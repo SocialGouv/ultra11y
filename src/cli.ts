@@ -90,10 +90,12 @@ import {
 } from "./ledger.js";
 import { combineDynamic, mergeDynamic, mergeSnapshotAudit, scanPageSummary } from "./scan.js";
 import { resolveAxeEngine } from "./axe-engine.js";
-import { ALL_ROUTES_MAX, type ObservedPage, type RouteSource, readRoutes, routeCounts, routeCoverage, routesToScan, writeRoutes } from "./routes.js";
+import { ALL_ROUTES_MAX, type ObservedPage, type RouteSource, readRoutes, routeCounts, routeCoverage, routePath, routesToScan, writeRoutes } from "./routes.js";
+import type { SampleMethodology } from "./standards/types.js";
+import { applyProposal, DEFAULT_SAMPLE_SIZE, type ProposalInput, proposeSample, type SampleProposal, skeletonOf } from "./sample-propose.js";
 import { DOCUMENTS_DIR, downloadSnapshotDocuments } from "./documents.js";
 import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localTierStatus } from "./scan-local.js";
-import { validateSample, lintSample, kindLabel, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
+import { validateSample, lintSample, kindLabel, isTransverseKind, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
 import { runFix, fixSummary } from "./fix.js";
 import { findingId, parseFailOn, findingsAtOrAbove } from "./baseline.js";
 import { repoRoot, resolveEnginePath, writeHook } from "./init.js";
@@ -173,7 +175,7 @@ Usage:
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
-  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write | --routes-only] [--json]   (build the page sample and the route inventory)
+  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--propose [--sample-size <n>] [--search-query <q>]] [--write | --routes-only] [--json]   (build the page sample and the route inventory)
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
@@ -515,7 +517,18 @@ Options:
                      and the report's annex lists every other route with how it was observed
   --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling —
                      the only route that sees a state-reached page (a modal, a funnel step)
-  --all-routes       scan: after the sample (with --sample), scan every route of the inventory
+  --propose          pages discover: propose a DETERMINISTIC sample instead of every page —
+                     the required kinds of the standard (--standard, default rgaa) matched by
+                     keyword on the sorted URLs and titles, the search page with a fixed
+                     query, then one page per template cluster (URL pattern with ids, slugs
+                     and dates normalized; DOM skeleton when a snapshot exists), largest
+                     first, ties broken by URL. Each pick's reason goes to \`notes\`, each kind
+                     with no page to \`sample.absent\`. With --write it REPLACES the declared
+                     pages, keeping those that carry auth, storageState, sources or notes
+  --sample-size <n>  pages discover --propose: most pages proposed (default: ${DEFAULT_SAMPLE_SIZE});
+                     the required kinds are never cut
+  --search-query <q> pages discover --propose: the search query (default: "information")
+  --all-routes      scan: after the sample (with --sample), scan every route of the inventory
                      (.ultra11y/routes.json) the sample does not hold — except the routes your
                      E2E run already captured, which win. Each route is then listed in the
                      annex: captured, scanned, source only, or not reached
@@ -620,6 +633,9 @@ const VALUE_FLAGS = new Set([
   "crawl",
   "depth",
   "max",
+  // `pages discover --propose`: the bound on the proposed sample, and its fixed search query.
+  "sample-size",
+  "search-query",
   // `scan --all-routes`: the most inventory routes visited beyond the sample (src/routes.ts).
   "max-routes",
   // `scan`: most linked PDF documents downloaded per run.
@@ -697,6 +713,8 @@ const BOOLEAN_FLAGS = new Set([
   "from-snapshots",
   // `pages discover`: record the route inventory (.ultra11y/routes.json) without touching the sample.
   "routes-only",
+  // `pages discover`: a deterministic RGAA sample (src/sample-propose.ts) instead of every page.
+  "propose",
   // `scan`: cover every route of the inventory, beyond the sample (bounded by --max-routes).
   "all-routes",
   "dry-run",
@@ -1216,7 +1234,8 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
   // transition), and this is what folds that knowledge back into the declared sample.
   if (p.flags["from-snapshots"] === true) {
     const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
-    const snaps = sampleFromSnapshots(readSnapshots(root));
+    const recorded = readSnapshots(root);
+    const snaps = sampleFromSnapshots(recorded);
     if (!snaps.length) {
       console.error(
         lang === "fr"
@@ -1232,6 +1251,12 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
       "snapshots",
     );
     if (p.flags["routes-only"] === true) return 0;
+    if (p.flags.propose === true)
+      return writeProposedSample(
+        p,
+        lang,
+        recorded.map((s) => ({ url: s.meta.url, title: extractTitle(s.dom) ?? s.meta.name, html: s.dom, skeleton: skeletonOf(s.dom) })),
+      );
     return writeDiscoveredSample(p, lang, snaps, snaps.length);
   }
 
@@ -1304,7 +1329,136 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
     }),
   );
 
+  if (p.flags.propose === true) {
+    // The template fingerprint comes from a snapshot when the project has one for the route:
+    // the served HTML of a client-rendered page is a shell, the snapshot is what it renders.
+    const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+    const skeletons = new Map<string, string>();
+    for (const s of readSnapshots(root)) {
+      const key = routePath(s.meta.url);
+      if (!skeletons.has(key)) skeletons.set(key, skeletonOf(s.dom));
+    }
+    const inputs: ProposalInput[] = urls.map((url) => {
+      const html = cache.get(url);
+      const title = titles.get(url);
+      const skeleton = skeletons.get(routePath(url));
+      return { url, ...(title ? { title } : {}), ...(html ? { html } : {}), ...(skeleton ? { skeleton } : {}) };
+    });
+    return writeProposedSample(p, lang, inputs);
+  }
   return writeDiscoveredSample(p, lang, proposeSamplePages(urls, titles), urls.length);
+}
+
+/** `pages discover --propose`: the deterministic sample (src/sample-propose.ts), printed, or
+ *  written over the declared pages with --write (human work kept — see applyProposal). */
+function writeProposedSample(p: ParsedArgs, lang: Lang, inputs: ProposalInput[]): number {
+  const key = typeof p.flags.standard === "string" && p.flags.standard ? p.flags.standard : "rgaa";
+  let methodology: SampleMethodology | undefined;
+  let locale = "fr";
+  try {
+    const standard = resolveStandard(key);
+    const pack = isCore(standard) ? null : getPack(standard);
+    methodology = pack?.sampleMethodology;
+    locale = pack?.defaultLocale ?? "fr";
+  } catch (e) {
+    console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  if (!methodology) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y pages discover : --propose suit la méthodologie d'échantillon d'un référentiel, et « ${key} » n'en définit pas (essayez --standard rgaa).`
+        : `ultra11y pages discover: --propose follows a standard's sample methodology, and "${key}" defines none (try --standard rgaa).`,
+    );
+    return 2;
+  }
+  const sizeFlag = p.flags["sample-size"];
+  const size = typeof sizeFlag === "string" ? Number(sizeFlag) : DEFAULT_SAMPLE_SIZE;
+  if (!Number.isInteger(size) || size < 1) {
+    console.error(`ultra11y pages discover: --sample-size expects a positive integer, got "${String(sizeFlag)}".`);
+    return 2;
+  }
+  const searchQuery = typeof p.flags["search-query"] === "string" ? (p.flags["search-query"] as string) : undefined;
+  const proposal = proposeSample(inputs, { methodology, size, locale, ...(searchQuery ? { searchQuery } : {}) });
+
+  let existing: SampleConfig | undefined;
+  try {
+    existing = loadConfig(process.cwd())?.sample;
+  } catch (e) {
+    console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  const applied = applyProposal(existing, proposal.sample);
+  const v = validateSample(applied.sample);
+  if (!v.ok || !v.sample) {
+    console.error(lang === "fr" ? "ultra11y pages discover : échantillon proposé invalide :" : "ultra11y pages discover: the proposed sample is invalid:");
+    for (const i of v.issues) console.error(`  ✗ ${i.path ? `${i.path}: ` : ""}${i.message}`);
+    return 1;
+  }
+  const summary = proposalSummary(lang, proposal, applied);
+  if (p.flags.json)
+    console.log(
+      JSON.stringify(
+        {
+          sample: v.sample,
+          considered: proposal.considered,
+          documents: proposal.documents,
+          clusters: proposal.clusters,
+          leftOut: proposal.leftOut,
+          kept: applied.kept.map((x) => ({ id: x.id, url: x.url })),
+          dropped: applied.dropped.map((x) => ({ id: x.id, url: x.url })),
+        },
+        null,
+        2,
+      ),
+    );
+  if (p.flags.write !== true) {
+    if (!p.flags.json) {
+      console.log(JSON.stringify({ sample: v.sample }, null, 2));
+      console.log(
+        `\n${summary}\n${lang === "fr" ? "Rien n'a été écrit — relancez avec --write pour remplacer l'échantillon de .ultra11yrc.json." : "Nothing was written — re-run with --write to replace the sample in .ultra11yrc.json."}`,
+      );
+    }
+    return 0;
+  }
+  const file = persistSample(v.sample);
+  if (file === undefined) return 2;
+  if (!p.flags.json)
+    console.log(
+      `${summary} → ${file}\n${
+        lang === "fr"
+          ? "Gardez cet échantillon : toute modification à la main consigne sa raison (`notes` de la page, ou `sample.absent` pour un type de page retiré). Puis `ultra11y sample check --standard rgaa` et `ultra11y scan --sample`."
+          : "Keep this sample: any hand edit records its reason (the page's `notes`, or `sample.absent` for a page kind taken out). Then `ultra11y sample check --standard rgaa` and `ultra11y scan --sample`."
+      }`,
+    );
+  return 0;
+}
+
+function proposalSummary(lang: Lang, proposal: SampleProposal, applied: ReturnType<typeof applyProposal>): string {
+  const n = proposal.sample.pages.length;
+  const represented = proposal.clusters.filter((c) => c.representative).length;
+  const absent = (proposal.sample.absent ?? []).map((a) => a.kind).join(", ");
+  return lang === "fr"
+    ? `${n} page(s) proposée(s) sur ${proposal.considered} découverte(s) · ${represented}/${proposal.clusters.length} gabarit(s) représenté(s)${proposal.leftOut ? ` (${proposal.leftOut} laissé(s) par --sample-size)` : ""}${absent ? ` · sans page : ${absent}` : ""}${applied.kept.length ? ` · ${applied.kept.length} page(s) déclarée(s) conservée(s)` : ""}${applied.dropped.length ? ` · ${applied.dropped.length} retirée(s)` : ""}`
+    : `${n} page(s) proposed out of ${proposal.considered} discovered · ${represented}/${proposal.clusters.length} template(s) represented${proposal.leftOut ? ` (${proposal.leftOut} left out by --sample-size)` : ""}${absent ? ` · no page for: ${absent}` : ""}${applied.kept.length ? ` · ${applied.kept.length} declared page(s) kept` : ""}${applied.dropped.length ? ` · ${applied.dropped.length} dropped` : ""}`;
+}
+
+/** Write `sample` into `.ultra11yrc.json`, every other key untouched. Undefined when the file
+ *  is not JSON (it is then left alone). */
+function persistSample(sample: SampleConfig): string | undefined {
+  const file = join(process.cwd(), ".ultra11yrc.json");
+  let doc: Record<string, unknown> = {};
+  if (existsSync(file)) {
+    try {
+      doc = JSON.parse(readText(file)) as Record<string, unknown>;
+    } catch {
+      console.error("ultra11y pages discover: .ultra11yrc.json is not valid JSON — refusing to overwrite it.");
+      return undefined;
+    }
+  }
+  doc.sample = sample;
+  writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
+  return file;
 }
 
 /** Merge proposed pages into `.ultra11yrc.json` (or print them), shared by every discovery
@@ -1402,18 +1556,8 @@ function writeDiscoveredSample(p: ParsedArgs, lang: Lang, proposed: SamplePage[]
     return 0;
   }
 
-  const file = join(process.cwd(), ".ultra11yrc.json");
-  let doc: Record<string, unknown> = {};
-  if (existsSync(file)) {
-    try {
-      doc = JSON.parse(readText(file)) as Record<string, unknown>;
-    } catch {
-      console.error("ultra11y pages discover: .ultra11yrc.json is not valid JSON — refusing to overwrite it.");
-      return 2;
-    }
-  }
-  doc.sample = v.sample;
-  writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
+  const file = persistSample(v.sample);
+  if (file === undefined) return 2;
   if (!p.flags.json)
     console.log(
       lang === "fr"
@@ -4210,7 +4354,7 @@ function cmdSample(p: ParsedArgs): number {
   const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
   const snapshotted = sampleFromSnapshots(readSnapshots(root));
   const union = unionSample(v.sample, snapshotted);
-  const { missing } = lintSample(union.sample, methodology);
+  const { missing, waived } = lintSample(union.sample, methodology);
   const loc = pack?.defaultLocale ?? "fr";
   const counts = {
     declared: v.sample.pages.length,
@@ -4228,6 +4372,7 @@ function cmdSample(p: ParsedArgs): number {
           undeclaredPages: union.undeclared.map((x) => ({ id: x.id, url: x.url })),
           uncapturedPages: union.uncaptured.map((x) => ({ id: x.id, url: x.url })),
           missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, loc) })),
+          waived: waived.map((w) => ({ id: w.kind.id, label: kindLabel(w.kind, loc), reason: w.reason })),
           warnings: v.warnings,
         },
         null,
@@ -4243,6 +4388,9 @@ function cmdSample(p: ParsedArgs): number {
       ? `${counts.declared} déclarée(s) · ${counts.snapshotted} instantanée(s) · ${counts.undeclared} instantanée(s) non déclarée(s) · ${counts.uncaptured} déclarée(s) jamais capturée(s)`
       : `${counts.declared} declared · ${counts.snapshotted} snapshotted · ${counts.undeclared} snapshotted but undeclared · ${counts.uncaptured} declared but never captured`,
   );
+  // A kind can be absent for a good reason — it cannot be absent for no reason. A recorded one
+  // is listed with its reason, so the omission stays visible without nagging.
+  for (const w of waived) console.log(`ℹ️ ${kindLabel(w.kind, loc)} — ${lang === "fr" ? "absent, raison consignée" : "absent, reason recorded"} : ${w.reason}`);
   if (missing.length) {
     console.log(
       (lang === "fr"
@@ -4250,6 +4398,19 @@ function cmdSample(p: ParsedArgs): number {
         : `⚠️ Incomplete sample (${union.sample.pages.length} page(s)) — required page kinds missing (${pack!.name}):`) +
         ` ${missing.map((k) => kindLabel(k, loc)).join(", ")}`,
     );
+    const page = missing.find((k) => !isTransverseKind(k));
+    if (page)
+      console.log(
+        lang === "fr"
+          ? `   Ajoutez la page, ou consignez pourquoi l'échantillon n'en a pas : "absent": [{ "kind": "${page.id}", "reason": "…" }] dans le bloc sample (\`pages discover --propose\` le fait pour les types qu'il ne trouve pas).`
+          : `   Add the page, or record why the sample has none: "absent": [{ "kind": "${page.id}", "reason": "…" }] in the sample block (\`pages discover --propose\` does so for the kinds it finds no page for).`,
+      );
+    if (missing.some(isTransverseKind))
+      console.log(
+        lang === "fr"
+          ? `   Les éléments transverses se déclarent dans "transverse": ["En-tête", "Navigation", "Pied de page"].`
+          : `   Transverse elements are declared in "transverse": ["Header", "Navigation", "Footer"].`,
+      );
   } else if (counts.undeclared > 0) {
     // Complete over the union, but the declared sample is NOT the audited surface. Saying
     // "complete" flat here is the sentence the reporter's project acted on.
@@ -4267,8 +4428,8 @@ function cmdSample(p: ParsedArgs): number {
   } else {
     console.log(
       lang === "fr"
-        ? `✓ Échantillon complet (${union.sample.pages.length} page(s)) — tous les types de page requis par ${pack!.name} sont couverts.`
-        : `✓ Sample complete (${union.sample.pages.length} page(s)) — every page kind ${pack!.name} requires is covered.`,
+        ? `✓ Échantillon complet (${union.sample.pages.length} page(s)) — tous les types de page requis par ${pack!.name} sont couverts${waived.length ? " ou consignés absents avec leur raison" : ""}.`
+        : `✓ Sample complete (${union.sample.pages.length} page(s)) — every page kind ${pack!.name} requires is covered${waived.length ? " or recorded absent with a reason" : ""}.`,
     );
   }
   if (counts.uncaptured > 0) {

@@ -27270,11 +27270,25 @@ var rgaa_default = {
         keywords: ["authentification", "authentication", "connexion", "identification", "login", "log in", "sign in", "se connecter", "auth"]
       },
       {
+        id: "recherche",
+        label: {
+          fr: "Recherche"
+        },
+        keywords: ["recherche", "search", "resultats de recherche", "search results"]
+      },
+      {
+        id: "documents",
+        label: {
+          fr: "Documents t\xE9l\xE9chargeables"
+        },
+        keywords: ["documents", "telechargement", "telecharger", "publications", "download", "pdf"]
+      },
+      {
         id: "pages-representatives",
         label: {
           fr: "Pages repr\xE9sentatives"
         },
-        keywords: ["representative", "representatif", "representatives", "gabarit", "template", "modele", "formulaire", "recherche", "resultats"]
+        keywords: ["representative", "representatif", "representatives", "gabarit", "template", "modele", "formulaire"]
       },
       {
         id: "elements-transverses",
@@ -58580,10 +58594,8 @@ function routesToScan(inventory, opts) {
   return { scan: rest.slice(0, max), captured, bounded: rest.slice(max) };
 }
 
-// src/scan-local.ts
-import { existsSync as existsSync23, realpathSync as realpathSync3, statSync as statSync8 } from "fs";
-import { createRequire as createRequire4 } from "module";
-import { dirname as dirname15, join as join21, resolve as resolve12 } from "path";
+// src/sample-propose.ts
+import { createHash as createHash5 } from "crypto";
 
 // src/sample.ts
 import { existsSync as existsSync22 } from "fs";
@@ -58666,6 +58678,22 @@ function validateSample(raw) {
       });
     }
   }
+  if (s2.absent !== void 0) {
+    if (!Array.isArray(s2.absent)) {
+      err("sample.absent", "absent must be an array of { kind, reason }");
+    } else {
+      s2.absent.forEach((e, i) => {
+        const x2 = e;
+        if (typeof x2 !== "object" || x2 === null || Array.isArray(x2)) {
+          err(`sample.absent[${i}]`, "each entry must be an object { kind, reason }");
+          return;
+        }
+        if (typeof x2.kind !== "string" || x2.kind.trim() === "") err(`sample.absent[${i}].kind`, "kind must be a required page kind id");
+        if (typeof x2.reason !== "string" || x2.reason.trim() === "")
+          err(`sample.absent[${i}].reason`, "reason is required \u2014 say why the sample holds no page of this kind");
+      });
+    }
+  }
   const ok = issues.length === 0;
   return { ok, issues, warnings, sample: ok ? normalizeSample(s2) : void 0 };
 }
@@ -58682,7 +58710,17 @@ function normalizeSample(s2) {
   const transverse = Array.isArray(s2.transverse) ? s2.transverse.map(String) : void 0;
   const global = Array.isArray(s2.global) ? s2.global.map(String) : void 0;
   const exempt = Array.isArray(s2.exempt) ? s2.exempt.map((e) => ({ path: String(e.path), reason: String(e.reason) })) : void 0;
-  return { pages, ...transverse?.length ? { transverse } : {}, ...global?.length ? { global } : {}, ...exempt?.length ? { exempt } : {} };
+  const absent = Array.isArray(s2.absent) ? s2.absent.map((e) => ({ kind: String(e.kind), reason: String(e.reason) })) : void 0;
+  return {
+    pages,
+    ...transverse?.length ? { transverse } : {},
+    ...global?.length ? { global } : {},
+    ...exempt?.length ? { exempt } : {},
+    ...carryAbsent(absent)
+  };
+}
+function carryAbsent(absent) {
+  return absent?.length ? { absent } : {};
 }
 function sampleScope(sample) {
   return {
@@ -58703,17 +58741,45 @@ function keywordMatches(haystack, keyword) {
   if (keyword.length > SHORT_KEYWORD) return haystack.includes(keyword);
   return new RegExp(`(^|[^a-z0-9])${escapeRe(keyword)}($|[^a-z0-9])`).test(haystack);
 }
+var isTransverseKind = (kind) => /transverse/.test(kind.id);
+var isRepresentativeKind = (kind) => /representative|representatif/.test(kind.id);
+function pathOf(url) {
+  try {
+    const u2 = new URL(url);
+    return safeDecode(u2.pathname) + u2.search;
+  } catch {
+    return url;
+  }
+}
+function safeDecode(s2) {
+  try {
+    return decodeURIComponent(s2);
+  } catch {
+    return s2;
+  }
+}
 function lintSample(sample, methodology) {
   const haystacks = sample.pages.map((p2) => norm4([p2.name, p2.notes ?? "", p2.url, p2.id].join(" ")));
   const transverseHay = norm4((sample.transverse ?? []).join(" "));
   const hasTransverse = (sample.transverse ?? []).length > 0;
+  const pageKinds = methodology.requiredKinds.filter((k) => !isTransverseKind(k) && !isRepresentativeKind(k));
+  const beyondKinds = sample.pages.some((p2) => {
+    const h3 = norm4([p2.name, pathOf(p2.url), p2.id].join(" "));
+    return !pageKinds.some((kind) => kind.keywords.map(norm4).some((k) => k && keywordMatches(h3, k)));
+  });
+  const reasons = /* @__PURE__ */ new Map();
+  for (const a2 of sample.absent ?? []) if (!reasons.has(a2.kind)) reasons.set(a2.kind, a2.reason);
   const missing = [];
+  const waived = [];
   for (const kind of methodology.requiredKinds) {
     const kws = kind.keywords.map(norm4).filter(Boolean);
-    const covered = haystacks.some((h3) => kws.some((k) => keywordMatches(h3, k))) || transverseHay !== "" && kws.some((k) => keywordMatches(transverseHay, k)) || hasTransverse && /transverse/.test(kind.id) || /representative|representatif/.test(kind.id) && sample.pages.length >= 2;
-    if (!covered) missing.push(kind);
+    const covered = haystacks.some((h3) => kws.some((k) => keywordMatches(h3, k))) || transverseHay !== "" && kws.some((k) => keywordMatches(transverseHay, k)) || hasTransverse && isTransverseKind(kind) || isRepresentativeKind(kind) && beyondKinds;
+    if (covered) continue;
+    const reason = reasons.get(kind.id);
+    if (reason) waived.push({ kind, reason });
+    else missing.push(kind);
   }
-  return { missing };
+  return { missing, waived };
 }
 function proposeSamplePages(urls, titles) {
   const used = /* @__PURE__ */ new Set();
@@ -58747,7 +58813,8 @@ function mergeSample(existing, proposed) {
       pages,
       ...existing?.transverse?.length ? { transverse: existing.transverse } : {},
       ...existing?.global?.length ? { global: existing.global } : {},
-      ...existing?.exempt?.length ? { exempt: existing.exempt } : {}
+      ...existing?.exempt?.length ? { exempt: existing.exempt } : {},
+      ...carryAbsent(existing?.absent)
     },
     added,
     kept: pages.length - added.length
@@ -58773,7 +58840,8 @@ function unionSample(declared, snapshotted) {
       pages: [...pages, ...undeclared],
       ...declared?.transverse?.length ? { transverse: declared.transverse } : {},
       ...declared?.global?.length ? { global: declared.global } : {},
-      ...declared?.exempt?.length ? { exempt: declared.exempt } : {}
+      ...declared?.exempt?.length ? { exempt: declared.exempt } : {},
+      ...carryAbsent(declared?.absent)
     },
     undeclared,
     uncaptured
@@ -58783,7 +58851,415 @@ function kindLabel(kind, locale = "fr") {
   return kind.label[locale] ?? Object.values(kind.label)[0] ?? kind.id;
 }
 
+// src/sample-propose.ts
+var DEFAULT_SAMPLE_SIZE = 20;
+var FIXED_SEARCH_QUERY = "information";
+var PROPOSAL_NOTE = "proposal: ";
+var SLUG_SIBLINGS = 3;
+var cmp = (a2, b) => a2 < b ? -1 : a2 > b ? 1 : 0;
+function cmpTuple(a2, b) {
+  for (let i = 0; i < Math.max(a2.length, b.length); i++) {
+    const x2 = a2[i] ?? "";
+    const y = b[i] ?? "";
+    const c = typeof x2 === "number" && typeof y === "number" ? x2 - y : cmp(String(x2), String(y));
+    if (c !== 0) return c;
+  }
+  return 0;
+}
+function parseUrl(url) {
+  try {
+    const u2 = new URL(url);
+    const path = safeDecode(u2.pathname) || "/";
+    return { url, path, segments: path.split("/").filter(Boolean), query: [...u2.searchParams.entries()], origin: u2.origin };
+  } catch {
+    const [p2 = url, q3 = ""] = url.split("?", 2);
+    return { url, path: p2, segments: p2.split(/[/\\]/).filter(Boolean), query: [...new URLSearchParams(q3).entries()] };
+  }
+}
+var DATE = ":date";
+var YEAR = /^(19|20)\d{2}$/;
+var FULL_DATE = /^(19|20)\d{2}[-_.]?(0[1-9]|1[0-2])([-_.]?(0[1-9]|[12]\d|3[01]))?$/;
+var EMBEDDED_DATE = /(19|20)\d{2}[-_.](0[1-9]|1[0-2])[-_.](0[1-9]|[12]\d|3[01])/;
+var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function normalizeSegment(seg, afterDate) {
+  const s2 = seg.replace(/\.x?html?$/i, "");
+  if (YEAR.test(s2) || FULL_DATE.test(s2)) return DATE;
+  if (afterDate && /^\d{1,2}$/.test(s2)) return DATE;
+  if (/^\d+$/.test(s2) || UUID.test(s2) || /^[0-9a-f]{12,}$/i.test(s2) && /\d/.test(s2)) return ":id";
+  if (EMBEDDED_DATE.test(s2) || /[-_]\d+$/.test(s2)) return ":slug";
+  return seg;
+}
+function normalizeQueryValue(v2) {
+  if (YEAR.test(v2) || FULL_DATE.test(v2) || EMBEDDED_DATE.test(v2)) return DATE;
+  if (/^\d+$/.test(v2)) return ":id";
+  return ":v";
+}
+function urlPatterns(urls) {
+  const parsed = [...new Set(urls)].sort(cmp).map(parseUrl);
+  const segs = parsed.map((p2) => {
+    const out2 = [];
+    for (const s2 of p2.segments) {
+      const n = normalizeSegment(s2, out2[out2.length - 1] === DATE);
+      if (n === DATE && out2[out2.length - 1] === DATE) continue;
+      out2.push(n);
+    }
+    return out2;
+  });
+  const depth = Math.max(0, ...segs.map((s2) => s2.length));
+  for (let i = 1; i < depth; i++) {
+    const values = /* @__PURE__ */ new Map();
+    for (const s2 of segs) {
+      const v2 = s2[i];
+      if (v2 === void 0 || v2.startsWith(":")) continue;
+      const prefix2 = s2.slice(0, i).join("/");
+      let set = values.get(prefix2);
+      if (!set) values.set(prefix2, set = /* @__PURE__ */ new Set());
+      set.add(v2);
+    }
+    for (const s2 of segs) {
+      const v2 = s2[i];
+      if (v2 === void 0 || v2.startsWith(":")) continue;
+      if ((values.get(s2.slice(0, i).join("/"))?.size ?? 0) >= SLUG_SIBLINGS) s2[i] = ":slug";
+    }
+  }
+  const out = /* @__PURE__ */ new Map();
+  parsed.forEach((p2, i) => {
+    const keys = [...new Set(p2.query.map(([k, v2]) => `${k}=${normalizeQueryValue(v2)}`))].sort(cmp);
+    out.set(p2.url, `/${segs[i].join("/")}${keys.length ? `?${keys.join("&")}` : ""}`);
+  });
+  return out;
+}
+var STRUCTURAL = /* @__PURE__ */ new Set([
+  "header",
+  "nav",
+  "main",
+  "aside",
+  "footer",
+  "article",
+  "section",
+  "form",
+  "table",
+  "dialog",
+  "iframe",
+  "video",
+  "audio",
+  "search",
+  "fieldset",
+  "details"
+]);
+var ROLE_TAG = {
+  banner: "header",
+  navigation: "nav",
+  main: "main",
+  complementary: "aside",
+  contentinfo: "footer",
+  search: "search",
+  form: "form",
+  dialog: "dialog",
+  table: "table",
+  grid: "table"
+};
+var OPAQUE = /* @__PURE__ */ new Set(["script", "style", "template", "noscript", "svg", "head"]);
+var SKELETON_DEPTH = 5;
+function skeletonOfNodes(nodes, depth) {
+  const out = [];
+  for (const n of nodes) {
+    if (n.type !== "element" || OPAQUE.has(n.tag)) continue;
+    const role = (attr(n, "role") ?? "").trim().toLowerCase();
+    const tag = ROLE_TAG[role] ?? (STRUCTURAL.has(n.tag) ? n.tag : void 0);
+    const parts = tag ? depth < SKELETON_DEPTH ? skeletonOfNodes(n.children, depth + 1) : [] : skeletonOfNodes(n.children, depth);
+    if (!tag) {
+      for (const p2 of parts) if (out[out.length - 1] !== p2) out.push(p2);
+      continue;
+    }
+    const s2 = parts.length ? `${tag}(${parts.join(",")})` : tag;
+    if (out[out.length - 1] !== s2) out.push(s2);
+  }
+  return out;
+}
+function skeletonOf(html) {
+  const doc = parseHtml(html, "skeleton.html");
+  const body = doc.elements.find((e) => e.tag === "body");
+  const shape = skeletonOfNodes(body ? body.children : doc.roots, 0).join(",");
+  return createHash5("sha256").update(shape).digest("hex").slice(0, 12);
+}
+var SEARCH_PARAMS = /* @__PURE__ */ new Set([
+  "q",
+  "s",
+  "query",
+  "search",
+  "recherche",
+  "keys",
+  "keywords",
+  "keyword",
+  "term",
+  "terms",
+  "text",
+  "motcle",
+  "mot-cle",
+  "search_api_fulltext"
+]);
+function readFacts(html, pageUrl) {
+  const doc = parseHtml(html, "page.html");
+  let origin;
+  try {
+    origin = new URL(pageUrl).origin;
+  } catch {
+    origin = void 0;
+  }
+  let documentLinks = 0;
+  if (origin) {
+    for (const a2 of doc.elements) {
+      if (a2.tag !== "a") continue;
+      const href = attr(a2, "href");
+      if (!href) continue;
+      try {
+        const u2 = new URL(href, pageUrl);
+        if (u2.origin === origin && isDownloadUrl(u2.href) && /\.(pdf|docx?|odt|xlsx?|ods|pptx?|odp|rtf|csv|epub)$/i.test(u2.pathname)) documentLinks++;
+      } catch {
+      }
+    }
+  }
+  return { documentLinks, ...origin ? searchFormOf(doc.elements, pageUrl, origin) : {} };
+}
+function searchFormOf(elements, pageUrl, origin) {
+  for (const form of elements) {
+    if (form.tag !== "form") continue;
+    if ((attr(form, "method") ?? "get").trim().toLowerCase() !== "get") continue;
+    const inSearch = attr(form, "role") === "search" || ancestors(form).some((a2) => a2.tag === "search" || attr(a2, "role") === "search");
+    const fields = descendants(form).filter((e) => e.tag === "input" && (attr(e, "name") ?? "").trim() !== "").sort((a2, b) => a2.start - b.start);
+    const typed = (e) => (attr(e, "type") ?? "text").trim().toLowerCase();
+    const field = fields.find((e) => typed(e) === "search") ?? fields.find((e) => (typed(e) === "text" || typed(e) === "search") && SEARCH_PARAMS.has((attr(e, "name") ?? "").toLowerCase()));
+    if (!field) continue;
+    const param = (attr(field, "name") ?? "").trim();
+    if (!inSearch && typed(field) !== "search" && !SEARCH_PARAMS.has(param.toLowerCase())) continue;
+    try {
+      const u2 = new URL(attr(form, "action") || pageUrl, pageUrl);
+      if (u2.origin !== origin || !/^https?:$/.test(u2.protocol)) continue;
+      return { searchForm: { action: `${u2.origin}${u2.pathname}`, param } };
+    } catch {
+    }
+  }
+  return {};
+}
+function searchUrl(action, param, query) {
+  return `${action}?${new URLSearchParams([[param, query]]).toString()}`;
+}
+var TITLE_SEPARATOR = /\s+[-|–—·:»]\s+/;
+function strippedTitles(titles) {
+  const parts = /* @__PURE__ */ new Map();
+  for (const t3 of titles.values()) for (const p2 of new Set(t3.split(TITLE_SEPARATOR).map((x2) => x2.trim()))) parts.set(p2, (parts.get(p2) ?? 0) + 1);
+  const common = titles.size >= 3 ? new Set([...parts].filter(([, n]) => n * 2 >= titles.size).map(([p2]) => p2)) : /* @__PURE__ */ new Set();
+  const out = /* @__PURE__ */ new Map();
+  for (const [url, t3] of titles) {
+    const kept = t3.split(TITLE_SEPARATOR).map((x2) => x2.trim()).filter((x2) => x2 && !common.has(x2));
+    out.set(url, kept.join(" "));
+  }
+  return out;
+}
+function matchKind(kind, pages) {
+  const kws = kind.keywords.map(norm4).filter(Boolean);
+  let best;
+  for (const page of pages) {
+    for (let ki = 0; ki < kws.length; ki++) {
+      const k = kws[ki];
+      const where = keywordMatches(page.urlHay, k) ? "URL" : keywordMatches(page.titleHay, k) ? "title" : void 0;
+      if (!where) continue;
+      const rank = [page.depth, page.hasQuery, where === "URL" ? 0 : 1, ki, page.url.length, page.url];
+      if (!best || cmpTuple(rank, best.rank) < 0) best = { page, keyword: kind.keywords[ki] ?? k, where, rank };
+    }
+  }
+  return best;
+}
+function proposeSample(inputs, opts) {
+  const size = opts.size !== void 0 && Number.isFinite(opts.size) && opts.size > 0 ? Math.floor(opts.size) : DEFAULT_SAMPLE_SIZE;
+  const query = opts.searchQuery?.trim() || FIXED_SEARCH_QUERY;
+  const locale = opts.locale ?? "fr";
+  const sorted = inputs.map((i) => ({ ...i, url: i.url.split("#", 1)[0] })).filter((i) => i.url).sort((a2, b) => cmpTuple([a2.url, a2.title ?? "", a2.skeleton ?? "", a2.html ?? ""], [b.url, b.title ?? "", b.skeleton ?? "", b.html ?? ""]));
+  const unique = [];
+  for (const i of sorted) if (unique[unique.length - 1]?.url !== i.url) unique.push(i);
+  const documents = unique.filter((i) => isDownloadUrl(i.url));
+  const pageInputs = unique.filter((i) => !isDownloadUrl(i.url));
+  const titles = /* @__PURE__ */ new Map();
+  for (const i of pageInputs) if (i.title?.trim()) titles.set(i.url, i.title.trim());
+  const bare = strippedTitles(titles);
+  const pages = pageInputs.map((i) => {
+    const parsed = parseUrl(i.url);
+    const words = parsed.segments.map((s2) => s2.replace(/\.x?html?$/i, "")).join(" ");
+    const root = parsed.segments.length === 0 || /^index\.x?html?$/i.test(parsed.segments.join("/"));
+    return {
+      url: i.url,
+      ...i.title?.trim() ? { title: i.title.trim() } : {},
+      ...i.html ? { html: i.html } : {},
+      ...i.skeleton ? { skeleton: i.skeleton } : {},
+      parsed,
+      depth: root ? 0 : parsed.segments.length,
+      hasQuery: parsed.query.length ? 1 : 0,
+      urlHay: norm4(`${words.replace(/[-_.+~]+/g, " ")}${root ? " home index" : ""}`),
+      titleHay: norm4(bare.get(i.url) ?? ""),
+      ...i.html ? { facts: readFacts(i.html, i.url) } : {}
+    };
+  });
+  const byShallow = [...pages].sort((a2, b) => cmpTuple([a2.depth, a2.hasQuery, a2.url], [b.depth, b.hasQuery, b.url]));
+  const picks = [];
+  const pickOf = /* @__PURE__ */ new Map();
+  const take = (url, title, reason) => {
+    const hit = pickOf.get(url);
+    if (hit) {
+      if (!hit.reasons.includes(reason)) hit.reasons.push(reason);
+      return;
+    }
+    const p2 = { url, ...title ? { title } : {}, reasons: [reason] };
+    picks.push(p2);
+    pickOf.set(url, p2);
+  };
+  const absent = [];
+  const pathOf2 = (p2) => p2.parsed.path + (p2.parsed.query.length ? `?${new URLSearchParams(p2.parsed.query).toString()}` : "");
+  for (const kind of opts.methodology.requiredKinds) {
+    if (isTransverseKind(kind) || isRepresentativeKind(kind)) continue;
+    const label = kindLabel(kind, locale);
+    if (/recherche|search/.test(kind.id)) {
+      const withForm = byShallow.find((p2) => p2.facts?.searchForm);
+      if (withForm?.facts?.searchForm) {
+        const { action, param: param2 } = withForm.facts.searchForm;
+        take(searchUrl(action, param2, query), void 0, `required kind "${label}", fixed query "${query}" through the search form of ${pathOf2(withForm)}`);
+        continue;
+      }
+      const withParam = byShallow.find(
+        (p2) => p2.parsed.origin && p2.parsed.query.some(([k]) => SEARCH_PARAMS.has(k.toLowerCase())) && kind.keywords.map(norm4).some((k) => keywordMatches(p2.urlHay, k))
+      );
+      const param = withParam?.parsed.query.find(([k]) => SEARCH_PARAMS.has(k.toLowerCase()))?.[0];
+      if (withParam && param) {
+        take(
+          searchUrl(`${withParam.parsed.origin}${new URL(withParam.url).pathname}`, param, query),
+          void 0,
+          `required kind "${label}", fixed query "${query}" on the discovered search URL ${pathOf2(withParam)}`
+        );
+        continue;
+      }
+    }
+    const m3 = matchKind(kind, pages);
+    if (m3) {
+      const extra = /recherche|search/.test(kind.id) ? `; no search parameter known \u2014 search "${query}" by hand on this page` : "";
+      take(m3.page.url, m3.page.title, `required kind "${label}", keyword "${m3.keyword}" in the ${m3.where}${extra}`);
+      continue;
+    }
+    if (/document/.test(kind.id)) {
+      const linking = byShallow.find((p2) => (p2.facts?.documentLinks ?? 0) > 0);
+      if (linking) {
+        take(linking.url, linking.title, `required kind "${label}", the shallowest page linking downloadable documents (${linking.facts.documentLinks})`);
+        continue;
+      }
+    }
+    absent.push({
+      kind: kind.id,
+      reason: `${PROPOSAL_NOTE}no discovered URL or title matches ${kind.keywords.map((k) => `"${k}"`).join(", ")}${/document/.test(kind.id) && documents.length ? ` (${documents.length} document URL(s) discovered, no page known to link them)` : ""} \u2014 confirm the site has none`
+    });
+  }
+  const patterns = urlPatterns(pages.map((p2) => p2.url));
+  const groups = /* @__PURE__ */ new Map();
+  for (const p2 of pages) {
+    const key2 = p2.skeleton ? `template:${p2.skeleton}` : `url:${patterns.get(p2.url)}`;
+    let g = groups.get(key2);
+    if (!g) groups.set(key2, g = []);
+    g.push(p2);
+  }
+  const clusters = [...groups].map(([key2, members]) => ({
+    key: key2,
+    members: members.sort((a2, b) => cmpTuple([a2.hasQuery, a2.url], [b.hasQuery, b.url])),
+    pattern: [...new Set(members.map((m3) => patterns.get(m3.url)))].sort(cmp).join(" ")
+  })).sort((a2, b) => cmpTuple([-a2.members.length, a2.pattern, a2.key], [-b.members.length, b.pattern, b.key]));
+  const representativeKind = opts.methodology.requiredKinds.find(isRepresentativeKind);
+  const repLabel = representativeKind ? kindLabel(representativeKind, locale) : "representative pages";
+  const out = [];
+  let leftOut = 0;
+  let represented = 0;
+  for (const c of clusters) {
+    const sampled = c.members.find((m3) => pickOf.has(m3.url));
+    if (sampled) {
+      out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: sampled.url });
+      continue;
+    }
+    if (picks.length >= size) {
+      out.push({ key: c.key, pattern: c.pattern, size: c.members.length });
+      leftOut++;
+      continue;
+    }
+    const rep = c.members[0];
+    const what = c.key.startsWith("template:") ? `template ${c.key.slice("template:".length)} (${c.pattern})` : `template cluster ${c.pattern}`;
+    take(rep.url, rep.title, `${repLabel}: ${what}, ${c.members.length} page(s), first by URL`);
+    represented++;
+    out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: rep.url });
+  }
+  if (representativeKind && represented === 0 && !leftOut)
+    absent.push({
+      kind: representativeKind.id,
+      reason: `${PROPOSAL_NOTE}every discovered page is already sampled for a required kind \u2014 no other template found`
+    });
+  const used = /* @__PURE__ */ new Set();
+  const samplePages = picks.map((p2) => {
+    const base = slugifyPageId(p2.url);
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    used.add(id);
+    return { id, name: p2.title ?? nameFromUrl(p2.url), url: p2.url, notes: `${PROPOSAL_NOTE}${p2.reasons.join("; ")}` };
+  });
+  return {
+    sample: { pages: samplePages, ...carryAbsent(absent) },
+    clusters: out,
+    considered: pages.length,
+    documents: documents.length,
+    leftOut
+  };
+}
+function humanNotes(notes) {
+  return (notes ?? "").split(" | ").filter((s2) => s2.trim() && !s2.startsWith(PROPOSAL_NOTE)).join(" | ");
+}
+function applyProposal(existing, proposal) {
+  const declared = existing?.pages ?? [];
+  const byUrl = new Map(declared.map((p2) => [p2.url, p2]));
+  const proposedUrls = new Set(proposal.pages.map((p2) => p2.url));
+  const humanWork = (p2) => p2.auth !== void 0 || !!p2.storageState || !!p2.sources?.length || humanNotes(p2.notes) !== "";
+  const kept = declared.filter((p2) => !proposedUrls.has(p2.url) && humanWork(p2));
+  const dropped = declared.filter((p2) => !proposedUrls.has(p2.url) && !humanWork(p2));
+  const used = new Set(kept.map((p2) => p2.id));
+  const pages = proposal.pages.map((p2) => {
+    const prior = byUrl.get(p2.url);
+    const human = humanNotes(prior?.notes);
+    const notes = [human, p2.notes].filter(Boolean).join(" | ");
+    const base = prior?.id ?? p2.id;
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    used.add(id);
+    return {
+      id,
+      name: prior?.name ?? p2.name,
+      url: p2.url,
+      ...prior?.auth !== void 0 ? { auth: prior.auth } : {},
+      ...prior?.storageState ? { storageState: prior.storageState } : {},
+      ...notes ? { notes } : {},
+      ...prior?.sources?.length ? { sources: prior.sources } : {}
+    };
+  });
+  const humanAbsent = (existing?.absent ?? []).filter((a2) => !a2.reason.startsWith(PROPOSAL_NOTE));
+  const absent = [...humanAbsent, ...(proposal.absent ?? []).filter((a2) => !humanAbsent.some((h3) => h3.kind === a2.kind))];
+  return {
+    sample: {
+      pages: [...pages, ...kept],
+      ...existing?.transverse?.length ? { transverse: existing.transverse } : {},
+      ...existing?.global?.length ? { global: existing.global } : {},
+      ...existing?.exempt?.length ? { exempt: existing.exempt } : {},
+      ...carryAbsent(absent)
+    },
+    kept,
+    dropped
+  };
+}
+
 // src/scan-local.ts
+import { existsSync as existsSync23, realpathSync as realpathSync3, statSync as statSync8 } from "fs";
+import { createRequire as createRequire4 } from "module";
+import { dirname as dirname15, join as join21, resolve as resolve12 } from "path";
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
 function localTestedScs(interact) {
@@ -60647,7 +61123,7 @@ function captureCoverageSummary(cov, lang) {
 }
 
 // src/evidence.ts
-import { createHash as createHash5 } from "crypto";
+import { createHash as createHash6 } from "crypto";
 import { existsSync as existsSync30, mkdirSync as mkdirSync14, readFileSync as readFileSync22, writeFileSync as writeFileSync14 } from "fs";
 import { join as join28 } from "path";
 var DEFAULT_GEOMETRY = { pad: 24, minWidth: 320, minHeight: 120, maxWidth: 960, maxHeight: 540 };
@@ -60844,7 +61320,7 @@ function bump(t3, reason) {
   t3.skipped[reason] = (t3.skipped[reason] ?? 0) + 1;
 }
 function cropName(f2) {
-  return `${createHash5("sha1").update(findingId(f2)).digest("hex").slice(0, 12)}.png`;
+  return `${createHash6("sha1").update(findingId(f2)).digest("hex").slice(0, 12)}.png`;
 }
 function writeEvidence(result, opts) {
   const root = opts.root ?? process.cwd();
@@ -62591,9 +63067,9 @@ function orchestrateRun(runDir, engineAbs, opts = {}) {
 }
 
 // src/trial-summary.ts
-import { createHash as createHash6 } from "crypto";
+import { createHash as createHash7 } from "crypto";
 import { readFileSync as readFileSync25 } from "fs";
-var sha256 = (path) => createHash6("sha256").update(readFileSync25(path)).digest("hex");
+var sha256 = (path) => createHash7("sha256").update(readFileSync25(path)).digest("hex");
 var entry = (it) => ({
   n: it.n,
   kind: it.kind ?? "nc",
@@ -62887,7 +63363,7 @@ Usage:
   ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
-  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--write | --routes-only] [--json]   (build the page sample and the route inventory)
+  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--propose [--sample-size <n>] [--search-query <q>]] [--write | --routes-only] [--json]   (build the page sample and the route inventory)
   ultra11y hook     --claude-code|--codex|--opencode   (internal: the PreToolUse hook; payload on stdin)
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
@@ -63229,7 +63705,18 @@ Options:
                      and the report's annex lists every other route with how it was observed
   --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling \u2014
                      the only route that sees a state-reached page (a modal, a funnel step)
-  --all-routes       scan: after the sample (with --sample), scan every route of the inventory
+  --propose          pages discover: propose a DETERMINISTIC sample instead of every page \u2014
+                     the required kinds of the standard (--standard, default rgaa) matched by
+                     keyword on the sorted URLs and titles, the search page with a fixed
+                     query, then one page per template cluster (URL pattern with ids, slugs
+                     and dates normalized; DOM skeleton when a snapshot exists), largest
+                     first, ties broken by URL. Each pick's reason goes to \`notes\`, each kind
+                     with no page to \`sample.absent\`. With --write it REPLACES the declared
+                     pages, keeping those that carry auth, storageState, sources or notes
+  --sample-size <n>  pages discover --propose: most pages proposed (default: ${DEFAULT_SAMPLE_SIZE});
+                     the required kinds are never cut
+  --search-query <q> pages discover --propose: the search query (default: "information")
+  --all-routes      scan: after the sample (with --sample), scan every route of the inventory
                      (.ultra11y/routes.json) the sample does not hold \u2014 except the routes your
                      E2E run already captured, which win. Each route is then listed in the
                      annex: captured, scanned, source only, or not reached
@@ -63330,6 +63817,9 @@ var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "crawl",
   "depth",
   "max",
+  // `pages discover --propose`: the bound on the proposed sample, and its fixed search query.
+  "sample-size",
+  "search-query",
   // `scan --all-routes`: the most inventory routes visited beyond the sample (src/routes.ts).
   "max-routes",
   // `scan`: most linked PDF documents downloaded per run.
@@ -63404,6 +63894,8 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   "from-snapshots",
   // `pages discover`: record the route inventory (.ultra11y/routes.json) without touching the sample.
   "routes-only",
+  // `pages discover`: a deterministic RGAA sample (src/sample-propose.ts) instead of every page.
+  "propose",
   // `scan`: cover every route of the inventory, beyond the sample (bounded by --max-routes).
   "all-routes",
   "dry-run",
@@ -63730,7 +64222,8 @@ async function cmdPagesDiscover(p2) {
   const crawl = typeof p2.flags.crawl === "string" ? p2.flags.crawl : void 0;
   if (p2.flags["from-snapshots"] === true) {
     const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
-    const snaps = sampleFromSnapshots(readSnapshots(root));
+    const recorded = readSnapshots(root);
+    const snaps = sampleFromSnapshots(recorded);
     if (!snaps.length) {
       console.error(
         lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join32(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join32(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
@@ -63744,6 +64237,12 @@ async function cmdPagesDiscover(p2) {
       "snapshots"
     );
     if (p2.flags["routes-only"] === true) return 0;
+    if (p2.flags.propose === true)
+      return writeProposedSample(
+        p2,
+        lang,
+        recorded.map((s2) => ({ url: s2.meta.url, title: extractTitle(s2.dom) ?? s2.meta.name, html: s2.dom, skeleton: skeletonOf(s2.dom) }))
+      );
     return writeDiscoveredSample(p2, lang, snaps, snaps.length);
   }
   if (!sitemap && !crawl) {
@@ -63794,7 +64293,122 @@ async function cmdPagesDiscover(p2) {
       }
     })
   );
+  if (p2.flags.propose === true) {
+    const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
+    const skeletons = /* @__PURE__ */ new Map();
+    for (const s2 of readSnapshots(root)) {
+      const key2 = routePath(s2.meta.url);
+      if (!skeletons.has(key2)) skeletons.set(key2, skeletonOf(s2.dom));
+    }
+    const inputs = urls.map((url) => {
+      const html = cache2.get(url);
+      const title = titles.get(url);
+      const skeleton = skeletons.get(routePath(url));
+      return { url, ...title ? { title } : {}, ...html ? { html } : {}, ...skeleton ? { skeleton } : {} };
+    });
+    return writeProposedSample(p2, lang, inputs);
+  }
   return writeDiscoveredSample(p2, lang, proposeSamplePages(urls, titles), urls.length);
+}
+function writeProposedSample(p2, lang, inputs) {
+  const key2 = typeof p2.flags.standard === "string" && p2.flags.standard ? p2.flags.standard : "rgaa";
+  let methodology;
+  let locale = "fr";
+  try {
+    const standard = resolveStandard(key2);
+    const pack = isCore(standard) ? null : getPack(standard);
+    methodology = pack?.sampleMethodology;
+    locale = pack?.defaultLocale ?? "fr";
+  } catch (e) {
+    console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  if (!methodology) {
+    console.error(
+      lang === "fr" ? `ultra11y pages discover : --propose suit la m\xE9thodologie d'\xE9chantillon d'un r\xE9f\xE9rentiel, et \xAB ${key2} \xBB n'en d\xE9finit pas (essayez --standard rgaa).` : `ultra11y pages discover: --propose follows a standard's sample methodology, and "${key2}" defines none (try --standard rgaa).`
+    );
+    return 2;
+  }
+  const sizeFlag = p2.flags["sample-size"];
+  const size = typeof sizeFlag === "string" ? Number(sizeFlag) : DEFAULT_SAMPLE_SIZE;
+  if (!Number.isInteger(size) || size < 1) {
+    console.error(`ultra11y pages discover: --sample-size expects a positive integer, got "${String(sizeFlag)}".`);
+    return 2;
+  }
+  const searchQuery = typeof p2.flags["search-query"] === "string" ? p2.flags["search-query"] : void 0;
+  const proposal = proposeSample(inputs, { methodology, size, locale, ...searchQuery ? { searchQuery } : {} });
+  let existing;
+  try {
+    existing = loadConfig(process.cwd())?.sample;
+  } catch (e) {
+    console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  const applied = applyProposal(existing, proposal.sample);
+  const v2 = validateSample(applied.sample);
+  if (!v2.ok || !v2.sample) {
+    console.error(lang === "fr" ? "ultra11y pages discover : \xE9chantillon propos\xE9 invalide :" : "ultra11y pages discover: the proposed sample is invalid:");
+    for (const i of v2.issues) console.error(`  \u2717 ${i.path ? `${i.path}: ` : ""}${i.message}`);
+    return 1;
+  }
+  const summary = proposalSummary(lang, proposal, applied);
+  if (p2.flags.json)
+    console.log(
+      JSON.stringify(
+        {
+          sample: v2.sample,
+          considered: proposal.considered,
+          documents: proposal.documents,
+          clusters: proposal.clusters,
+          leftOut: proposal.leftOut,
+          kept: applied.kept.map((x2) => ({ id: x2.id, url: x2.url })),
+          dropped: applied.dropped.map((x2) => ({ id: x2.id, url: x2.url }))
+        },
+        null,
+        2
+      )
+    );
+  if (p2.flags.write !== true) {
+    if (!p2.flags.json) {
+      console.log(JSON.stringify({ sample: v2.sample }, null, 2));
+      console.log(
+        `
+${summary}
+${lang === "fr" ? "Rien n'a \xE9t\xE9 \xE9crit \u2014 relancez avec --write pour remplacer l'\xE9chantillon de .ultra11yrc.json." : "Nothing was written \u2014 re-run with --write to replace the sample in .ultra11yrc.json."}`
+      );
+    }
+    return 0;
+  }
+  const file = persistSample(v2.sample);
+  if (file === void 0) return 2;
+  if (!p2.flags.json)
+    console.log(
+      `${summary} \u2192 ${file}
+${lang === "fr" ? "Gardez cet \xE9chantillon : toute modification \xE0 la main consigne sa raison (`notes` de la page, ou `sample.absent` pour un type de page retir\xE9). Puis `ultra11y sample check --standard rgaa` et `ultra11y scan --sample`." : "Keep this sample: any hand edit records its reason (the page's `notes`, or `sample.absent` for a page kind taken out). Then `ultra11y sample check --standard rgaa` and `ultra11y scan --sample`."}`
+    );
+  return 0;
+}
+function proposalSummary(lang, proposal, applied) {
+  const n = proposal.sample.pages.length;
+  const represented = proposal.clusters.filter((c) => c.representative).length;
+  const absent = (proposal.sample.absent ?? []).map((a2) => a2.kind).join(", ");
+  return lang === "fr" ? `${n} page(s) propos\xE9e(s) sur ${proposal.considered} d\xE9couverte(s) \xB7 ${represented}/${proposal.clusters.length} gabarit(s) repr\xE9sent\xE9(s)${proposal.leftOut ? ` (${proposal.leftOut} laiss\xE9(s) par --sample-size)` : ""}${absent ? ` \xB7 sans page : ${absent}` : ""}${applied.kept.length ? ` \xB7 ${applied.kept.length} page(s) d\xE9clar\xE9e(s) conserv\xE9e(s)` : ""}${applied.dropped.length ? ` \xB7 ${applied.dropped.length} retir\xE9e(s)` : ""}` : `${n} page(s) proposed out of ${proposal.considered} discovered \xB7 ${represented}/${proposal.clusters.length} template(s) represented${proposal.leftOut ? ` (${proposal.leftOut} left out by --sample-size)` : ""}${absent ? ` \xB7 no page for: ${absent}` : ""}${applied.kept.length ? ` \xB7 ${applied.kept.length} declared page(s) kept` : ""}${applied.dropped.length ? ` \xB7 ${applied.dropped.length} dropped` : ""}`;
+}
+function persistSample(sample) {
+  const file = join32(process.cwd(), ".ultra11yrc.json");
+  let doc = {};
+  if (existsSync32(file)) {
+    try {
+      doc = JSON.parse(readText(file));
+    } catch {
+      console.error("ultra11y pages discover: .ultra11yrc.json is not valid JSON \u2014 refusing to overwrite it.");
+      return void 0;
+    }
+  }
+  doc.sample = sample;
+  writeFileSync17(file, `${JSON.stringify(doc, null, 2)}
+`);
+  return file;
 }
 function stampRoutes(result, root, lang, extra = {}) {
   const inventory = readRoutes(root);
@@ -63854,19 +64468,8 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
     }
     return 0;
   }
-  const file = join32(process.cwd(), ".ultra11yrc.json");
-  let doc = {};
-  if (existsSync32(file)) {
-    try {
-      doc = JSON.parse(readText(file));
-    } catch {
-      console.error("ultra11y pages discover: .ultra11yrc.json is not valid JSON \u2014 refusing to overwrite it.");
-      return 2;
-    }
-  }
-  doc.sample = v2.sample;
-  writeFileSync17(file, `${JSON.stringify(doc, null, 2)}
-`);
+  const file = persistSample(v2.sample);
+  if (file === void 0) return 2;
   if (!p2.flags.json)
     console.log(
       lang === "fr" ? `${merged.added.length} page(s) ajout\xE9e(s), ${merged.kept} conserv\xE9e(s) \u2192 ${file}
@@ -65819,7 +66422,7 @@ function cmdSample(p2) {
   const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
   const snapshotted = sampleFromSnapshots(readSnapshots(root));
   const union = unionSample(v2.sample, snapshotted);
-  const { missing } = lintSample(union.sample, methodology);
+  const { missing, waived } = lintSample(union.sample, methodology);
   const loc = pack?.defaultLocale ?? "fr";
   const counts = {
     declared: v2.sample.pages.length,
@@ -65837,6 +66440,7 @@ function cmdSample(p2) {
           undeclaredPages: union.undeclared.map((x2) => ({ id: x2.id, url: x2.url })),
           uncapturedPages: union.uncaptured.map((x2) => ({ id: x2.id, url: x2.url })),
           missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, loc) })),
+          waived: waived.map((w2) => ({ id: w2.kind.id, label: kindLabel(w2.kind, loc), reason: w2.reason })),
           warnings: v2.warnings
         },
         null,
@@ -65848,17 +66452,27 @@ function cmdSample(p2) {
   console.log(
     lang === "fr" ? `${counts.declared} d\xE9clar\xE9e(s) \xB7 ${counts.snapshotted} instantan\xE9e(s) \xB7 ${counts.undeclared} instantan\xE9e(s) non d\xE9clar\xE9e(s) \xB7 ${counts.uncaptured} d\xE9clar\xE9e(s) jamais captur\xE9e(s)` : `${counts.declared} declared \xB7 ${counts.snapshotted} snapshotted \xB7 ${counts.undeclared} snapshotted but undeclared \xB7 ${counts.uncaptured} declared but never captured`
   );
+  for (const w2 of waived) console.log(`\u2139\uFE0F ${kindLabel(w2.kind, loc)} \u2014 ${lang === "fr" ? "absent, raison consign\xE9e" : "absent, reason recorded"} : ${w2.reason}`);
   if (missing.length) {
     console.log(
       (lang === "fr" ? `\u26A0\uFE0F \xC9chantillon incomplet (${union.sample.pages.length} page(s)) \u2014 types de page requis absents (${pack.name}) :` : `\u26A0\uFE0F Incomplete sample (${union.sample.pages.length} page(s)) \u2014 required page kinds missing (${pack.name}):`) + ` ${missing.map((k) => kindLabel(k, loc)).join(", ")}`
     );
+    const page = missing.find((k) => !isTransverseKind(k));
+    if (page)
+      console.log(
+        lang === "fr" ? `   Ajoutez la page, ou consignez pourquoi l'\xE9chantillon n'en a pas : "absent": [{ "kind": "${page.id}", "reason": "\u2026" }] dans le bloc sample (\`pages discover --propose\` le fait pour les types qu'il ne trouve pas).` : `   Add the page, or record why the sample has none: "absent": [{ "kind": "${page.id}", "reason": "\u2026" }] in the sample block (\`pages discover --propose\` does so for the kinds it finds no page for).`
+      );
+    if (missing.some(isTransverseKind))
+      console.log(
+        lang === "fr" ? `   Les \xE9l\xE9ments transverses se d\xE9clarent dans "transverse": ["En-t\xEAte", "Navigation", "Pied de page"].` : `   Transverse elements are declared in "transverse": ["Header", "Navigation", "Footer"].`
+      );
   } else if (counts.undeclared > 0) {
     console.log(
       lang === "fr" ? `\u26A0\uFE0F Types de page requis couverts, mais l'\xE9chantillon d\xE9clar\xE9 n'est pas la surface audit\xE9e : ${counts.undeclared} page(s) instantan\xE9e(s) n'y figurent pas (${union.undeclared.slice(0, 5).map((x2) => x2.id).join(", ")}${counts.undeclared > 5 ? ", \u2026" : ""}). D\xE9clarez-les avec \`pages discover --from-snapshots --write\`.` : `\u26A0\uFE0F Required page kinds covered, but the declared sample is not the audited surface: ${counts.undeclared} snapshotted page(s) are absent from it (${union.undeclared.slice(0, 5).map((x2) => x2.id).join(", ")}${counts.undeclared > 5 ? ", \u2026" : ""}). Declare them with \`pages discover --from-snapshots --write\`.`
     );
   } else {
     console.log(
-      lang === "fr" ? `\u2713 \xC9chantillon complet (${union.sample.pages.length} page(s)) \u2014 tous les types de page requis par ${pack.name} sont couverts.` : `\u2713 Sample complete (${union.sample.pages.length} page(s)) \u2014 every page kind ${pack.name} requires is covered.`
+      lang === "fr" ? `\u2713 \xC9chantillon complet (${union.sample.pages.length} page(s)) \u2014 tous les types de page requis par ${pack.name} sont couverts${waived.length ? " ou consign\xE9s absents avec leur raison" : ""}.` : `\u2713 Sample complete (${union.sample.pages.length} page(s)) \u2014 every page kind ${pack.name} requires is covered${waived.length ? " or recorded absent with a reason" : ""}.`
     );
   }
   if (counts.uncaptured > 0) {
