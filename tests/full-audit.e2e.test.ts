@@ -3,7 +3,8 @@
 // skills/ultra11y/references/full-audit.md prescribes one chain of engine calls, and every
 // harness is told to run it as written. This file runs that chain for real, command by
 // command, on a small but complete application (tests/fixtures/full-audit-app): eleven served
-// routes, a React component directory, downloadable PDFs, a unit test with a snapshot and a
+// routes, a React component directory, downloadable PDFs, two journeys (a menu disclosure and
+// the contact form sent with an invalid address), a unit test with a snapshot and a
 // Playwright spec. The only thing it does not run is a model: the auditor is a committed
 // script (tests/fixtures/full-audit-verdicts.json) that fills the worklist the engine wrote,
 // copying each citation from the evidence the engine harvested, so the same run gives the
@@ -40,7 +41,7 @@ interface Anchor {
   alsoAt?: string[];
 }
 interface Match {
-  file: string;
+  file?: string;
   selector?: string;
   snippetIncludes?: string;
   noteIncludes?: string;
@@ -51,7 +52,7 @@ interface ScriptedVerdict {
   reason?: string;
   cite?: "all";
   except?: Match[];
-  findings?: { at: Match; message: string; normativeRef: string; severity: string }[];
+  findings?: { at: Match; from?: string; message: string; normativeRef: string; severity: string }[];
 }
 interface AuditorScript {
   verdicts: Record<string, ScriptedVerdict>;
@@ -120,7 +121,7 @@ function walk(rel: string): string[] {
 // ── The scripted auditor ────────────────────────────────────────────────────────────────
 
 const matches = (e: Anchor, m: Match): boolean =>
-  (e.file === m.file || (e.alsoAt ?? []).some((a) => a.replace(/:\d+$/, "") === m.file)) &&
+  (m.file === undefined || e.file === m.file || (e.alsoAt ?? []).some((a) => a.replace(/:\d+$/, "") === m.file)) &&
   (m.selector === undefined || e.selector === m.selector) &&
   (m.snippetIncludes === undefined || (e.snippet ?? "").includes(m.snippetIncludes)) &&
   (m.noteIncludes === undefined || (e.note ?? "").includes(m.noteIncludes));
@@ -144,7 +145,10 @@ function adjudicate(todoRel: string): void {
     }
     if (v.findings) {
       item.findings = v.findings.map((f) => {
-        const e = evidence.find((x) => matches(x, f.at));
+        // `from`: the anchor sits in another criterion's evidence (the error message the 11.10
+        // harvest shows, cited under 7.5).
+        const pool = f.from ? (todo.items.find((x) => x.criteriaId === f.from)?.evidence ?? []) : evidence;
+        const e = pool.find((x) => matches(x, f.at));
         expect(e, `${item.criteriaId}: no harvested evidence matches ${JSON.stringify(f.at)}`).toBeDefined();
         return { ...anchorOf(e!), message: f.message, normativeRef: f.normativeRef, severity: f.severity };
       });
@@ -230,8 +234,10 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
         if (reactResolvable) await step(["render", "."]);
         await step(["audit", ".", "--graph", "--standard", "rgaa", "--lang", "fr", "--out", "audits", "--json"]);
         await step(["scan", "--sample", "--all-routes", "--cwd", ".", "--standard", "rgaa", "--merge", "audits/audit-latest.json", "--out", "audits"]);
-        // `journey run --keyboard --merge` belongs here once the journey command is on main
-        // (PR #192); until then the chain has no journey step to run.
+        // The journeys the scan cannot walk: the home menu disclosure, and the contact form sent
+        // with an invalid address. Keyboard only; each step becomes a page state of the grid.
+        const journeys = await step(["journey", "run", "--all", "--keyboard", "--base-url", origin, "--merge", "audits/audit-latest.json", "--out", "audits"]);
+        expect(journeys).toMatch(/Parcours fusionnés/);
 
         // 3. Adjudicate: the worklist, the scripted verdicts, the fail-closed fold.
         await step(["report", "--in", "audits/audit-latest.json", "--standard", "rgaa", "--lang", "fr", "--out", "audits"]);
@@ -336,7 +342,26 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
     STEP_TIMEOUT_MS * 4,
   );
 
-  it.todo("journey run --keyboard --merge: wire the journey step here once the command lands on main (PR #192)");
+  it("replays every journey, lists every step in annex H, and puts its states in the grid", () => {
+    if (!browserAvailable) return;
+    expect(annex).toMatch(/^## H\. /m);
+    expect(annex).toMatch(/2 parcours .* 2 terminé\(s\), 0 en échec/);
+    for (const j of ["contact", "rubriques"]) expect(annex).toContain(`| **${j}** (clavier seul) | — | \`.ultra11y/journeys/${j}.json\` | terminée |`);
+    expect(annex).toMatch(
+      /\| contact \| 4 \| click button "Envoyer le message" \| terminée \| `contact-04-click-button-envoyer-le-message` \| error-unassociated/,
+    );
+    expect(annex).not.toMatch(/non jouée/);
+    const pages = readJson<{ pages: { id: string; criteria: { id: string; status: string }[] }[] }>("audits/pages.json");
+    const cell = (page: string, criterion: string) => pages.pages.find((p) => p.id === page)?.criteria.find((c) => c.id === criterion)?.status;
+    const states = pages.pages.map((p) => p.id).filter((id) => /^(contact|rubriques)-\d{2}-/.test(id));
+    expect(states.length).toBe(9);
+    // The error the invalid submit revealed is a non-conformity of THAT state only.
+    expect(cell("contact-04-click-button-envoyer-le-message", "11.10")).toBe("NC");
+    expect(cell("contact-04-click-button-envoyer-le-message", "7.5")).toBe("NC");
+    expect(cell("contact-00-start", "11.10")).not.toBe("NC");
+    expect(cell("rubriques-01-click-button-rubriques", "7.5")).not.toBe("NC");
+    for (const id of states) expect(existsSync(join(project, "audits", "pages", `page-${id}.md`)), id).toBe(true);
+  });
 
   it("writes every deliverable the skill hands over", () => {
     if (!browserAvailable) return;

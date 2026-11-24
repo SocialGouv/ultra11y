@@ -1,5 +1,5 @@
 {
-  "about": "The scripted auditor of tests/full-audit.e2e.test.ts: one verdict per RGAA criterion the worklist of tests/fixtures/full-audit-app hands over. `cite: \"all\"` cites every evidence anchor the worklist harvested for that criterion (copied from the worklist, never retyped); `except` leaves out the anchors a verdict does not clear; `at` names the evidence anchors an NC finding is drawn from. A criterion missing here fails the test by name, so a worklist that changes shape is seen, not silently filled.",
+  "about": "The scripted auditor of tests/full-audit.e2e.test.ts: one verdict per RGAA criterion the worklist of tests/fixtures/full-audit-app hands over. `cite: \"all\"` cites every evidence anchor the worklist harvested for that criterion (copied from the worklist, never retyped); `except` leaves out the anchors a verdict does not clear; `at` names the evidence anchor an NC finding is drawn from (by file, selector, snippet or note; `from` reads it in another criterion's evidence). A criterion missing here fails the test by name, so a worklist that changes shape is seen, not silently filled.",
   "verdicts": {
     "1.1": {
       "verdict": "NC",
@@ -66,11 +66,22 @@
       "cite": "all",
       "except": [{ "file": "src/components/SiteLogo.tsx" }, { "file": ".ultra11y/captures/src-components-SiteLogo__SiteLogo.html" }]
     },
-    "7.1": { "verdict": "NA", "justification": "No page loads a script; the anchors are native landmarks and a static role=status region.", "cite": "all" },
-    "7.2": { "verdict": "NA", "justification": "No script." },
-    "7.3": { "verdict": "NA", "justification": "No script: the only control is a native submit button.", "cite": "all" },
-    "7.4": { "verdict": "NA", "justification": "No script initiates a change of context." },
-    "7.5": { "verdict": "C", "justification": "The service notice is a role=status region; no other message is inserted at run time.", "cite": "all" },
+    "7.1": { "verdict": "C", "justification": "Two scripts: the home menu disclosure, a native button that keeps aria-expanded in step, and the contact form check; both act on native controls the assistive technologies already expose.", "cite": "all" },
+    "7.2": { "verdict": "NA", "justification": "Neither script has an alternative: they enhance native controls that work as such.", "cite": "all" },
+    "7.3": { "verdict": "C", "justification": "The scripted controls are native buttons, reached and activated with the keyboard (the keyboard journeys replay both).", "cite": "all" },
+    "7.4": { "verdict": "NA", "justification": "Neither script changes the context: the menu opens in place and the form check stays on the page.", "cite": "all" },
+    "7.5": {
+      "verdict": "NC",
+      "findings": [
+        {
+          "at": { "selector": "p#erreur" },
+          "from": "11.10",
+          "message": "The invalid-address error appears after the submit with no role=\"alert\": it is not announced.",
+          "normativeRef": "7.5.2",
+          "severity": "majeur"
+        }
+      ]
+    },
     "8.1": { "verdict": "C", "justification": "Every page, source and rendered, starts with <!doctype html>.", "cite": "all" },
     "8.2": {
       "verdict": "manual",
@@ -105,34 +116,44 @@
       "verdict": "C",
       "justification": "The engine proved the unlabelled email field of the contact page (11.1.1); every other field, on every other page, has a label.",
       "cite": "all",
-      "except": [{ "file": ".ultra11y/pages/contact/dom.html", "selector": "input" }]
+      "except": [{ "selector": "input", "snippetIncludes": "name=\"courriel\"" }]
     },
     "11.2": {
       "verdict": "C",
       "justification": "Each existing label names its field (« Nom », « Identifiant », « Mot de passe », « Message »…).",
       "cite": "all",
-      "except": [{ "file": ".ultra11y/pages/contact/dom.html", "selector": "input" }]
+      "except": [{ "selector": "input", "snippetIncludes": "name=\"courriel\"" }]
     },
     "11.3": { "verdict": "C", "justification": "No two fields with the same function carry different labels.", "cite": "all" },
     "11.4": {
       "verdict": "C",
       "justification": "Each label sits right above its field.",
       "cite": "all",
-      "except": [{ "file": ".ultra11y/pages/contact/dom.html", "selector": "input" }]
+      "except": [{ "selector": "input", "snippetIncludes": "name=\"courriel\"" }]
     },
     "11.5": { "verdict": "C", "justification": "Each form is short and single-purpose: no group of same-nature fields needs a fieldset.", "cite": "all" },
     "11.6": { "verdict": "NA", "justification": "No group of fields.", "cite": "all" },
     "11.7": { "verdict": "NA", "justification": "No group of fields, so no legend.", "cite": "all" },
     "11.8": { "verdict": "NA", "justification": "No select list.", "cite": "all" },
     "11.9": { "verdict": "C", "justification": "Each button says what it does (« Se connecter », « Envoyer le message », « Rechercher »…).", "cite": "all" },
-    "11.10": { "verdict": "NA", "justification": "No field is required or format-checked.", "cite": "all" },
+    "11.10": {
+      "verdict": "NC",
+      "findings": [
+        {
+          "at": { "selector": "p#erreur" },
+          "message": "The format error of the email field is tied to no field (no aria-describedby, no aria-errormessage).",
+          "normativeRef": "11.10.6",
+          "severity": "majeur"
+        }
+      ]
+    },
     "11.11": { "verdict": "NA", "justification": "No input control, so no error message to suggest from.", "cite": "all" },
     "11.12": { "verdict": "NA", "justification": "No form has legal, financial or personal-data consequences.", "cite": "all" },
     "11.13": {
       "verdict": "NC",
       "findings": [
         {
-          "at": { "file": ".ultra11y/pages/contact/dom.html", "selector": "input" },
+          "at": { "selector": "input", "snippetIncludes": "name=\"courriel\"" },
           "message": "The email field asks for the user's own address and has no autocomplete=\"email\".",
           "normativeRef": "11.13.1",
           "severity": "majeur"
@@ -193,6 +214,14 @@
       {
         "criteriaId": "11.13",
         "reason": "Ruled non-conforming on the contact page; the login and search fields of the other pages are not ruled one page at a time by a scope-wide verdict."
+      },
+      {
+        "criteriaId": "7.5",
+        "reason": "Ruled non-conforming on the state the contact journey reached after its invalid submit; the other pages are not ruled one page at a time by a scope-wide verdict."
+      },
+      {
+        "criteriaId": "11.10",
+        "reason": "Ruled non-conforming on the state the contact journey reached after its invalid submit; the other forms are not ruled one page at a time by a scope-wide verdict."
       },
       { "criteriaId": "13.7", "reason": "The image files are not served, so whether they flash needs the original assets." }
     ]

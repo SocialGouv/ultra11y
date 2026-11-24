@@ -1,0 +1,9 @@
+{
+  "name": "rubriques",
+  "description": "Open the section menu on the home page (a disclosure button).",
+  "startUrl": "/",
+  "steps": [
+    { "action": "click", "target": { "role": "button", "name": "Rubriques" }, "note": "disclosure" },
+    { "action": "expect", "target": { "role": "link", "name": "Écrire au service" } }
+  ]
+}

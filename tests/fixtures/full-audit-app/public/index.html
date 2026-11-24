@@ -36,6 +36,19 @@
     <main id="contenu" role="main">
       <h1>Bienvenue sur le service de démonstration</h1>
       <p>Ce service vous permet de déclarer une demande en ligne et de suivre son traitement.</p>
+      <button type="button" id="rubriques-bouton" aria-expanded="false" aria-controls="rubriques">Rubriques</button>
+      <ul id="rubriques" hidden>
+        <li><a href="/aide">Aide en ligne</a></li>
+        <li><a href="/documents">Documents utiles</a></li>
+        <li><a href="/contact">Écrire au service</a></li>
+      </ul>
+      <script>
+        document.getElementById("rubriques-bouton").addEventListener("click", function () {
+          var open = this.getAttribute("aria-expanded") === "true";
+          this.setAttribute("aria-expanded", String(!open));
+          document.getElementById("rubriques").hidden = open;
+        });
+      </script>
       <h2>Dernières actualités</h2>
       <ul>
         <li><a href="/actualites/102">Ouverture du service en ligne</a></li>

@@ -35,7 +35,7 @@
     </header>
     <main id="contenu" role="main">
       <h1>Nous contacter</h1>
-      <form action="/contact" method="post">
+      <form id="contact" action="/contact" method="post" novalidate>
         <label for="nom">Nom</label>
         <input type="text" id="nom" name="nom" autocomplete="family-name">
         <p>Adresse électronique</p>
@@ -44,6 +44,15 @@
         <textarea id="message" name="message"></textarea>
         <button type="submit">Envoyer le message</button>
       </form>
+      <p id="erreur" hidden>Adresse électronique invalide.</p>
+      <script>
+        document.getElementById("contact").addEventListener("submit", function (event) {
+          if (this.elements.courriel.value.indexOf("@") === -1) {
+            event.preventDefault();
+            document.getElementById("erreur").hidden = false;
+          }
+        });
+      </script>
     </main>
     <footer role="contentinfo">
       <nav aria-label="Liens de bas de page">
