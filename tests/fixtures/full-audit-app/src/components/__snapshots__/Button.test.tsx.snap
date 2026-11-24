@@ -1,0 +1,8 @@
+// Vitest Snapshot v1
+
+exports[`renders 1`] = `
+<div>
+  <img src="/images/decoy-from-a-test-snapshot.png" data-decoy="TEST-SNAPSHOT-DECOY">
+  <button type="button" class="button">TEST-SNAPSHOT-DECOY</button>
+</div>
+`;

@@ -246,3 +246,17 @@ Append `--allow-undecided .ultra11y/undecidable-<standard>.json` to the complete
 when the project records named exceptions with reasons. Report the scope, page count, criterion
 count, provenance tally, remaining named exceptions and every deliverable path. A failed gate
 is part of the result and must not be summarized as a complete report.
+
+## The reference run
+
+`tests/full-audit.e2e.test.ts` in the ultra11y repository is this route, run as written: every
+command above, in this order, on `tests/fixtures/full-audit-app` (eleven served routes, a React
+component directory, downloadable PDFs, a unit test with a snapshot and a Playwright spec that
+must never be read). The only thing it does not run is a model: a committed script fills
+`ADJUDICATE.todo.json` and `VERIFY.todo.json`, copying every citation from the evidence the
+engine harvested, so the run costs nothing and gives the same deliverable every time. It
+asserts that every deliverable exists, that every `check` above passes (with an
+`--allow-undecided` file naming what a human still has to rule), that the annex lists every
+route and rendered component, that pages with different findings get different rates, and that
+no test file reaches the output. CI runs it in the `browser-tier` job. When this page and that
+test disagree, one of them is wrong: change both together.

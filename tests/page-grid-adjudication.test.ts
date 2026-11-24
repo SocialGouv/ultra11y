@@ -21,7 +21,7 @@ import { runAudit } from "../src/audit.js";
 import { applyAdjudication, buildAdjudicationWorklist, type AdjudicationFile, type AdjudicationItem } from "../src/adjudicate.js";
 import { formatPageRate, type PageCriterionRow, pageCriterionRows, pageRatePct, pageTally } from "../src/pages-report.js";
 import { subjectsAbsent, subjectsForPackCriterion } from "../src/adjudicate-subjects.js";
-import { loadPack } from "../src/standards/index.js";
+import { derivePackResults, loadPack } from "../src/standards/index.js";
 import { derivePages, pagesOf, attributePages, pageGridModel, renderPageGrid, unattributedFindings } from "../src/pages.js";
 import { averageConformanceRate } from "../src/report.js";
 import type { AuditResult, Finding, PageScope } from "../src/types.js";
@@ -148,6 +148,21 @@ describe("a non-conformity the agent ruled stays on the pages it was found on", 
     expect(pageTally(badRows).nc).toBe(pageTally(goodRows).nc + 1);
     expect(goodRows.find((r) => r.id === "11.2")?.decidedBy).toBeUndefined();
     expect(badRows.find((r) => r.id === "11.2")?.decidedBy).toBe("agent");
+  });
+
+  it("is not applicable on a page that has none of the criterion's subject, instead of open for ever", () => {
+    // The run's NC closed the worklist item, so no later verdict could reach the other pages;
+    // on a page with none of the subject there is nothing left to rule.
+    const { audit, bad } = twoPages();
+    const pc = loadPack("rgaa").criteria.find((c) => c.id === "11.2")!;
+    audit.scope.pageSubjects = { bad: subjectsForPackCriterion("rgaa", "11.2", pc.wcag), good: [] };
+    const ruled = ruleOn(audit, bad);
+    const cells = grid(ruled);
+    expect(cells?.get("bad")).toBe("NC");
+    expect(cells?.get("good")).toBe("C");
+    attributePages(ruled, ruled.scope.pages ?? []);
+    const goodPage = derivePages(ruled, ruled.scope.pages ?? [])[1]!;
+    expect(pageCriterionRows(ruled, goodPage, "rgaa", "fr").find((r) => r.id === "11.2")).toMatchObject({ status: "C", inapplicable: true });
   });
 
   it("survives a JSON round-trip, where the verdict's findings are copies of the stamped ones", () => {
@@ -326,6 +341,12 @@ describe("a strict page grid can adjudicate a run-level non-conformity", () => {
     );
     expect(folded.issues.join("\n")).not.toMatch(/not open for adjudication/);
     expect(folded.audit.packAdjudication?.criteria.find((criterion) => criterion.id === "1.1")?.status).toBe("NA");
+    // The verdict was asked for the unaffected page, and lands there; the page the engine
+    // proved non-conformant stays non-conformant, and so does the run.
+    const after = pageGridModel(folded.audit, derivePages(folded.audit, folded.audit.scope.pages ?? []), "rgaa", "fr");
+    expect(after.status.get("1.1")?.get("bad"), "a clearing verdict must not erase a deterministic failure").toBe("NC");
+    expect(after.status.get("1.1")?.get("good")).toBe("C");
+    expect(derivePackResults(folded.audit, "rgaa").find((criterion) => criterion.id === "1.1")?.status).toBe("NC");
   });
 });
 

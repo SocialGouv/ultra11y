@@ -17,6 +17,9 @@ export default defineConfig({
     // the cwd out from under whichever file happened to share its worker, and the failures
     // landed somewhere else entirely (language resolution, which reads the repo it is in).
     //
+    // tests/full-audit.e2e.test.ts, the reference run of references/full-audit.md, needs the same
+    // browser and runs in the same tier (`pnpm run test:browser`).
+    //
     // tests/opencode-smoke.e2e.test.ts boots real OpenCode servers (both majors, when
     // installed) and is run on its own: `pnpm run test:opencode`. tests/codex-smoke.e2e.test.ts
     // likewise drives a real Codex CLI: `pnpm run test:codex`. Both have their own CI job.
@@ -28,6 +31,7 @@ export default defineConfig({
       "tests/browser-tier.e2e.test.ts",
       // The journey replay (`journey run`) drives a real browser too: same job, same command.
       "tests/journey.e2e.test.ts",
+      "tests/full-audit.e2e.test.ts",
       "tests/opencode-smoke.e2e.test.ts",
       "tests/codex-smoke.e2e.test.ts",
     ],

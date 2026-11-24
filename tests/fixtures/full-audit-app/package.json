@@ -1,0 +1,11 @@
+{
+  "name": "full-audit-app",
+  "private": true,
+  "dependencies": {
+    "react": "*",
+    "react-dom": "*"
+  },
+  "devDependencies": {
+    "@playwright/test": "*"
+  }
+}

@@ -49924,6 +49924,10 @@ function derivePackResults(audit, packKey, pageId) {
         ...ruler(decided)
       };
     }
+    if (decided && decided.status !== "NC" && measured2.status === "NC") {
+      const advisory = decided.findings.filter((f2) => f2.advisory);
+      return { ...measured2, findings: [...measured2.findings, ...advisory] };
+    }
     if (decided) {
       const na = decided.status === "NA";
       return {
@@ -50541,7 +50545,9 @@ function adjudicationOnPage(result, adjudication, page) {
     if (c.status === "C" && absentHere(c.id)) return [{ ...c, status: "NA", justification: NOTHING_ON_THIS_PAGE }];
     if (c.status !== "NC") return [c];
     const findings = c.findings.filter(onPage);
-    return findings.some((f2) => !f2.advisory) ? [{ ...c, findings }] : [];
+    if (findings.some((f2) => !f2.advisory)) return [{ ...c, findings }];
+    if (absentHere(c.id)) return [{ ...c, status: "NA", findings: [], justification: NOTHING_ON_THIS_PAGE }];
+    return [];
   });
   return { ...adjudication, criteria };
 }
