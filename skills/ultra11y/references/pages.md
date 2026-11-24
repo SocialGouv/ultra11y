@@ -1,6 +1,6 @@
 # Page snapshots — auditing a real page, offline
 
-A **capture** (`render --setup`) is a rendered *component*. A **snapshot** is a rendered
+A **capture** (`render`) is a rendered *component*. A **snapshot** is a rendered
 *page*: the whole document as the browser built it, plus the signals only a browser has
 (computed styles, boxes, accessibility tree, a screenshot), stored on disk so the static
 engine can re-audit it later with **no browser**.
@@ -50,10 +50,10 @@ business declaring a page language. A snapshot **is** a full document, so those 
 None of these can be judged from a component render, and several cannot be judged from source
 either once a framework injects the document shell. The snapshot is where they become real.
 
-> Do **not** "fix" this by making the unit-test harvester serialize `documentElement`. In
-> jsdom a component test still has an `<html>` with no `lang` and no `<title>`, so every
-> component capture would report two blocking non-conformities that describe nothing a user
-> could experience. Component captures stay fragments, on purpose.
+> Do **not** "fix" this by wrapping component captures in a full document. A component
+> rendered on its own has no `<html lang>` and no `<title>`, so every component capture would
+> report two blocking non-conformities that describe nothing a user could experience.
+> Component captures stay fragments, on purpose.
 
 ## Page identity
 

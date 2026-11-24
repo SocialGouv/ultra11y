@@ -17,7 +17,7 @@
 //                   what a reviewer judges; never read by a rule
 //
 // `dom.html` is deliberately an ORDINARY capture: it carries the same
-// `<!-- ultra11y:capture … -->` provenance comment the unit-test harvester writes, so the
+// `<!-- ultra11y:capture … -->` provenance comment the render engine writes on a component, so the
 // existing `audit` path ingests it with no special case. Two differences matter:
 //   • it is a FULL document (a component capture is a fragment), so `scope: "page"` rules —
 //     html-lang, title, viewport — actually run on it. That is where RGAA 8.3/8.5/8.6 and

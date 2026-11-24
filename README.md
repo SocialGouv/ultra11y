@@ -70,9 +70,11 @@ Cypress : `ultra11y(on)` dans `setupNodeEvents` (import depuis `ultra11y/cypress
 `sweepSample()` parcourt l’échantillon déclaré dans `.ultra11yrc.json`. Options :
 [`references/e2e.md`](skills/ultra11y/references/e2e.md).
 
-Tests unitaires : `audit` lit les instantanés `__snapshots__/*.snap` de Jest et Vitest tels quels,
-et `checkA11y(container)` ou `expect(container).toBeAccessible()` (depuis `ultra11y/vitest` ou
-`ultra11y/jest`) auditent un composant rendu par jsdom. Voir [`references/rendered.md`](skills/ultra11y/references/rendered.md).
+Composants : `npx ultra11y render .` rend chaque composant, page et story avec le
+`react-dom/server` du projet, dans un harnais jetable, sans lire ni lancer ses tests. Les rendus
+vont dans `.ultra11y/captures/` et `audit` les lit. Ce qui n’a pas pu être rendu (contexte
+manquant, props, API du navigateur, chargement de données, délai) est listé avec la raison dans
+l’annexe du rapport. Voir [`references/rendered.md`](skills/ultra11y/references/rendered.md).
 
 **3. En CI : le bot [`rgaa-audit` d’iterion](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit).**
 Il installe le moteur à une version épinglée, rend l’échantillon de pages, fait arbitrer et

@@ -266,7 +266,7 @@ export interface Finding {
   // and re-attributed to the source component that produced it. `file`/`sourceStart`
   // still index the capture bytes (so `fix` and finding identity stay stable); origin
   // points back to the source. Optional/additive (no schemaVersion bump).
-  origin?: { capture: string; sourceFile?: string; component?: string; sourceLine?: number; snapshot?: string };
+  origin?: { capture: string; sourceFile?: string; component?: string; sourceLine?: number };
   // PAGE IDENTITY — the stable id of the page snapshot this finding was raised on
   // (src/snapshot.ts). Set from the capture provenance for a snapshot-borne finding, and by
   // the per-page attribution pass (src/pages.ts) for a source finding it can attribute. It
@@ -696,14 +696,6 @@ export interface AuditResult {
     // Set when RENDERED capture files (real serialized DOM) were audited at full
     // fidelity — the true markup a component library / SFC emits, not its source call.
     captures?: { files: number; components: string[] };
-    // UNIT-TEST SNAPSHOTS read in this run (`__snapshots__/*.snap` and the
-    // `toMatchInlineSnapshot(`…`)` literals of test files, src/parse/snap.ts): how many files
-    // (`.snap` or test file) contributed at least one markup entry, how many entries were
-    // audited, and how many entries were skipped as not markup (objects, prose, shallow
-    // component trees). `inline` is how many of the audited `entries` were inline snapshots
-    // (absent when none). Each audited entry is a COMPONENT render by jsdom/happy-dom — no
-    // page, no computed style. Optional/additive; absent when no snapshot entry was audited.
-    unitSnapshots?: { files: number; entries: number; skipped: number; inline?: number };
     // Set by the coverage pass (`--require-captures` / `render --coverage`): which
     // components have a rendered capture vs which are still opaque-source-only blind
     // spots. Keys are "posix/path#Component". `unattributed` = capture files with no
@@ -768,6 +760,12 @@ export interface AuditResult {
     // it was observed. Set only when an inventory exists, so the annex lists every route and
     // never silently omits one. Optional/additive.
     routes?: RouteCoverage[];
+    // WHAT ULTRA11Y'S OWN RENDER ENGINE DID (`render`, src/render-engine.ts), read from its
+    // manifest (`.ultra11y/render.json`) when the captures it wrote are in this audit: every
+    // unit it found — component, page, story — rendered, skipped with the reason, or not
+    // attempted. Set only when a manifest exists, so the annex lists every unit and never
+    // silently drops one that threw. Optional/additive.
+    renders?: RenderScope;
   };
   guidelines: GuidelineTally[];
   criteria: CriterionResult[];
@@ -860,6 +858,70 @@ export type RouteObservation =
   | "source"
   // Known, and observed by nothing.
   | "not-reached";
+
+/** How a unit fared in ultra11y's render engine (src/render-engine.ts). */
+export type RenderStatus = "rendered" | "skipped" | "not-attempted";
+
+/** Why a unit was skipped (it was tried and failed) or not attempted (it could not be tried). */
+export type RenderReason =
+  // tried, and failed
+  | "provider" // needs a context provider the app mounts (router, store, theme, i18n…)
+  | "props" // needs props: declares them and has no story, or threw reading one it was not given
+  | "browser-api" // touches window/document/localStorage… at render time
+  | "data" // fetches data, suspends, or is an async server component
+  | "transpile" // its source (or one it imports) could not be transpiled
+  | "module" // an import could not be resolved
+  | "timeout" // the render did not finish in time
+  | "empty" // rendered nothing without props
+  | "error" // threw for another reason (the detail says which)
+  // not tried
+  | "via-story" // declares props: rendered through the stories that give it some instead
+  | "unsupported-renderer" // .vue/.svelte/.astro: the engine renders React only
+  | "no-renderer" // react / react-dom are not resolvable from the project
+  | "no-transpiler"; // no esbuild, typescript or sucrase in the project to load TSX/JSX
+
+/** One renderable unit and what the engine did with it. */
+export interface RenderUnit {
+  /** The capture's file stem under `.ultra11y/captures/`, also the unit's stable key. */
+  id: string;
+  /** Project-relative posix source file. */
+  file: string;
+  /** The export rendered — `default`, a named export, a story — or `*` for a file-level outcome. */
+  export: string;
+  component: string;
+  kind: "component" | "page" | "story";
+  /** The framework route a page file serves (Next.js app/pages routers). */
+  route?: string;
+  status: RenderStatus;
+  reason?: RenderReason;
+  /** The first line of the error, when there was one. */
+  detail?: string;
+  /** Project-relative path of the capture written, for a rendered unit. */
+  capture?: string;
+}
+
+/** `.ultra11y/render.json`, written by `render`. */
+export interface RenderManifest {
+  v: 1;
+  /** e.g. "react-dom/server 19.1.0". Absent when none resolved. */
+  renderer?: string;
+  /** e.g. "typescript 5.9.3". Absent when none resolved. */
+  transpiler?: string;
+  /** Test, spec, mock and snapshot files the discovery left out unread. */
+  testFilesIgnored: number;
+  units: RenderUnit[];
+}
+
+/** `scope.renders`: the manifest, with its counts. */
+export interface RenderScope {
+  manifest: string;
+  renderer?: string;
+  transpiler?: string;
+  rendered: number;
+  skipped: number;
+  notAttempted: number;
+  units: RenderUnit[];
+}
 
 /** One route of the application and how it was observed (`scope.routes`). */
 export interface RouteCoverage {

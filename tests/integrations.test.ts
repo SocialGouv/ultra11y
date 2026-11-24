@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 import { failingFindings, formatFailure, buildPayload, slugify, gate, type FindingLike } from "../src/integrations/payload.js";
 import { slugifyPageId } from "../src/snapshot.js";
 
@@ -118,9 +117,6 @@ describe("buildPayload", () => {
   });
 });
 
-// Every published test-runner subpath.
-const SUBPATHS = ["./playwright", "./cypress", "./cypress/plugin", "./vitest", "./jest"];
-
 describe("packaging", () => {
   it("keeps `.` on the OpenCode plugin — an exports map without it breaks the plugin", () => {
     expect(pkg.exports["."]).toBe(`./${pkg.main}`);
@@ -130,7 +126,7 @@ describe("packaging", () => {
   it("declares every plugin subpath, with a default condition a bundler can resolve", () => {
     // Cypress bundles the support file with webpack, which asks for `default`; an
     // import-only entry fails with "Package path ./cypress is not exported".
-    for (const sub of SUBPATHS) {
+    for (const sub of ["./playwright", "./cypress", "./cypress/plugin"]) {
       const e = pkg.exports[sub] as Record<string, string>;
       expect(e, sub).toBeTruthy();
       expect(e.default, sub).toBeTruthy();
@@ -161,9 +157,9 @@ describe("packaging", () => {
     // beside the generated bundle and a clean would be destructive. This test stays as the
     // belt to that braces: it is what caught both.
     const entries = new Set<string>();
-    for (const sub of SUBPATHS) {
+    for (const sub of ["./playwright", "./cypress", "./cypress/plugin"]) {
       const e = pkg.exports[sub] as Record<string, string>;
-      for (const key of ["default", "types", "require", "import"]) if (e[key]) entries.add(basename(e[key]!));
+      for (const key of ["default", "types"]) entries.add(basename(e[key]!));
     }
     const files = readdirSync(join(ROOT, "dist"));
     const referenced = new Set<string>();
@@ -180,7 +176,7 @@ describe("packaging", () => {
   });
 
   it("has a built artefact behind every declared subpath", () => {
-    for (const sub of SUBPATHS) {
+    for (const sub of ["./playwright", "./cypress", "./cypress/plugin"]) {
       const e = pkg.exports[sub] as Record<string, string>;
       for (const key of ["default", "types"]) expect(existsSync(join(ROOT, e[key]!)), `${sub} ${key}`).toBe(true);
     }
@@ -192,30 +188,6 @@ describe("packaging", () => {
     const bytes = readFileSync(join(ROOT, "dist/cypress.mjs")).byteLength;
     expect(bytes).toBeLessThan(64 * 1024);
     expect(readFileSync(join(ROOT, "dist/cypress.mjs"), "utf8")).not.toContain("node:child_process");
-  });
-});
-
-describe("the unit-test entries (ultra11y/vitest, ultra11y/jest)", () => {
-  it("stay free of the engine — they pipe to it, they do not bundle it", () => {
-    for (const f of ["dist/vitest.mjs", "dist/jest.mjs", "dist/jest.cjs"]) {
-      const src = readFileSync(join(ROOT, f), "utf8");
-      expect(src.length, f).toBeLessThan(32 * 1024);
-      expect(src, f).not.toContain("htmlparser2");
-      expect(src, f).toContain('"capture", "write"');
-    }
-  });
-
-  it("ships Jest a CommonJS build it can require, resolved through the `require` condition", () => {
-    const e = pkg.exports["./jest"] as Record<string, string>;
-    expect(e.require).toBe("./dist/jest.cjs");
-    const mod = createRequire(import.meta.url)(join(ROOT, e.require!)) as Record<string, unknown>;
-    expect(typeof mod.checkA11y).toBe("function");
-    expect(typeof mod.toBeAccessible).toBe("function");
-  });
-
-  it("augments each runner's own matcher types", () => {
-    expect(readFileSync(join(ROOT, "dist/vitest.d.ts"), "utf8")).toMatch(/declare module "vitest"[\s\S]*toBeAccessible/);
-    expect(readFileSync(join(ROOT, "dist/jest.d.ts"), "utf8")).toMatch(/namespace jest[\s\S]*toBeAccessible/);
   });
 });
 

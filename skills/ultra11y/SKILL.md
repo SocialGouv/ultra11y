@@ -109,10 +109,10 @@ adjudicates. So the engine's clean run is a starting point, never a verdict — 
 >    browser — to earn C; for RGAA, **104 of 106**. See `references/standards.md`.
 > 6. **The FINAL rendered semantic HTML must be correct.** The engine sees only source; a
 >    component library (DSFR/MUI…) or `.vue`/`.svelte`/`.astro` SFC hides the real markup, so
->    a green source audit is not proof. Verify the produced semantic HTML — install the
->    zero-touch **capture** harvester (`render --setup`) so every component your tests render
->    is serialized to `.ultra11y/captures` and audited, with `audit --require-captures` gating
->    the blind spots. See `references/automation.md` / `rendered.md`.
+>    a green source audit is not proof. Verify the produced semantic HTML — run ultra11y's
+>    own render engine (`render`), which renders every component, page and story with the
+>    project's react-dom/server into `.ultra11y/captures` (never reading its tests), with
+>    `audit --require-captures` gating the blind spots. See `references/rendered.md`.
 > 7. **Language**: ALWAYS pass `--lang` matching the language of your conversation with
 >    the user; ask the user when ambiguous. Without the flag the CLI auto-detects (repo
 >    `<html lang>` → the active standard's default locale → English) — a scripted/CI
@@ -185,12 +185,13 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   pass: it has no ledger, no refutation, no per-page dossiers and no completeness gate, so say
   so and never present it as a conformance report.
 - **"Code rendered by a library (DSFR, MUI…) or a `.vue`/`.svelte`/`.astro` SFC / avoid
-  false negatives"** → audit the **produced HTML**, not the source template. Easiest:
-  install the zero-touch **capture** harvester (`render --setup`) so your tests serialize
-  every rendered component to `.ultra11y/captures` (auto-ingested, findings attributed to the
-  source component; `render --coverage` and `audit --require-captures` track blind spots). Or
-  `render` (build→audit recipe or SSR snapshot `--scaffold`) then `audit` on the output, and
-  `scan` for computed rendering. SFC-source findings are flagged `preliminary` (a
+  false negatives"** → audit the **produced HTML**, not the source template. Run `render`:
+  ultra11y's engine renders every component, page and story with the project's own
+  react-dom/server into `.ultra11y/captures` (auto-ingested, findings attributed to the source
+  component; every unit it could not render is listed with the reason; `render --coverage`
+  and `audit --require-captures` track blind spots). It never reads the project's tests or
+  snapshots. Or `render --detect` (build→audit recipe) then `audit` on the output, and `scan`
+  for computed rendering. SFC-source findings are flagged `preliminary` (a
   `scope.sourceTemplate` caveat); read **`references/rendered.md`**.
 - **"A finding looks wrong / false positive on a component"** → the engine auto-suppresses
   most component false positives (slot/prop-injected names, component children, dynamic
@@ -245,7 +246,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
   Installed as a **Claude Code, Codex or OpenCode
   plugin**, a third gate runs the `review-a11y` *skill* (not just the engine) on a pending
   commit/push/PR — that one is shipped by the plugin (or `ultra11y install`), not by `init`. For library/SFC code, commit rendered
-  **captures** (`render --setup`) and stage them so the real semantic HTML is what's
+  **captures** (`render`) and stage them so the real semantic HTML is what's
   checked (`audit --require-captures`); read **`references/automation.md`**.
 - **"Check a page during our E2E tests"** → the `ultra11y/playwright` and `ultra11y/cypress`
   package exports audit the page **as your test left it** (logged in, form filled, modal open) — state a
@@ -345,7 +346,7 @@ node scripts/ultra11y.mjs audit - < component.html                           # a
 node scripts/ultra11y.mjs audit --changed --json                             # only the git diff (large repo)
 node scripts/ultra11y.mjs audit --staged --fail-on blocking                  # gate EXACTLY the staged snapshot (pre-commit)
 node scripts/ultra11y.mjs audit "dist/**/*.html"                             # the RENDERED HTML (reliable for DSFR/MUI…)
-node scripts/ultra11y.mjs render --setup                                     # install the capture harvester (tests → .ultra11y/captures)
+node scripts/ultra11y.mjs render .                                          # ultra11y's render engine (components, pages, stories → .ultra11y/captures)
 node scripts/ultra11y.mjs audit --require-captures                           # gate the components with no rendered capture
 node scripts/ultra11y.mjs scan http://localhost:3000 --cwd . --merge audits/audit-latest.json
 node scripts/ultra11y.mjs check --in audits/audit-latest.json --require-rendered              # gate: a rendering criterion left open by a run that rendered nothing

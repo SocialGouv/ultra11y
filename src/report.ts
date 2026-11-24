@@ -6,7 +6,7 @@
 // (never silently C).
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import type { AuditResult, Auditor, DecidedBy, Finding, Lang, PageResult, RouteCoverage, Severity, Status } from "./types.js";
+import type { AuditResult, Auditor, DecidedBy, Finding, Lang, PageResult, RenderScope, RouteCoverage, Severity, Status } from "./types.js";
 import { isAdjudicated } from "./types.js";
 import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits, type PrdUnit } from "./prd.js";
@@ -176,10 +176,8 @@ const L = {
     sourceTemplateAudited: (n: number, exts: string, pages: number) =>
       `${n} composant(s) ${exts} audité(s) en SOURCE (template) — slots et liaisons dynamiques invisibles en analyse statique. ${pages} page(s) ont été capturées et auditées sur leur DOM réel ; ce qu'ils rendent sur une page non capturée reste un angle mort.`,
     captures: (n: number) => `${n} fichier(s) de capture rendus audités à pleine fidélité (DOM réel) — le vrai HTML produit, pas l'appel de composant.`,
-    unitSnapshots: (entries: number, files: number, skipped: number, inline = 0) =>
-      `${entries} rendu(s) de composant lus dans ${files} fichier(s) d'instantanés de tests unitaires (\`__snapshots__/*.snap\`${inline ? `, dont ${inline} instantané(s) en ligne \`toMatchInlineSnapshot\`` : ""})${skipped ? `, ${skipped} entrée(s) non balisées ignorées` : ""} — composants rendus par jsdom, jamais une page, sans styles calculés : les critères de rendu y restent à évaluer.`,
     blindSpots: (n: number) =>
-      `${n} composant(s) sans capture rendue (angles morts) — audités sur source opaque uniquement ; auditez leur DOM rendu (\`render --setup\`).`,
+      `${n} composant(s) sans capture rendue (angles morts) — audités sur source opaque uniquement ; rendez-les avec le moteur ultra11y (\`render\`), ou auditez la page qui les montre (\`scan\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
     partialAudit: (list: string) =>
@@ -358,6 +356,29 @@ const L = {
             : `au-delà de --max-routes${detail ? ` ${detail}` : ""}`,
     routesTodo: (n: number) =>
       `${n} route(s) non atteinte(s). Pour les couvrir : \`ultra11y scan --sample --all-routes --merge <audit.json>\`, ou un test Playwright avec \`ultra11y/playwright\` pour celles qui exigent un état (session, parcours).`,
+    annexRendersTitle: "G. Composants rendus par le moteur ultra11y",
+    rendersIntro: (n: number, rendered: number, skipped: number, notAttempted: number, tools: string) =>
+      `${n} unité(s) trouvée(s) dans le code (composants exportés, pages du framework, stories) : ${rendered} rendue(s), ${skipped} en échec avec la raison, ${notAttempted} non tentée(s)${tools ? ` — ${tools}` : ""}. Le react-dom/server du projet rend, hors de ses tests, les composants qui ne prennent pas de props et les stories avec leurs args ; un composant qui prend des props n'est rendu que par ses stories. Aucun fichier de test ni instantané n'est lu. Un rendu serveur ne calcule aucun style (\`styles="none"\`) : les critères de rendu restent à évaluer sur ces captures.`,
+    rendersHead: "| Unité | Fichier | Type | Statut | Raison |",
+    renderKind: { component: "composant", page: "page", story: "story" } as Record<string, string>,
+    renderStatus: { rendered: "rendue", skipped: "échec", "not-attempted": "non tentée" } as Record<string, string>,
+    renderReason: {
+      provider: "fournisseur de contexte manquant (routeur, store, thème…)",
+      props: "prend des props et n'a pas de story",
+      "browser-api": "API du navigateur au rendu",
+      data: "chargement de données (fetch, suspense, composant serveur asynchrone)",
+      transpile: "erreur de transpilation",
+      module: "import introuvable",
+      timeout: "délai dépassé",
+      empty: "ne rend rien",
+      error: "erreur",
+      "via-story": "rendu par ses stories",
+      "unsupported-renderer": "moteur de rendu non pris en charge (React seulement)",
+      "no-renderer": "react / react-dom introuvables",
+      "no-transpiler": "aucun transpileur (esbuild, typescript, sucrase)",
+    } as Record<string, string>,
+    rendersTodo: (n: number) =>
+      `${n} unité(s) sans rendu. Pour les couvrir : une story avec ses args et ses décorateurs, ou la page qui les montre dans le navigateur (\`ultra11y/playwright\`, \`scan\`). Jusque-là, leur HTML rendu n'a pas été audité.`,
   },
   en: {
     title: (std: string) => `Accessibility audit report — ${std}`,
@@ -450,10 +471,8 @@ const L = {
     sourceTemplateAudited: (n: number, exts: string, pages: number) =>
       `${n} ${exts} component(s) audited as SOURCE (template) — slots and dynamic bindings invisible to static analysis. ${pages} page(s) were captured and audited on their real DOM; what they render on a page nobody captured remains a blind spot.`,
     captures: (n: number) => `${n} rendered capture file(s) audited at full fidelity (real DOM) — the true produced HTML, not the component call.`,
-    unitSnapshots: (entries: number, files: number, skipped: number, inline = 0) =>
-      `${entries} component render(s) read from ${files} unit-test snapshot file(s) (\`__snapshots__/*.snap\`${inline ? `, ${inline} of them \`toMatchInlineSnapshot\` inline snapshot(s)` : ""})${skipped ? `, ${skipped} non-markup entr(y/ies) skipped` : ""} — components rendered by jsdom, never a page, with no computed style: the rendering criteria stay to assess there.`,
     blindSpots: (n: number) =>
-      `${n} component(s) without a rendered capture (blind spots) — audited from opaque source only; audit their rendered DOM (\`render --setup\`).`,
+      `${n} component(s) without a rendered capture (blind spots) — audited from opaque source only; render them with ultra11y's engine (\`render\`), or audit the page that shows them (\`scan\`).`,
     // Task 5 — partial-audit advisory (owner decision: scan stays opt-in but strongly advised).
     // The list names ONLY the needs-rendering criteria still untested (real coverage).
     partialAudit: (list: string) =>
@@ -623,6 +642,29 @@ const L = {
             : `beyond --max-routes${detail ? ` ${detail}` : ""}`,
     routesTodo: (n: number) =>
       `${n} route(s) not reached. To cover them: \`ultra11y scan --sample --all-routes --merge <audit.json>\`, or a Playwright test with \`ultra11y/playwright\` for those that need a state (a session, a funnel).`,
+    annexRendersTitle: "G. Components rendered by ultra11y's engine",
+    rendersIntro: (n: number, rendered: number, skipped: number, notAttempted: number, tools: string) =>
+      `${n} unit(s) found in the code (exported components, framework pages, stories): ${rendered} rendered, ${skipped} failed with the reason, ${notAttempted} not attempted${tools ? ` — ${tools}` : ""}. The project's own react-dom/server renders, outside its tests, the components that take no props and the stories with their args; a component that takes props is rendered through its stories only. No test file or snapshot is read. A server render computes no style (\`styles="none"\`): the rendering criteria stay to assess on these captures.`,
+    rendersHead: "| Unit | File | Kind | Status | Reason |",
+    renderKind: { component: "component", page: "page", story: "story" } as Record<string, string>,
+    renderStatus: { rendered: "rendered", skipped: "failed", "not-attempted": "not attempted" } as Record<string, string>,
+    renderReason: {
+      provider: "missing context provider (router, store, theme…)",
+      props: "takes props and has no story",
+      "browser-api": "browser API at render time",
+      data: "data fetching (fetch, suspense, async server component)",
+      transpile: "transpile error",
+      module: "unresolved import",
+      timeout: "timed out",
+      empty: "renders nothing",
+      error: "error",
+      "via-story": "rendered through its stories",
+      "unsupported-renderer": "unsupported renderer (React only)",
+      "no-renderer": "react / react-dom not resolvable",
+      "no-transpiler": "no transpiler (esbuild, typescript, sucrase)",
+    } as Record<string, string>,
+    rendersTodo: (n: number) =>
+      `${n} unit(s) without a render. To cover them: a story with its args and decorators, or the page that shows them in the browser (\`ultra11y/playwright\`, \`scan\`). Until then, their rendered HTML has not been audited.`,
   },
 } as const;
 
@@ -727,7 +769,9 @@ const RENDERED_TIER_SCS = new Set(["1.3.4", "1.4.1", "1.4.3", "1.4.11", "2.4.7"]
 
 /** Did any browser pass contribute to this audit — a scan stamp, or audited captures? */
 export function ranBrowser(r: AuditResult): boolean {
-  return (r.scope.scan?.testedScs?.length ?? 0) > 0 || (r.scope.captures?.files ?? 0) > 0 || (r.scope.pagesAudited?.length ?? 0) > 0;
+  // The render engine's captures are server renders (styles="none"): they measured nothing a browser would.
+  const captured = (r.scope.captures?.files ?? 0) - (r.scope.renders?.rendered ?? 0);
+  return (r.scope.scan?.testedScs?.length ?? 0) > 0 || captured > 0 || (r.scope.pagesAudited?.length ?? 0) > 0;
 }
 
 /** THE pack report's partial-audit list — one definition for the document, the CLI warning and
@@ -1957,10 +2001,6 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
     ax.push(`> 🧩 ${pagesRead > 0 ? s.sourceTemplateAudited(files, extensions.join(", "), pagesRead) : s.sourceTemplate(files, extensions.join(", "))}`, "");
   }
   if (r.scope.captures) ax.push(`> ✅ ${s.captures(r.scope.captures.files)}`, "");
-  if (r.scope.unitSnapshots) {
-    const { entries, files, skipped, inline } = r.scope.unitSnapshots;
-    ax.push(`> 🧪 ${s.unitSnapshots(entries, files, skipped, inline)}`, "");
-  }
   if (r.scope.captureCoverage?.blindSpots.length) ax.push(`> ⚠️ ${s.blindSpots(r.scope.captureCoverage.blindSpots.length)}`, "");
   if (new Set((r.scope.axe ?? []).map((e) => e.version)).size > 1) ax.push(`> ⚠️ ${s.axeMixed}`, "");
 
@@ -2036,6 +2076,8 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   ax.push(...exhaustiveGrid(opts.groups, opts.standard, lang, s.annexGridTitle));
   // F. every route of the application and how it was observed — never silently omitted.
   if (r.scope.routes?.length) ax.push("", ...renderRoutes(r.scope.routes, lang));
+  // G. every unit ultra11y's render engine found, and what it did with it — none omitted.
+  if (r.scope.renders?.units.length) ax.push("", ...renderRenderUnits(r.scope.renders, lang));
 
   return { report: out.join("\n"), annex: ax.join("\n"), reportFile, annexFile };
 }
@@ -2053,6 +2095,38 @@ export function renderRoutes(routes: readonly RouteCoverage[], lang: Lang): stri
   const missing = routes.filter((r) => r.observed === "not-reached").length;
   out.push("");
   if (missing) out.push(`> ${s.routesTodo(missing)}`, "");
+  return out;
+}
+
+/** A render reason (`RenderUnit.reason`), labelled in `lang` — the annex's words, for the CLI too. */
+export function renderReasonLabel(reason: string, lang: Lang): string {
+  return L[lang].renderReason[reason] ?? reason;
+}
+
+/** The annex's render table: every unit of `scope.renders` (src/render-engine.ts), failures
+ *  first. Worklist-inert and criterion-free, like the route table. */
+export function renderRenderUnits(renders: RenderScope, lang: Lang): string[] {
+  const s = L[lang];
+  const cell = (t: string) => t.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const tools = [renders.renderer, renders.transpiler].filter(Boolean).join(", ");
+  const out = [
+    `## ${s.annexRendersTitle}`,
+    "",
+    s.rendersIntro(renders.units.length, renders.rendered, renders.skipped, renders.notAttempted, tools),
+    "",
+    s.rendersHead,
+    "|---|---|---|---|---|",
+  ];
+  const rank = { skipped: 0, "not-attempted": 1, rendered: 2 } as const;
+  const units = [...renders.units].sort((a, b) => rank[a.status] - rank[b.status] || a.file.localeCompare(b.file) || a.export.localeCompare(b.export));
+  for (const u of units) {
+    const unit = u.kind === "story" ? `${u.component} · ${u.export}` : u.route !== undefined ? `${u.component} (\`${u.route}\`)` : u.component;
+    const why = u.reason ? `${s.renderReason[u.reason] ?? u.reason}${u.detail ? ` — ${u.detail}` : ""}` : "";
+    out.push(`| ${cell(unit)} | \`${cell(u.file)}\` | ${s.renderKind[u.kind] ?? u.kind} | ${s.renderStatus[u.status] ?? u.status} | ${cell(why)} |`);
+  }
+  const missing = renders.units.filter((u) => u.status !== "rendered" && u.reason !== "via-story").length;
+  out.push("");
+  if (missing) out.push(`> ${s.rendersTodo(missing)}`, "");
   return out;
 }
 

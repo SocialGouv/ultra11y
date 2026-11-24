@@ -19,137 +19,98 @@ SOURCE templates (the HTML path with component case preserved), so `<slot>`/`{@r
 `v-for`/`{#each}`, dynamic bindings (`:aria-label`) and child components are invisible to
 static analysis. Every finding raised on them is flagged **`preliminary: true`** and the run
 adds a **`scope.sourceTemplate`** caveat ("audited SOURCE template only — audit the rendered
-output"). Treat those verdicts as provisional: audit the rendered HTML (a static Storybook
-build is ideal for SFCs) or `scan` a live page before concluding, and refute any source
-finding the rendered DOM disproves (`verify --apply`). See `references/false-positives.md`.
+output"). Treat those verdicts as provisional: audit the rendered HTML (a static build) or
+`scan` a live page before concluding, and refute any source finding the rendered DOM
+disproves (`verify --apply`). See `references/false-positives.md`.
 
-## Zero-touch test-render captures (recommended)
+## ultra11y's render engine (`render`)
 
-Rather than hand-write a render list, let your existing tests do the rendering. Install the
-capture harvester once and every component your tests already render is serialized to a
-provenance-tagged `.html` the static engine audits at full fidelity — the real markup a
-library/SFC emits, not its source call:
+ultra11y renders the components itself. It does **not** read or run the project's tests,
+`__snapshots__` or inline snapshots: those hold what a test author wrote, sometimes broken on
+purpose, and they go stale.
 
 ```
-node scripts/ultra11y.mjs render --setup     # writes .ultra11y/capture-setup.mjs + prints the runner wiring
-# wire it into your runner (Vitest: setupFiles + globals:true; Jest: setupFilesAfterEnv), then:
-npm test                                      # every rendered component → .ultra11y/captures/*.html
-node scripts/ultra11y.mjs audit              # auto-ingests .ultra11y/captures; findings attribute to the source component
+node scripts/ultra11y.mjs render .      # components, pages, stories → .ultra11y/captures + .ultra11y/render.json
+node scripts/ultra11y.mjs audit .       # ingests .ultra11y/captures; findings name the source component
 ```
 
-- **Attribution.** Each capture carries `<!-- ultra11y:capture source="src/Button.tsx" component="Button" … -->`,
-  so a finding on the rendered DOM is reported against the SOURCE component, not the anonymous
-  capture file. Storybook/manual dumps with no marker still audit as plain HTML.
-- **Coverage + gate.** `render --coverage` lists which components have a capture vs which are
-  still opaque-source-only blind spots; `audit --require-captures` fails when an opaque/control
-  component lacks one — so "all components" actually get rendered-DOM coverage.
-  `.vue`/`.svelte`/`.astro` self-defined components now count in this coverage universe too
-  (previously invisible to the graph), so a previously-green `--require-captures` gate can newly
-  report blind spots on an SFC-heavy repo — that is intended (a named blind spot beats
-  invisibility); capture those components or scope the gate.
-- **Commit `.ultra11y/captures`.** In diff-scoped mode (`--changed`/`--staged`/`--since`) the
-  audit automatically pulls in the captures whose provenance points at a diffed source file —
-  the pre-commit gate sees the real rendered markup for a touched component even though the
-  (unchanged) capture itself isn't part of the diff. After a component change, re-run your
-  tests so its capture refreshes, and stage the refreshed capture with the source change.
-  `fix` never rewrites captures (generated output). Add `.gitattributes`:
-  `.ultra11y/captures/*.html text eol=lf` for stable cross-platform diffs.
-- **Storybook**: with **portable stories** (composeStories) rendered in your test suite, the
-  harvester captures them for free. For per-story HTML produced another way (e.g.
-  `@storybook/test-runner`), `render --storybook [<storybook-static>] [--captures <html-dir>]`
-  attributes each file to its source component via the Storybook index, into `.ultra11y/captures`.
-- ultra11y renders nothing itself — your test toolchain (jsdom/happy-dom) does. Disable with `ULTRA11Y_CAPTURES=off`.
-- The harvester pipeline is covered by a real end-to-end test in ultra11y's own suite (a
-  spawned vitest+jsdom project renders, the capture lands with correct provenance, and the
-  engine ingests it) — the escaping scheme it embeds is locked byte-identical to the parser's.
+- **Discovery.** Every `.tsx`/`.jsx` module of the project: its default export and its
+  PascalCase exports that are React components. Next.js `app/**/page.tsx` and `pages/**` files
+  are labelled with their route. Storybook stories (`*.stories.*`, CSF) are rendered with
+  their `args`. Test, spec, mock, fixture and snapshot files are left out without being read;
+  the manifest counts them (`testFilesIgnored`). `--include`/`--exclude` scope it,
+  `--no-stories` leaves the stories out.
+- **Rendering.** Each unit is rendered by the **project's own** `react-dom/server`
+  (`renderToStaticMarkup`), in a throwaway harness ultra11y owns: a runner script in the OS
+  temp dir, one child process per source file, the project as working directory. TSX/JSX is
+  transpiled **in memory** with the transpiler the project already has — esbuild, else
+  typescript, else sucrase (`--transpiler` picks one). No project file is written and no
+  build runs. The harness resolves the tsconfig `paths` aliases, stubs style imports (CSS
+  modules map each class to its name), static assets (their public path; an SVG is also a
+  component), `next/font/*`, `server-only` and `client-only`. `fetch` is disabled: data
+  fetching is reported, never performed. Each unit gets `--timeout` ms (default 10000); a
+  unit past it is killed and recorded, and the rest of its file still renders.
+- **Props.** A component that declares no props (or only defaulted ones) is rendered with
+  none — that is what it renders. A component that **takes props** is not rendered without
+  them: it would show a state no user meets (an empty label, an image without its alt). It is
+  rendered through its stories when it has some (`via-story`), otherwise listed as not
+  attempted (`props`). Write a story with the args a real screen passes to cover it.
+- **Captures.** Each render is written to `.ultra11y/captures/<id>.html` with the provenance
+  comment `<!-- ultra11y:capture v="1" source="src/Button.tsx" component="Button" name="…"
+  renderer="react-dom/server 19.x" styles="none" -->`, so a finding on it is reported against
+  the SOURCE component. A story is attributed to the component file beside it. A re-run
+  rewrites only the captures that changed and removes the ones it no longer renders.
+- **Honesty.** `.ultra11y/render.json` lists every unit: `rendered`, `skipped` with the
+  reason (`provider` — a context the app mounts; `props`; `browser-api` — `window`,
+  `document`, `localStorage` at render time; `data` — an async server component, a suspended
+  fetch; `transpile`; `module` — an unresolved import; `timeout`; `empty`; `error`), or
+  `not-attempted` (`props`, `via-story`, `unsupported-renderer` for `.vue`/`.svelte`/`.astro`,
+  `no-renderer`, `no-transpiler`). `audit` reads it into `scope.renders`, and the report's
+  annex (section G) lists every unit with its status and reason, even when no capture was
+  written. A unit that throws is never dropped, and a run that renders none of its units exits 1.
+- **What a server render cannot decide.** It computes no style and lays out no box
+  (`styles="none"`): colour, contrast, reflow, focus visibility stay « à évaluer » on these
+  captures. A component capture is a fragment, so the page-level criteria (language, title)
+  are not decided there either. Real pages go through Playwright (`ultra11y/playwright`) and
+  `scan`.
+- **React only.** Vue, Svelte and Astro components are listed as not attempted; audit their
+  rendered output through a static build or `scan`.
 
-## Unit-test snapshots (`__snapshots__/*.snap`) — nothing to install
+`render --coverage` lists which components have a capture and which are still
+opaque-source-only blind spots; `audit --require-captures` fails while one remains.
+Commit `.ultra11y/captures` and `.ultra11y/render.json` when the pre-commit gate should see
+the rendered markup: in diff-scoped mode (`--changed`/`--staged`/`--since`) the audit pulls in
+the captures whose provenance points at a diffed source file. `fix` never rewrites captures.
 
-The project's Jest/Vitest snapshot files already hold what its components rendered. `audit`
-reads every `.snap` in scope: one **component** document per entry whose value is markup —
-Testing Library's pretty-format DOM (`container`, `asFragment()`), react-test-renderer's
-`toJSON()` (`className`, `onClick={[Function]}` → plain HTML), an `innerHTML` string snapshot.
+## Other ways to get rendered HTML
 
-- Each finding sits on the `.snap` **file and line** of the element, and names the entry
-  (`origin.snapshot`, printed under the occurrence). It is attributed to `Button.tsx` when that
-  file sits beside `Button.test.tsx`.
-- A component, never a page: the page-scoped rules (title, lang) stay off. Rendered by jsdom:
-  no computed style, so contrast, reflow and focus stay « à évaluer ».
-- Skipped, and counted in `scope.unitSnapshots`: objects, prose, numbers, and shallow renders
-  (`<Button>` is the component call, not its output).
-- Snapshots are audited even under `__tests__/` — they are product output, not hand-typed
-  fixtures. A suite that snapshots deliberately broken markup opts out with
-  `--exclude "**/__snapshots__/**"`. A snapshot is never rewritten by `fix`: fix the component,
-  then `vitest -u` / `jest -u`.
-- Inline snapshots too: each `toMatchInlineSnapshot(`…`)` literal (after a property matcher
-  or not) of a `.test`/`.spec` JS/TS file is dedented as the runner compares it and read the same
-  way — findings on the **test file** and the literal's line, named after the enclosing
-  `it`/`test` title (`inline snapshot @ line N` outside one). Only the markup literals: the rest
-  of the test file stays a test artifact, never audited. Counted in `scope.unitSnapshots`
-  (`inline`: how many of the `entries` were inline).
+`node scripts/ultra11y.mjs render --detect [<dir>]` detects the framework and prints the
+"build → audit" recipe for the project (and flags the libraries it detects).
 
-## Check a render inside the test (`ultra11y/vitest`, `ultra11y/jest`)
-
-```js
-import { checkA11y, toBeAccessible } from "ultra11y/vitest"; // or "ultra11y/jest"
-expect.extend({ toBeAccessible });
-
-const { container } = render(<Button variant="primary" />);
-await checkA11y(container, { as: "button-primary", failOn: "major" });
-expect(container).toBeAccessible();
-```
-
-Accepts an element, `asFragment()`, a render result, a document (its body) or an HTML string.
-Each check writes `.ultra11y/captures/<id>.html` (`capture write`, the same capture format as
-`render --setup`, marked `runner="vitest" env="jsdom" styles="none"`; without `as`, the id is
-the test file's repo-relative path and the test title, slugged) and audits it; `failOn`
-(`blocking` by default, `false` to record only) decides the test. Commit the captures: `audit`
-re-reads them offline. `render --setup` remains the zero-touch way to record every render.
-
-## Get rendered HTML
-
-`node scripts/ultra11y.mjs render [<dir>]` detects the framework and prints the
-"build → audit" recipe for the project (and flags the libraries it detects). Other routes,
-simplest to most faithful:
-
-1. **Build output** (recommended): build the site/pages, then audit the emitted HTML with the
-   static engine — it is real HTML, audited at full fidelity:
+1. **Build output**: build the site/pages, then audit the emitted HTML with the static engine
+   — it is real HTML, audited at full fidelity:
    ```
    npx astro build   # or next build (output:'export'), vite build…
    node scripts/ultra11y.mjs audit "dist/**/*.html"
    ```
-   **Storybook is the one exception**: a bare `storybook build` does **NOT** emit one HTML
-   file per story — `storybook-static/` is a single-page-app shell (`iframe.html`/`index.html`)
-   that renders stories client-side; auditing `storybook-static/**/*.html` sees only that shell,
-   not your components. Get REAL per-story HTML first, either via `@storybook/test-runner`
-   (renders every story in a real browser — dump/audit its output) or **portable stories**
-   (`composeStories`) rendered in your OWN test suite, where the zero-touch capture harvester
-   (`render --setup`) captures them for free. Only then does `render --storybook
-   [<storybook-static>] [--captures <html-dir>]` do anything useful: it ATTRIBUTES that
-   already-produced per-story HTML to its source component via the Storybook index — it does
-   not render anything itself. Point it at nothing but the shell and it now fails honestly
-   (exit 1, not a silent no-op) when candidate HTML existed but none could be attributed.
-2. **SSR snapshot**: `render --scaffold` writes `ultra11y-render.tsx`, a `react-dom/server`
-   harness (`renderToStaticMarkup`) that imports **your** components and writes HTML into
-   `audits/rendered/`. **The written file is INERT until you fill in `COMPONENTS`** — running
-   it as-is writes nothing (it self-reports `COMPONENTS is empty` and exits), and the CLI's own
-   write-time message says so. Fill in the list, run it with your toolchain (`npx tsx
-   ultra11y-render.tsx`), then audit `audits/rendered`. ultra11y does not embed React — your
-   project renders.
-3. **Headless browser**: `scan <url>` (browser tier, axe-core) against the running app — the
-   most faithful, and required for the **rendering** criteria (computed contrast 1.4.3, reflow
-   1.4.10). `--merge` folds the result into a static AuditResult.
+   A bare `storybook build` does **NOT** emit one HTML file per story — `storybook-static/` is
+   a single-page-app shell that renders stories client-side. The render engine renders the
+   stories itself; per-story HTML produced another way (e.g. `@storybook/test-runner`) can be
+   attributed to its source component with `render --storybook [<storybook-static>]
+   [--captures <html-dir>]`, which renders nothing itself and fails (exit 1) when candidate
+   HTML existed but none could be attributed.
+2. **Headless browser**: `scan <url>` (browser tier, axe-core) against the running app — the
+   most faithful, and required for the **rendering** criteria (computed contrast 1.4.3,
+   reflow 1.4.10). `--merge` folds the result into a static AuditResult. During an E2E run,
+   `ultra11y/playwright` records each page as your test left it (`references/e2e.md`).
 
 ## Choosing
 
-- Components WITH a test suite → their `.snap` files (read as they are), the
-  `ultra11y/vitest`/`ultra11y/jest` helper in the tests that matter, or zero-touch captures
-  (`render --setup`), then `audit --require-captures`.
-- Components / design system (no tests) → portable stories + `@storybook/test-runner` (real
-  per-story HTML, then `render --storybook` to attribute it) **or** an SSR snapshot
-  (`render --scaffold`), then `audit`. A bare `storybook build` alone is NOT enough (see above).
-- Full pages / SSG → build output (`dist`/`out`), then `audit`.
+- Components and design systems → `render`, then `audit` (and `audit --require-captures` as
+  a gate).
+- Full pages / SSG → build output (`dist`/`out`), then `audit`; pages behind a state →
+  `ultra11y/playwright`.
 - Rendering criteria (contrast, focus, zoom) → `scan` (browser).
 - In all cases, do not conclude "conforming" on a library component from the source: that is
-  what the scope risk reminds you — resolve it on the produced HTML (captures / `scan`), then let
-  the AI agent adjudicate the criterion (`verify --manual`, gated).
+  what the scope risk reminds you — resolve it on the produced HTML (captures / `scan`), then
+  let the AI agent adjudicate the criterion (`verify --manual`, gated).

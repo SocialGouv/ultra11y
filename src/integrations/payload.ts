@@ -36,15 +36,13 @@ export function failingFindings(result: AuditLike, failOn: string): FindingLike[
   return (result.findings ?? []).filter((f) => !f.advisory && (RANK[f.severity] ?? 99) <= max);
 }
 
-/** `where` names the recorded artefact the reader opens next: the page snapshots for a browser
- *  run, the component captures for a unit test. */
-export function formatFailure(pageName: string, failing: FindingLike[], where = ".ultra11y/pages/"): string {
+export function formatFailure(pageName: string, failing: FindingLike[]): string {
   const lines = [`ultra11y: ${failing.length} accessibility non-conformity(ies) on "${pageName}":`];
   for (const f of failing.slice(0, 20)) {
     lines.push(`  [${f.severity}] ${f.ruleId} (WCAG ${f.criteriaId}) — ${f.origin?.sourceFile ?? f.file} — ${f.message}`);
   }
   if (failing.length > 20) lines.push(`  … and ${failing.length - 20} more.`);
-  lines.push(`Full detail: ${where} — re-audit offline with \`ultra11y audit\`.`);
+  lines.push("Full detail: .ultra11y/pages/ — re-audit offline with `ultra11y audit`.");
   return lines.join("\n");
 }
 
@@ -61,22 +59,6 @@ export interface SnapshotPayload {
   probes?: unknown;
   /** What axe-core found on this page, when the caller ran it. */
   axe?: unknown;
-}
-
-/** What the unit-test helpers (`ultra11y/vitest`, `ultra11y/jest`) pipe to `capture write`: the
- *  rendered markup of a component and who rendered it. The engine owns the file, the provenance
- *  comment and the audit; this is only the shape of the pipe. */
-export interface ComponentCapturePayload {
-  meta: {
-    id: string;
-    name?: string;
-    component?: string;
-    source?: string;
-    test?: string;
-    runner?: string;
-    env?: string;
-  };
-  html: string;
 }
 
 /** Same slug rule as the engine (src/snapshot.ts slugifyPageId): accent-folded URL path. */

@@ -26,17 +26,6 @@
       "import": "./dist/cypress-plugin.mjs",
       "default": "./dist/cypress-plugin.mjs"
     },
-    "./vitest": {
-      "types": "./dist/vitest.d.ts",
-      "import": "./dist/vitest.mjs",
-      "default": "./dist/vitest.mjs"
-    },
-    "./jest": {
-      "types": "./dist/jest.d.ts",
-      "import": "./dist/jest.mjs",
-      "require": "./dist/jest.cjs",
-      "default": "./dist/jest.cjs"
-    },
     "./scripts/ultra11y.mjs": "./scripts/ultra11y.mjs",
     "./package.json": "./package.json"
   },
@@ -113,6 +102,8 @@
     "@types/picomatch": "^4.0.3",
     "@vitest/coverage-v8": "^4.1.9",
     "jsdom": "^29.1.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "semantic-release": "^25.0.8",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
