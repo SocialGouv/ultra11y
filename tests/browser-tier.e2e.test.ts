@@ -28,6 +28,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { buildAdjudicationWorklist } from "../src/adjudicate.js";
 import { runAudit } from "../src/audit.js";
 import { PAGES_DIR } from "../src/snapshot.js";
 
@@ -1502,4 +1503,174 @@ describe("rendered fidelity (#184)", () => {
     expect(inPlaceholder.length).toBeGreaterThan(0);
     for (const x of inPlaceholder) expect(x.ev.note).toContain("état sans consentement");
   }, 120_000);
+});
+
+// ---------------------------------------------------------------------------------------------
+// THE PAGE'S BEHAVIOUR, RECORDED (#190).
+//
+// `scripts.json` is what the script criteria are judged on: a `<div>` with a click listener is
+// markup-identical to a `<div>`, an `aria-expanded` a button toggles is markup-identical to one
+// nobody touches, a carousel that turns on its own is markup-identical to one that waits. So the
+// fixture carries one of each — and a mouse-only control — and every producer that drives a real
+// browser must record them, and every one must reach the brief of the criterion it informs.
+describe("the behaviour digest records what the page's scripts do", () => {
+  const BEHAVIOUR_PAGE = `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Comportements</title>
+<style>.slide { display: none; } .slide.active { display: block; }</style></head>
+<body>
+  <main>
+    <h1>Comportements</h1>
+    <div id="carte" class="carte">Ouvrir la fiche</div>
+    <div id="en-ligne" onclick="this.classList.toggle('ouvert')">Gestionnaire en ligne</div>
+    <button type="button" id="menu-btn" aria-expanded="false" aria-controls="menu">Menu</button>
+    <ul id="menu" hidden><li>Premier</li></ul>
+    <div id="carousel" class="carousel">
+      <div class="slide active" aria-hidden="false">Diapositive A</div>
+      <div class="slide" aria-hidden="true">Diapositive B</div>
+      <div class="slide" aria-hidden="true">Diapositive C</div>
+    </div>
+    <span id="survol" role="button" tabindex="0">Survol</span>
+    <p id="statut" role="status"></p>
+  </main>
+  <script>
+    document.getElementById('carte').addEventListener('click', function () { this.classList.toggle('ouverte'); });
+    var b = document.getElementById('menu-btn');
+    b.addEventListener('click', function () {
+      var open = b.getAttribute('aria-expanded') === 'true';
+      b.setAttribute('aria-expanded', String(!open));
+      document.getElementById('menu').hidden = open;
+    });
+    var k = 0, slides = document.querySelectorAll('.slide');
+    setInterval(function () {
+      slides[k].classList.remove('active'); slides[k].setAttribute('aria-hidden', 'true');
+      k = (k + 1) % slides.length;
+      slides[k].classList.add('active'); slides[k].setAttribute('aria-hidden', 'false');
+    }, 300);
+    document.getElementById('survol').addEventListener('mousedown', function () { document.getElementById('statut').textContent = 'Survolé'; });
+  </script>
+</body></html>`;
+
+  let bServer: Server | undefined;
+  let bOrigin = "";
+  beforeAll(async () => {
+    if (!browserAvailable) return;
+    bServer = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(BEHAVIOUR_PAGE);
+    });
+    await new Promise<void>((resolve) => bServer!.listen(0, "127.0.0.1", resolve));
+    const addr = bServer.address();
+    bOrigin = typeof addr === "object" && addr ? `http://127.0.0.1:${addr.port}` : "";
+  }, 60_000);
+  afterAll(async () => {
+    await new Promise<void>((resolve) => (bServer ? bServer.close(() => resolve()) : resolve()));
+  });
+
+  type Scripts = import("../src/types.js").ScriptsDigest;
+  const readScripts = (base: string, id: string): Scripts => JSON.parse(readFileSync(join(base, PAGES_DIR, id, "scripts.json"), "utf8")) as Scripts;
+
+  /** What every producer must have recorded about the fixture. */
+  function expectFixtureRecorded(s: Scripts) {
+    expect(s.collected, s.why).toBe("cdp");
+    const carte = s.listeners?.find((l) => l.selector === "div#carte");
+    expect(carte, JSON.stringify(s.listeners)).toMatchObject({ tag: "div", events: ["click"], native: false, flagged: true });
+    expect(carte!.i).toBeGreaterThan(0);
+    // The button toggles its own state: a native control, never flagged.
+    expect(s.listeners?.find((l) => l.selector === "button#menu-btn")).toMatchObject({ native: true, flagged: false });
+    // A role and a tabindex, so not flagged — but a mousedown and nothing a keyboard fires.
+    expect(s.listeners?.find((l) => l.selector === "span#survol")).toMatchObject({ flagged: false, mouseOnly: true, role: "button" });
+    expect(s.inline?.find((e) => e.selector === "div#en-ligne")?.attrs).toEqual(["onclick"]);
+    // The carousel turned with nothing touching the page.
+    expect(
+      s.motion?.some((m) => m.selector.includes("slide") && m.changes >= 2),
+      JSON.stringify(s.motion),
+    ).toBe(true);
+    expect(s.ariaMutations?.some((m) => m.attr === "aria-hidden" && m.phase !== "interaction")).toBe(true);
+    expect(s.liveRegions?.find((r) => r.selector === "p#statut")).toMatchObject({ role: "status" });
+    expect(s.timers?.inlineSetInterval).toBe(1);
+    expect(s.resources?.some((r) => r.kind === "script" && r.origin === "inline")).toBe(true);
+    expect(s.caps.listeners).toBeGreaterThan(0);
+  }
+
+  /** …and what each brief must then carry. */
+  function expectBriefsCarryIt(pagesDir: string) {
+    const audit = runAudit({ inputs: [pagesDir] });
+    const rgaa = buildAdjudicationWorklist(audit, { standard: "rgaa" });
+    const wcag = buildAdjudicationWorklist(audit, {});
+    const ev = (items: typeof rgaa, id: string) => (items.find((i) => i.criteriaId === id)?.evidence ?? []).map((e) => `${e.selector} :: ${e.note ?? ""}`);
+    expect(ev(rgaa, "7.1").some((e) => e.startsWith("div#carte.carte ::") && /neither role nor tabindex/.test(e))).toBe(true);
+    expect(ev(wcag, "4.1.2").some((e) => e.startsWith("div#carte.carte ::") && /neither role nor tabindex/.test(e))).toBe(true);
+    expect(ev(rgaa, "7.1").some((e) => e.startsWith("button#menu-btn ::") && /aria-expanded/.test(e))).toBe(true);
+    expect(ev(rgaa, "13.8").some((e) => e.startsWith("div.slide") && /with nothing touching the page/.test(e))).toBe(true);
+    expect(ev(rgaa, "7.3").some((e) => e.startsWith("span#survol ::") && /no keyboard event/.test(e))).toBe(true);
+    expect(ev(rgaa, "7.5").some((e) => e.startsWith("p#statut ::") && /live region/.test(e))).toBe(true);
+    expect(ev(rgaa, "13.1").some((e) => /^scripts:timers :: timers/.test(e))).toBe(true);
+  }
+
+  it("ultra11y/playwright records it through CDP, the button's aria-expanded toggled by the probe's click", async () => {
+    if (!browserAvailable) return;
+    const work = mkdtempSync(join(tmpdir(), "u11y-behaviour-pw-"));
+    const { checkA11y } = await import("../src/integrations/playwright.js");
+    const context = await browser!.newContext();
+    const page = await context.newPage();
+    const cwd = process.cwd();
+    process.chdir(work);
+    try {
+      await page.goto(bOrigin);
+      // `any`: the plugin is typed against Playwright's Page structurally.
+      await checkA11y(page as any, { as: "comportements", failOn: false, axe: false, pdf: false, probes: false, liveRegion: { clicks: true } });
+    } finally {
+      process.chdir(cwd);
+      await context.close();
+    }
+    const s = readScripts(work, "comportements");
+    expectFixtureRecorded(s);
+    // The live-region pass pressed the button: the toggle happened under the observer.
+    expect(s.ariaMutations?.find((m) => m.selector === "button#menu-btn" && m.attr === "aria-expanded")).toMatchObject({
+      from: "false",
+      phase: "interaction",
+    });
+    expect(s.idleMs).toBeGreaterThanOrEqual(1900);
+    expectBriefsCarryIt(join(work, PAGES_DIR));
+  }, 120_000);
+
+  it("scan records the same file, with the timers counted from page start", async () => {
+    if (!browserAvailable) return;
+    const work = mkdtempSync(join(tmpdir(), "u11y-behaviour-scan-"));
+    const { runScanManyLocal } = await import("../src/scan-local.js");
+    const out = await runScanManyLocal([`${bOrigin}/comportements`], { cwd: process.cwd(), snapshotRoot: work, lang: "fr" });
+    const id = out.snapshots?.[0];
+    expect(id).toBeDefined();
+    const s = readScripts(work, id!);
+    expectFixtureRecorded(s);
+    // The hook went in before the page's scripts: the carousel's interval is seen running.
+    expect(s.timers).toMatchObject({ source: "init" });
+    expect(s.timers?.intervals).toContain(300);
+    expect(s.ariaMutations?.some((m) => m.selector === "button#menu-btn" && m.attr === "aria-expanded")).toBe(true);
+    expectBriefsCarryIt(join(work, PAGES_DIR));
+  }, 120_000);
+
+  it("falls back to the DOM without a CDP session, and says what it cannot see", async () => {
+    if (!browserAvailable) return;
+    const { startBehaviour } = await import("../src/behaviour.js");
+    const context = await browser!.newContext();
+    const page = await context.newPage();
+    try {
+      await page.goto(bOrigin);
+      const capture = await startBehaviour(page as any, { cdp: false });
+      await capture.idle(1200);
+      const s = await capture.finish();
+      expect(s.collected).toBe("dom");
+      expect(s.why).toMatch(/addEventListener are invisible/);
+      // The inline handler is visible; the addEventListener one is not — and is not claimed absent.
+      expect(s.listeners?.find((l) => l.selector === "div#en-ligne")).toMatchObject({ flagged: true });
+      expect(s.listeners?.some((l) => l.selector === "div#carte")).toBe(false);
+      expect(s.motion?.some((m) => m.selector.includes("slide"))).toBe(true);
+      // The window cleaned up after itself.
+      expect(await page.evaluate("typeof window.__ultra11yBehaviour")).toBe("undefined");
+      expect(await page.evaluate("String(window.setInterval).includes('native code')")).toBe(true);
+    } finally {
+      await context.close();
+    }
+  }, 60_000);
 });

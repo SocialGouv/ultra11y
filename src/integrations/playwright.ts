@@ -23,6 +23,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { BEHAVIOUR_WINDOW_MS, type CdpSessionLike, startBehaviour } from "../behaviour.js";
 import { COLLECT_SNAPSHOT, FULL_SCREENSHOT_MAX_HEIGHT, LOADING_TIMEOUT_MS, waitForLoaded } from "../collector.js";
 import {
   DOCUMENT_MAX_BYTES,
@@ -56,7 +57,9 @@ interface PlaywrightPage {
   mouse?: { move(x: number, y: number): Promise<void> };
   // Used only by the document download, so optional too: a page object without a context still
   // records exactly as before, and simply downloads nothing.
-  context?(): { request?: PlaywrightRequest };
+  // `newCDPSession` is Chromium's: it is how the behaviour digest reads every listener. Without
+  // it (Firefox, WebKit) the digest falls back to what the DOM shows, and says so.
+  context?(): { request?: PlaywrightRequest; newCDPSession?(page: unknown): Promise<CdpSessionLike> };
 }
 
 /** Playwright's APIRequestContext, to exactly what the document download uses. */
@@ -308,6 +311,13 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
         `The state that opens this route is not the one the test built; seed it first, or drop the page from the sample.`,
     );
   }
+  // THE BEHAVIOUR WINDOW (#190), opened on the DOM just collected so what it reports joins to it.
+  // Its idle half first: nothing touches the page, and what changes changed on its own. The
+  // probes below are its interaction half — a button they press toggling `aria-expanded` is
+  // recorded — and it closes before axe, which only reads.
+  const behaviour = opts.behaviour === false ? undefined : await startBehaviour(page as Parameters<typeof startBehaviour>[0]);
+  await behaviour?.idle(typeof opts.behaviour === "object" && opts.behaviour.windowMs !== undefined ? opts.behaviour.windowMs : BEHAVIOUR_WINDOW_MS);
+
   // The probes run AFTER the snapshot is collected, deliberately: they stress the page —
   // double the root font size, narrow the viewport to 320px, force a spacing stylesheet, press
   // Tab, hover a tooltip — and what gets recorded must be the page as the test built it, not
@@ -346,6 +356,8 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
   // After the probes, and after the snapshot: axe reads the page, it does not stress it, so
   // its position only has to be somewhere the page is settled. Running it last keeps the
   // recorded DOM the one the test built.
+  const scripts = behaviour ? await behaviour.finish() : undefined;
+  if (scripts) collected.scripts = scripts;
   const axe = await runAxePass(page, opts.axe ?? "auto");
 
   const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe, fullShot);

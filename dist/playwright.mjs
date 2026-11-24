@@ -139,18 +139,7 @@ async function waitForLoaded(page, timeoutMs, intervalMs = 150) {
 }
 var LOADING_TIMEOUT_MS = 1e4;
 var FULL_SCREENSHOT_MAX_HEIGHT = 8e3;
-var COLLECT_SNAPSHOT = `(() => {
-  const PROPS = ${JSON.stringify(COLLECTED_CSS)};
-  const MAX = ${COLLECT_MAX_ELEMENTS};
-  // The ordinal is a JOIN KEY against parseHtml(dom), so the walk must enumerate elements
-  // exactly as a reparse of the serialisation below will (#101). querySelectorAll('*') did not:
-  //  - an element appended INSIDE a raw-text element (Next's dev overlay puts <nextjs-portal>
-  //    in a <script>) is serialised as that element's raw text, and a reparse reads text \u2014
-  //    one ordinal too many, and every digest refused from there on;
-  //  - <template> contents are serialised and reparsed as elements, but live in
-  //    template.content, which querySelectorAll never traverses \u2014 one ordinal too few.
-  // Pre-order, children of the raw-text elements HTML parsers (htmlparser2 included) treat as
-  // text skipped, template.content descended.
+var ELEMENT_WALK = `(root) => {
   const RAW_TEXT = new Set(['script', 'style', 'title', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes']);
   const els = [];
   const walkElements = (parent) => {
@@ -171,7 +160,13 @@ var COLLECT_SNAPSHOT = `(() => {
       walkElements(name === 'template' && child.content ? child.content : child);
     }
   };
-  walkElements(document);
+  walkElements(root);
+  return els;
+}`;
+var COLLECT_SNAPSHOT = `(() => {
+  const PROPS = ${JSON.stringify(COLLECTED_CSS)};
+  const MAX = ${COLLECT_MAX_ELEMENTS};
+  const els = (${ELEMENT_WALK})(document);
   const styles = [];
   const boxes = [];
   const n = Math.min(els.length, MAX);
@@ -263,6 +258,498 @@ var COLLECT_SNAPSHOT = `(() => {
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };
 })()`;
+
+// src/behaviour.ts
+var SCRIPTS_VERSION = 1;
+var BEHAVIOUR_WINDOW_MS = 2e3;
+var BEHAVIOUR_CAPS = {
+  listeners: 200,
+  inline: 200,
+  ariaMutations: 100,
+  liveRegions: 50,
+  updates: 50,
+  motion: 30,
+  animations: 30,
+  resources: 100,
+  intervals: 50
+};
+var ACTIVATION_EVENTS = ["click", "dblclick", "auxclick", "mousedown", "mouseup", "pointerdown", "pointerup", "touchstart", "touchend"];
+var HOVER_EVENTS = ["mouseover", "mouseenter", "mouseout", "mouseleave", "pointerover", "pointerenter", "pointerout", "pointerleave"];
+var KEY_EVENTS = ["keydown", "keyup", "keypress"];
+var FOCUS_EVENTS = ["focus", "blur", "focusin", "focusout"];
+var WATCHED = /* @__PURE__ */ new Set([...ACTIVATION_EVENTS, ...HOVER_EVENTS, ...KEY_EVENTS, ...FOCUS_EVENTS]);
+var TIMER_HOOK_BODY = (since) => `
+  if (!window.__ultra11yTimers) {
+    const t = { since: '${since}', intervals: new Map(), timeouts: 0, long: [], orig: { si: window.setInterval, ci: window.clearInterval, st: window.setTimeout } };
+    window.setInterval = function (fn, delay, ...rest) {
+      const id = t.orig.si.call(this, fn, delay, ...rest);
+      if (t.intervals.size < 500) t.intervals.set(id, Number(delay) || 0);
+      return id;
+    };
+    window.clearInterval = function (id) {
+      t.intervals.delete(id);
+      return t.orig.ci.call(this, id);
+    };
+    window.setTimeout = function (fn, delay, ...rest) {
+      t.timeouts++;
+      const d = Number(delay) || 0;
+      if (d >= 20000 && t.long.length < 20) t.long.push(d);
+      return t.orig.st.call(this, fn, delay, ...rest);
+    };
+    Object.defineProperty(window, '__ultra11yTimers', { value: t, configurable: true, enumerable: false, writable: true });
+  }`;
+var TIMER_HOOK = `(() => {${TIMER_HOOK_BODY("init")}
+})()`;
+var BEHAVIOUR_START = `(() => {
+  if (window.__ultra11yBehaviour) return true;
+  const els = (${ELEMENT_WALK})(document);
+  const idx = new Map();
+  for (let i = 0; i < els.length; i++) idx.set(els[i], i);
+  const installedTimers = !window.__ultra11yTimers;
+  ${TIMER_HOOK_BODY("window")}
+  const B = { idx: idx, els: els, phase: 'idle', t0: performance.now(), idleMs: undefined, changed: new Map(), aria: new Map(), installedTimers: installedTimers, overflow: { changed: 0, aria: 0 }, batch: 0 };
+  const inHead = (n) => !!(document.head && (n === document.head || document.head.contains(n)));
+  const OWN = /^(STYLE|SCRIPT|LINK)$/;
+  const track = (el, kind) => {
+    if (!el || el.nodeType !== 1 || inHead(el)) return;
+    let r = B.changed.get(el);
+    if (!r) {
+      if (B.changed.size >= 500) { B.overflow.changed++; return; }
+      r = { idle: new Set(), interaction: 0, kinds: new Set() };
+      B.changed.set(el, r);
+    }
+    if (B.phase === 'idle') r.idle.add(B.batch);
+    else r.interaction++;
+    r.kinds.add(kind);
+  };
+  B.mo = new MutationObserver((records) => {
+    B.batch++;
+    for (const m of records) {
+      if (m.type === 'attributes') {
+        const n = m.attributeName || '';
+        // The probes tag what they measure; their own marks are not the page's behaviour.
+        if (n.indexOf('data-u11y') === 0) continue;
+        const el = m.target;
+        if (n.indexOf('aria-') === 0 || n === 'role') {
+          let a = B.aria.get(el);
+          if (!a) {
+            if (B.aria.size >= 300) { B.overflow.aria++; continue; }
+            a = new Map();
+            B.aria.set(el, a);
+          }
+          let rec = a.get(n);
+          if (!rec) { rec = { from: m.oldValue, values: [], count: 0, phases: new Set() }; a.set(n, rec); }
+          rec.count++;
+          rec.phases.add(B.phase);
+          if (rec.values.length < 6) rec.values.push(el.getAttribute(n));
+        }
+        track(el, 'attr:' + n);
+      } else if (m.type === 'childList') {
+        let real = false;
+        for (const a of m.addedNodes) if (!(a.nodeType === 1 && OWN.test(a.nodeName))) real = true;
+        for (const a of m.removedNodes) if (!(a.nodeType === 1 && OWN.test(a.nodeName))) real = true;
+        if (real) track(m.target, 'children');
+      } else if (m.type === 'characterData') {
+        track(m.target.parentElement, 'text');
+      }
+    }
+  });
+  B.mo.observe(document.documentElement, { subtree: true, attributes: true, attributeOldValue: true, childList: true, characterData: true });
+  const NATIVE = new Set(['button', 'select', 'textarea', 'summary', 'option', 'label', 'iframe']);
+  B.native = (el) => {
+    const t = el.localName;
+    if (t === 'a' || t === 'area') return el.hasAttribute('href');
+    if (t === 'input') return (el.getAttribute('type') || '').toLowerCase() !== 'hidden';
+    if (t === 'video' || t === 'audio') return el.hasAttribute('controls');
+    return NATIVE.has(t) || el.isContentEditable === true;
+  };
+  B.selector = (el) => {
+    if (el.id) return el.localName + '#' + el.id;
+    const parts = [];
+    let e = el;
+    for (let depth = 0; e && e.nodeType === 1 && depth < 4; depth++) {
+      if (e.id) { parts.unshift(e.localName + '#' + e.id); break; }
+      let p = e.localName;
+      const cls = (e.getAttribute('class') || '').trim().split(/\\s+/)[0];
+      if (cls) p += '.' + cls;
+      const parent = e.parentElement;
+      if (parent) {
+        const same = Array.from(parent.children).filter((c) => c.localName === e.localName);
+        if (same.length > 1) p += ':nth-of-type(' + (same.indexOf(e) + 1) + ')';
+      }
+      parts.unshift(p);
+      e = parent;
+    }
+    return parts.join(' > ');
+  };
+  B.openTag = (el) => {
+    let s = '<' + el.localName;
+    for (const a of Array.from(el.attributes)) {
+      if (a.name.indexOf('data-u11y') === 0) continue;
+      s += ' ' + a.name + (a.value === '' ? '' : '="' + a.value.slice(0, 60) + '"');
+      if (s.length > 160) break;
+    }
+    return (s + '>').slice(0, 160);
+  };
+  B.describe = (el) => {
+    if (!el) return null;
+    if (el.nodeType === 9) return { i: -1, tag: '#document', selector: 'document', root: true };
+    if (el.nodeType !== 1) return null;
+    const i = B.idx.has(el) ? B.idx.get(el) : -1;
+    const role = el.getAttribute('role');
+    const tabindex = el.getAttribute('tabindex');
+    return {
+      i: i,
+      tag: el.localName,
+      selector: B.selector(el),
+      html: B.openTag(el),
+      native: B.native(el),
+      ...(role !== null ? { role: role } : {}),
+      ...(tabindex !== null ? { tabindex: tabindex } : {}),
+      root: el === document.documentElement || el === document.body,
+    };
+  };
+  Object.defineProperty(window, '__ultra11yBehaviour', { value: B, configurable: true, enumerable: false, writable: true });
+  return true;
+})()`;
+var BEHAVIOUR_MARK = `(() => {
+  const B = window.__ultra11yBehaviour;
+  if (!B) return false;
+  B.phase = 'interaction';
+  B.idleMs = Math.round(performance.now() - B.t0);
+  // The probes schedule timeouts of their own once the page is in their hands: counted here, the
+  // page's are not mixed with ours.
+  B.timeoutsAtMark = window.__ultra11yTimers ? window.__ultra11yTimers.timeouts : 0;
+  return true;
+})()`;
+var behaviourFinishExpr = (domListeners) => `(() => {
+  const B = window.__ultra11yBehaviour;
+  if (!B) return null;
+  try { B.mo.disconnect(); } catch (e) {}
+  const CAPS = ${JSON.stringify(BEHAVIOUR_CAPS)};
+  const truncated = {};
+  const cap = (name, list) => {
+    if (list.length > CAPS[name]) { truncated[name] = list.length; return list.slice(0, CAPS[name]); }
+    return list;
+  };
+  const el$ = (el) => { const d = B.describe(el); return { i: d.i, tag: d.tag, selector: d.selector, html: d.html }; };
+  const byI = (a, b) => (a.i - b.i) || (a.selector < b.selector ? -1 : a.selector > b.selector ? 1 : 0);
+  const live = Array.from(B.els).filter((e) => e.isConnected);
+  // Inline handlers, on what was serialized.
+  const inline = [];
+  for (const e of live) {
+    const attrs = Array.from(e.attributes).map((a) => a.name.toLowerCase()).filter((n) => n.indexOf('on') === 0 && n.length > 2).sort();
+    if (attrs.length) inline.push({ ...el$(e), attrs: attrs });
+  }
+  // The listeners the DOM alone can show.
+  let domL = null;
+  if (${domListeners ? "true" : "false"}) {
+    const EVENTS = ${JSON.stringify([...WATCHED])};
+    domL = [];
+    const read = (target) => {
+      const ev = new Set();
+      if (target.attributes) for (const a of Array.from(target.attributes)) {
+        const n = a.name.toLowerCase();
+        if (n.indexOf('on') === 0 && EVENTS.indexOf(n.slice(2)) >= 0) ev.add(n.slice(2));
+      }
+      for (const t of EVENTS) { try { if (typeof target['on' + t] === 'function') ev.add(t); } catch (e) {} }
+      return Array.from(ev).sort();
+    };
+    for (const e of live) {
+      const events = read(e);
+      if (events.length) domL.push({ facts: B.describe(e), events: events });
+    }
+    const de = read(document);
+    if (de.length) domL.push({ facts: B.describe(document), events: de });
+    const we = [];
+    for (const t of EVENTS) { try { if (typeof window['on' + t] === 'function') we.push(t); } catch (e) {} }
+    if (we.length) domL.push({ facts: { i: -1, tag: '#window', selector: 'window', root: true }, events: we });
+  }
+  // ARIA mutations.
+  const ariaMutations = [];
+  for (const [el, attrs] of B.aria) {
+    for (const [name, rec] of attrs) {
+      const phase = rec.phases.size > 1 ? 'both' : rec.phases.has('idle') ? 'idle' : 'interaction';
+      ariaMutations.push({ ...el$(el), attr: name, from: rec.from === undefined ? null : rec.from, values: rec.values, count: rec.count, phase: phase });
+    }
+  }
+  ariaMutations.sort((a, b) => byI(a, b) || (a.attr < b.attr ? -1 : 1));
+  // Live regions, and whether what they hold changed.
+  const REGION = '[aria-live],[role~="status"],[role~="alert"],[role~="log"],[role~="marquee"],[role~="timer"],output';
+  const changedEls = Array.from(B.changed.keys());
+  const liveRegions = [];
+  for (const r of Array.from(document.querySelectorAll(REGION))) {
+    const changed = changedEls.some((c) => r === c || r.contains(c));
+    const lv = r.getAttribute('aria-live');
+    const role = r.getAttribute('role');
+    const atomic = r.getAttribute('aria-atomic');
+    liveRegions.push({ ...el$(r), ...(lv !== null ? { live: lv } : {}), ...(role !== null ? { role: role } : {}), ...(atomic !== null ? { atomic: atomic } : {}), changed: changed });
+  }
+  liveRegions.sort(byI);
+  // Content updated on interaction outside any live region, and what moved on its own.
+  const updates = [];
+  const motion = [];
+  for (const [el, r] of B.changed) {
+    if (!el.isConnected) continue;
+    const kinds = Array.from(r.kinds).sort();
+    if (r.interaction > 0 && (r.kinds.has('children') || r.kinds.has('text')) && !el.closest(REGION)) updates.push({ ...el$(el), kinds: kinds });
+    if (r.idle.size >= 2) motion.push({ ...el$(el), changes: r.idle.size, kinds: kinds });
+  }
+  updates.sort(byI);
+  motion.sort(byI);
+  // Long CSS animations \u2014 moving content by the stylesheet's own declaration.
+  const animations = [];
+  try {
+    for (const a of document.getAnimations ? document.getAnimations() : []) {
+      const target = a.effect && a.effect.target;
+      if (!target || target.nodeType !== 1) continue;
+      const t = a.effect.getComputedTiming ? a.effect.getComputedTiming() : {};
+      const iterations = t.iterations === Infinity ? 'infinite' : Number(t.iterations) || 1;
+      const durationMs = Math.round(Number(t.duration) || 0);
+      if (iterations !== 'infinite' && durationMs * iterations <= 5000) continue;
+      animations.push({ ...el$(target), name: String(a.animationName || a.transitionProperty || a.id || 'animation'), iterations: iterations, durationMs: durationMs });
+    }
+  } catch (e) {}
+  animations.sort(byI);
+  // Timers.
+  const T = window.__ultra11yTimers;
+  const inlineText = Array.from(document.scripts).filter((s) => !s.src).map((s) => s.textContent || '').join('\\n');
+  const count = (re) => (inlineText.match(re) || []).length;
+  const refresh = document.querySelector('meta[http-equiv="refresh" i]');
+  const timers = {
+    source: T ? T.since : 'none',
+    intervals: T ? cap('intervals', Array.from(T.intervals.values()).sort((a, b) => a - b)) : [],
+    timeouts: T ? (B.timeoutsAtMark !== undefined ? B.timeoutsAtMark : T.timeouts) : 0,
+    longTimeouts: T ? T.long.slice().sort((a, b) => a - b) : [],
+    inlineSetInterval: count(/\\bsetInterval\\s*\\(/g),
+    inlineSetTimeout: count(/\\bsetTimeout\\s*\\(/g),
+    ...(refresh ? { metaRefresh: refresh.getAttribute('content') || '' } : {}),
+  };
+  if (T && B.installedTimers) {
+    window.setInterval = T.orig.si;
+    window.clearInterval = T.orig.ci;
+    window.setTimeout = T.orig.st;
+    try { delete window.__ultra11yTimers; } catch (e) {}
+  }
+  // The scripts and stylesheets loaded \u2014 the ones the page had when the window opened.
+  const sizeOf = (url) => {
+    try {
+      const e = performance.getEntriesByName(url)[0];
+      const n = e ? (e.encodedBodySize || e.transferSize || e.decodedBodySize || 0) : 0;
+      return n > 0 ? { size: n } : {};
+    } catch (e) { return {}; }
+  };
+  const originOf = (url) => { try { return new URL(url, location.href).origin === location.origin ? 'same-origin' : 'cross-origin'; } catch (e) { return 'cross-origin'; } };
+  const resources = [];
+  for (const e of live) {
+    const t = e.localName;
+    if (t === 'script') {
+      const src = e.getAttribute('src');
+      if (src) resources.push({ kind: 'script', origin: originOf(e.src), url: e.src, ...sizeOf(e.src) });
+      else if ((e.textContent || '').trim()) resources.push({ kind: 'script', origin: 'inline', size: (e.textContent || '').length });
+    } else if (t === 'link' && /(^|\\s)stylesheet(\\s|$)/i.test(e.getAttribute('rel') || '') && e.getAttribute('href')) {
+      resources.push({ kind: 'stylesheet', origin: originOf(e.href), url: e.href, ...sizeOf(e.href) });
+    } else if (t === 'style' && (e.textContent || '').trim()) {
+      resources.push({ kind: 'stylesheet', origin: 'inline', size: (e.textContent || '').length });
+    }
+  }
+  const idleMs = B.idleMs !== undefined ? B.idleMs : Math.round(performance.now() - B.t0);
+  const windowMs = Math.round(performance.now() - B.t0);
+  if (B.overflow.changed) truncated.changed = B.changed.size + B.overflow.changed;
+  if (B.overflow.aria) truncated.ariaElements = B.aria.size + B.overflow.aria;
+  try { delete window.__ultra11yBehaviour; } catch (e) {}
+  return {
+    windowMs: windowMs,
+    idleMs: idleMs,
+    inline: cap('inline', inline),
+    domListeners: domL,
+    ariaMutations: cap('ariaMutations', ariaMutations),
+    liveRegions: cap('liveRegions', liveRegions),
+    updates: cap('updates', updates),
+    motion: cap('motion', motion),
+    animations: cap('animations', animations),
+    timers: timers,
+    resources: cap('resources', resources),
+    truncated: truncated,
+  };
+})()`;
+function classifyListener(facts, events) {
+  const has = (list) => events.some((e) => list.includes(e));
+  const activation = has(ACTIVATION_EVENTS);
+  const hover = has(HOVER_EVENTS);
+  const key = has(KEY_EVENTS);
+  const focus = has(FOCUS_EVENTS);
+  const native = facts.native === true;
+  const role = facts.role !== void 0 && facts.role.trim() !== "" ? facts.role : void 0;
+  const tabindex = facts.tabindex !== void 0 ? facts.tabindex : void 0;
+  return {
+    i: facts.i,
+    tag: facts.tag,
+    selector: facts.selector,
+    ...facts.html ? { html: facts.html } : {},
+    events: [...events].sort(),
+    native,
+    ...role !== void 0 ? { role } : {},
+    ...tabindex !== void 0 ? { tabindex } : {},
+    flagged: activation && !native && role === void 0 && tabindex === void 0,
+    // An activation a keyboard cannot fire (a native control's click IS keyboard-fired), or a
+    // hover reaction with neither a focus nor a key counterpart.
+    mouseOnly: activation && !native && !key || hover && !focus && !key
+  };
+}
+function assembleDigest(raw, targets, collected, why) {
+  if (!raw) return noDigest("the capture window closed before it could be read (the page navigated or reloaded during it)");
+  const listeners = [];
+  const delegated = [];
+  for (const t of targets ?? []) {
+    const events = [...new Set(t.events.filter((e) => WATCHED.has(e)))].sort();
+    if (!events.length) continue;
+    if (t.facts.root) delegated.push({ target: t.facts.selector === "window" || t.facts.selector === "document" ? t.facts.selector : t.facts.tag, events });
+    else listeners.push(classifyListener(t.facts, events));
+  }
+  listeners.sort((a, b) => a.i - b.i || a.selector.localeCompare(b.selector));
+  delegated.sort((a, b) => a.target.localeCompare(b.target));
+  const truncated = { ...raw.truncated ?? {} };
+  const capped = (name, list) => {
+    if (list.length <= BEHAVIOUR_CAPS[name]) return list;
+    truncated[name] = list.length;
+    return list.slice(0, BEHAVIOUR_CAPS[name]);
+  };
+  const ranked = [...listeners.filter((l) => l.flagged || l.mouseOnly), ...listeners.filter((l) => !l.flagged && !l.mouseOnly)];
+  const kept = capped("listeners", ranked).sort((a, b) => a.i - b.i || a.selector.localeCompare(b.selector));
+  return {
+    v: SCRIPTS_VERSION,
+    collected,
+    ...why ? { why } : {},
+    ...typeof raw.windowMs === "number" ? { windowMs: raw.windowMs } : {},
+    ...typeof raw.idleMs === "number" ? { idleMs: raw.idleMs } : {},
+    listeners: kept,
+    delegated,
+    inline: raw.inline ?? [],
+    ariaMutations: raw.ariaMutations ?? [],
+    liveRegions: raw.liveRegions ?? [],
+    updates: raw.updates ?? [],
+    motion: raw.motion ?? [],
+    animations: raw.animations ?? [],
+    ...raw.timers ? { timers: raw.timers } : {},
+    resources: raw.resources ?? [],
+    caps: { ...BEHAVIOUR_CAPS },
+    ...Object.keys(truncated).length ? { truncated } : {}
+  };
+}
+function noDigest(why) {
+  return { v: SCRIPTS_VERSION, collected: "none", why, caps: { ...BEHAVIOUR_CAPS } };
+}
+var DESCRIBE_THIS = `function () { const B = window.__ultra11yBehaviour; return B ? B.describe(this) : null; }`;
+var sleep = (page, ms) => page.waitForTimeout ? page.waitForTimeout(ms) : new Promise((resolve) => setTimeout(resolve, ms));
+var firstLine = (e) => (e instanceof Error ? e.message : String(e)).split("\n")[0].slice(0, 200);
+function pageListeners(list) {
+  const instrumentation = new Set(list.filter((l) => l.type.startsWith("__playwright")).map((l) => l.scriptId));
+  return list.filter((l) => !(l.scriptId !== void 0 && instrumentation.has(l.scriptId)));
+}
+async function cdpListeners(s) {
+  const group = "ultra11y-behaviour";
+  const evaluate = async (expression) => (await s.send("Runtime.evaluate", { expression, objectGroup: group })).result?.objectId;
+  try {
+    await s.send("DOM.getDocument", { depth: 0 });
+    const docId = await evaluate("document");
+    if (!docId) throw new Error("no document object");
+    const all = pageListeners(
+      (await s.send("DOMDebugger.getEventListeners", { objectId: docId, depth: -1, pierce: false })).listeners ?? []
+    );
+    const byNode = /* @__PURE__ */ new Map();
+    for (const l of all) {
+      if (l.backendNodeId === void 0 || !WATCHED.has(l.type)) continue;
+      const set = byNode.get(l.backendNodeId) ?? /* @__PURE__ */ new Set();
+      set.add(l.type);
+      byNode.set(l.backendNodeId, set);
+    }
+    const out = [];
+    const nodes = [...byNode.entries()].slice(0, BEHAVIOUR_CAPS.listeners * 3);
+    for (const [backendNodeId, events] of nodes) {
+      try {
+        const resolved = await s.send("DOM.resolveNode", { backendNodeId, objectGroup: group });
+        const objectId = resolved.object?.objectId;
+        if (!objectId) continue;
+        const r = await s.send("Runtime.callFunctionOn", { objectId, functionDeclaration: DESCRIBE_THIS, returnByValue: true });
+        const facts = r.result?.value;
+        if (facts) out.push({ facts, events: [...events] });
+      } catch {
+      }
+    }
+    const winId = await evaluate("window");
+    if (winId) {
+      const w = pageListeners((await s.send("DOMDebugger.getEventListeners", { objectId: winId })).listeners ?? []);
+      const events = [...new Set(w.map((l) => l.type).filter((t) => WATCHED.has(t)))];
+      if (events.length) out.push({ facts: { i: -1, tag: "#window", selector: "window", root: true }, events });
+    }
+    return out;
+  } finally {
+    await s.send("Runtime.releaseObjectGroup", { objectGroup: group }).catch(() => {
+    });
+  }
+}
+async function startBehaviour(page, opts = {}) {
+  let opened = false;
+  let why = "";
+  try {
+    opened = await page.evaluate(BEHAVIOUR_START) === true;
+    if (!opened) why = "the page refused the capture script";
+  } catch (e) {
+    why = `the capture script failed: ${firstLine(e)}`;
+  }
+  let marked = false;
+  let targets;
+  let fallback = "";
+  const readListeners = async () => {
+    const ctx = opts.cdp === false ? void 0 : page.context?.();
+    const newSession = ctx?.newCDPSession;
+    if (!ctx || !newSession) {
+      targets = null;
+      fallback = opts.cdp === false ? "CDP disabled by the producer" : "no CDP session on this page object";
+      return;
+    }
+    let session;
+    try {
+      session = await newSession.call(ctx, page);
+      targets = await cdpListeners(session);
+    } catch (e) {
+      targets = null;
+      fallback = `CDP unavailable: ${firstLine(e)}`;
+    } finally {
+      await session?.detach?.().catch(() => {
+      });
+    }
+  };
+  return {
+    async idle(ms = BEHAVIOUR_WINDOW_MS) {
+      if (!opened || marked) return;
+      await sleep(page, ms);
+      marked = true;
+      await page.evaluate(BEHAVIOUR_MARK).catch(() => {
+      });
+      await readListeners();
+    },
+    async finish() {
+      if (!opened) return noDigest(why);
+      if (!marked) {
+        marked = true;
+        await page.evaluate(BEHAVIOUR_MARK).catch(() => {
+        });
+      }
+      if (targets === void 0) await readListeners();
+      const found = targets ?? null;
+      let raw;
+      try {
+        raw = await page.evaluate(behaviourFinishExpr(found === null));
+      } catch (e) {
+        return noDigest(`the capture window could not be read: ${firstLine(e)}`);
+      }
+      if (found !== null) return assembleDigest(raw, found, "cdp");
+      return assembleDigest(raw, raw?.domListeners ?? [], "dom", `${fallback} \u2014 listeners attached with addEventListener are invisible to the DOM`);
+    }
+  };
+}
 
 // src/document-store.ts
 import { createHash } from "crypto";
@@ -1644,7 +2131,9 @@ function buildPayload(collected, url, runner, opts, screenshot, probes, axe, scr
     ...probes ? { probes } : {},
     // Same contract as the probes: it rides in the payload and `snapshot write` persists it
     // beside the DOM, so the offline re-audit sees what the browser saw.
-    ...axe ? { axe } : {}
+    ...axe ? { axe } : {},
+    // The behaviour digest, when the runner opened a capture window (src/behaviour.ts).
+    ...collected.scripts ? { scripts: collected.scripts } : {}
   };
 }
 function gate(result, pageName, failOn) {
@@ -1852,6 +2341,8 @@ async function checkA11y(page, opts = {}) {
       `ultra11y: ${opts.expectPath} landed on ${url} \u2014 not recording it as "${opts.as ?? opts.name ?? "this page"}". The state that opens this route is not the one the test built; seed it first, or drop the page from the sample.`
     );
   }
+  const behaviour = opts.behaviour === false ? void 0 : await startBehaviour(page);
+  await behaviour?.idle(typeof opts.behaviour === "object" && opts.behaviour.windowMs !== void 0 ? opts.behaviour.windowMs : BEHAVIOUR_WINDOW_MS);
   let probes;
   if (opts.probes || opts.liveRegion) {
     try {
@@ -1866,6 +2357,8 @@ async function checkA11y(page, opts = {}) {
       );
     }
   }
+  const scripts = behaviour ? await behaviour.finish() : void 0;
+  if (scripts) collected.scripts = scripts;
   const axe = await runAxePass(page, opts.axe ?? "auto");
   const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe, fullShot);
   const result = auditSnapshot(payload);

@@ -2594,6 +2594,243 @@ export const SUBJECTS: Record<string, Subject> = {
 
 for (const sc of MEASURED_SCS) SUBJECTS[`rendered:${sc}`] = measured(sc);
 
+// ---- the page's behaviour (scripts.json) ------------------------------------------------
+//
+// What the page's SCRIPTS did during its capture (src/behaviour.ts, #190): the evidence the
+// script criteria are judged on and markup cannot show. A `<div>` with a click listener looks
+// exactly like a `<div>`; an `aria-expanded` that no script ever toggles looks exactly like one
+// that does; a carousel that turns on its own looks exactly like one that waits. Each subject
+// below hands the adjudicator one of those facts, anchored on the element in the serialized
+// DOM (the ordinal is the styles.json join key, verified here entry by entry), and opens with
+// a COVERAGE line per page — how the digest was collected, over how long, and what it could not
+// see — so that the absence of a flagged element is never read further than the collector looked.
+
+type Scripts = NonNullable<NonNullable<Doc["signals"]>["scripts"]>;
+type BehaviourEl = { i: number; tag: string; selector: string; html?: string };
+
+/** An anchor on the element a behaviour entry names: the parsed element when the ordinal
+ *  verifies (same tag), the collected selector otherwise — an element the page created during
+ *  the window is not in the serialized DOM, and saying so beats anchoring on its neighbour. */
+function behaviourAnchor(d: Doc, e: BehaviourEl, note: string, cls: string): Harvested {
+  const el = e.i >= 0 ? d.elements[e.i] : undefined;
+  if (el && el.tag === e.tag) return h(d, el, note, cls);
+  return hAt(d, 1, e.selector, `${note} [${e.selector}${e.html ? ` ${e.html.slice(0, 100)}` : ""} — not in the serialized DOM]`, cls);
+}
+
+/** The coverage line: what this page's digest could and could not see, for this subject. */
+function behaviourCoverage(d: Doc, page: string, s: Scripts, subject: string, found: string, listeners: boolean, lists: string[]): Harvested {
+  const how =
+    s.collected === "none"
+      ? `could NOT be collected (${s.why ?? "no reason recorded"}) — nothing here was looked at, and the absence of ${found} proves nothing`
+      : `collected via ${s.collected === "cdp" ? "CDP (every listener, however attached)" : "the DOM only"} over ${s.windowMs ?? "?"} ms (${s.idleMs ?? "?"} ms with nothing touching the page)`;
+  const caveats: string[] = [];
+  if (s.collected === "dom" && listeners)
+    caveats.push(
+      `DOM fallback (${s.why ?? "no CDP session"}): only inline on* handlers and on* properties are visible, so the absence of ${found} proves nothing`,
+    );
+  if (listeners && s.delegated?.length)
+    caveats.push(
+      `listeners delegated to ${s.delegated.map((g) => `${g.target} (${g.events.join(",")})`).join("; ")}: a framework that delegates events (React) declares its handlers there, invisible on the elements`,
+    );
+  const cut = lists.filter((l) => s.truncated?.[l] !== undefined).map((l) => `${l} capped at ${s.caps?.[l] ?? "?"} of ${s.truncated?.[l]}`);
+  if (cut.length) caveats.push(cut.join(", "));
+  return hAt(
+    d,
+    1,
+    `scripts:${subject}`,
+    `page="${page}" behaviour digest (scripts.json) ${how}${s.collected === "none" ? "" : `: ${found}`}${caveats.length ? ` — ${caveats.join("; ")}` : ""}`,
+    `behaviourcov|${subject}|${s.collected}|${s.collected === "none" ? "" : found}`,
+  );
+}
+
+/** One behaviour subject: per captured page carrying a digest, its coverage line then its anchors. */
+function behaviourSubject(
+  subject: string,
+  listeners: boolean,
+  lists: string[],
+  anchors: (d: Doc, s: Scripts) => Harvested[],
+  found: (n: number) => string,
+): Subject {
+  return (docs) =>
+    docs.flatMap((d) => {
+      const page = pageOfDoc(d.file);
+      const s = d.signals?.scripts;
+      if (page === undefined || !s) return [];
+      const items = s.collected === "none" ? [] : anchors(d, s);
+      return [behaviourCoverage(d, page, s, subject, found(items.length), listeners, lists), ...items];
+    });
+}
+
+const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+const listenerVia = (s: Scripts): string => (s.collected === "cdp" ? "CDP" : "DOM");
+/** ARIA states a script is expected to keep in step with what the control shows. */
+const STATE_ARIA = ["aria-expanded", "aria-pressed", "aria-selected", "aria-checked", "aria-current", "aria-hidden"];
+
+const BEHAVIOUR_SUBJECTS: Record<string, Subject> = {
+  // RGAA 7.1 / WCAG 4.1.2 — a scripted control the keyboard cannot reach and assistive
+  // technology cannot name: an activation listener on an element that is not natively
+  // interactive and carries neither a role nor a tabindex.
+  "behaviour:clickable": behaviourSubject(
+    "clickable",
+    true,
+    ["listeners"],
+    (d, s) =>
+      (s.listeners ?? [])
+        .filter((l) => l.flagged)
+        .map((l) =>
+          behaviourAnchor(
+            d,
+            l,
+            `<${l.tag}> listens for ${l.events.join(", ")} (${listenerVia(s)}) but is not natively interactive and has neither role nor tabindex — out of the tab order and unknown to assistive technology`,
+            `bclickable|${l.tag}|${l.selector}|${l.events.join(",")}`,
+          ),
+        ),
+    (n) => `${plural(n, "clickable element")} without role or tabindex`,
+  ),
+
+  // RGAA 7.3 / WCAG 2.1.1 — a behaviour reachable by pointer only.
+  "behaviour:keyboard": behaviourSubject(
+    "keyboard",
+    true,
+    ["listeners"],
+    (d, s) =>
+      (s.listeners ?? [])
+        .filter((l) => l.mouseOnly)
+        .map((l) =>
+          behaviourAnchor(
+            d,
+            l,
+            `<${l.tag}${l.role ? ` role="${l.role}"` : ""}${l.tabindex !== undefined ? ` tabindex="${l.tabindex}"` : ""}> listens for ${l.events.join(", ")} (${listenerVia(s)}) and for no keyboard event${l.native ? "" : " — and is not a native control, so Enter/Space do not fire its click"}: is the same action available from the keyboard?`,
+            `bkeyboard|${l.tag}|${l.selector}|${l.events.join(",")}`,
+          ),
+        ),
+    (n) => plural(n, "mouse-only listener target"),
+  ),
+
+  // RGAA 7.1 / WCAG 4.1.2 — an ARIA state the script keeps (or fails to keep) in step: what it
+  // changed during the window, and the stateful controls carrying a listener it was not seen to
+  // change.
+  "behaviour:aria": behaviourSubject(
+    "aria",
+    true,
+    ["ariaMutations", "listeners"],
+    (d, s) => {
+      const mutated = new Set((s.ariaMutations ?? []).map((m) => `${m.i}|${m.selector}|${m.attr}`));
+      return [
+        ...(s.ariaMutations ?? []).map((m) =>
+          behaviourAnchor(
+            d,
+            m,
+            `script changed ${m.attr} on <${m.tag}> ${m.phase === "idle" ? "with nothing touching the page" : m.phase === "interaction" ? "on interaction" : "on its own and on interaction"}: ${JSON.stringify(m.from)} → ${m.values.map((v) => JSON.stringify(v)).join(" → ")} (${plural(m.count, "change")}) — does the state announced match the state shown?`,
+            `baria|${m.tag}|${m.selector}|${m.attr}`,
+          ),
+        ),
+        ...(s.listeners ?? []).flatMap((l) => {
+          const el = l.i >= 0 ? d.elements[l.i] : undefined;
+          if (!el || el.tag !== l.tag) return [];
+          const states = STATE_ARIA.filter((a) => attr(el, a) !== undefined && !mutated.has(`${l.i}|${l.selector}|${a}`));
+          if (!states.length || !l.events.some((e) => /click|pointer|mouse|key|touch/.test(e))) return [];
+          return [
+            h(
+              d,
+              el,
+              `<${l.tag}> carries ${states.map((a) => `${a}="${attr(el, a)}"`).join(" ")} and listens for ${l.events.join(", ")} (${listenerVia(s)}) — the state is the script's to toggle; it was not seen changing during the capture`,
+              `bariastate|${l.tag}|${l.selector}|${states.join(",")}`,
+            ),
+          ];
+        }),
+      ];
+    },
+    (n) => plural(n, "scripted ARIA state"),
+  ),
+
+  // RGAA 7.5 / WCAG 4.1.3 — status messages: the live regions and whether they spoke, and the
+  // content a script updated on interaction where no live region would announce it.
+  "behaviour:live": behaviourSubject(
+    "live",
+    false,
+    ["liveRegions", "updates"],
+    (d, s) => [
+      ...(s.liveRegions ?? []).map((r) =>
+        behaviourAnchor(
+          d,
+          r,
+          `live region <${r.tag}>${r.role ? ` role="${r.role}"` : ""}${r.live !== undefined ? ` aria-live="${r.live}"` : ""}${r.atomic !== undefined ? ` aria-atomic="${r.atomic}"` : ""} — its content ${r.changed ? "CHANGED during the capture" : "did not change during the capture"}`,
+          `blive|${r.tag}|${r.selector}|${r.changed}`,
+        ),
+      ),
+      ...(s.updates ?? []).map((u) =>
+        behaviourAnchor(
+          d,
+          u,
+          `<${u.tag}> content updated by script on interaction (${u.kinds.join(", ")}) OUTSIDE any live region — a status message nobody is told about?`,
+          `bupdate|${u.tag}|${u.selector}`,
+        ),
+      ),
+    ],
+    (n) => plural(n, "live region or unannounced update", "live regions and unannounced updates"),
+  ),
+
+  // RGAA 13.8 / WCAG 2.2.2 — content that moves or updates on its own.
+  "behaviour:motion": behaviourSubject(
+    "motion",
+    false,
+    ["motion", "animations"],
+    (d, s) => [
+      ...(s.motion ?? []).map((m) =>
+        behaviourAnchor(
+          d,
+          m,
+          `<${m.tag}> changed ${plural(m.changes, "time")} in ${s.idleMs ?? "?"} ms with nothing touching the page (${m.kinds.join(", ")}) — moving or auto-updating content: can it be paused, stopped or hidden?`,
+          `bmotion|${m.tag}|${m.selector}`,
+        ),
+      ),
+      ...(s.animations ?? []).map((a) =>
+        behaviourAnchor(
+          d,
+          a,
+          `CSS animation "${a.name}" on <${a.tag}> runs ${a.iterations === "infinite" ? "forever" : `${a.iterations} × ${a.durationMs} ms`} — moving for more than 5 s: can it be stopped?`,
+          `banim|${a.tag}|${a.selector}|${a.name}`,
+        ),
+      ),
+    ],
+    (n) => plural(n, "moving element"),
+  ),
+
+  // RGAA 13.1 / WCAG 2.2.1 — time limits: the timers running, and the long ones.
+  "behaviour:timers": behaviourSubject(
+    "timers",
+    false,
+    ["intervals"],
+    (d, s) => {
+      const t = s.timers;
+      if (!t) return [];
+      const any = t.intervals.length || t.timeouts || t.longTimeouts.length || t.inlineSetInterval || t.inlineSetTimeout || t.metaRefresh !== undefined;
+      if (!any) return [];
+      const seen = t.source === "init" ? "since the page started" : t.source === "window" ? "scheduled during the capture window only" : "not hooked";
+      const parts = [
+        `${plural(t.intervals.length, "interval")} running${t.intervals.length ? ` (every ${[...new Set(t.intervals)].slice(0, 8).join(", ")} ms)` : ""}`,
+        `${plural(t.timeouts, "timeout")} scheduled`,
+        ...(t.longTimeouts.length ? [`long timeouts of ${t.longTimeouts.join(", ")} ms — a session or time limit?`] : []),
+        `inline scripts call setInterval ×${t.inlineSetInterval}, setTimeout ×${t.inlineSetTimeout}`,
+        ...(t.metaRefresh !== undefined ? [`<meta http-equiv="refresh" content="${t.metaRefresh}">`] : []),
+      ];
+      return [
+        hAt(
+          d,
+          1,
+          "scripts:timers",
+          `timers (${seen}): ${parts.join("; ")}`,
+          `btimers|${t.intervals.length > 0}|${t.longTimeouts.join(",")}|${t.metaRefresh ?? ""}`,
+        ),
+      ];
+    },
+    (n) => (n ? "timers recorded" : "no timer recorded"),
+  ),
+};
+
+Object.assign(SUBJECTS, BEHAVIOUR_SUBJECTS);
+
 // ---- which subjects serve which criterion ------------------------------------------------
 //
 // EVERY success criterion the static engine cannot decide names its subjects. The integrity
@@ -2623,11 +2860,11 @@ export const SC_SUBJECTS: Record<string, string[]> = {
   // Content on Hover or Focus. Its subject IS the additional content — `aria` and `stickies`
   // were standing in for a harvester that did not exist yet.
   "1.4.13": ["additionalContent", "aria", "stickies"],
-  "2.1.1": ["pointerHandlers", "focusables"],
+  "2.1.1": ["pointerHandlers", "focusables", "behaviour:keyboard", "behaviour:clickable"],
   "2.1.2": ["focusables", "pointerHandlers"],
   "2.1.4": ["shortcuts"],
-  "2.2.1": ["timers"],
-  "2.2.2": ["motion", "timers"],
+  "2.2.1": ["timers", "behaviour:timers"],
+  "2.2.2": ["motion", "timers", "behaviour:motion", "behaviour:timers"],
   "2.3.1": ["flashes"],
   "2.4.1": ["landmarks"],
   "2.4.3": ["focusOrder"],
@@ -2654,8 +2891,8 @@ export const SC_SUBJECTS: Record<string, string[]> = {
   "3.3.4": ["controls", "errors"],
   "3.3.7": ["controls"],
   "3.3.8": ["controls"],
-  "4.1.2": ["aria"],
-  "4.1.3": ["liveRegions"],
+  "4.1.2": ["aria", "behaviour:clickable", "behaviour:aria"],
+  "4.1.3": ["liveRegions", "behaviour:live"],
 };
 
 /** Pack criteria whose subject is NARROWER than the union of their mapped success criteria.
@@ -2766,11 +3003,13 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "3.3": ["colourPairs", "colourDecls", "rendered:1.4.11", "controls", "buttons", "stylesheets"],
     // Theme 7 — scripts. "Is each script operable by keyboard AND pointer?" is about the
     // handlers and the focusable surface, never about the page's headings and lists.
-    "7.1": ["aria", "pointerHandlers"],
+    // The behaviour digest (scripts.json, #190) is what these are judged on in a capture: a
+    // listener on a `<div>`, an `aria-expanded` the script toggles, a status that is announced.
+    "7.1": ["aria", "pointerHandlers", "behaviour:clickable", "behaviour:aria"],
     "7.2": ["scriptAlternatives"],
-    "7.3": ["pointerHandlers", "pointerActions", "focusables"],
+    "7.3": ["pointerHandlers", "pointerActions", "focusables", "behaviour:keyboard", "behaviour:clickable"],
     "7.4": ["contextChange"],
-    "7.5": ["liveRegions", "rendered:4.1.3"],
+    "7.5": ["liveRegions", "rendered:4.1.3", "behaviour:live"],
     // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
     // reorders, and what is hidden on purpose.
     //
@@ -2798,7 +3037,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "10.13": ["additionalContent", "rendered:1.4.13", "aria", "stickies"],
     "10.14": ["additionalContent", "rendered:1.4.13", "focusables", "pointerHandlers"],
     // Theme 13 — consultation.
-    "13.1": ["timers", "externalScripts"],
+    "13.1": ["timers", "externalScripts", "behaviour:timers"],
     // 13.2 asks about a window OPENING, which is not the context-change question it inherited
     // from WCAG 3.2.1. See `newWindow`.
     "13.2": ["newWindow"],
@@ -2807,7 +3046,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "13.5": ["cryptic"],
     "13.6": ["cryptic"],
     "13.7": ["flashes"],
-    "13.8": ["motion", "timers", "externalScripts"],
+    "13.8": ["motion", "timers", "externalScripts", "behaviour:motion"],
     "13.9": ["orientation", "rendered:1.3.4", "stylesheets"],
     "13.10": ["pointerHandlers", "externalScripts"],
     "13.12": ["pointerHandlers", "externalScripts"],

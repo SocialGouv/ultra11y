@@ -17,6 +17,9 @@ That difference is not cosmetic. It is what makes a whole class of criteria deci
   axtree.json   the accessibility tree, when a producer supplies it (no rule reads it yet)
   probes.json   what the LIVE probes measured here — and `probed`, which ones actually ran
   axe.json      the axe pass that ran beside them (`ran: true` is what makes its silence usable)
+  scripts.json  what the page's SCRIPTS did during a short capture window: listeners (flagged
+                when nothing makes the element keyboard-reachable), inline handlers, ARIA
+                mutations, live regions, timers, moving content, scripts and stylesheets loaded
   screen.png    viewport screenshot (pixel tier)
 ```
 
@@ -27,6 +30,21 @@ rendering conformity — 1.4.4, 1.4.10 and 1.4.12 have no offline rule at all, a
 canonical decider is axe. `probed` is written only for a probe that really ran: one that threw,
 a viewport that would not resize, an override that would not apply — none of them reach it,
 because their silence is not a measurement.
+
+`scripts.json` is the behaviour half (#190). The script criteria — RGAA 7.1, 7.3, 7.5, 13.1,
+13.8; WCAG 2.1.1, 2.2.1, 2.2.2, 4.1.2, 4.1.3 — are judged on what the page DOES, which markup
+does not show: a `<div>` with a click listener is markup-identical to a `<div>`. After the DOM is
+serialized, the producer leaves the page alone for ~2 s (whatever changes then changed on its
+own: a carousel, a ticker), then runs its probes (an `aria-expanded` a button toggles shows up
+then). Listeners are read through CDP (`DOMDebugger.getEventListeners`) when the producer has a
+session — `scan` and `ultra11y/playwright` on Chromium — and from the DOM alone otherwise
+(`ultra11y/cypress`: inline `on*` handlers and `on*` properties). The file says which in
+`collected` (`cdp` | `dom` | `none`), every list is capped (`caps`, `truncated`), and elements are
+indexed with the same document-order ordinal as `styles.json`. The adjudication briefs of those
+criteria quote it as evidence, element by element, after a coverage line saying how it was
+collected — so a page whose behaviour could not be read is never mistaken for one with nothing to
+find. `ultra11y/playwright` and `ultra11y/cypress` take `behaviour: false` to skip it, or
+`{ windowMs }` to change the window.
 
 `audit` ingests `.ultra11y/pages` automatically, exactly as it ingests `.ultra11y/captures`
 (`--no-captures` opts out of both). Nothing new to run:

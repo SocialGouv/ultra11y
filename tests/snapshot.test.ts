@@ -19,6 +19,7 @@ import {
   type StyleEntry,
 } from "../src/snapshot.js";
 import { parseCaptureProvenance } from "../src/capture.js";
+import { ELEMENT_WALK } from "../src/collector.js";
 import { runAudit } from "../src/audit.js";
 
 let root: string;
@@ -280,7 +281,10 @@ describe("browser collector", () => {
   });
 
   it("walks elements in the order a reparse of its serialisation yields, so the ordinal is the join key (#101)", () => {
-    expect(COLLECT_SNAPSHOT).toContain("walkElements(document)");
+    // The walk is one shared definition (ELEMENT_WALK), applied to the document — the behaviour
+    // digest (scripts.json) indexes its elements with the very same function.
+    expect(COLLECT_SNAPSHOT).toContain(`(${ELEMENT_WALK})(document)`);
+    expect(ELEMENT_WALK).toContain("walkElements(root)");
     expect(COLLECT_SNAPSHOT).toContain("template' && child.content");
     for (const raw of ["script", "style", "title", "textarea", "xmp", "iframe", "noembed", "noframes"]) expect(COLLECT_SNAPSHOT).toContain(`'${raw}'`);
     expect(COLLECT_SNAPSHOT).toContain("documentElement");

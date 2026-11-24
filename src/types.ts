@@ -474,6 +474,100 @@ export interface ReflowClipped {
   textNodesWalked?: number;
 }
 
+/** An element a behaviour digest reports on. `i` is the same document-order ordinal
+ *  styles.json and boxes.json use (src/collector.ts ELEMENT_WALK), taken when the capture window
+ *  OPENED — right after the DOM was serialized — so it joins to `dom.html`; `-1` for an element
+ *  the page created during the window, which the serialized DOM does not hold. `tag` repeats the
+ *  element so the join is verified per entry, and `selector` is what a reader is shown when it
+ *  does not verify. */
+export interface BehaviourElement {
+  i: number;
+  tag: string;
+  selector: string;
+  /** The opening tag, attributes included, bounded. */
+  html?: string;
+}
+
+/** One element carrying click, key, pointer, hover or focus listeners. */
+export interface BehaviourListener extends BehaviourElement {
+  /** The event types listened for on the element ITSELF, sorted. */
+  events: string[];
+  /** Natively interactive: a link with href, a button, a form control, summary… */
+  native: boolean;
+  role?: string;
+  tabindex?: string;
+  /** An activation listener (click, pointer, mouse or touch) on an element that is not natively
+   *  interactive and has neither a role nor a tabindex: out of the tab order and unknown to
+   *  assistive technology. */
+  flagged: boolean;
+  /** Pointer or hover behaviour with no keyboard counterpart on the element. */
+  mouseOnly: boolean;
+}
+
+/** WHAT THE PAGE'S SCRIPTS DO — `scripts.json`, the behaviour digest of a page snapshot (#190).
+ *
+ *  Collected in the browser over a short capture window, through the Chrome DevTools Protocol
+ *  when the producer has a CDP session (`DOMDebugger.getEventListeners` sees every listener,
+ *  however it was attached) and from the DOM alone otherwise (inline `on*` handlers and `on*`
+ *  properties only). `collected` says which, and `none` says the collector could not run at
+ *  all: the ABSENCE of a listener, a mutation or a timer is evidence only as far as the
+ *  collector could look, and never a conformity by silence.
+ *
+ *  Every list is capped; `caps` records the bounds and `truncated` how many were seen when a
+ *  list was cut. */
+export interface ScriptsDigest {
+  v: number;
+  collected: "cdp" | "dom" | "none";
+  /** Why the collector fell back to the DOM, or could not run. */
+  why?: string;
+  /** The capture window, and how much of it the page was left alone (no probe, no click). */
+  windowMs?: number;
+  idleMs?: number;
+  listeners?: BehaviourListener[];
+  /** Listeners on `window`, `document`, `<html>` or `<body>`: delegation roots, where a
+   *  framework (React) attaches the handlers its components declare — which are then invisible
+   *  on the elements themselves. */
+  delegated?: { target: string; events: string[] }[];
+  /** Elements carrying inline `on*` handler attributes. */
+  inline?: (BehaviourElement & { attrs: string[] })[];
+  /** ARIA attributes (and `role`) the page's scripts changed during the window. `phase` says
+   *  whether it happened while the page was left alone or while the producer interacted with it
+   *  (a probe pressing Tab, hovering, clicking a button). */
+  ariaMutations?: (BehaviourElement & {
+    attr: string;
+    from: string | null;
+    values: (string | null)[];
+    count: number;
+    phase: "idle" | "interaction" | "both";
+  })[];
+  /** Live regions on the page, and whether their content changed during the window. */
+  liveRegions?: (BehaviourElement & { live?: string; role?: string; atomic?: string; changed: boolean })[];
+  /** Content the page updated on interaction OUTSIDE any live region — candidate status messages. */
+  updates?: (BehaviourElement & { kinds: string[] })[];
+  /** Elements that changed at least twice while nobody interacted: auto-updating or rotating content. */
+  motion?: (BehaviourElement & { changes: number; kinds: string[] })[];
+  /** CSS animations running forever or for longer than five seconds. */
+  animations?: (BehaviourElement & { name: string; iterations: number | "infinite"; durationMs: number })[];
+  /** Timers. `source: "init"` when the hook was installed before the page's own scripts ran (the
+   *  whole life of the page is counted), `"window"` when only the capture window was. */
+  timers?: {
+    source: "init" | "window" | "none";
+    /** Delays (ms) of the intervals still running at the end of the window. */
+    intervals: number[];
+    timeouts: number;
+    /** Timeouts of 20 s or more — the shape of a session limit. */
+    longTimeouts: number[];
+    inlineSetInterval: number;
+    inlineSetTimeout: number;
+    metaRefresh?: string;
+  };
+  /** The scripts and stylesheets the page loaded, with their origin and size when the browser
+   *  exposes it (a cross-origin resource without Timing-Allow-Origin does not). */
+  resources?: { kind: "script" | "stylesheet"; origin: "inline" | "same-origin" | "cross-origin"; url?: string; size?: number }[];
+  caps: Record<string, number>;
+  truncated?: Record<string, number>;
+}
+
 /** The signals attached to a Doc parsed from a page snapshot's `dom.html`. Absent for every
  *  ordinary source file — a rendered rule simply does not fire, which is why adding this tier
  *  cannot change any existing verdict. */
@@ -543,6 +637,10 @@ export interface RenderSignals {
   doctype?: string;
   /** The collector truncated: elements past the cap have NO signals and stay undecided. */
   truncated?: boolean;
+  /** What the page's scripts did during the capture (`scripts.json`). Element-indexed like the
+   *  styles, but verified PER ENTRY by its reader rather than wholesale: an element the page
+   *  created during the window has no ordinal, and that must not refuse the rest. */
+  scripts?: ScriptsDigest;
 }
 
 // ---- the page dimension -----------------------------------------------------------------

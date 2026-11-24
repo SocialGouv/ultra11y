@@ -107,6 +107,7 @@ import { evidenceNotice, writeEvidence } from "./evidence.js";
 import { writeHtml } from "./html-emit.js";
 import {
   PAGES_DIR,
+  asScriptsDigest,
   readSnapshots,
   type SnapshotProbes,
   validateSnapshotMeta,
@@ -1925,6 +1926,7 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
     screenshotFull?: unknown;
     probes?: SnapshotProbes;
     axe?: unknown;
+    scripts?: unknown;
   };
   try {
     payload = JSON.parse(raw);
@@ -1958,6 +1960,10 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
       // Same reason, for the axe pass: what a rule engine found in the browser has to survive
       // the process that found it, or the offline re-audit sees a page nobody ran axe on.
       ...(payload.axe ? { axe: payload.axe as RenderSignals["axe"] } : {}),
+      // And for the behaviour digest (#190): what the page's scripts did during the capture
+      // window. Checked first — a producer is untrusted input, and a digest this engine cannot
+      // read is not written as if it could.
+      ...(asScriptsDigest(payload.scripts) ? { scripts: asScriptsDigest(payload.scripts) } : {}),
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command,
       // `scan` — writes it the one same way.

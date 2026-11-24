@@ -27,6 +27,7 @@ import { join, resolve } from "node:path";
 import { type AxeEngine, runAxe } from "./axe-engine.js";
 import { type Journey, type JourneyStep, type JourneyTarget, notRunRecord, stepPageId, targetLabel } from "./journey.js";
 import { resolveMessage } from "./messages.js";
+import { TIMER_HOOK, startBehaviour } from "./behaviour.js";
 import { PRELUDE, runLiveProbes } from "./probes.js";
 import { type ProbeHit, type RunnerOutput, toDynamicResult, writeRunnerSnapshot } from "./scan.js";
 import { landedOnRequestedPage, launchChromium, resolveLocalDeps } from "./scan-local.js";
@@ -406,6 +407,11 @@ async function capture(page: Any, axe: AxeEngine, lang: Lang): Promise<RunnerOut
       }
     }
   }
+  // THE BEHAVIOUR WINDOW (#190), as `scan` opens it: on the DOM just serialized, idle first (what
+  // changes then changed on its own), the probes below as its interaction half, closed after
+  // them. Each step's snapshot then carries its own scripts.json — the state the journey built.
+  const behaviour = snapshot ? await startBehaviour(page) : undefined;
+  await behaviour?.idle();
   // Not caught: a state whose axe pass failed would be persisted as « axe ran, found nothing ».
   // The throw fails the step instead, with the reason.
   const axeRun = await runAxe(axe, page, "journey");
@@ -431,6 +437,8 @@ async function capture(page: Any, axe: AxeEngine, lang: Lang): Promise<RunnerOut
     focusObscured: undefined as ProbeHit[] | undefined,
   }));
   await page.evaluate("window.__u11yJ && window.__u11yJ.restore()").catch(() => {});
+  // Never fatal: a window that could not be read is written `collected: "none"`, with the reason.
+  if (behaviour && snapshot) snapshot.scripts = await behaviour.finish();
   await page.evaluate(STRIP_TAGS).catch(() => {});
   return {
     url: page.url() as string,
@@ -545,6 +553,9 @@ async function runOne(
   }
   const context = await browser.newContext(storageState ? { storageState } : {});
   const page = await context.newPage();
+  // The timer hook before the application's own scripts, so each step's behaviour digest counts
+  // the intervals started at load (src/behaviour.ts), as `scan` does.
+  await page.addInitScript(TIMER_HOOK).catch(() => {});
   const traps = new Set<string>();
   try {
     const steps: { def: JourneyStep; rec: JourneyStepRecord }[] = [
