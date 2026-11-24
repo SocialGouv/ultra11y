@@ -23,7 +23,8 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAudit } from "../src/audit.js";
-import { buildAdjudicationWorklist, formatAdjudication } from "../src/adjudicate.js";
+import { buildAdjudicationWorklist, formatAdjudication, glossaryAnchorsOf } from "../src/adjudicate.js";
+import { getCriterion, loadPack, resolveGlossary } from "../src/standards/index.js";
 import { verdictSystemPrompt } from "../src/verdict-rules.js";
 
 const dir = mkdtempSync(join(tmpdir(), "u11y-ctx-"));
@@ -40,6 +41,22 @@ writeFileSync(
 );
 
 const items = () => buildAdjudicationWorklist(runAudit({ inputs: [PAGE] }), { standard: "rgaa" });
+
+/** Every definition the glossary block prints: the `- **term** — …` lines that follow its
+ *  heading (and the blank line after it), up to the first line that is not one. */
+function printedDefinitions(md: string): string[] {
+  const lines = md.split("\n");
+  const start = lines.indexOf("> **Termes définis par le référentiel**");
+  if (start < 0) return [];
+  const out: string[] = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (line.startsWith("- **")) out.push(line);
+    else if (line === "" && !out.length) continue;
+    else break;
+  }
+  return out;
+}
 
 describe("the contract is dropped only where a system prompt already carries it", () => {
   const one = () => [items()[0]!];
@@ -73,10 +90,28 @@ describe("the bounded blocks stay bounded", () => {
   const all = () => items().map((it) => formatAdjudication([it], "fr", "rgaa", { preamble: false, contract: false }));
 
   it("never cuts a glossary definition — the glossary is not a bounded block (#182)", () => {
-    for (const md of all()) {
-      const block = md.split("**Termes définis par le référentiel**")[1]?.split("\n\n")[0] ?? "";
-      for (const line of block.split("\n").filter((l) => l.startsWith("- **"))) expect(line.endsWith("…"), line.slice(0, 60)).toBe(false);
+    const pack = loadPack("rgaa");
+    let checked = 0;
+    for (const it of items()) {
+      const md = formatAdjudication([it], "fr", "rgaa", { preamble: false, contract: false });
+      const expected = glossaryAnchorsOf(getCriterion(pack, it.criteriaId))
+        .map((a) => resolveGlossary("rgaa", a))
+        .filter((e) => e !== undefined)
+        .map((e) => `- **${e.title}** — ${e.body.replace(/\s+/g, " ").trim()}`);
+      const printed = printedDefinitions(md);
+      expect(printed, it.criteriaId).toEqual(expected);
+      checked += printed.length;
     }
+    // Non-vacuous: a worklist of ~100 RGAA criteria cites hundreds of defined terms.
+    expect(checked).toBeGreaterThan(100);
+  });
+
+  it("the extractor sees a cut definition — the check above can fail", () => {
+    const md = formatAdjudication([items().find((i) => i.criteriaId === "11.5") ?? items()[0]!], "fr", "rgaa", { preamble: false, contract: false });
+    const printed = printedDefinitions(md);
+    expect(printed.length).toBeGreaterThan(0);
+    const cut = md.replace(printed[0]!, `${printed[0]!.slice(0, 120)}…`);
+    expect(printedDefinitions(cut)).not.toEqual(printed);
   });
 
   it("keeps every numbered test's WORDING, never abridged by the procedure budget", () => {
