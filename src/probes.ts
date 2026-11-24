@@ -33,6 +33,18 @@ export const PROBES_VERSION = 2;
  *  nothing. */
 export const WALK_DEPENDENT_SCS: readonly string[] = ["1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
 
+/** What the 320px reflow probe found beyond the viewport, per element (#184). A type-only
+ *  import: erased at build, so this module still depends on nothing at run time. */
+import type { ReflowClipped } from "./types.js";
+
+/** The reflow measure as a message parameter: how much TEXT and how many CONTROLS lie beyond
+ *  the viewport. Absent on a capture older than the measure, so the sentence then says nothing
+ *  about it rather than claiming a zero nobody measured. */
+export function reflowClippedParams(clipped: ReflowClipped | undefined): Record<string, string> {
+  if (!clipped || typeof clipped.textCount !== "number" || typeof clipped.controlCount !== "number") return {};
+  return { clippedText: String(clipped.textCount), clippedControls: String(clipped.controlCount) };
+}
+
 /** One thing a probe observed. Structurally identical to `ProbeHit` in src/scan.ts, restated
  *  here so this module keeps no dependency on the scan runtime. */
 export interface ProbeHit {
@@ -208,7 +220,58 @@ export const REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
   // content (a long word, a ::before/::after) spills out — its ancestors only carry the spill.
   const deepest = content.filter(([e]) => !content.some(([o]) => o !== e && e.contains(o)) && !Array.from(boxes).some((b) => e.contains(b)));
   const widening = outer.concat(deepest).slice(0, 5).map(([e, d]) => ({ selector: __sel(e), html: __html(e), detail: d }));
-  return { horizontalScroll, widening };
+  // A WIDE BOX IS NOT LOST CONTENT (#184). A footer logo sticking out by 8px makes the page
+  // scroll sideways, and was reported on a dozen pages as if text had gone missing. What 1.4.10
+  // is about is CONTENT the user has to scroll in two dimensions to reach: text and controls.
+  // So the same pass measures, per element, which TEXT lays out beyond the viewport (the text
+  // node's own line boxes, Range.getClientRects, not its container's box) and which controls or
+  // replaced elements (a link, a field, an image) do. A box whose own text fits reports neither.
+  const textOver = new Map();
+  const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+  let seenText = 0;
+  for (let t = walker.nextNode(); t && seenText < 5000; t = walker.nextNode()) {
+    if (!t.nodeValue || !t.nodeValue.trim()) continue;
+    const p = t.parentElement;
+    if (!p) continue;
+    seenText++;
+    const ps = getComputedStyle(p);
+    if (ps.visibility === 'hidden' || ps.display === 'none') continue;
+    const range = document.createRange();
+    range.selectNodeContents(t);
+    let over = 0;
+    for (const r of Array.from(range.getClientRects())) if (r.width > 0 && r.height > 0) over = Math.max(over, r.right + sx - vw);
+    if (over <= 2) continue;
+    if (contained(p)) continue;
+    let fixed = false;
+    for (let n = p; n && n !== document.documentElement; n = n.parentElement) if (getComputedStyle(n).position === 'fixed') { fixed = true; break; }
+    if (fixed) continue;
+    const prev = textOver.get(p);
+    textOver.set(p, { over: Math.max(over, prev ? prev.over : 0), text: ((prev ? prev.text + ' ' : '') + t.nodeValue.trim()).slice(0, 80) });
+  }
+  const textHits = Array.from(textOver.entries()).sort((a, b) => b[1].over - a[1].over);
+  const CONTROL = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=link],[tabindex]:not([tabindex="-1"]),img,svg,video,iframe,canvas,object,embed';
+  const controlHits = [];
+  for (const e of Array.from(document.querySelectorAll(CONTROL))) {
+    const r = e.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) continue;
+    const over = r.right + sx - vw;
+    if (over <= 2) continue;
+    const s = getComputedStyle(e);
+    if (s.visibility === 'hidden' || s.display === 'none' || s.position === 'fixed') continue;
+    if (contained(e)) continue;
+    // The svg inside a link is the link: name the outermost control only.
+    if (controlHits.some(([o]) => o.contains(e))) continue;
+    for (let i = controlHits.length - 1; i >= 0; i--) if (e.contains(controlHits[i][0])) controlHits.splice(i, 1);
+    controlHits.push([e, over, r.width, /^(img|svg|video|iframe|canvas|object|embed)$/i.test(e.tagName) ? 'replaced' : 'control']);
+  }
+  controlHits.sort((a, b) => b[1] - a[1]);
+  const clipped = {
+    text: textHits.slice(0, 5).map(([e, v]) => ({ selector: __sel(e), html: __html(e), detail: 'texte « ' + v.text + ' » posé ' + Math.round(v.over) + 'px au-delà du bord droit du viewport' })),
+    textCount: textHits.length,
+    controls: controlHits.slice(0, 5).map(([e, over, w, kind]) => ({ selector: __sel(e), html: __html(e), detail: (kind === 'replaced' ? 'élément remplacé' : 'contrôle') + ' posé ' + Math.round(over) + 'px au-delà du bord droit du viewport (largeur ' + Math.round(w) + 'px)' })),
+    controlCount: controlHits.length,
+  };
+  return { horizontalScroll, widening, clipped };
 })()`;
 
 /** THE STRESS LIBRARY — what the zoom and text-spacing probes share.
@@ -488,7 +551,7 @@ export const TEXT_SPACING_PROBE = `(async () => { ${PRELUDE} ${STRESS_LIB}
 // one-part one would report a change on every element that has a `::before` at all.
 export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables): string {
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
-  return `(() => { ${PRELUDE}
+  return `(async () => { ${PRELUDE} ${FRAMES}
   // FOCUSABLE MEANS FOCUSABLE, NOT "the six tags we thought of". This list decides which
   // elements get tagged, and since the walk may now license a conformity, an element missing
   // from it is not merely unmeasured -- it is silently cleared. A page whose only control is a
@@ -551,6 +614,27 @@ export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFoc
     if (root.matches && root.matches(sel)) focusables.push(root);
     for (const e of Array.from(root.querySelectorAll(sel))) focusables.push(e);
   }
+  // THE REST STATE IS THE UNFOCUSED STATE, and an element focused at load is not at rest. An
+  // autofocus field (a login form's username, #184) was photographed with its ring already on,
+  // so the comparison after Tab saw no change and reported a decisive « focus not visible » on
+  // a ring that was plainly there. Blur whatever holds focus, let the page repaint (and finish
+  // any focus transition, whose mid-flight value is neither state), snapshot, then hand focus
+  // back so the walk starts where a keyboard user would.
+  // NOT INSIDE AN OPENED DIALOG: the scoped pass runs on a dialog this tool opened, and blurring
+  // its focused control is exactly what closes a menu or a popover listening on focusout. There
+  // the focused element is simply recorded as not at rest, and never accused.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const held = document.activeElement;
+  const focusedHeld = !!(held && held !== document.body && held !== document.documentElement);
+  const blurred = ${scope ? "false" : "true"} && focusedHeld && typeof held.blur === 'function';
+  if (blurred) {
+    try { held.blur(); } catch (_) {}
+    await __frames();
+    try { for (const a of document.getAnimations ? document.getAnimations() : []) { if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) a.finish(); } } catch (_) {}
+  }
+  // A page that pulls focus straight back (a focus handler, a trap) leaves nothing at rest to
+  // compare with: that element is recorded as such, and the check refuses to accuse it.
+  const stillHeld = focusedHeld && document.activeElement === held ? held : null;
   window.__u11yF = {};
   let n = 0;
   for (const e of focusables) {
@@ -561,9 +645,11 @@ export function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFoc
     if (n >= ${maxFocusables}) continue; // tagged the cap; keep COUNTING so the caller knows it was cut
     e.setAttribute('data-u11y-f', key);
     proxy.setAttribute('data-u11y-fp', key);
-    window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
+    const focusedAtRest = !!stillHeld && (stillHeld === e || stillHeld === proxy || e.contains(stillHeld));
+    window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy), ...(focusedAtRest ? { focusedAtRest: true } : {}) };
     n++;
   }
+  if (blurred && document.activeElement !== held) { try { held.focus({ preventScroll: true }); } catch (_) {} }
   return { n: n, total: total };
 })()`;
 }
@@ -599,6 +685,11 @@ export const FOCUS_CHECK_PROBE = `(() => {
   const st = (pseudo) => sty(proxy, pseudo);
   const ctx = [proxy.parentElement, proxy.parentElement && proxy.parentElement.parentElement, proxy.nextElementSibling].map((x) => (x ? sty(x, null) : '-')).join('~');
   const now = [st(null), st('::before'), st('::after')].join('#') + '@' + ctx;
+  // FOCUSED AT LOAD AND NEVER LET GO: the setup could not photograph this element unfocused
+  // (the page pulled focus back, or the pass ran inside an opened dialog), so its « rest » is
+  // its focused look and an unchanged read proves nothing. Unmeasured, never accused (#184).
+  // (No backticks in this comment: it lives inside a template literal.)
+  if (rec.focusedAtRest && now === rec.rest) return { key: key, changed: true, unmeasured: true, selector: rec.sel, html: rec.html };
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
 
@@ -769,6 +860,7 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
   // else sets one.
   let cutShort: string | undefined = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
   let untagged = 0;
+  let unmeasured = 0;
   for (let i = 0; i < limit; i++) {
     // A tab ring of 130 elements is two round-trips each on a loaded CI runner. Stopping at
     // the deadline costs the tail of the ring, which `runLiveProbes` then records.
@@ -784,6 +876,7 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
       html: string;
       untagged?: boolean;
       devTools?: boolean;
+      unmeasured?: boolean;
     } | null;
     if (!r || r.devTools) continue;
     // Tab landed on a focusable the setup never tagged. Nothing here can be measured, and the
@@ -812,6 +905,8 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
     }
     seen.add(r.key);
     prevKey = r.key;
+    // Focused at load and never let go (FOCUS_CHECK_PROBE): crossed, but not compared.
+    if (r.unmeasured) unmeasured++;
     if (!r.changed) {
       hits.push({
         selector: r.selector,
@@ -846,7 +941,9 @@ export async function probeFocusRing(page: Any, scope = "", limits: ProbeLimits 
     cutShort ??
     (untagged > 0
       ? `Tab crossed ${untagged} element(s) the tagging pass never matched — a control focusable in the browser but not by this selector (a skip link revealed on focus, a widget moving focus into an untagged node). They were never compared, so this page is not cleared`
-      : undefined);
+      : unmeasured > 0
+        ? `${unmeasured} element(s) held focus from page load and could not be photographed unfocused (the page pulled focus straight back), so their focus indicator was never compared and this page is not cleared`
+        : undefined);
   return { visible: hits, obscured, complete: !why, ...(why ? { why } : {}) };
 }
 
@@ -1552,7 +1649,7 @@ export interface LiveProbeResult {
   textSpacing: ProbeHit[];
   /** `widening` names the outermost boxes wider than the viewport — what a developer has to
    *  change. Absent when the page does not scroll, or from a producer that predates the naming. */
-  reflow: { horizontalScroll: boolean; widening?: ProbeHit[] };
+  reflow: { horizontalScroll: boolean; widening?: ProbeHit[]; clipped?: ReflowClipped };
   /** 4.1.3 — content updated by an interaction outside any live region. Present only when the
    *  caller opted in: unlike every other probe here, this one TYPES INTO the page. */
   liveRegion?: ProbeHit[];

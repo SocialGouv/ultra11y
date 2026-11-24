@@ -219,6 +219,7 @@ export function buildPayload(
     viewport?: unknown;
     doctype?: string;
     loading?: string[];
+    consent?: string[];
   },
   url: string,
   runner: string,
@@ -254,6 +255,9 @@ export function buildPayload(
       // Still loading when collected: named, so the report can say so and the audit concludes
       // nothing from this page's silence.
       ...(collected.loading?.length ? { loading: collected.loading } : {}),
+      // Captured without consent (#184): a test browser never accepts cookies either, so the
+      // consent placeholders it showed are named and their content tagged in the briefs.
+      ...(collected.consent?.length ? { consent: "none" as const, consentMarkers: collected.consent } : {}),
     },
     dom: collected.dom,
     styles: collected.styles,

@@ -1877,6 +1877,7 @@ export const CAPTURE_FILES = [
   "axtree.json",
   "screen.png",
   "screen-full.png",
+  "screen-320.png",
 ] as const;
 export type CaptureFile = (typeof CAPTURE_FILES)[number];
 
@@ -1891,6 +1892,7 @@ const CAPTURE_FILE_LABEL: Record<Lang, Record<CaptureFile, string>> = {
     "axtree.json": "l'arbre d'accessibilité",
     "screen.png": "la capture d'écran",
     "screen-full.png": "la page entière en capture d'écran",
+    "screen-320.png": "la page à 320px de large, telle que la sonde de redistribution l'a mesurée",
   },
   en: {
     "dom.html": "the DOM the browser serialized",
@@ -1902,6 +1904,7 @@ const CAPTURE_FILE_LABEL: Record<Lang, Record<CaptureFile, string>> = {
     "axtree.json": "the accessibility tree",
     "screen.png": "the screenshot",
     "screen-full.png": "the whole page as a screenshot",
+    "screen-320.png": "the page at 320px width, as the reflow probe measured it",
   },
 };
 

@@ -458,6 +458,18 @@ export interface AxNode {
   children?: AxNode[];
 }
 
+/** What the 320px reflow probe found laid out BEYOND the viewport, per element (#184): text
+ *  (the text node's own line boxes) and controls or replaced elements. A page whose boxes
+ *  overflow while both lists are empty scrolls sideways without putting any content out of
+ *  reach — the measure an adjudicator needs to tell a stray 8px logo from lost text. The
+ *  lists are capped; the counts are not. Absent on a capture older than the measure. */
+export interface ReflowClipped {
+  text: { selector: string; html: string; detail: string }[];
+  textCount: number;
+  controls: { selector: string; html: string; detail: string }[];
+  controlCount: number;
+}
+
 /** The signals attached to a Doc parsed from a page snapshot's `dom.html`. Absent for every
  *  ordinary source file — a rendered rule simply does not fire, which is why adding this tier
  *  cannot change any existing verdict. */
@@ -500,7 +512,7 @@ export interface RenderSignals {
     inputOverflowReflow?: { selector: string; html: string; detail: string }[];
     inputOverflowZoom?: { selector: string; html: string; detail: string }[];
     inputOverflowSpacing?: { selector: string; html: string; detail: string }[];
-    reflow?: { horizontalScroll: boolean; widening?: { selector: string; html: string; detail: string }[] };
+    reflow?: { horizontalScroll: boolean; widening?: { selector: string; html: string; detail: string }[]; clipped?: ReflowClipped };
     probed?: string[];
     /** Why a probe did not run, or did not finish. Never a verdict — the complement of
      *  `probed`, which is the only field allowed to license a conformity. */
@@ -1028,6 +1040,11 @@ export interface DynamicFinding {
   /** 1.4.10 only — the selectors of the boxes widening the page at 320px, when the probe named
    *  them. Carried so a later `--lang` re-render keeps the cause in the sentence. */
   widening?: string;
+  /** 1.4.10 only — how many text blocks and how many controls or replaced elements the probe
+   *  found laid out beyond the 320px viewport (ReflowClipped), as message parameters. Absent on
+   *  a capture older than the measure. */
+  clippedText?: string;
+  clippedControls?: string;
 }
 
 export interface DynamicResult {

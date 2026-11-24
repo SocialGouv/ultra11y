@@ -29,6 +29,7 @@ import type { Evidence } from "./adjudicate.js";
 import { AXE_WCAG } from "./axe-map.js";
 import { computedTextPairs, renderedRulesFor, renderedRulesRan } from "./rules/rendered.js";
 import { rendersNativeLink } from "./rules/rule.js";
+import { consentContainerOf, consentNote } from "./consent.js";
 
 /** Mask the parts of a text that change between runs without the code changing.
  *
@@ -110,9 +111,14 @@ function markupOf(el: El, extra?: string[]): string[] {
 }
 
 function h(doc: Doc, el: El, note: string, cls?: string, markupExtra?: string[]): Harvested {
+  // EVIDENCE FROM INSIDE A CONSENT PLACEHOLDER OR BANNER IS THE CAPTURE'S STATE, NOT THE PAGE'S
+  // CONTENT (#184). Tagged on every anchor, whatever subject harvested it, so the DSFR
+  // « Youtube est désactivé » `p.fr-h6` reaches the 9.1 adjudicator saying what it is.
+  const consent = consentContainerOf(el);
+  const tagged = consent ? `${consentNote(consent.kind, consent.vendor)} ${note}` : note;
   return {
-    ev: { file: doc.file, line: el.line, selector: selectorFor(el), snippet: elSnippet(doc, el, 160), note },
-    cls: stable(cls ?? `${el.tag}|${note}`),
+    ev: { file: doc.file, line: el.line, selector: selectorFor(el), snippet: elSnippet(doc, el, 160), note: tagged },
+    cls: stable(`${cls ?? `${el.tag}|${note}`}${consent ? `|consent-none:${consent.kind}` : ""}`),
     at: el.start,
     markup: markupOf(el, markupExtra),
   };
@@ -629,62 +635,131 @@ function isTabbable(e: El): boolean {
  *  probe (ran, how many issues, or why it was skipped), the offline rendered rules that ran,
  *  and axe-core's verdict for that criterion. A measurement that found nothing is exactly what
  *  a conformity is ruled on — and it used to be the one thing never shown. */
+/** One reflow component the 320px probe named on a page: a widening box, a text block or a
+ *  control laid out beyond the viewport. Keyed by selector AND markup, so the same footer logo
+ *  on twelve pages is one component and two different `div.col` are two. */
+type ReflowItem = { kind: "box" | "text" | "control"; selector: string; html: string; detail: string };
+const reflowItems = (r: NonNullable<NonNullable<Doc["signals"]>["probes"]>["reflow"]): ReflowItem[] =>
+  r?.horizontalScroll
+    ? [
+        ...(r.widening ?? []).map((w) => ({ kind: "box" as const, ...w })),
+        ...(r.clipped?.text ?? []).map((w) => ({ kind: "text" as const, ...w })),
+        ...(r.clipped?.controls ?? []).map((w) => ({ kind: "control" as const, ...w })),
+      ].filter((w) => w.selector)
+    : [];
+const reflowKey = (w: ReflowItem): string => `${w.kind}|${w.selector}|${w.html}`;
+
+/** THE SAME COMPONENT ON EVERY PAGE IS ONE FINDING, NOT TWELVE (#184). A shared footer whose
+ *  logo overhangs the 320px viewport by 8px was handed to the adjudicator once per page, and
+ *  read as twelve losses of content. Each component met on two pages or more is stated ONCE,
+ *  with the pages it was measured on; the page lines then point at it instead of repeating it. */
+function reflowShared(docs: Doc[]): { shared: Map<string, { item: ReflowItem; pages: string[]; doc: Doc }> } {
+  const seen = new Map<string, { item: ReflowItem; pages: string[]; doc: Doc }>();
+  for (const d of docs) {
+    const page = pageOfDoc(d.file);
+    const probes = d.signals?.probes;
+    if (page === undefined || !probes?.probed?.includes("1.4.10")) continue;
+    for (const w of reflowItems(probes.reflow)) {
+      const k = reflowKey(w);
+      const at = seen.get(k) ?? seen.set(k, { item: w, pages: [], doc: d }).get(k)!;
+      if (!at.pages.includes(page)) at.pages.push(page);
+    }
+  }
+  return { shared: new Map([...seen].filter(([, v]) => v.pages.length > 1)) };
+}
+
+/** The 1.4.10 measure of one page, as the brief states it: the scroll, the boxes that cause it,
+ *  and — the half that decides whether content is lost — the text and controls beyond the
+ *  viewport. A component shared with other pages is named by reference, not restated. */
+function reflowNote(reflow: NonNullable<NonNullable<Doc["signals"]>["probes"]>["reflow"], shared: Map<string, unknown>): string {
+  if (!reflow) return "";
+  if (!reflow.horizontalScroll) return " horizontal scroll at 320px: no;";
+  const name = (w: ReflowItem) => (shared.has(reflowKey(w)) ? `${w.selector} [shared component]` : w.selector);
+  const items = reflowItems(reflow);
+  const wide = items.filter((w) => w.kind === "box").map(name);
+  let note = ` horizontal scroll at 320px: YES${wide.length ? ` (widened by ${wide.join(", ")})` : ""};`;
+  const c = reflow.clipped;
+  if (c && typeof c.textCount === "number") {
+    if (!c.textCount && !c.controlCount) note += " content beyond the viewport: NONE — no text and no control lies past the right edge, only boxes overflow;";
+    else {
+      const list = (kind: ReflowItem["kind"]) =>
+        items
+          .filter((w) => w.kind === kind)
+          .map((w) => `${name(w)} (${w.detail.slice(0, 90)})`)
+          .join("; ");
+      note += ` content beyond the viewport: ${c.textCount} text block(s)${c.textCount ? ` — ${list("text")}` : ""}, ${c.controlCount} control(s)/replaced element(s)${c.controlCount ? ` — ${list("control")}` : ""};`;
+    }
+  }
+  return note;
+}
+
 function measured(sc: string): Subject {
-  return (docs) =>
-    docs.flatMap((d) => {
-      const page = pageOfDoc(d.file);
-      const s = d.signals;
-      if (page === undefined || !s) return [];
-      const out: Harvested[] = [];
-      const probes = s.probes;
-      if (probes?.probed?.includes(sc)) {
-        const issues = PROBE_KEYS[sc]?.flatMap((k) => ((probes as Record<string, unknown>)[k] as { detail: string }[] | undefined) ?? []) ?? [];
-        // The cause, when the probe named one: « YES » alone sent the reader bisecting the DOM.
-        const wide = (probes.reflow?.widening ?? []).map((w) => w.selector).filter(Boolean);
-        const scroll =
-          sc === "1.4.10" && probes.reflow
-            ? ` horizontal scroll at 320px: ${probes.reflow.horizontalScroll ? `YES${wide.length ? ` (widened by ${wide.join(", ")})` : ""}` : "no"};`
-            : "";
+  return (docs) => {
+    const { shared } = sc === "1.4.10" ? reflowShared(docs) : { shared: new Map() };
+    const sharedLines: Harvested[] = [...shared.values()].map(({ item, pages, doc }) =>
+      hAt(
+        doc,
+        1,
+        `probe:${sc}`,
+        `shared component measured by the 320px reflow probe on ${pages.length} pages (${pages.join(", ")}): ${item.kind === "box" ? "widening box" : item.kind === "text" ? "text beyond the viewport" : "control/replaced element beyond the viewport"} ${item.selector} — ${item.detail.slice(0, 120)} — ONE component, to be judged once, not once per page`,
+        `reflowshared|${reflowKey(item)}`,
+      ),
+    );
+    return [...sharedLines, ...measuredPerPage(sc, docs, shared)];
+  };
+}
+
+function measuredPerPage(sc: string, docs: Doc[], shared: Map<string, unknown>): Harvested[] {
+  return docs.flatMap((d) => {
+    const page = pageOfDoc(d.file);
+    const s = d.signals;
+    if (page === undefined || !s) return [];
+    const out: Harvested[] = [];
+    const probes = s.probes;
+    if (probes?.probed?.includes(sc)) {
+      const issues = PROBE_KEYS[sc]?.flatMap((k) => ((probes as Record<string, unknown>)[k] as { detail: string }[] | undefined) ?? []) ?? [];
+      // The cause, when the probe named one: « YES » alone sent the reader bisecting the DOM.
+      const scroll = sc === "1.4.10" && probes.reflow ? reflowNote(probes.reflow, shared) : "";
+      out.push(
+        hAt(
+          d,
+          1,
+          `probe:${sc}`,
+          `page="${page}" live probe for WCAG ${sc} RAN:${scroll} ${issues.length} issue(s)${issues.length ? ` — ${issues[0]!.detail.slice(0, 120)}` : ""}`,
+          `probe|${sc}|${issues.length}|${scroll}`,
+        ),
+      );
+    }
+    for (const sk of probes?.skipped ?? [])
+      if (sk.sc === sc)
         out.push(
           hAt(
             d,
             1,
             `probe:${sc}`,
-            `page="${page}" live probe for WCAG ${sc} RAN:${scroll} ${issues.length} issue(s)${issues.length ? ` — ${issues[0]!.detail.slice(0, 120)}` : ""}`,
-            `probe|${sc}|${issues.length}|${scroll}`,
+            `page="${page}" live probe for WCAG ${sc} did NOT finish: ${sk.why.slice(0, 160)}`,
+            `probeskip|${sc}|${sk.why.slice(0, 60)}`,
           ),
         );
-      }
-      for (const sk of probes?.skipped ?? [])
-        if (sk.sc === sc)
-          out.push(
-            hAt(
-              d,
-              1,
-              `probe:${sc}`,
-              `page="${page}" live probe for WCAG ${sc} did NOT finish: ${sk.why.slice(0, 160)}`,
-              `probeskip|${sc}|${sk.why.slice(0, 60)}`,
-            ),
-          );
-      const ran = renderedRulesRan(s).filter((id) => renderedRulesFor(sc).includes(id));
-      if (ran.length)
-        out.push(
-          hAt(d, 1, `rendered:${sc}`, `page="${page}" rendered rule(s) ${ran.join(", ")} ran on the captured styles`, `renderedran|${sc}|${ran.join(",")}`),
-        );
-      if (s.axe?.ran) {
-        const hits = (s.axe.violations ?? []).filter((v) => AXE_WCAG[v.id] === sc);
-        out.push(
-          hAt(
-            d,
-            1,
-            `axe:${sc}`,
-            `page="${page}" axe-core ran: ${hits.length ? hits.map((v) => `${v.id} (${v.nodes?.length ?? 0} node(s))`).join(", ") : `no violation for WCAG ${sc}`}`,
-            `axe|${sc}|${hits.map((v) => v.id).join(",")}`,
-          ),
-        );
-      }
-      return out;
-    });
+    const ran = renderedRulesRan(s).filter((id) => renderedRulesFor(sc).includes(id));
+    if (ran.length)
+      out.push(
+        hAt(d, 1, `rendered:${sc}`, `page="${page}" rendered rule(s) ${ran.join(", ")} ran on the captured styles`, `renderedran|${sc}|${ran.join(",")}`),
+      );
+    if (s.axe?.ran) {
+      const hits = (s.axe.violations ?? []).filter((v) => AXE_WCAG[v.id] === sc);
+      out.push(
+        hAt(
+          d,
+          1,
+          `axe:${sc}`,
+          `page="${page}" axe-core ran: ${hits.length ? hits.map((v) => `${v.id} (${v.nodes?.length ?? 0} node(s))`).join(", ") : `no violation for WCAG ${sc}`}`,
+          `axe|${sc}|${hits.map((v) => v.id).join(",")}`,
+        ),
+      );
+    }
+    return out;
+  });
 }
 
 /** Which probe lists report on which success criterion (src/probes.ts). */

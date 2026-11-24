@@ -23628,6 +23628,10 @@ import { dirname as dirname2, join as join3 } from "path";
 // src/probes.ts
 var PROBES_VERSION = 2;
 var WALK_DEPENDENT_SCS = ["1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
+function reflowClippedParams(clipped) {
+  if (!clipped || typeof clipped.textCount !== "number" || typeof clipped.controlCount !== "number") return {};
+  return { clippedText: String(clipped.textCount), clippedControls: String(clipped.controlCount) };
+}
 var PRELUDE = `
 const __sel = (e) => {
   if (!e || !e.tagName) return '\u2014';
@@ -23732,7 +23736,58 @@ var REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
   // content (a long word, a ::before/::after) spills out \u2014 its ancestors only carry the spill.
   const deepest = content.filter(([e]) => !content.some(([o]) => o !== e && e.contains(o)) && !Array.from(boxes).some((b) => e.contains(b)));
   const widening = outer.concat(deepest).slice(0, 5).map(([e, d]) => ({ selector: __sel(e), html: __html(e), detail: d }));
-  return { horizontalScroll, widening };
+  // A WIDE BOX IS NOT LOST CONTENT (#184). A footer logo sticking out by 8px makes the page
+  // scroll sideways, and was reported on a dozen pages as if text had gone missing. What 1.4.10
+  // is about is CONTENT the user has to scroll in two dimensions to reach: text and controls.
+  // So the same pass measures, per element, which TEXT lays out beyond the viewport (the text
+  // node's own line boxes, Range.getClientRects, not its container's box) and which controls or
+  // replaced elements (a link, a field, an image) do. A box whose own text fits reports neither.
+  const textOver = new Map();
+  const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+  let seenText = 0;
+  for (let t = walker.nextNode(); t && seenText < 5000; t = walker.nextNode()) {
+    if (!t.nodeValue || !t.nodeValue.trim()) continue;
+    const p = t.parentElement;
+    if (!p) continue;
+    seenText++;
+    const ps = getComputedStyle(p);
+    if (ps.visibility === 'hidden' || ps.display === 'none') continue;
+    const range = document.createRange();
+    range.selectNodeContents(t);
+    let over = 0;
+    for (const r of Array.from(range.getClientRects())) if (r.width > 0 && r.height > 0) over = Math.max(over, r.right + sx - vw);
+    if (over <= 2) continue;
+    if (contained(p)) continue;
+    let fixed = false;
+    for (let n = p; n && n !== document.documentElement; n = n.parentElement) if (getComputedStyle(n).position === 'fixed') { fixed = true; break; }
+    if (fixed) continue;
+    const prev = textOver.get(p);
+    textOver.set(p, { over: Math.max(over, prev ? prev.over : 0), text: ((prev ? prev.text + ' ' : '') + t.nodeValue.trim()).slice(0, 80) });
+  }
+  const textHits = Array.from(textOver.entries()).sort((a, b) => b[1].over - a[1].over);
+  const CONTROL = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=link],[tabindex]:not([tabindex="-1"]),img,svg,video,iframe,canvas,object,embed';
+  const controlHits = [];
+  for (const e of Array.from(document.querySelectorAll(CONTROL))) {
+    const r = e.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) continue;
+    const over = r.right + sx - vw;
+    if (over <= 2) continue;
+    const s = getComputedStyle(e);
+    if (s.visibility === 'hidden' || s.display === 'none' || s.position === 'fixed') continue;
+    if (contained(e)) continue;
+    // The svg inside a link is the link: name the outermost control only.
+    if (controlHits.some(([o]) => o.contains(e))) continue;
+    for (let i = controlHits.length - 1; i >= 0; i--) if (e.contains(controlHits[i][0])) controlHits.splice(i, 1);
+    controlHits.push([e, over, r.width, /^(img|svg|video|iframe|canvas|object|embed)$/i.test(e.tagName) ? 'replaced' : 'control']);
+  }
+  controlHits.sort((a, b) => b[1] - a[1]);
+  const clipped = {
+    text: textHits.slice(0, 5).map(([e, v]) => ({ selector: __sel(e), html: __html(e), detail: 'texte \xAB ' + v.text + ' \xBB pos\xE9 ' + Math.round(v.over) + 'px au-del\xE0 du bord droit du viewport' })),
+    textCount: textHits.length,
+    controls: controlHits.slice(0, 5).map(([e, over, w, kind]) => ({ selector: __sel(e), html: __html(e), detail: (kind === 'replaced' ? '\xE9l\xE9ment remplac\xE9' : 'contr\xF4le') + ' pos\xE9 ' + Math.round(over) + 'px au-del\xE0 du bord droit du viewport (largeur ' + Math.round(w) + 'px)' })),
+    controlCount: controlHits.length,
+  };
+  return { horizontalScroll, widening, clipped };
 })()`;
 var STRESS_LIB = `${FRAMES}
 const __pause = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -23940,7 +23995,7 @@ var TEXT_SPACING_PROBE = `(async () => { ${PRELUDE} ${STRESS_LIB}
 })()`;
 function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables) {
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
-  return `(() => { ${PRELUDE}
+  return `(async () => { ${PRELUDE} ${FRAMES}
   // FOCUSABLE MEANS FOCUSABLE, NOT "the six tags we thought of". This list decides which
   // elements get tagged, and since the walk may now license a conformity, an element missing
   // from it is not merely unmeasured -- it is silently cleared. A page whose only control is a
@@ -24003,6 +24058,27 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
     if (root.matches && root.matches(sel)) focusables.push(root);
     for (const e of Array.from(root.querySelectorAll(sel))) focusables.push(e);
   }
+  // THE REST STATE IS THE UNFOCUSED STATE, and an element focused at load is not at rest. An
+  // autofocus field (a login form's username, #184) was photographed with its ring already on,
+  // so the comparison after Tab saw no change and reported a decisive \xAB focus not visible \xBB on
+  // a ring that was plainly there. Blur whatever holds focus, let the page repaint (and finish
+  // any focus transition, whose mid-flight value is neither state), snapshot, then hand focus
+  // back so the walk starts where a keyboard user would.
+  // NOT INSIDE AN OPENED DIALOG: the scoped pass runs on a dialog this tool opened, and blurring
+  // its focused control is exactly what closes a menu or a popover listening on focusout. There
+  // the focused element is simply recorded as not at rest, and never accused.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const held = document.activeElement;
+  const focusedHeld = !!(held && held !== document.body && held !== document.documentElement);
+  const blurred = ${scope ? "false" : "true"} && focusedHeld && typeof held.blur === 'function';
+  if (blurred) {
+    try { held.blur(); } catch (_) {}
+    await __frames();
+    try { for (const a of document.getAnimations ? document.getAnimations() : []) { if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) a.finish(); } } catch (_) {}
+  }
+  // A page that pulls focus straight back (a focus handler, a trap) leaves nothing at rest to
+  // compare with: that element is recorded as such, and the check refuses to accuse it.
+  const stillHeld = focusedHeld && document.activeElement === held ? held : null;
   window.__u11yF = {};
   let n = 0;
   for (const e of focusables) {
@@ -24013,9 +24089,11 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
     if (n >= ${maxFocusables}) continue; // tagged the cap; keep COUNTING so the caller knows it was cut
     e.setAttribute('data-u11y-f', key);
     proxy.setAttribute('data-u11y-fp', key);
-    window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
+    const focusedAtRest = !!stillHeld && (stillHeld === e || stillHeld === proxy || e.contains(stillHeld));
+    window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy), ...(focusedAtRest ? { focusedAtRest: true } : {}) };
     n++;
   }
+  if (blurred && document.activeElement !== held) { try { held.focus({ preventScroll: true }); } catch (_) {} }
   return { n: n, total: total };
 })()`;
 }
@@ -24046,6 +24124,11 @@ var FOCUS_CHECK_PROBE = `(() => {
   const st = (pseudo) => sty(proxy, pseudo);
   const ctx = [proxy.parentElement, proxy.parentElement && proxy.parentElement.parentElement, proxy.nextElementSibling].map((x) => (x ? sty(x, null) : '-')).join('~');
   const now = [st(null), st('::before'), st('::after')].join('#') + '@' + ctx;
+  // FOCUSED AT LOAD AND NEVER LET GO: the setup could not photograph this element unfocused
+  // (the page pulled focus back, or the pass ran inside an opened dialog), so its \xAB rest \xBB is
+  // its focused look and an unchanged read proves nothing. Unmeasured, never accused (#184).
+  // (No backticks in this comment: it lives inside a template literal.)
+  if (rec.focusedAtRest && now === rec.rest) return { key: key, changed: true, unmeasured: true, selector: rec.sel, html: rec.html };
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
 var FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
@@ -24140,6 +24223,7 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
   let prevKey = null;
   let cutShort = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
   let untagged = 0;
+  let unmeasured = 0;
   for (let i = 0; i < limit; i++) {
     if (deadline?.out()) {
       cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements \u2014 the rest of the ring was never focused`;
@@ -24159,6 +24243,7 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
     }
     seen.add(r2.key);
     prevKey = r2.key;
+    if (r2.unmeasured) unmeasured++;
     if (!r2.changed) {
       hits.push({
         selector: r2.selector,
@@ -24182,7 +24267,7 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
     }
   }
   if (cutShort && seen.size >= count) cutShort = void 0;
-  const why = cappedRing(capped, limits) ?? cutShort ?? (untagged > 0 ? `Tab crossed ${untagged} element(s) the tagging pass never matched \u2014 a control focusable in the browser but not by this selector (a skip link revealed on focus, a widget moving focus into an untagged node). They were never compared, so this page is not cleared` : void 0);
+  const why = cappedRing(capped, limits) ?? cutShort ?? (untagged > 0 ? `Tab crossed ${untagged} element(s) the tagging pass never matched \u2014 a control focusable in the browser but not by this selector (a skip link revealed on focus, a widget moving focus into an untagged node). They were never compared, so this page is not cleared` : unmeasured > 0 ? `${unmeasured} element(s) held focus from page load and could not be photographed unfocused (the page pulled focus straight back), so their focus indicator was never compared and this page is not cleared` : void 0);
   return { visible: hits, obscured, complete: !why, ...why ? { why } : {} };
 }
 var NATIVE_SEGMENT_STOPS = {
@@ -24604,6 +24689,84 @@ var UNREADABLE_BY_OLDER = [
   ["liveRegion", "4.1.3"]
 ];
 
+// src/consent.ts
+var CONSENT_MARKERS = [
+  // DSFR (système de design de l'État): the consent placeholder and the consent banner.
+  { vendor: "dsfr", kind: "placeholder", cls: "fr-consent-placeholder" },
+  { vendor: "dsfr", kind: "banner", cls: "fr-consent-banner" },
+  // EU Cookie Compliance (Drupal).
+  { vendor: "eu-cookie-compliance", kind: "banner", id: "sliding-popup" },
+  { vendor: "eu-cookie-compliance", kind: "banner", cls: "eu-cookie-compliance-banner" },
+  // tarteaucitron: its root and the « activate » box it puts where a blocked service was.
+  { vendor: "tarteaucitron", kind: "banner", id: "tarteaucitron", idPrefix: true },
+  { vendor: "tarteaucitron", kind: "placeholder", cls: "tac_activate", classPrefix: true },
+  // Didomi.
+  { vendor: "didomi", kind: "banner", id: "didomi-host" },
+  { vendor: "didomi", kind: "banner", id: "didomi-notice" },
+  { vendor: "didomi", kind: "placeholder", cls: "didomi-content-placeholder", classPrefix: true },
+  // Axeptio.
+  { vendor: "axeptio", kind: "banner", id: "axeptio_overlay" },
+  { vendor: "axeptio", kind: "banner", cls: "axeptio_mount" },
+  { vendor: "axeptio", kind: "placeholder", cls: "axeptio-placeholder", classPrefix: true }
+];
+var GENERIC_PLACEHOLDER = /consent.*(?:placeholder|blocked|disabled|fallback)|(?:placeholder|blocked).*consent/i;
+var GENERIC_BANNER = /(?:cookie|consent).*(?:banner|popup|notice|modal|overlay|bar)$|^(?:cookie-?)?consent-?(?:banner|popup|notice|modal|overlay|bar)/i;
+function consentMarkerFor(id, classes) {
+  for (const m3 of CONSENT_MARKERS) {
+    if (m3.id !== void 0 && id && (m3.idPrefix ? id.startsWith(m3.id) : id === m3.id)) return { vendor: m3.vendor, kind: m3.kind };
+    if (m3.cls !== void 0 && classes.some((c) => m3.classPrefix ? c.startsWith(m3.cls) : c === m3.cls)) return { vendor: m3.vendor, kind: m3.kind };
+  }
+  for (const c of classes) {
+    if (!/consent/i.test(c)) continue;
+    if (GENERIC_PLACEHOLDER.test(c)) return { vendor: "generic", kind: "placeholder" };
+    if (GENERIC_BANNER.test(c)) return { vendor: "generic", kind: "banner" };
+  }
+  return void 0;
+}
+function consentContainerOf(el) {
+  for (let n = el; n; n = n.parent) {
+    const m3 = consentMarkerFor(n.attribs.id ?? "", (n.attribs.class ?? "").split(/\s+/).filter(Boolean));
+    if (m3) return { el: n, ...m3 };
+  }
+  return void 0;
+}
+function consentNote(kind, vendor) {
+  return kind === "placeholder" ? `[\xE9tat sans consentement \u2014 consent placeholder (${vendor}): the capture refused cookies, so this stands in for blocked third-party content; it is not the page's own content and is not to be judged as such (e.g. not a heading)]` : `[\xE9tat sans consentement \u2014 consent banner (${vendor}) shown because the capture gave no consent]`;
+}
+var CONSENT_STATE = `(() => {
+  const MARKERS = ${JSON.stringify(CONSENT_MARKERS)};
+  const GP = ${GENERIC_PLACEHOLDER.toString()};
+  const GB = ${GENERIC_BANNER.toString()};
+  const match = (id, classes) => {
+    for (const m of MARKERS) {
+      if (m.id !== undefined && id && (m.idPrefix ? id.indexOf(m.id) === 0 : id === m.id)) return m;
+      if (m.cls !== undefined && classes.some((c) => (m.classPrefix ? c.indexOf(m.cls) === 0 : c === m.cls))) return m;
+    }
+    for (const c of classes) {
+      if (!/consent/i.test(c)) continue;
+      if (GP.test(c)) return { vendor: 'generic', kind: 'placeholder' };
+      if (GB.test(c)) return { vendor: 'generic', kind: 'banner' };
+    }
+    return null;
+  };
+  const out = [];
+  const seen = new Set();
+  for (const e of Array.from(document.querySelectorAll('[id],[class]'))) {
+    const classes = typeof e.className === 'string' ? e.className.split(/\\s+/).filter(Boolean) : Array.from(e.classList || []);
+    const m = match(e.id || '', classes);
+    if (!m) continue;
+    // The outermost container only: the children of a banner are the banner.
+    let inner = false;
+    for (let p = e.parentElement; p; p = p.parentElement) if (seen.has(p)) { inner = true; break; }
+    seen.add(e);
+    if (inner) continue;
+    const sel = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (classes[0] ? '.' + classes[0] : '');
+    out.push(m.kind + ' ' + m.vendor + ' ' + sel);
+    if (out.length >= 10) break;
+  }
+  return out;
+})()`;
+
 // src/collector.ts
 var COLLECTED_CSS = [
   "color",
@@ -24801,6 +24964,9 @@ var COLLECT_SNAPSHOT = `(() => {
     // Still loading at the instant of collection: the markers, or none. Every producer runs
     // this same collector, so every producer can say so \u2014 see LOADING_STATE.
     loading: ${LOADING_STATE},
+    // The consent placeholders and banners on the page (#184): a headless capture never
+    // accepts cookies, so what they show is \xAB \xE9tat sans consentement \xBB, not content.
+    consent: ${CONSENT_STATE},
     styles: { v: 1, entries: styles, truncated: truncated },
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };
@@ -24847,6 +25013,9 @@ function validateSnapshotMeta(raw) {
   if (m3.doctype !== void 0 && typeof m3.doctype !== "string") err("meta.doctype", "doctype must be a string");
   if (m3.loading !== void 0 && (!Array.isArray(m3.loading) || m3.loading.some((s2) => typeof s2 !== "string")))
     err("meta.loading", "loading must be an array of strings");
+  if (m3.consent !== void 0 && m3.consent !== "none" && m3.consent !== "accepted") err("meta.consent", 'consent must be "none" or "accepted"');
+  if (m3.consentMarkers !== void 0 && (!Array.isArray(m3.consentMarkers) || m3.consentMarkers.some((s2) => typeof s2 !== "string")))
+    err("meta.consentMarkers", "consentMarkers must be an array of strings");
   if (m3.sources !== void 0 && (!Array.isArray(m3.sources) || m3.sources.some((s2) => typeof s2 !== "string")))
     err("meta.sources", "sources must be an array of strings");
   const j = m3.journey;
@@ -24878,6 +25047,9 @@ function validateSnapshotMeta(raw) {
       ...typeof m3.notes === "string" ? { notes: m3.notes } : {},
       // Kept only when it says something: an empty list is a page that was ready.
       ...Array.isArray(m3.loading) && m3.loading.length ? { loading: m3.loading } : {},
+      // Same whitelist lesson as `doctype`: a field the rebuild does not name dies here.
+      ...m3.consent === "none" || m3.consent === "accepted" ? { consent: m3.consent } : {},
+      ...Array.isArray(m3.consentMarkers) && m3.consentMarkers.length ? { consentMarkers: m3.consentMarkers } : {},
       ...j ? { journey: { name: j.name, step: j.step, action: j.action, keyboard: j.keyboard } } : {}
     }
   };
@@ -24924,6 +25096,12 @@ ${snap.dom}
     } catch {
     }
   }
+  if (snap.screenshot320Base64) {
+    try {
+      writeFileSync(join3(dir, "screen-320.png"), Buffer.from(snap.screenshot320Base64, "base64"));
+    } catch {
+    }
+  }
   return dir;
 }
 function readJson(file) {
@@ -24952,6 +25130,7 @@ function readSnapshot(dir) {
   const axe = readJson(join3(dir, "axe.json"));
   const shot = join3(dir, "screen.png");
   const full = join3(dir, "screen-full.png");
+  const narrow = join3(dir, "screen-320.png");
   return {
     meta: v2.meta,
     dom,
@@ -24962,7 +25141,8 @@ function readSnapshot(dir) {
     ...probes ? { probes } : {},
     ...axe ? { axe } : {},
     ...existsSync2(shot) ? { screenshot: "screen.png" } : {},
-    ...existsSync2(full) ? { screenshotFull: "screen-full.png" } : {}
+    ...existsSync2(full) ? { screenshotFull: "screen-full.png" } : {},
+    ...existsSync2(narrow) ? { screenshot320: "screen-320.png" } : {}
   };
 }
 function pageScreenshot(pagesDir, id) {
@@ -26230,8 +26410,8 @@ var MSG_CATALOG = {
   // the scroll and nothing else, never a cause nobody measured.
   "dyn-reflow": {
     message: {
-      fr: (p2) => `D\xE9filement horizontal \xE0 320px de large${p2.widening ? ` \u2014 la page est \xE9largie par ${String(p2.widening)}` : ""}.`,
-      en: (p2) => `Horizontal scrolling at 320px width${p2.widening ? ` \u2014 the page is widened by ${String(p2.widening)}` : ""}.`
+      fr: (p2) => `D\xE9filement horizontal \xE0 320px de large${p2.widening ? ` \u2014 la page est \xE9largie par ${String(p2.widening)}` : ""}${p2.clippedText === void 0 ? "" : p2.clippedText === "0" && p2.clippedControls === "0" ? " ; aucun texte ni contr\xF4le n'est pos\xE9 au-del\xE0 du viewport : seules des bo\xEEtes d\xE9bordent" : ` ; ${String(p2.clippedText)} bloc(s) de texte et ${String(p2.clippedControls)} contr\xF4le(s) ou \xE9l\xE9ment(s) remplac\xE9(s) pos\xE9s au-del\xE0 du viewport`}.`,
+      en: (p2) => `Horizontal scrolling at 320px width${p2.widening ? ` \u2014 the page is widened by ${String(p2.widening)}` : ""}${p2.clippedText === void 0 ? "" : p2.clippedText === "0" && p2.clippedControls === "0" ? "; no text or control lies beyond the viewport: only boxes overflow" : `; ${String(p2.clippedText)} text block(s) and ${String(p2.clippedControls)} control(s) or replaced element(s) lie beyond the viewport`}.`
     },
     remediation: {
       fr: () => `V\xE9rifi\xE9 au rendu par axe-core ; corrigez l'\xE9l\xE9ment cit\xE9.`,
@@ -34894,9 +35074,11 @@ function markupOf(el, extra) {
   return [...out];
 }
 function h(doc, el, note, cls, markupExtra) {
+  const consent = consentContainerOf(el);
+  const tagged = consent ? `${consentNote(consent.kind, consent.vendor)} ${note}` : note;
   return {
-    ev: { file: doc.file, line: el.line, selector: selectorFor(el), snippet: snippet(doc, el, 160), note },
-    cls: stable(cls ?? `${el.tag}|${note}`),
+    ev: { file: doc.file, line: el.line, selector: selectorFor(el), snippet: snippet(doc, el, 160), note: tagged },
+    cls: stable(`${cls ?? `${el.tag}|${note}`}${consent ? `|consent-none:${consent.kind}` : ""}`),
     at: el.start,
     markup: markupOf(el, markupExtra)
   };
@@ -35222,8 +35404,60 @@ function isTabbable(e) {
   if (e.tag === "input") return (attr(e, "type") ?? "").toLowerCase() !== "hidden";
   return ["button", "select", "textarea", "iframe", "summary"].includes(e.tag) || (attr(e, "contenteditable") ?? "false") !== "false";
 }
+var reflowItems = (r2) => r2?.horizontalScroll ? [
+  ...(r2.widening ?? []).map((w2) => ({ kind: "box", ...w2 })),
+  ...(r2.clipped?.text ?? []).map((w2) => ({ kind: "text", ...w2 })),
+  ...(r2.clipped?.controls ?? []).map((w2) => ({ kind: "control", ...w2 }))
+].filter((w2) => w2.selector) : [];
+var reflowKey = (w2) => `${w2.kind}|${w2.selector}|${w2.html}`;
+function reflowShared(docs) {
+  const seen = /* @__PURE__ */ new Map();
+  for (const d2 of docs) {
+    const page = pageOfDoc(d2.file);
+    const probes = d2.signals?.probes;
+    if (page === void 0 || !probes?.probed?.includes("1.4.10")) continue;
+    for (const w2 of reflowItems(probes.reflow)) {
+      const k = reflowKey(w2);
+      const at = seen.get(k) ?? seen.set(k, { item: w2, pages: [], doc: d2 }).get(k);
+      if (!at.pages.includes(page)) at.pages.push(page);
+    }
+  }
+  return { shared: new Map([...seen].filter(([, v2]) => v2.pages.length > 1)) };
+}
+function reflowNote(reflow, shared) {
+  if (!reflow) return "";
+  if (!reflow.horizontalScroll) return " horizontal scroll at 320px: no;";
+  const name = (w2) => shared.has(reflowKey(w2)) ? `${w2.selector} [shared component]` : w2.selector;
+  const items = reflowItems(reflow);
+  const wide = items.filter((w2) => w2.kind === "box").map(name);
+  let note = ` horizontal scroll at 320px: YES${wide.length ? ` (widened by ${wide.join(", ")})` : ""};`;
+  const c = reflow.clipped;
+  if (c && typeof c.textCount === "number") {
+    if (!c.textCount && !c.controlCount) note += " content beyond the viewport: NONE \u2014 no text and no control lies past the right edge, only boxes overflow;";
+    else {
+      const list = (kind) => items.filter((w2) => w2.kind === kind).map((w2) => `${name(w2)} (${w2.detail.slice(0, 90)})`).join("; ");
+      note += ` content beyond the viewport: ${c.textCount} text block(s)${c.textCount ? ` \u2014 ${list("text")}` : ""}, ${c.controlCount} control(s)/replaced element(s)${c.controlCount ? ` \u2014 ${list("control")}` : ""};`;
+    }
+  }
+  return note;
+}
 function measured(sc) {
-  return (docs) => docs.flatMap((d2) => {
+  return (docs) => {
+    const { shared } = sc === "1.4.10" ? reflowShared(docs) : { shared: /* @__PURE__ */ new Map() };
+    const sharedLines = [...shared.values()].map(
+      ({ item, pages, doc }) => hAt(
+        doc,
+        1,
+        `probe:${sc}`,
+        `shared component measured by the 320px reflow probe on ${pages.length} pages (${pages.join(", ")}): ${item.kind === "box" ? "widening box" : item.kind === "text" ? "text beyond the viewport" : "control/replaced element beyond the viewport"} ${item.selector} \u2014 ${item.detail.slice(0, 120)} \u2014 ONE component, to be judged once, not once per page`,
+        `reflowshared|${reflowKey(item)}`
+      )
+    );
+    return [...sharedLines, ...measuredPerPage(sc, docs, shared)];
+  };
+}
+function measuredPerPage(sc, docs, shared) {
+  return docs.flatMap((d2) => {
     const page = pageOfDoc(d2.file);
     const s2 = d2.signals;
     if (page === void 0 || !s2) return [];
@@ -35231,8 +35465,7 @@ function measured(sc) {
     const probes = s2.probes;
     if (probes?.probed?.includes(sc)) {
       const issues = PROBE_KEYS[sc]?.flatMap((k) => probes[k] ?? []) ?? [];
-      const wide = (probes.reflow?.widening ?? []).map((w2) => w2.selector).filter(Boolean);
-      const scroll = sc === "1.4.10" && probes.reflow ? ` horizontal scroll at 320px: ${probes.reflow.horizontalScroll ? `YES${wide.length ? ` (widened by ${wide.join(", ")})` : ""}` : "no"};` : "";
+      const scroll = sc === "1.4.10" && probes.reflow ? reflowNote(probes.reflow, shared) : "";
       out.push(
         hAt(
           d2,
@@ -44770,7 +45003,7 @@ function probeFindings(probes, file, page) {
   if (probes.reflow?.horizontalScroll) {
     const wide = probes.reflow.widening ?? [];
     const widening = wide.map((w2) => w2.selector).filter(Boolean).join(", ");
-    const params = widening ? { widening } : {};
+    const params = { ...widening ? { widening } : {}, ...reflowClippedParams(probes.reflow.clipped) };
     add2(
       "1.4.10",
       "dyn-reflow",
@@ -57391,7 +57624,8 @@ var CAPTURE_FILES = [
   "axe.json",
   "axtree.json",
   "screen.png",
-  "screen-full.png"
+  "screen-full.png",
+  "screen-320.png"
 ];
 var CAPTURE_FILE_LABEL = {
   fr: {
@@ -57403,7 +57637,8 @@ var CAPTURE_FILE_LABEL = {
     "axe.json": "les r\xE9sultats axe-core de la page",
     "axtree.json": "l'arbre d'accessibilit\xE9",
     "screen.png": "la capture d'\xE9cran",
-    "screen-full.png": "la page enti\xE8re en capture d'\xE9cran"
+    "screen-full.png": "la page enti\xE8re en capture d'\xE9cran",
+    "screen-320.png": "la page \xE0 320px de large, telle que la sonde de redistribution l'a mesur\xE9e"
   },
   en: {
     "dom.html": "the DOM the browser serialized",
@@ -57414,7 +57649,8 @@ var CAPTURE_FILE_LABEL = {
     "axe.json": "axe-core's results on the page",
     "axtree.json": "the accessibility tree",
     "screen.png": "the screenshot",
-    "screen-full.png": "the whole page as a screenshot"
+    "screen-full.png": "the whole page as a screenshot",
+    "screen-320.png": "the page at 320px width, as the reflow probe measured it"
   }
 };
 function captureFilesPresent(files, cwd) {
@@ -58408,7 +58644,10 @@ function writeRunnerSnapshot(root, out, target, page, extra = {}) {
     ...page?.sources?.length ? { sources: page.sources } : {},
     // Still loading when the browser collected it (#135): the report says so, and the audit
     // concludes nothing from this page's silence.
-    ...collected.loading?.length ? { loading: collected.loading } : {}
+    ...collected.loading?.length ? { loading: collected.loading } : {},
+    // Captured without consent (#184): the placeholders it showed are named, and the briefs
+    // tag what was harvested inside them « état sans consentement ».
+    ...collected.consent?.length ? { consent: "none", consentMarkers: collected.consent } : {}
   };
   const v2 = validateSnapshotMeta(meta2);
   if (!v2.ok || !v2.meta) return void 0;
@@ -58437,7 +58676,8 @@ function writeRunnerSnapshot(root, out, target, page, extra = {}) {
       // a runner always runs axe — that is the one instrument neither runtime skips.
       axe: { violations: out.violations, ran: true, ...out.axe ? { engine: out.axe } : {} },
       ...collected.screenshot ? { screenshotBase64: collected.screenshot } : {},
-      ...collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {}
+      ...collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {},
+      ...collected.screenshot320 ? { screenshot320Base64: collected.screenshot320 } : {}
     });
   } catch {
     return void 0;
@@ -58494,17 +58734,19 @@ function toDynamicResult(out, target, lang = "en", engine = "axe-core@playwright
   if (out.reflow?.horizontalScroll) {
     const widening = reflowWidening(out.reflow);
     const first = out.reflow.widening?.[0];
+    const clipped = reflowClippedParams(out.reflow.clipped);
     findings.push({
       criteriaId: "1.4.10",
       axeRule: "reflow",
       impact: "serious",
       severity: "majeur",
-      message: resolveMessage({ message: "", msg: { id: "dyn-reflow", params: widening ? { widening } : {} } }, lang),
+      message: resolveMessage({ message: "", msg: { id: "dyn-reflow", params: { ...widening ? { widening } : {}, ...clipped } } }, lang),
       selector: first?.selector || "document",
       snippet: first?.html ?? "",
       engine: "reflow",
       page,
-      ...widening ? { widening } : {}
+      ...widening ? { widening } : {},
+      ...clipped.clippedText !== void 0 ? { clippedText: clipped.clippedText, clippedControls: clipped.clippedControls } : {}
     });
   }
   for (const { key: key2, engine: probe } of PROBE_FIELDS) {
@@ -58638,7 +58880,13 @@ function mergeDynamic(audit, dynamic, lang = "en") {
   for (const df of dynamic.findings) {
     const c = byId2.get(df.criteriaId);
     if (!c) continue;
-    const msg = df.engine === "reflow" ? { id: "dyn-reflow", ...df.widening ? { params: { widening: df.widening } } : {} } : { id: "dyn-remediation", params: { message: df.message } };
+    const msg = df.engine === "reflow" ? (() => {
+      const params = {
+        ...df.widening ? { widening: df.widening } : {},
+        ...df.clippedText !== void 0 && df.clippedControls !== void 0 ? { clippedText: df.clippedText, clippedControls: df.clippedControls } : {}
+      };
+      return { id: "dyn-reflow", ...Object.keys(params).length ? { params } : {} };
+    })() : { id: "dyn-remediation", params: { message: df.message } };
     const file = df.page ?? dynamic.target;
     const anchor = resolveHostAnchor(file, df.snippet);
     const finding = {
@@ -60075,6 +60323,13 @@ async function runOnPage(browser, axe, target, isFile, opts) {
       await page.setViewportSize({ width: 320, height: 800 });
       return await page.evaluate(REFLOW_PROBE);
     });
+    let screenshot320;
+    if (snapshot && probed.includes("1.4.10")) {
+      try {
+        screenshot320 = (await page.screenshot({ fullPage: false })).toString("base64");
+      } catch {
+      }
+    }
     const inputOverflowReflow = filled ? await stressed("1.4.10", async () => await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.reflow[l], CELL_SUFFIX[l]))) : empty2;
     await page.setViewportSize({ width: 1280, height: 900 }).catch(() => {
     });
@@ -60120,7 +60375,14 @@ async function runOnPage(browser, axe, target, isFile, opts) {
       // Sorted for the same reason as `probed`: a persisted artefact that differs only by list
       // order shows up as a change in every diff of a committed `.ultra11y/pages` tree.
       ...skipped.length ? { skipped: [...skipped].sort((a2, b) => a2.sc.localeCompare(b.sc)) } : {},
-      ...snapshot ? { snapshot: { ...snapshot, ...screenshot ? { screenshot } : {}, ...screenshotFull ? { screenshotFull } : {} } } : {}
+      ...snapshot ? {
+        snapshot: {
+          ...snapshot,
+          ...screenshot ? { screenshot } : {},
+          ...screenshotFull ? { screenshotFull } : {},
+          ...screenshot320 ? { screenshot320 } : {}
+        }
+      } : {}
     };
   } finally {
     await context.close();
@@ -63443,15 +63705,29 @@ var entry = (it) => ({
 });
 var norm5 = (v2) => typeof v2 === "string" && v2.trim() ? v2.trim().toLowerCase() : null;
 var emptyCounts = () => ({ supported: 0, partial: 0, refuted: 0, unsupported: 0, unadjudicated: 0, invalid: 0, missing: 0 });
-function recordOf(audit, standard, id) {
-  if (!isCore(standard)) return audit.packAdjudication?.standard === standard ? audit.packAdjudication.criteria.find((c) => c.id === id) : void 0;
+function shownOf(audit, standard, id) {
+  if (!isCore(standard)) {
+    try {
+      return derivePackResults(audit, standard).find((c) => c.id === id);
+    } catch {
+      return audit.packAdjudication?.standard === standard ? audit.packAdjudication.criteria.find((c) => c.id === id) : void 0;
+    }
+  }
   return audit.criteria.find((c) => c.id === id);
 }
+var anchorOf = (it) => `${it.file.trim()}|${it.line}|${(it.selector ?? "").trim()}`;
+var findingAnchor = (f2) => `${f2.file.trim()}|${f2.line}|${(f2.selectorHint ?? "").trim()}`;
 function withdrawalLanded(pruned, standard, it) {
-  const rec = recordOf(pruned, standard, it.criteriaId);
+  const rec = shownOf(pruned, standard, it.criteriaId);
   if (it.kind === "c") return !rec || rec.status !== "C" && rec.status !== "NA";
-  const k = `${it.file.trim()}|${it.line}|${(it.selector ?? "").trim()}`;
-  return !rec?.findings.some((f2) => `${f2.file.trim()}|${f2.line}|${(f2.selectorHint ?? "").trim()}` === k);
+  const k = anchorOf(it);
+  return !rec?.findings.some((f2) => !f2.advisory && findingAnchor(f2) === k);
+}
+function engineStillCarries(afterPrune, standard, it) {
+  if (it.kind === "c") return false;
+  const rec = shownOf(afterPrune, standard, it.criteriaId);
+  const k = anchorOf(it);
+  return !!rec?.findings.some((f2) => !f2.advisory && !f2.ruleId.startsWith("agent:") && findingAnchor(f2) === k);
 }
 var ids = (xs) => [...new Set(xs.map((x2) => x2.criteriaId))].sort((a2, b) => a2.localeCompare(b, "en", { numeric: true }));
 function buildTrialSummary(input) {
@@ -63473,9 +63749,15 @@ function buildTrialSummary(input) {
   for (const it of missingItems) (it.kind === "c" ? claims.c : claims.nc).missing++;
   const untriedForPrune = r2.failures.filter((f2) => !["refuted", "unsupported"].includes(norm5(f2.verdict) ?? ""));
   const dry = pruneRefuted(audit, standard, verdicts, input.lang, untriedForPrune);
-  const contested = /* @__PURE__ */ new Set([...dry.skippedEngineClaims, ...dry.skippedHumanClaims]);
   const foreign = new Set(foreignItems);
-  const withdrawnAgent = verdicts.filter((it) => !foreign.has(it) && !contested.has(it) && ["refuted", "unsupported"].includes(norm5(it.verdict) ?? ""));
+  const withdrawnNamed = verdicts.filter((it) => !foreign.has(it) && ["refuted", "unsupported"].includes(norm5(it.verdict) ?? ""));
+  const contested = /* @__PURE__ */ new Set([
+    ...dry.skippedEngineClaims,
+    ...dry.skippedHumanClaims,
+    // Agent-ruled but engine-anchored: the prune deletes the agent's finding, the engine's stays.
+    ...withdrawnNamed.filter((it) => engineStillCarries(dry.audit, standard, it))
+  ]);
+  const withdrawnAgent = withdrawnNamed.filter((it) => !contested.has(it));
   const applied = [];
   const notApplied = [];
   for (const it of withdrawnAgent) (input.pruned && withdrawalLanded(input.pruned.audit, standard, it) ? applied : notApplied).push(entry(it));

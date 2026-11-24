@@ -37,6 +37,7 @@ import {
 } from "./probes.js";
 import { type AxeEngine, resolveAxeEngine, runAxe } from "./axe-engine.js";
 import { sampleScope } from "./sample.js";
+import { CONSENT_STATE } from "./consent.js";
 import {
   COLLECT_SNAPSHOT,
   type CollectedPage,
@@ -649,6 +650,7 @@ export function probeSources(): Record<string, string> {
     // producer (`scan`, the E2E integrations), so it is syntax-gated here like the probes.
     COLLECT_SNAPSHOT,
     LOADING_STATE,
+    CONSENT_STATE,
   };
 }
 
@@ -863,6 +865,18 @@ async function runOnPage(
       await page.setViewportSize({ width: 320, height: 800 });
       return (await page.evaluate(REFLOW_PROBE)) as RunnerOutput["reflow"];
     });
+    // THE PAGE AT 320px, AS THE PROBE MEASURED IT (#184). « Horizontal scroll: YES » and a list
+    // of selectors used to be all a reviewer had, and an 8px logo overhang reads exactly like a
+    // column of cut-off text until somebody looks. Taken in the state the probe read — inputs
+    // filled when interactions are on — and only beside a snapshot, which is where it is kept.
+    let screenshot320: string | undefined;
+    if (snapshot && probed.includes("1.4.10")) {
+      try {
+        screenshot320 = ((await page.screenshot({ fullPage: false })) as Buffer).toString("base64");
+      } catch {
+        /* the brief still carries the measure itself */
+      }
+    }
     const inputOverflowReflow = filled
       ? await stressed("1.4.10", async () => (await page.evaluate(inputOverflowExpr(INPUT_OVERFLOW_DETAIL.reflow[l], CELL_SUFFIX[l]))) as ProbeHit[])
       : empty;
@@ -924,7 +938,16 @@ async function runOnPage(
       // Sorted for the same reason as `probed`: a persisted artefact that differs only by list
       // order shows up as a change in every diff of a committed `.ultra11y/pages` tree.
       ...(skipped.length ? { skipped: [...skipped].sort((a, b) => a.sc.localeCompare(b.sc)) } : {}),
-      ...(snapshot ? { snapshot: { ...snapshot, ...(screenshot ? { screenshot } : {}), ...(screenshotFull ? { screenshotFull } : {}) } } : {}),
+      ...(snapshot
+        ? {
+            snapshot: {
+              ...snapshot,
+              ...(screenshot ? { screenshot } : {}),
+              ...(screenshotFull ? { screenshotFull } : {}),
+              ...(screenshot320 ? { screenshot320 } : {}),
+            },
+          }
+        : {}),
     };
   } finally {
     await context.close();

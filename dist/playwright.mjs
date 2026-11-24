@@ -3,6 +3,62 @@ import { existsSync as existsSync3, readFileSync as readFileSync3 } from "fs";
 import { createRequire as createRequire3 } from "module";
 import { join as join3 } from "path";
 
+// src/consent.ts
+var CONSENT_MARKERS = [
+  // DSFR (système de design de l'État): the consent placeholder and the consent banner.
+  { vendor: "dsfr", kind: "placeholder", cls: "fr-consent-placeholder" },
+  { vendor: "dsfr", kind: "banner", cls: "fr-consent-banner" },
+  // EU Cookie Compliance (Drupal).
+  { vendor: "eu-cookie-compliance", kind: "banner", id: "sliding-popup" },
+  { vendor: "eu-cookie-compliance", kind: "banner", cls: "eu-cookie-compliance-banner" },
+  // tarteaucitron: its root and the « activate » box it puts where a blocked service was.
+  { vendor: "tarteaucitron", kind: "banner", id: "tarteaucitron", idPrefix: true },
+  { vendor: "tarteaucitron", kind: "placeholder", cls: "tac_activate", classPrefix: true },
+  // Didomi.
+  { vendor: "didomi", kind: "banner", id: "didomi-host" },
+  { vendor: "didomi", kind: "banner", id: "didomi-notice" },
+  { vendor: "didomi", kind: "placeholder", cls: "didomi-content-placeholder", classPrefix: true },
+  // Axeptio.
+  { vendor: "axeptio", kind: "banner", id: "axeptio_overlay" },
+  { vendor: "axeptio", kind: "banner", cls: "axeptio_mount" },
+  { vendor: "axeptio", kind: "placeholder", cls: "axeptio-placeholder", classPrefix: true }
+];
+var GENERIC_PLACEHOLDER = /consent.*(?:placeholder|blocked|disabled|fallback)|(?:placeholder|blocked).*consent/i;
+var GENERIC_BANNER = /(?:cookie|consent).*(?:banner|popup|notice|modal|overlay|bar)$|^(?:cookie-?)?consent-?(?:banner|popup|notice|modal|overlay|bar)/i;
+var CONSENT_STATE = `(() => {
+  const MARKERS = ${JSON.stringify(CONSENT_MARKERS)};
+  const GP = ${GENERIC_PLACEHOLDER.toString()};
+  const GB = ${GENERIC_BANNER.toString()};
+  const match = (id, classes) => {
+    for (const m of MARKERS) {
+      if (m.id !== undefined && id && (m.idPrefix ? id.indexOf(m.id) === 0 : id === m.id)) return m;
+      if (m.cls !== undefined && classes.some((c) => (m.classPrefix ? c.indexOf(m.cls) === 0 : c === m.cls))) return m;
+    }
+    for (const c of classes) {
+      if (!/consent/i.test(c)) continue;
+      if (GP.test(c)) return { vendor: 'generic', kind: 'placeholder' };
+      if (GB.test(c)) return { vendor: 'generic', kind: 'banner' };
+    }
+    return null;
+  };
+  const out = [];
+  const seen = new Set();
+  for (const e of Array.from(document.querySelectorAll('[id],[class]'))) {
+    const classes = typeof e.className === 'string' ? e.className.split(/\\s+/).filter(Boolean) : Array.from(e.classList || []);
+    const m = match(e.id || '', classes);
+    if (!m) continue;
+    // The outermost container only: the children of a banner are the banner.
+    let inner = false;
+    for (let p = e.parentElement; p; p = p.parentElement) if (seen.has(p)) { inner = true; break; }
+    seen.add(e);
+    if (inner) continue;
+    const sel = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (classes[0] ? '.' + classes[0] : '');
+    out.push(m.kind + ' ' + m.vendor + ' ' + sel);
+    if (out.length >= 10) break;
+  }
+  return out;
+})()`;
+
 // src/collector.ts
 var COLLECTED_CSS = [
   "color",
@@ -200,6 +256,9 @@ var COLLECT_SNAPSHOT = `(() => {
     // Still loading at the instant of collection: the markers, or none. Every producer runs
     // this same collector, so every producer can say so \u2014 see LOADING_STATE.
     loading: ${LOADING_STATE},
+    // The consent placeholders and banners on the page (#184): a headless capture never
+    // accepts cookies, so what they show is \xAB \xE9tat sans consentement \xBB, not content.
+    consent: ${CONSENT_STATE},
     styles: { v: 1, entries: styles, truncated: truncated },
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };
@@ -538,7 +597,58 @@ var REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
   // content (a long word, a ::before/::after) spills out \u2014 its ancestors only carry the spill.
   const deepest = content.filter(([e]) => !content.some(([o]) => o !== e && e.contains(o)) && !Array.from(boxes).some((b) => e.contains(b)));
   const widening = outer.concat(deepest).slice(0, 5).map(([e, d]) => ({ selector: __sel(e), html: __html(e), detail: d }));
-  return { horizontalScroll, widening };
+  // A WIDE BOX IS NOT LOST CONTENT (#184). A footer logo sticking out by 8px makes the page
+  // scroll sideways, and was reported on a dozen pages as if text had gone missing. What 1.4.10
+  // is about is CONTENT the user has to scroll in two dimensions to reach: text and controls.
+  // So the same pass measures, per element, which TEXT lays out beyond the viewport (the text
+  // node's own line boxes, Range.getClientRects, not its container's box) and which controls or
+  // replaced elements (a link, a field, an image) do. A box whose own text fits reports neither.
+  const textOver = new Map();
+  const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+  let seenText = 0;
+  for (let t = walker.nextNode(); t && seenText < 5000; t = walker.nextNode()) {
+    if (!t.nodeValue || !t.nodeValue.trim()) continue;
+    const p = t.parentElement;
+    if (!p) continue;
+    seenText++;
+    const ps = getComputedStyle(p);
+    if (ps.visibility === 'hidden' || ps.display === 'none') continue;
+    const range = document.createRange();
+    range.selectNodeContents(t);
+    let over = 0;
+    for (const r of Array.from(range.getClientRects())) if (r.width > 0 && r.height > 0) over = Math.max(over, r.right + sx - vw);
+    if (over <= 2) continue;
+    if (contained(p)) continue;
+    let fixed = false;
+    for (let n = p; n && n !== document.documentElement; n = n.parentElement) if (getComputedStyle(n).position === 'fixed') { fixed = true; break; }
+    if (fixed) continue;
+    const prev = textOver.get(p);
+    textOver.set(p, { over: Math.max(over, prev ? prev.over : 0), text: ((prev ? prev.text + ' ' : '') + t.nodeValue.trim()).slice(0, 80) });
+  }
+  const textHits = Array.from(textOver.entries()).sort((a, b) => b[1].over - a[1].over);
+  const CONTROL = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=link],[tabindex]:not([tabindex="-1"]),img,svg,video,iframe,canvas,object,embed';
+  const controlHits = [];
+  for (const e of Array.from(document.querySelectorAll(CONTROL))) {
+    const r = e.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) continue;
+    const over = r.right + sx - vw;
+    if (over <= 2) continue;
+    const s = getComputedStyle(e);
+    if (s.visibility === 'hidden' || s.display === 'none' || s.position === 'fixed') continue;
+    if (contained(e)) continue;
+    // The svg inside a link is the link: name the outermost control only.
+    if (controlHits.some(([o]) => o.contains(e))) continue;
+    for (let i = controlHits.length - 1; i >= 0; i--) if (e.contains(controlHits[i][0])) controlHits.splice(i, 1);
+    controlHits.push([e, over, r.width, /^(img|svg|video|iframe|canvas|object|embed)$/i.test(e.tagName) ? 'replaced' : 'control']);
+  }
+  controlHits.sort((a, b) => b[1] - a[1]);
+  const clipped = {
+    text: textHits.slice(0, 5).map(([e, v]) => ({ selector: __sel(e), html: __html(e), detail: 'texte \xAB ' + v.text + ' \xBB pos\xE9 ' + Math.round(v.over) + 'px au-del\xE0 du bord droit du viewport' })),
+    textCount: textHits.length,
+    controls: controlHits.slice(0, 5).map(([e, over, w, kind]) => ({ selector: __sel(e), html: __html(e), detail: (kind === 'replaced' ? '\xE9l\xE9ment remplac\xE9' : 'contr\xF4le') + ' pos\xE9 ' + Math.round(over) + 'px au-del\xE0 du bord droit du viewport (largeur ' + Math.round(w) + 'px)' })),
+    controlCount: controlHits.length,
+  };
+  return { horizontalScroll, widening, clipped };
 })()`;
 var STRESS_LIB = `${FRAMES}
 const __pause = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -746,7 +856,7 @@ var TEXT_SPACING_PROBE = `(async () => { ${PRELUDE} ${STRESS_LIB}
 })()`;
 function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables) {
   const rootExpr = scope ? `document.querySelectorAll(${JSON.stringify(scope)})` : `[document.documentElement]`;
-  return `(() => { ${PRELUDE}
+  return `(async () => { ${PRELUDE} ${FRAMES}
   // FOCUSABLE MEANS FOCUSABLE, NOT "the six tags we thought of". This list decides which
   // elements get tagged, and since the walk may now license a conformity, an element missing
   // from it is not merely unmeasured -- it is silently cleared. A page whose only control is a
@@ -809,6 +919,27 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
     if (root.matches && root.matches(sel)) focusables.push(root);
     for (const e of Array.from(root.querySelectorAll(sel))) focusables.push(e);
   }
+  // THE REST STATE IS THE UNFOCUSED STATE, and an element focused at load is not at rest. An
+  // autofocus field (a login form's username, #184) was photographed with its ring already on,
+  // so the comparison after Tab saw no change and reported a decisive \xAB focus not visible \xBB on
+  // a ring that was plainly there. Blur whatever holds focus, let the page repaint (and finish
+  // any focus transition, whose mid-flight value is neither state), snapshot, then hand focus
+  // back so the walk starts where a keyboard user would.
+  // NOT INSIDE AN OPENED DIALOG: the scoped pass runs on a dialog this tool opened, and blurring
+  // its focused control is exactly what closes a menu or a popover listening on focusout. There
+  // the focused element is simply recorded as not at rest, and never accused.
+  // (No backticks in this comment: it lives inside a template literal.)
+  const held = document.activeElement;
+  const focusedHeld = !!(held && held !== document.body && held !== document.documentElement);
+  const blurred = ${scope ? "false" : "true"} && focusedHeld && typeof held.blur === 'function';
+  if (blurred) {
+    try { held.blur(); } catch (_) {}
+    await __frames();
+    try { for (const a of document.getAnimations ? document.getAnimations() : []) { if (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition) a.finish(); } } catch (_) {}
+  }
+  // A page that pulls focus straight back (a focus handler, a trap) leaves nothing at rest to
+  // compare with: that element is recorded as such, and the check refuses to accuse it.
+  const stillHeld = focusedHeld && document.activeElement === held ? held : null;
   window.__u11yF = {};
   let n = 0;
   for (const e of focusables) {
@@ -819,9 +950,11 @@ function focusSetupExpr(scope = "", maxFocusables = PROBE_DEFAULTS.maxFocusables
     if (n >= ${maxFocusables}) continue; // tagged the cap; keep COUNTING so the caller knows it was cut
     e.setAttribute('data-u11y-f', key);
     proxy.setAttribute('data-u11y-fp', key);
-    window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy) };
+    const focusedAtRest = !!stillHeld && (stillHeld === e || stillHeld === proxy || e.contains(stillHeld));
+    window.__u11yF[key] = { rest: snap(proxy), sel: __sel(proxy), html: __html(proxy), ...(focusedAtRest ? { focusedAtRest: true } : {}) };
     n++;
   }
+  if (blurred && document.activeElement !== held) { try { held.focus({ preventScroll: true }); } catch (_) {} }
   return { n: n, total: total };
 })()`;
 }
@@ -852,6 +985,11 @@ var FOCUS_CHECK_PROBE = `(() => {
   const st = (pseudo) => sty(proxy, pseudo);
   const ctx = [proxy.parentElement, proxy.parentElement && proxy.parentElement.parentElement, proxy.nextElementSibling].map((x) => (x ? sty(x, null) : '-')).join('~');
   const now = [st(null), st('::before'), st('::after')].join('#') + '@' + ctx;
+  // FOCUSED AT LOAD AND NEVER LET GO: the setup could not photograph this element unfocused
+  // (the page pulled focus back, or the pass ran inside an opened dialog), so its \xAB rest \xBB is
+  // its focused look and an unchanged read proves nothing. Unmeasured, never accused (#184).
+  // (No backticks in this comment: it lives inside a template literal.)
+  if (rec.focusedAtRest && now === rec.rest) return { key: key, changed: true, unmeasured: true, selector: rec.sel, html: rec.html };
   return { key: key, changed: now !== rec.rest, selector: rec.sel, html: rec.html };
 })()`;
 var FOCUS_OBSCURED_PROBE = `(() => { ${PRELUDE}
@@ -943,6 +1081,7 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
   let prevKey = null;
   let cutShort = `the walk spent its ${limit} Tab presses without the ring ever closing, so the tail of it was never reached`;
   let untagged = 0;
+  let unmeasured = 0;
   for (let i = 0; i < limit; i++) {
     if (deadline?.out()) {
       cutShort = `the probe budget of ${limits.budgetMs}ms ran out after ${seen.size} of the ${count} focusable elements \u2014 the rest of the ring was never focused`;
@@ -962,6 +1101,7 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
     }
     seen.add(r.key);
     prevKey = r.key;
+    if (r.unmeasured) unmeasured++;
     if (!r.changed) {
       hits.push({
         selector: r.selector,
@@ -985,7 +1125,7 @@ async function probeFocusRing(page, scope = "", limits = PROBE_DEFAULTS, deadlin
     }
   }
   if (cutShort && seen.size >= count) cutShort = void 0;
-  const why = cappedRing(capped, limits) ?? cutShort ?? (untagged > 0 ? `Tab crossed ${untagged} element(s) the tagging pass never matched \u2014 a control focusable in the browser but not by this selector (a skip link revealed on focus, a widget moving focus into an untagged node). They were never compared, so this page is not cleared` : void 0);
+  const why = cappedRing(capped, limits) ?? cutShort ?? (untagged > 0 ? `Tab crossed ${untagged} element(s) the tagging pass never matched \u2014 a control focusable in the browser but not by this selector (a skip link revealed on focus, a widget moving focus into an untagged node). They were never compared, so this page is not cleared` : unmeasured > 0 ? `${unmeasured} element(s) held focus from page load and could not be photographed unfocused (the page pulled focus straight back), so their focus indicator was never compared and this page is not cleared` : void 0);
   return { visible: hits, obscured, complete: !why, ...why ? { why } : {} };
 }
 var NATIVE_SEGMENT_STOPS = {
@@ -1481,7 +1621,10 @@ function buildPayload(collected, url, runner, opts, screenshot, probes, axe, scr
       ...opts.notes ? { notes: opts.notes } : {},
       // Still loading when collected: named, so the report can say so and the audit concludes
       // nothing from this page's silence.
-      ...collected.loading?.length ? { loading: collected.loading } : {}
+      ...collected.loading?.length ? { loading: collected.loading } : {},
+      // Captured without consent (#184): a test browser never accepts cookies either, so the
+      // consent placeholders it showed are named and their content tagged in the briefs.
+      ...collected.consent?.length ? { consent: "none", consentMarkers: collected.consent } : {}
     },
     dom: collected.dom,
     styles: collected.styles,

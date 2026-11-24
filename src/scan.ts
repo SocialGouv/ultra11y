@@ -1,6 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { AuditResult, AxeEngineInfo, DynamicEngine, DynamicFinding, DynamicResult, Finding, Lang, SamplePage, ScanRedirect, Severity } from "./types.js";
+import type {
+  AuditResult,
+  AxeEngineInfo,
+  DynamicEngine,
+  DynamicFinding,
+  DynamicResult,
+  Finding,
+  Lang,
+  ReflowClipped,
+  SamplePage,
+  ScanRedirect,
+  Severity,
+} from "./types.js";
 import { isAdjudicated } from "./types.js";
 import { lineStartsOf, lineColAt } from "./parse/html.js";
 import { allGuidelines } from "./wcag.js";
@@ -18,7 +30,7 @@ import {
   type SnapshotProbes,
 } from "./snapshot.js";
 import { resolveMessage } from "./messages.js";
-import { PROBES_VERSION } from "./probes.js";
+import { PROBES_VERSION, reflowClippedParams } from "./probes.js";
 import { today } from "./util.js";
 import { findingId } from "./baseline.js";
 
@@ -53,7 +65,7 @@ export interface RunnerOutput {
   /** The axe-core build that produced `violations` (src/axe-engine.ts). */
   axe?: AxeEngineInfo;
   /** `widening`: the outermost boxes wider than the viewport, when the producer looked. */
-  reflow: { horizontalScroll: boolean; widening?: ProbeHit[] };
+  reflow: { horizontalScroll: boolean; widening?: ProbeHit[]; clipped?: ReflowClipped };
   // Residual-criteria probes — populated by the local runtime (scan-local.ts). Optional so
   // every caller/test that omits them stays valid.
   focusVisible?: ProbeHit[];
@@ -89,7 +101,8 @@ export interface RunnerOutput {
   // base64). Absent when snapshotting was off or the collection failed — in which case the
   // page keeps its findings but earns no snapshot, and therefore no conforming-by-silence.
   /** `screenshotFull`: the whole page, height-bounded, beside the viewport shot (#135). */
-  snapshot?: CollectedPage & { screenshot?: string; screenshotFull?: string };
+  /** `screenshot320`: the page at the 320px reflow viewport, as the probe measured it (#184). */
+  snapshot?: CollectedPage & { screenshot?: string; screenshotFull?: string; screenshot320?: string };
   // WHERE the browser was when the measurement started — read right after goto + settle,
   // before any probe could click something that routes. `url` above is read at the END and
   // is the address the run finished on; only this one is the identity of what was audited.
@@ -220,6 +233,9 @@ export function writeRunnerSnapshot(
     // Still loading when the browser collected it (#135): the report says so, and the audit
     // concludes nothing from this page's silence.
     ...(collected.loading?.length ? { loading: collected.loading } : {}),
+    // Captured without consent (#184): the placeholders it showed are named, and the briefs
+    // tag what was harvested inside them « état sans consentement ».
+    ...(collected.consent?.length ? { consent: "none" as const, consentMarkers: collected.consent } : {}),
   };
   // The producer is untrusted input even when it is us: a page id becomes a directory name.
   const v = validateSnapshotMeta(meta);
@@ -250,6 +266,7 @@ export function writeRunnerSnapshot(
       axe: { violations: out.violations, ran: true, ...(out.axe ? { engine: out.axe } : {}) },
       ...(collected.screenshot ? { screenshotBase64: collected.screenshot } : {}),
       ...(collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {}),
+      ...(collected.screenshot320 ? { screenshot320Base64: collected.screenshot320 } : {}),
     });
   } catch {
     return undefined;
@@ -320,17 +337,21 @@ export function toDynamicResult(out: RunnerOutput, target: string, lang: Lang = 
     // the finding is anchored on the first of them — the element a developer has to change.
     const widening = reflowWidening(out.reflow);
     const first = out.reflow.widening?.[0];
+    // …AND WHETHER ANY CONTENT IS OUT OF REACH (#184): a box that overflows with its text in
+    // view is not the same finding as text laid out past the edge, and the sentence says which.
+    const clipped = reflowClippedParams(out.reflow.clipped);
     findings.push({
       criteriaId: "1.4.10",
       axeRule: "reflow",
       impact: "serious",
       severity: "majeur",
-      message: resolveMessage({ message: "", msg: { id: "dyn-reflow", params: widening ? { widening } : {} } }, lang),
+      message: resolveMessage({ message: "", msg: { id: "dyn-reflow", params: { ...(widening ? { widening } : {}), ...clipped } } }, lang),
       selector: first?.selector || "document",
       snippet: first?.html ?? "",
       engine: "reflow",
       page,
       ...(widening ? { widening } : {}),
+      ...(clipped.clippedText !== undefined ? { clippedText: clipped.clippedText, clippedControls: clipped.clippedControls } : {}),
     });
   }
   // Residual-criteria probes (local runtime). Each hit the probe OBSERVED becomes a
@@ -542,7 +563,13 @@ export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: L
     // through verbatim via params.message) while the REMEDIATION is still ours.
     const msg: { id: string; params?: Record<string, string> } =
       df.engine === "reflow"
-        ? { id: "dyn-reflow", ...(df.widening ? { params: { widening: df.widening } } : {}) }
+        ? (() => {
+            const params: Record<string, string> = {
+              ...(df.widening ? { widening: df.widening } : {}),
+              ...(df.clippedText !== undefined && df.clippedControls !== undefined ? { clippedText: df.clippedText, clippedControls: df.clippedControls } : {}),
+            };
+            return { id: "dyn-reflow", ...(Object.keys(params).length ? { params } : {}) };
+          })()
         : { id: "dyn-remediation", params: { message: df.message } };
     const file = df.page ?? dynamic.target;
     // Anchor at a real host file:line by locating the cited outerHTML in the source (R3).

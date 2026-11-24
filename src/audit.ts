@@ -43,6 +43,7 @@ import { discover } from "./discover.js";
 import { GRAPH_ONLY_EXT } from "./glob.js";
 import { readText, today } from "./util.js";
 import { resolveMessage } from "./messages.js";
+import { reflowClippedParams } from "./probes.js";
 import { isPdfPath, loadPdfDoc, pdfDocFromBytes, readDocumentOrigin } from "./documents.js";
 import { PDF_MAX_BYTES } from "./parse/pdf.js";
 import { pdfCheckOutcomes } from "./rules/pdf.js";
@@ -967,7 +968,8 @@ function probeFindings(probes: NonNullable<RenderSignals["probes"]>, file: strin
       .map((w) => w.selector)
       .filter(Boolean)
       .join(", ");
-    const params: Record<string, string> = widening ? { widening } : {};
+    // …and whether any TEXT or CONTROL is out of reach, or only boxes overflow (#184).
+    const params: Record<string, string> = { ...(widening ? { widening } : {}), ...reflowClippedParams(probes.reflow.clipped) };
     add(
       "1.4.10",
       "dyn-reflow",

@@ -1,3 +1,59 @@
+// src/consent.ts
+var CONSENT_MARKERS = [
+  // DSFR (système de design de l'État): the consent placeholder and the consent banner.
+  { vendor: "dsfr", kind: "placeholder", cls: "fr-consent-placeholder" },
+  { vendor: "dsfr", kind: "banner", cls: "fr-consent-banner" },
+  // EU Cookie Compliance (Drupal).
+  { vendor: "eu-cookie-compliance", kind: "banner", id: "sliding-popup" },
+  { vendor: "eu-cookie-compliance", kind: "banner", cls: "eu-cookie-compliance-banner" },
+  // tarteaucitron: its root and the « activate » box it puts where a blocked service was.
+  { vendor: "tarteaucitron", kind: "banner", id: "tarteaucitron", idPrefix: true },
+  { vendor: "tarteaucitron", kind: "placeholder", cls: "tac_activate", classPrefix: true },
+  // Didomi.
+  { vendor: "didomi", kind: "banner", id: "didomi-host" },
+  { vendor: "didomi", kind: "banner", id: "didomi-notice" },
+  { vendor: "didomi", kind: "placeholder", cls: "didomi-content-placeholder", classPrefix: true },
+  // Axeptio.
+  { vendor: "axeptio", kind: "banner", id: "axeptio_overlay" },
+  { vendor: "axeptio", kind: "banner", cls: "axeptio_mount" },
+  { vendor: "axeptio", kind: "placeholder", cls: "axeptio-placeholder", classPrefix: true }
+];
+var GENERIC_PLACEHOLDER = /consent.*(?:placeholder|blocked|disabled|fallback)|(?:placeholder|blocked).*consent/i;
+var GENERIC_BANNER = /(?:cookie|consent).*(?:banner|popup|notice|modal|overlay|bar)$|^(?:cookie-?)?consent-?(?:banner|popup|notice|modal|overlay|bar)/i;
+var CONSENT_STATE = `(() => {
+  const MARKERS = ${JSON.stringify(CONSENT_MARKERS)};
+  const GP = ${GENERIC_PLACEHOLDER.toString()};
+  const GB = ${GENERIC_BANNER.toString()};
+  const match = (id, classes) => {
+    for (const m of MARKERS) {
+      if (m.id !== undefined && id && (m.idPrefix ? id.indexOf(m.id) === 0 : id === m.id)) return m;
+      if (m.cls !== undefined && classes.some((c) => (m.classPrefix ? c.indexOf(m.cls) === 0 : c === m.cls))) return m;
+    }
+    for (const c of classes) {
+      if (!/consent/i.test(c)) continue;
+      if (GP.test(c)) return { vendor: 'generic', kind: 'placeholder' };
+      if (GB.test(c)) return { vendor: 'generic', kind: 'banner' };
+    }
+    return null;
+  };
+  const out = [];
+  const seen = new Set();
+  for (const e of Array.from(document.querySelectorAll('[id],[class]'))) {
+    const classes = typeof e.className === 'string' ? e.className.split(/\\s+/).filter(Boolean) : Array.from(e.classList || []);
+    const m = match(e.id || '', classes);
+    if (!m) continue;
+    // The outermost container only: the children of a banner are the banner.
+    let inner = false;
+    for (let p = e.parentElement; p; p = p.parentElement) if (seen.has(p)) { inner = true; break; }
+    seen.add(e);
+    if (inner) continue;
+    const sel = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (classes[0] ? '.' + classes[0] : '');
+    out.push(m.kind + ' ' + m.vendor + ' ' + sel);
+    if (out.length >= 10) break;
+  }
+  return out;
+})()`;
+
 // src/collector.ts
 var COLLECTED_CSS = [
   "color",
@@ -178,6 +234,9 @@ var COLLECT_SNAPSHOT = `(() => {
     // Still loading at the instant of collection: the markers, or none. Every producer runs
     // this same collector, so every producer can say so \u2014 see LOADING_STATE.
     loading: ${LOADING_STATE},
+    // The consent placeholders and banners on the page (#184): a headless capture never
+    // accepts cookies, so what they show is \xAB \xE9tat sans consentement \xBB, not content.
+    consent: ${CONSENT_STATE},
     styles: { v: 1, entries: styles, truncated: truncated },
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };
@@ -237,7 +296,10 @@ function buildPayload(collected, url, runner, opts, screenshot, probes, axe, scr
       ...opts.notes ? { notes: opts.notes } : {},
       // Still loading when collected: named, so the report can say so and the audit concludes
       // nothing from this page's silence.
-      ...collected.loading?.length ? { loading: collected.loading } : {}
+      ...collected.loading?.length ? { loading: collected.loading } : {},
+      // Captured without consent (#184): a test browser never accepts cookies either, so the
+      // consent placeholders it showed are named and their content tagged in the briefs.
+      ...collected.consent?.length ? { consent: "none", consentMarkers: collected.consent } : {}
     },
     dom: collected.dom,
     styles: collected.styles,

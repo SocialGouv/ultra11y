@@ -107,6 +107,20 @@ carries `loading` (the markers it still showed), a warning is printed, and the p
 concludes nothing. `loadingTimeoutMs: 0` checks without waiting. `scan` waits the same way; Cypress records the markers but leaves the waiting to the
 test's own `should`.
 
+## A page captured without cookie consent (`consent`)
+
+A test browser, like `scan`'s, never accepts cookies. On a page whose video, map or social
+widget sits behind a consent manager, what gets captured is the **placeholder**, such as DSFR's
+`.fr-consent-placeholder` (« … est désactivé »), tarteaucitron's activation box, or a Didomi,
+Axeptio or EU Cookie Compliance (`#sliding-popup`) banner. The collector detects these
+(`src/consent.ts`: those vendors, plus generic `*consent*placeholder*` / `*consent*banner*`
+classes). `meta.json` then carries `consent: "none"` and `consentMarkers`, and every piece of
+evidence harvested inside one is tagged « état sans consentement » in the adjudication briefs, so
+it is not judged as the page's own content (not a 9.1 heading, for example). Accepting or
+refusing consent before the capture (`sample.consent: accept|refuse`) is not implemented yet:
+each consent manager names its buttons differently, and a click that misses would capture the
+wrong state under the right label.
+
 ## Playwright
 
 ```js
