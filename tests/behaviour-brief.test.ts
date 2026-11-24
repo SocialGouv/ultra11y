@@ -211,3 +211,31 @@ describe("a digest that could not look never reads as a page with nothing to fin
     expect(ev.some((e) => e.startsWith("div.toast ::") && /not in the serialized DOM/.test(e))).toBe(true);
   });
 });
+
+describe("a malformed scripts.json degrades to less evidence, never a crash", () => {
+  it("loads with the wrong-typed fields and entries dropped, and harvesting subjects does not throw", () => {
+    const d = digest();
+    const bad = {
+      ...d,
+      timers: {}, // every timers field missing — the reader takes `.length` on its arrays
+      listeners: [
+        ...(d.listeners ?? []).slice(0, 1), // a well-formed entry survives the read
+        { i: 0, tag: "div", selector: "div#carte", native: false, flagged: true, mouseOnly: true, events: "x" }, // events is not a list
+      ],
+      updates: [{ i: 4, tag: "p", selector: "p#statut", kinds: "x" }], // kinds is not a list
+    } as unknown as ScriptsDigest;
+    const root = capture(bad);
+    const s = readSnapshot(join(root, PAGES_DIR, "comportements"))?.scripts;
+    expect(s?.collected).toBe("cdp");
+    expect(s?.timers).toBeUndefined();
+    expect(s?.listeners).toHaveLength(1);
+    expect(s?.listeners?.[0]?.events).toEqual(["click"]);
+    expect(s?.updates).toEqual([]);
+    // The criteria the digest informs are harvested on it — none of it may throw.
+    for (const [std, ids] of [
+      ["rgaa", ["7.1", "7.3", "7.5", "13.1", "13.8"]],
+      ["wcag", ["2.1.1", "2.2.1", "2.2.2", "4.1.2", "4.1.3"]],
+    ] as const)
+      for (const id of ids) expect(() => evidenceOf(root, std, id)).not.toThrow();
+  });
+});

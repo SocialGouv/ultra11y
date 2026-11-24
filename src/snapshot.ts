@@ -448,18 +448,125 @@ export function readSnapshot(dir: string): Snapshot | null {
 
 /** Read `scripts.json`, or undefined when it is absent or not a behaviour digest this engine
  *  understands. A digest from a future format is refused rather than half-read, and a digest
- *  whose `collected` is not one of the three known values is not trusted to say what it saw. */
+ *  whose `collected` is not one of the three known values is not trusted to say what it saw.
+ *  A digest whose declared fields are of the wrong type is not a crash either: it is read with
+ *  the bad entries and fields dropped (see `asScriptsDigest`), and degrades to less evidence. */
 export function readScripts(dir: string): ScriptsDigest | undefined {
   return asScriptsDigest(readJson<unknown>(join(dir, "scripts.json")));
 }
 
-/** The same check for a digest arriving from a producer (`snapshot write` reads it off stdin). */
+// Field-by-field validators for the shapes `ScriptsDigest` declares. The digest arrives from a
+// producer's output or off disk, so it is DATA, not code: anything with the wrong type is
+// DROPPED — an entry out of a list, or the whole optional field — so a malformed digest
+// degrades to less evidence and never crashes brief generation downstream (the behaviour
+// subjects join on `events`/`kinds`/`values` and take `.length` on the timers arrays).
+const isStr = (x: unknown): x is string => typeof x === "string";
+const isNum = (x: unknown): x is number => typeof x === "number";
+const isBool = (x: unknown): x is boolean => typeof x === "boolean";
+const isObj = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === "object" && !Array.isArray(x);
+const isStrArr = (x: unknown): x is string[] => Array.isArray(x) && x.every(isStr);
+const isNumArr = (x: unknown): x is number[] => Array.isArray(x) && x.every(isNum);
+
+/** The element join every behaviour entry carries — the same ordinals styles.json/boxes.json use. */
+const isBehaviourEl = (e: Record<string, unknown>): boolean => isNum(e.i) && isStr(e.tag) && isStr(e.selector) && (e.html === undefined || isStr(e.html));
+
+const LISTENER_OK = (l: unknown): boolean =>
+  isObj(l) &&
+  isBehaviourEl(l) &&
+  isStrArr(l.events) &&
+  isBool(l.native) &&
+  isBool(l.flagged) &&
+  isBool(l.mouseOnly) &&
+  (l.role === undefined || isStr(l.role)) &&
+  (l.tabindex === undefined || isStr(l.tabindex));
+const DELEGATED_OK = (g: unknown): boolean => isObj(g) && isStr(g.target) && isStrArr(g.events);
+const INLINE_OK = (e: unknown): boolean => isObj(e) && isBehaviourEl(e) && isStrArr(e.attrs);
+const ARIA_MUTATION_OK = (m: unknown): boolean =>
+  isObj(m) &&
+  isBehaviourEl(m) &&
+  isStr(m.attr) &&
+  (m.from === null || isStr(m.from)) &&
+  Array.isArray(m.values) &&
+  m.values.every((v) => v === null || isStr(v)) &&
+  isNum(m.count) &&
+  (m.phase === "idle" || m.phase === "interaction" || m.phase === "both");
+const LIVE_REGION_OK = (r: unknown): boolean =>
+  isObj(r) &&
+  isBehaviourEl(r) &&
+  isBool(r.changed) &&
+  (r.live === undefined || isStr(r.live)) &&
+  (r.role === undefined || isStr(r.role)) &&
+  (r.atomic === undefined || isStr(r.atomic));
+const UPDATE_OK = (u: unknown): boolean => isObj(u) && isBehaviourEl(u) && isStrArr(u.kinds);
+const MOTION_OK = (m: unknown): boolean => isObj(m) && isBehaviourEl(m) && isNum(m.changes) && isStrArr(m.kinds);
+const ANIMATION_OK = (a: unknown): boolean =>
+  isObj(a) && isBehaviourEl(a) && isStr(a.name) && (a.iterations === "infinite" || isNum(a.iterations)) && isNum(a.durationMs);
+const RESOURCE_OK = (r: unknown): boolean =>
+  isObj(r) &&
+  (r.kind === "script" || r.kind === "stylesheet") &&
+  (r.origin === "inline" || r.origin === "same-origin" || r.origin === "cross-origin") &&
+  (r.url === undefined || isStr(r.url)) &&
+  (r.size === undefined || isNum(r.size));
+const TIMERS_OK = (t: unknown): boolean =>
+  isObj(t) &&
+  (t.source === "init" || t.source === "window" || t.source === "none") &&
+  isNumArr(t.intervals) &&
+  isNum(t.timeouts) &&
+  isNumArr(t.longTimeouts) &&
+  isNum(t.inlineSetInterval) &&
+  isNum(t.inlineSetTimeout) &&
+  (t.metaRefresh === undefined || isStr(t.metaRefresh));
+
+/** An optional list field, verified entry by entry: absent stays absent, a non-array or its
+ *  invalid entries are dropped. `T` is the declared list type. */
+const listField = <T>(raw: unknown, ok: (e: unknown) => boolean): T | undefined => (Array.isArray(raw) ? (raw.filter(ok) as T) : undefined);
+
+/** A `Record<string, number>` (caps, truncated) with its non-numeric entries dropped. */
+const countsOf = (raw: unknown): Record<string, number> =>
+  isObj(raw) ? (Object.fromEntries(Object.entries(raw).filter(([, v]) => isNum(v))) as Record<string, number>) : {};
+
+/** The same check for a digest arriving from a producer (`snapshot write` reads it off stdin):
+ *  the shape is verified FIELD BY FIELD against `ScriptsDigest`, and an unknown `v` or
+ *  `collected` still refuses the whole digest — but within a known version, a wrong-typed list,
+ *  entry or timers field is dropped, never propagated to a consumer that would crash on it. */
 export function asScriptsDigest(input: unknown): ScriptsDigest | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
-  const raw = input as Partial<ScriptsDigest>;
+  if (!isObj(input)) return undefined;
+  const raw = input;
   if (typeof raw.v !== "number" || raw.v < 1 || raw.v > SCRIPTS_VERSION) return undefined;
   if (raw.collected !== "cdp" && raw.collected !== "dom" && raw.collected !== "none") return undefined;
-  return { ...raw, caps: raw.caps ?? {} } as ScriptsDigest;
+  const out: ScriptsDigest = { v: raw.v, collected: raw.collected, caps: countsOf(raw.caps) };
+  if (isStr(raw.why)) out.why = raw.why;
+  if (isNum(raw.windowMs)) out.windowMs = raw.windowMs;
+  if (isNum(raw.idleMs)) out.idleMs = raw.idleMs;
+  const listeners = listField<NonNullable<ScriptsDigest["listeners"]>>(raw.listeners, LISTENER_OK);
+  const delegated = listField<NonNullable<ScriptsDigest["delegated"]>>(raw.delegated, DELEGATED_OK);
+  const inline = listField<NonNullable<ScriptsDigest["inline"]>>(raw.inline, INLINE_OK);
+  const ariaMutations = listField<NonNullable<ScriptsDigest["ariaMutations"]>>(raw.ariaMutations, ARIA_MUTATION_OK);
+  const liveRegions = listField<NonNullable<ScriptsDigest["liveRegions"]>>(raw.liveRegions, LIVE_REGION_OK);
+  const updates = listField<NonNullable<ScriptsDigest["updates"]>>(raw.updates, UPDATE_OK);
+  const motion = listField<NonNullable<ScriptsDigest["motion"]>>(raw.motion, MOTION_OK);
+  const animations = listField<NonNullable<ScriptsDigest["animations"]>>(raw.animations, ANIMATION_OK);
+  const resources = listField<NonNullable<ScriptsDigest["resources"]>>(raw.resources, RESOURCE_OK);
+  const truncated = countsOf(raw.truncated);
+  return {
+    ...out,
+    ...(listeners ? { listeners } : {}),
+    ...(delegated ? { delegated } : {}),
+    ...(inline ? { inline } : {}),
+    ...(ariaMutations ? { ariaMutations } : {}),
+    ...(liveRegions ? { liveRegions } : {}),
+    ...(updates ? { updates } : {}),
+    ...(motion ? { motion } : {}),
+    ...(animations ? { animations } : {}),
+    ...(resources ? { resources } : {}),
+    // The timers fields are read together (`.length` on the arrays beside the counters), so a
+    // half-valid timers object would be read as "no timers" — a statement of evidence, not the
+    // absence of one. It is dropped WHOLESALE when any field is missing or of the wrong type.
+    ...(TIMERS_OK(raw.timers) ? { timers: raw.timers as NonNullable<ScriptsDigest["timers"]> } : {}),
+    // The truncated counts are evidence-bearing only when non-empty; an all-invalid or
+    // non-object `truncated` simply says nothing was capped.
+    ...(Object.keys(truncated).length ? { truncated } : {}),
+  };
 }
 
 /** The screenshot a READER of the report should see for a page: the whole page when the

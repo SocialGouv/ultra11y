@@ -2405,11 +2405,11 @@ var require_ignore = __commonJS({
           this._added = true;
           return;
         }
-        const isStr = isString(pattern);
-        const raw = isStr ? pattern : pattern.pattern;
+        const isStr2 = isString(pattern);
+        const raw = isStr2 ? pattern : pattern.pattern;
         const rule = checkPattern(raw) && createRule(
           raw,
-          isStr ? UNDEFINED : pattern.mark,
+          isStr2 ? UNDEFINED : pattern.mark,
           this._ignoreCase,
           !this._split,
           this._stripBOM && !index
@@ -25650,12 +25650,63 @@ function readSnapshot(dir) {
 function readScripts(dir) {
   return asScriptsDigest(readJson(join3(dir, "scripts.json")));
 }
+var isStr = (x2) => typeof x2 === "string";
+var isNum = (x2) => typeof x2 === "number";
+var isBool = (x2) => typeof x2 === "boolean";
+var isObj = (x2) => x2 !== null && typeof x2 === "object" && !Array.isArray(x2);
+var isStrArr = (x2) => Array.isArray(x2) && x2.every(isStr);
+var isNumArr = (x2) => Array.isArray(x2) && x2.every(isNum);
+var isBehaviourEl = (e) => isNum(e.i) && isStr(e.tag) && isStr(e.selector) && (e.html === void 0 || isStr(e.html));
+var LISTENER_OK = (l) => isObj(l) && isBehaviourEl(l) && isStrArr(l.events) && isBool(l.native) && isBool(l.flagged) && isBool(l.mouseOnly) && (l.role === void 0 || isStr(l.role)) && (l.tabindex === void 0 || isStr(l.tabindex));
+var DELEGATED_OK = (g) => isObj(g) && isStr(g.target) && isStrArr(g.events);
+var INLINE_OK = (e) => isObj(e) && isBehaviourEl(e) && isStrArr(e.attrs);
+var ARIA_MUTATION_OK = (m3) => isObj(m3) && isBehaviourEl(m3) && isStr(m3.attr) && (m3.from === null || isStr(m3.from)) && Array.isArray(m3.values) && m3.values.every((v2) => v2 === null || isStr(v2)) && isNum(m3.count) && (m3.phase === "idle" || m3.phase === "interaction" || m3.phase === "both");
+var LIVE_REGION_OK = (r2) => isObj(r2) && isBehaviourEl(r2) && isBool(r2.changed) && (r2.live === void 0 || isStr(r2.live)) && (r2.role === void 0 || isStr(r2.role)) && (r2.atomic === void 0 || isStr(r2.atomic));
+var UPDATE_OK = (u2) => isObj(u2) && isBehaviourEl(u2) && isStrArr(u2.kinds);
+var MOTION_OK = (m3) => isObj(m3) && isBehaviourEl(m3) && isNum(m3.changes) && isStrArr(m3.kinds);
+var ANIMATION_OK = (a2) => isObj(a2) && isBehaviourEl(a2) && isStr(a2.name) && (a2.iterations === "infinite" || isNum(a2.iterations)) && isNum(a2.durationMs);
+var RESOURCE_OK = (r2) => isObj(r2) && (r2.kind === "script" || r2.kind === "stylesheet") && (r2.origin === "inline" || r2.origin === "same-origin" || r2.origin === "cross-origin") && (r2.url === void 0 || isStr(r2.url)) && (r2.size === void 0 || isNum(r2.size));
+var TIMERS_OK = (t3) => isObj(t3) && (t3.source === "init" || t3.source === "window" || t3.source === "none") && isNumArr(t3.intervals) && isNum(t3.timeouts) && isNumArr(t3.longTimeouts) && isNum(t3.inlineSetInterval) && isNum(t3.inlineSetTimeout) && (t3.metaRefresh === void 0 || isStr(t3.metaRefresh));
+var listField = (raw, ok) => Array.isArray(raw) ? raw.filter(ok) : void 0;
+var countsOf = (raw) => isObj(raw) ? Object.fromEntries(Object.entries(raw).filter(([, v2]) => isNum(v2))) : {};
 function asScriptsDigest(input) {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return void 0;
+  if (!isObj(input)) return void 0;
   const raw = input;
   if (typeof raw.v !== "number" || raw.v < 1 || raw.v > SCRIPTS_VERSION) return void 0;
   if (raw.collected !== "cdp" && raw.collected !== "dom" && raw.collected !== "none") return void 0;
-  return { ...raw, caps: raw.caps ?? {} };
+  const out = { v: raw.v, collected: raw.collected, caps: countsOf(raw.caps) };
+  if (isStr(raw.why)) out.why = raw.why;
+  if (isNum(raw.windowMs)) out.windowMs = raw.windowMs;
+  if (isNum(raw.idleMs)) out.idleMs = raw.idleMs;
+  const listeners = listField(raw.listeners, LISTENER_OK);
+  const delegated = listField(raw.delegated, DELEGATED_OK);
+  const inline = listField(raw.inline, INLINE_OK);
+  const ariaMutations = listField(raw.ariaMutations, ARIA_MUTATION_OK);
+  const liveRegions = listField(raw.liveRegions, LIVE_REGION_OK);
+  const updates = listField(raw.updates, UPDATE_OK);
+  const motion = listField(raw.motion, MOTION_OK);
+  const animations = listField(raw.animations, ANIMATION_OK);
+  const resources = listField(raw.resources, RESOURCE_OK);
+  const truncated = countsOf(raw.truncated);
+  return {
+    ...out,
+    ...listeners ? { listeners } : {},
+    ...delegated ? { delegated } : {},
+    ...inline ? { inline } : {},
+    ...ariaMutations ? { ariaMutations } : {},
+    ...liveRegions ? { liveRegions } : {},
+    ...updates ? { updates } : {},
+    ...motion ? { motion } : {},
+    ...animations ? { animations } : {},
+    ...resources ? { resources } : {},
+    // The timers fields are read together (`.length` on the arrays beside the counters), so a
+    // half-valid timers object would be read as "no timers" — a statement of evidence, not the
+    // absence of one. It is dropped WHOLESALE when any field is missing or of the wrong type.
+    ...TIMERS_OK(raw.timers) ? { timers: raw.timers } : {},
+    // The truncated counts are evidence-bearing only when non-empty; an all-invalid or
+    // non-object `truncated` simply says nothing was capped.
+    ...Object.keys(truncated).length ? { truncated } : {}
+  };
 }
 function pageScreenshot(pagesDir, id) {
   for (const f2 of ["screen-full.png", "screen.png"]) {
@@ -64705,10 +64756,10 @@ var TOP_KEYS = /* @__PURE__ */ new Set(["$schema", "name", "description", "start
 var STEP_KEYS = /* @__PURE__ */ new Set(["action", "target", "value", "url", "key", "state", "timeoutMs", "note"]);
 var STATES = /* @__PURE__ */ new Set(["visible", "hidden", "attached", "detached"]);
 var NEEDS_TARGET = /* @__PURE__ */ new Set(["click", "fill", "select", "check", "waitFor", "expect"]);
-var isObj = (v2) => typeof v2 === "object" && v2 !== null && !Array.isArray(v2);
+var isObj2 = (v2) => typeof v2 === "object" && v2 !== null && !Array.isArray(v2);
 var nonEmpty = (v2) => typeof v2 === "string" && v2.trim().length > 0;
 function validateTarget(raw, path, err) {
-  if (!isObj(raw)) {
+  if (!isObj2(raw)) {
     err(path, 'target must be an object: { "role", "name"? } | { "label" } | { "text" } | { "css" }');
     return void 0;
   }
@@ -64730,7 +64781,7 @@ function validateJourney(raw) {
   const err = (path, message) => {
     issues.push({ path, message });
   };
-  if (!isObj(raw)) {
+  if (!isObj2(raw)) {
     err("", "a journey must be a JSON object { name, startUrl, steps: [...] }");
     return { ok: false, issues };
   }
@@ -64746,7 +64797,7 @@ function validateJourney(raw) {
   else
     raw.steps.forEach((s2, i) => {
       const at = `steps[${i}]`;
-      if (!isObj(s2)) {
+      if (!isObj2(s2)) {
         err(at, "a step must be an object { action, target?, value?, url?, key?, \u2026 }");
         return;
       }
@@ -64836,7 +64887,7 @@ function readJourneyRuns(root) {
   try {
     const raw = JSON.parse(readFileSync26(file, "utf8"));
     if (!Array.isArray(raw.journeys)) return void 0;
-    return { v: 1, journeys: raw.journeys.filter((j) => isObj(j) && typeof j.name === "string" && Array.isArray(j.steps)) };
+    return { v: 1, journeys: raw.journeys.filter((j) => isObj2(j) && typeof j.name === "string" && Array.isArray(j.steps)) };
   } catch {
     return void 0;
   }
