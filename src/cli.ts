@@ -126,7 +126,9 @@ import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.
 import { runPackCheck, packScaffold } from "./pack.js";
 import { buildManifest, listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
 import { buildTrialSummary, formatTrialSummary } from "./trial-summary.js";
-import { readStdin, readText } from "./util.js";
+import { readStdin, readText, today } from "./util.js";
+import { duplicateJourneyNames, journeyScopeFor, listJourneyFiles, readJourneyRuns, writeJourneyRuns, JOURNEYS_DIR, JOURNEY_RUNS_FILE } from "./journey.js";
+import { JOURNEY_ENGINE, runJourneys } from "./journey-run.js";
 import type { RenderSignals } from "./types.js";
 
 const HELP = `ultra11y v${VERSION}
@@ -169,6 +171,8 @@ Usage:
   ultra11y scan     <url|file…> [--cwd <dir>] [--browser-path <file>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--all-routes [--max-routes <n>]] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample, then the rest of the route inventory)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
+  ultra11y journey  run [<name>… | --all] [--keyboard] [--base-url <url>] [--storage-state <file>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--out <dir>] [--json]   (replay .ultra11y/journeys/<name>.json with axe + keyboard checks)
+  ultra11y journey  list [--root <dir>] [--json]
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
@@ -305,6 +309,17 @@ Commands:
              (representative pages + transverse elements); each page's own
              storage-state overrides --storage-state, and the report groups the
              findings « Constats par page ».
+  journey    Replay the user journeys the agent wrote (.ultra11y/journeys/<name>.json:
+             startUrl + steps goto|click|fill|select|check|press|waitFor|expect on
+             role/label/text locators) in the local Playwright. Every step records a
+             page-state snapshot (.ultra11y/pages/<journey>-<nn>-<slug>/) measured
+             with the pinned axe-core and the live probes, plus what only a journey
+             sees: --keyboard reaches each control with Tab (a control never reached
+             is 2.1.1, a region Tab and Shift+Tab cannot leave is 2.1.2), focus into
+             and back out of dialogs (2.4.3), errors tied to no field (3.3.1), text
+             appearing outside a live region (4.1.3). A failing step stops its journey
+             with the reason; the annex lists every step done / failed / not run.
+             Exit 1 when a journey failed.
   sample     Normative page-sample (échantillon) helper. 'sample check' lints the
              .ultra11yrc.json sample block against the active standard's required
              page kinds (RGAA: accueil, contact, mentions légales, déclaration
@@ -599,6 +614,7 @@ export const COMMANDS = [
   "install",
   "uninstall",
   "status",
+  "journey",
 ] as const;
 type Command = (typeof COMMANDS)[number];
 
@@ -638,6 +654,8 @@ const VALUE_FLAGS = new Set([
   "search-query",
   // `scan --all-routes`: the most inventory routes visited beyond the sample (src/routes.ts).
   "max-routes",
+  // `journey run`: the base a journey's relative startUrl resolves against.
+  "base-url",
   // `scan`: most linked PDF documents downloaded per run.
   "max-pdf",
   "since",
@@ -771,6 +789,8 @@ const BOOLEAN_FLAGS = new Set([
   // instead of re-deriving it in shell.
   "browser",
   "no-skills",
+  // `journey run`: replay every click, check and fill with the keyboard alone.
+  "keyboard",
 ]);
 const KNOWN_FLAGS: ReadonlySet<string> = new Set<string>([...VALUE_FLAGS, ...BOOLEAN_FLAGS]);
 // Long flags whose repetition should accumulate (comma-joined) rather than last-wins,
@@ -1141,6 +1161,12 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   // Only the snapshots this audit actually read count as observations: under --no-captures or a
   // diff scope they were left out, and a route must not read « capturée » / « scannée » then.
   stampRoutes(result, ".", lang, { recorded: pagesInScope });
+  // Every journey the agent wrote, and what its last replay did — with the page states it
+  // recorded, which this audit just read. Left out with the snapshots, like the routes.
+  if (pagesInScope) {
+    const journeys = journeyScopeFor(".");
+    if (journeys) result.scope.journeys = journeys;
+  }
   // What ultra11y's render engine did, whenever its manifest is there and the captures are in
   // scope — NOT gated on the captures directory existing: a run where every unit failed or was
   // not attempted writes no capture at all, and that is exactly when its reasons must reach
@@ -3949,6 +3975,199 @@ export function scanSnapshotRoot(flags: ParsedArgs["flags"]): string | undefined
   return typeof flags.root === "string" && flags.root ? resolve(flags.root) : process.cwd();
 }
 
+/** `journey list` / `journey run` — the journeys the agent wrote, replayed in the browser. */
+async function cmdJourney(p: ParsedArgs): Promise<number> {
+  const sub = p.positionals[0];
+  const root = typeof p.flags.root === "string" && p.flags.root ? resolve(p.flags.root) : process.cwd();
+  const files = listJourneyFiles(root);
+  if (sub === "list") {
+    const lang = resolveLang(p.flags);
+    const runs = new Map((readJourneyRuns(root)?.journeys ?? []).map((r) => [r.name, r]));
+    const dupes = duplicateJourneyNames(files);
+    const rows = files.map((f) => {
+      const j = f.validation.journey;
+      const last = j ? runs.get(j.name) : undefined;
+      const twins = j ? dupes.get(j.name)?.filter((x) => x !== f.file) : undefined;
+      const issues = [
+        ...f.validation.issues,
+        ...(twins?.length ? [{ path: "name", message: `the journey name "${j!.name}" is also declared by ${twins.join(", ")} — names must be unique` }] : []),
+      ];
+      return {
+        name: j?.name ?? f.base,
+        file: f.file,
+        valid: issues.length === 0,
+        ...(issues.length ? { issues } : {}),
+        steps: j?.steps.length ?? 0,
+        keyboardOnly: j?.keyboardOnly === true,
+        lastRun: last ? last.status : "not-run",
+        ...(last?.reason ? { reason: last.reason } : {}),
+      };
+    });
+    if (p.flags.json) {
+      console.log(JSON.stringify(rows, null, 2));
+      return rows.every((r) => r.valid) ? 0 : 1;
+    }
+    if (!rows.length) {
+      console.log(lang === "fr" ? `Aucun parcours dans ${JOURNEYS_DIR}/.` : `No journey in ${JOURNEYS_DIR}/.`);
+      return 0;
+    }
+    for (const r of rows) {
+      console.log(
+        `${r.valid ? "•" : "✗"} ${r.name} — ${r.file}, ${r.steps} step(s)${r.keyboardOnly ? ", keyboard only" : ""}, last run: ${r.lastRun}${r.reason ? ` (${r.reason})` : ""}`,
+      );
+      for (const i of r.issues ?? []) console.log(`    ✗ ${i.path ? `${i.path}: ` : ""}${i.message}`);
+    }
+    return rows.every((r) => r.valid) ? 0 : 1;
+  }
+  if (sub !== "run") {
+    console.error("ultra11y journey: use `journey run [<name>… | --all]` or `journey list`.");
+    return 2;
+  }
+  const standard = stdOf(p, "journey");
+  if (standard === null) return 2;
+  const mergeAudit = peekMergeAudit(p.flags.merge);
+  const lang = resolveLang(p.flags, mergeAudit ? { audit: mergeAudit, standard } : { standard });
+  const names = p.positionals.slice(1);
+  if (!names.length && p.flags.all !== true) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y journey run : nommez un parcours de ${JOURNEYS_DIR}/ ou passez --all.`
+        : `ultra11y journey run: name a journey of ${JOURNEYS_DIR}/ or pass --all.`,
+    );
+    return 2;
+  }
+  const chosen = names.length ? files.filter((f) => names.includes(f.base) || names.includes(f.validation.journey?.name ?? "")) : files;
+  const unknown = names.filter((n) => !chosen.some((f) => f.base === n || f.validation.journey?.name === n));
+  if (unknown.length || !chosen.length) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y journey run : parcours introuvable(s) dans ${JOURNEYS_DIR}/ : ${unknown.join(", ") || "(aucun fichier)"}.`
+        : `ultra11y journey run: journey(s) not found in ${JOURNEYS_DIR}/: ${unknown.join(", ") || "(no file)"}.`,
+    );
+    return 2;
+  }
+  // Over EVERY file, not only the chosen ones: a name is the identity of the snapshots on disk,
+  // so replaying one of two same-named journeys would still overwrite the other's states.
+  const dupes = [...duplicateJourneyNames(files)].filter(([name]) => chosen.some((f) => f.validation.journey?.name === name));
+  if (dupes.length) {
+    for (const [name, list] of dupes)
+      console.error(
+        lang === "fr"
+          ? `ultra11y journey run : le nom de parcours « ${name} » est déclaré par plusieurs fichiers (${list.join(", ")}) — leurs états de page s'écraseraient. Renommez-en un.`
+          : `ultra11y journey run: the journey name "${name}" is declared by several files (${list.join(", ")}) — their page states would overwrite each other. Rename one.`,
+      );
+    return 2;
+  }
+  const invalid = chosen.filter((f) => !f.validation.ok);
+  if (invalid.length) {
+    for (const f of invalid) {
+      console.error(lang === "fr" ? `ultra11y journey run : ${f.file} est invalide :` : `ultra11y journey run: ${f.file} is invalid:`);
+      for (const i of f.validation.issues) console.error(`  ✗ ${i.path ? `${i.path}: ` : ""}${i.message}`);
+    }
+    return 2;
+  }
+  const cwd = typeof p.flags.cwd === "string" && p.flags.cwd ? (p.flags.cwd as string) : process.cwd();
+  const storageState = typeof p.flags["storage-state"] === "string" && p.flags["storage-state"] ? (p.flags["storage-state"] as string) : undefined;
+  const baseUrl = typeof p.flags["base-url"] === "string" && p.flags["base-url"] ? (p.flags["base-url"] as string) : undefined;
+  let result: Awaited<ReturnType<typeof runJourneys>>;
+  try {
+    result = await runJourneys(
+      chosen.map((f) => ({ journey: f.validation.journey!, file: f.file })),
+      {
+        root,
+        cwd,
+        lang,
+        keyboard: p.flags.keyboard === true,
+        ...(storageState ? { storageState } : {}),
+        ...(baseUrl ? { baseUrl } : {}),
+        ...(browserPathOf(p.flags) ? { browserPath: browserPathOf(p.flags) } : {}),
+        onStep: (name, st) =>
+          console.error(
+            `ultra11y journey: ${name} ${st.n}. ${st.label} — ${st.status}${st.reason ? ` (${st.reason})` : ""}${st.keyboard && st.keyboard !== "focus" ? ` [${st.keyboard}]` : ""}${st.observed?.length ? ` {${st.observed.join(", ")}}` : ""}`,
+          ),
+      },
+    );
+  } catch (e) {
+    console.error(`ultra11y journey run: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  writeJourneyRuns(root, result.records);
+  const failed = result.records.filter((r) => r.status !== "done");
+  for (const r of failed)
+    console.error(
+      lang === "fr"
+        ? `⚠️ ultra11y journey : « ${r.name} » arrêté — ${r.reason ?? "non joué"}. Les étapes suivantes ne sont pas jouées.`
+        : `⚠️ ultra11y journey: "${r.name}" stopped — ${r.reason ?? "not run"}. The later steps are not run.`,
+    );
+  const mergeIn = p.flags.merge;
+  if (typeof mergeIn === "string" && mergeIn) {
+    let audit: AuditResult;
+    if (mergeAudit) audit = mergeAudit;
+    else {
+      let parsed: unknown;
+      try {
+        parsed = unwrapAudit(JSON.parse(readText(mergeIn)));
+      } catch {
+        console.error("ultra11y journey run: --merge is not valid JSON (expected an AuditResult).");
+        return 2;
+      }
+      if (!isCurrentAudit(parsed)) {
+        console.error("ultra11y journey run: --merge input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+        return 2;
+      }
+      audit = parsed;
+    }
+    // The scan fold, unchanged: the run's measured criteria and axe build, then the static
+    // engine over the page states just written (their findings — axe, probes and journey
+    // observations alike — come back through the snapshot audit, attributed to the very state
+    // they were measured on). Findings of a step whose snapshot could not be written have no
+    // such home, so they are folded directly.
+    let merged = mergeDynamic(
+      audit,
+      {
+        tool: "ultra11y",
+        engine: JOURNEY_ENGINE,
+        target: `${result.records.length} journey(s)`,
+        date: today(),
+        findings: result.unsnapshotted,
+        ...(result.testedScs.length ? { testedScs: result.testedScs } : {}),
+        ...(result.axe ? { axe: result.axe } : {}),
+      },
+      lang,
+    );
+    if (result.snapshots.length) {
+      const doms = result.snapshots.map((id) => join(root, PAGES_DIR, id, "dom.html")).filter((f) => existsSync(f));
+      if (doms.length) merged = mergeSnapshotAudit(merged, runAudit({ inputs: doms, onWarn: (m) => console.error(m) }));
+      const scope = pageScopesFrom(readSnapshots(root));
+      if (scope.length) {
+        merged.scope.pages = scope;
+        attributePages(merged, scope);
+      }
+    }
+    stampRoutes(merged, root, lang, { scanned: result.scanned });
+    const journeys = journeyScopeFor(root);
+    if (journeys) merged.scope.journeys = journeys;
+    const out = typeof p.flags.out === "string" ? (p.flags.out as string) : "audits";
+    mkdirSync(out, { recursive: true });
+    const doc = auditDocumentFor(merged, standard, lang);
+    writeFileSync(join(out, "audit-latest.json"), `${JSON.stringify(doc, null, 2)}\n`);
+    if (p.flags.json) console.log(JSON.stringify({ journeys: result.records, ...doc }, null, 2));
+    else
+      console.log(
+        lang === "fr"
+          ? `Parcours fusionnés → ${join(out, "audit-latest.json")} (${result.snapshots.length} état(s) de page dans ${PAGES_DIR}/, bilan dans ${JOURNEY_RUNS_FILE}).`
+          : `Journeys merged → ${join(out, "audit-latest.json")} (${result.snapshots.length} page state(s) in ${PAGES_DIR}/, run record in ${JOURNEY_RUNS_FILE}).`,
+      );
+  } else if (p.flags.json) console.log(JSON.stringify({ journeys: result.records, snapshots: result.snapshots, findings: result.findings }, null, 2));
+  else
+    console.log(
+      lang === "fr"
+        ? `${result.records.length} parcours rejoué(s), ${failed.length} en échec — ${result.snapshots.length} état(s) de page dans ${PAGES_DIR}/, ${result.findings.length} constat(s). Bilan : ${JOURNEY_RUNS_FILE}. Fusionnez avec --merge <audit.json>.`
+        : `${result.records.length} journey(s) replayed, ${failed.length} failed — ${result.snapshots.length} page state(s) in ${PAGES_DIR}/, ${result.findings.length} finding(s). Run record: ${JOURNEY_RUNS_FILE}. Fold them in with --merge <audit.json>.`,
+    );
+  return failed.length ? 1 : 0;
+}
+
 async function cmdScan(p: ParsedArgs): Promise<number> {
   // `scan` takes `--standard` for the same reason `audit` now does: it REWRITES
   // audit-latest.json mid-chain, and a merge that silently re-keyed an RGAA document back to
@@ -4706,6 +4925,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdUninstall(p);
     case "status":
       return cmdStatus(p);
+    case "journey":
+      return cmdJourney(p);
     default:
       console.error(`ultra11y: "${p.command}" is not implemented yet`);
       return 1;

@@ -330,6 +330,11 @@ const RULE_TO_CRITERIA = {
   // measured and then never delivered to the criterion it answers. No axe rule joins it: axe
   // has none for keyboard traps, which is why the probe was written in the first place.
   "dyn-keyboard-trap": ["12.9"],
+  // Journey observations (`journey run`). 7.3 « chaque script est-il contrôlable par le
+  // clavier » is the RGAA home of WCAG 2.1.1 for a scripted control; 12.8 carries 2.4.3 (focus
+  // order, which a dialog's focus handling is part of); 11.10 carries 3.3.1. Candidate evidence:
+  // the official tests also ask about alternatives and cases a replay does not see.
+  "dyn-keyboard-unreachable": ["7.3"], "dyn-dialog-focus": ["12.8"], "dyn-error-unassociated": ["11.10"],
   // Theme 13 — consultation (13.1 time limits, 13.8 moving/blinking)
   "meta-refresh-redirect": ["13.1"], "blink-marquee": ["13.8"], "autoplay-media": ["4.10"],
   "axe:no-autoplay-audio": ["4.10"], "axe:blink": ["13.8"], "axe:marquee": ["13.8"],

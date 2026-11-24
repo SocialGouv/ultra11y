@@ -104,7 +104,7 @@
     "renderedRules": 6,
     "packRules": 4,
     "axeRules": 69,
-    "probes": 10
+    "probes": 13
   },
   "sources": [
     {
@@ -121,9 +121,9 @@
     },
     {
       "key": "probe",
-      "touched": 7,
+      "touched": 10,
       "decisive": 1,
-      "signalOnly": 6
+      "signalOnly": 9
     },
     {
       "key": "rendered",
@@ -165,7 +165,7 @@
     "overallPct": 47
   },
   "tests": {
-    "fixtures": 179
+    "fixtures": 187
   },
   "criteria": [
     {
@@ -805,12 +805,14 @@
       "title": "Chaque script est-il contrôlable par le clavier et par tout dispositif de pointage (hors cas particuliers) ?",
       "level": "hint",
       "sources": [
-        "static"
+        "static",
+        "probe"
       ],
       "decisiveSources": [],
       "decisive": [],
       "signals": [
-        "clickable-noninteractive"
+        "clickable-noninteractive",
+        "dyn-keyboard-unreachable"
       ],
       "advisory": [],
       "tests": 2
@@ -1517,12 +1519,14 @@
       "title": "Dans chaque formulaire, le contrôle de saisie est-il utilisé de manière pertinente (hors cas particuliers) ?",
       "level": "hint",
       "sources": [
-        "static"
+        "static",
+        "probe"
       ],
       "decisiveSources": [],
       "decisive": [],
       "signals": [
         "aria-invalid-no-description",
+        "dyn-error-unassociated",
         "error-not-associated"
       ],
       "advisory": [],
@@ -1680,12 +1684,14 @@
       "level": "hint",
       "sources": [
         "static",
-        "axe"
+        "axe",
+        "probe"
       ],
       "decisiveSources": [],
       "decisive": [],
       "signals": [
         "axe:tabindex",
+        "dyn-dialog-focus",
         "positive-tabindex"
       ],
       "advisory": [],

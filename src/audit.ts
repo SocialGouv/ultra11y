@@ -948,6 +948,10 @@ function probeFindings(probes: NonNullable<RenderSignals["probes"]>, file: strin
     ["inputOverflowReflow", "input-overflow-reflow"],
     ["inputOverflowZoom", "input-overflow-zoom"],
     ["inputOverflowSpacing", "input-overflow-spacing"],
+    // What a replayed journey observed on the state this snapshot holds (`journey run`).
+    ["keyboardUnreachable", "keyboard-unreachable"],
+    ["dialogFocus", "dialog-focus"],
+    ["errorUnassociated", "error-unassociated"],
   ];
   for (const [key, engine] of buckets) {
     const hits = probes[key] as { selector: string; html: string; detail: string }[] | undefined;

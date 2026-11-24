@@ -1,0 +1,10 @@
+{
+  "name": "modales",
+  "startUrl": "/#/modales",
+  "steps": [
+    { "action": "click", "target": { "role": "button", "name": "Conditions d'utilisation" } },
+    { "action": "click", "target": { "role": "button", "name": "Fermer les conditions" } },
+    { "action": "click", "target": { "role": "button", "name": "Aide en ligne" } },
+    { "action": "click", "target": { "role": "button", "name": "Fermer l'aide" } }
+  ]
+}

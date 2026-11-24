@@ -489,6 +489,12 @@ export interface RenderSignals {
     keyboardTrap?: { selector: string; html: string; detail: string }[];
     /** 4.1.3 — content updated by an interaction, outside any live region. */
     liveRegion?: { selector: string; html: string; detail: string }[];
+    /** Journey observations (`journey run`): 2.1.1 a control Tab never reached, 2.4.3 focus
+     *  not moved into an opened dialog or not returned to its trigger, 3.3.1 an error shown
+     *  after a submit and tied to no field. */
+    keyboardUnreachable?: { selector: string; html: string; detail: string }[];
+    dialogFocus?: { selector: string; html: string; detail: string }[];
+    errorUnassociated?: { selector: string; html: string; detail: string }[];
     /** A FILLED input clipped under each stress — 320px (1.4.10), 200% zoom (1.4.4), the
      *  text-spacing override (1.4.12). */
     inputOverflowReflow?: { selector: string; html: string; detail: string }[];
@@ -775,6 +781,11 @@ export interface AuditResult {
     // attempted. Set only when a manifest exists, so the annex lists every unit and never
     // silently drops one that threw. Optional/additive.
     renders?: RenderScope;
+    // THE JOURNEYS the agent wrote (`.ultra11y/journeys/*.json`) and what their last replay did
+    // (`.ultra11y/journey-runs.json`): every journey and every step, done, failed with the
+    // reason, or not run. Set only when journeys exist, so the annex never omits one.
+    // Optional/additive.
+    journeys?: JourneyScope;
   };
   guidelines: GuidelineTally[];
   criteria: CriterionResult[];
@@ -843,7 +854,12 @@ export type DynamicEngine =
   | "input-overflow-reflow"
   | "input-overflow-zoom"
   | "input-overflow-spacing"
-  | "live-region";
+  | "live-region"
+  // Journey observations (`journey run`, src/journey-run.ts): measured while a journey the
+  // agent wrote is replayed, on the state each step leaves the page in.
+  | "keyboard-unreachable"
+  | "dialog-focus"
+  | "error-unassociated";
 
 /** The axe-core build a result was measured with (src/axe-engine.ts). */
 export interface AxeEngineInfo {
@@ -930,6 +946,51 @@ export interface RenderScope {
   skipped: number;
   notAttempted: number;
   units: RenderUnit[];
+}
+
+/** How one journey step ended. `not-run`: a step after a failed one, or a journey never replayed. */
+export type JourneyStepStatus = "done" | "failed" | "not-run";
+
+/** One step of a replayed journey (`scope.journeys`, `.ultra11y/journey-runs.json`). */
+export interface JourneyStepRecord {
+  /** Position in the journey: 0 is the navigation to `startUrl`, 1 the first written step. */
+  n: number;
+  action: string;
+  /** What the step did, in words: `click button "Envoyer"`. */
+  label: string;
+  status: JourneyStepStatus;
+  /** Why the step failed: the locator found nothing, the navigation threw, a timeout. */
+  reason?: string;
+  /** The page-state snapshot recorded after the step (`.ultra11y/pages/<id>/`). */
+  page?: string;
+  /** Keyboard mode only: how the target was reached. `focus`: Tab moved focus onto it;
+   *  `unreachable`: Tab never reached it; `trap`: focus was trapped on the way. The last two
+   *  are performed with the pointer so the journey can go on, and say so. */
+  keyboard?: "focus" | "unreachable" | "trap";
+  /** The focus order Tab walked through on this step, as role + name labels (bounded). */
+  focus?: string[];
+  /** The journey observations raised at this step, as finding engine ids. */
+  observed?: string[];
+  /** What else the replay has to say about the step: the Tab bound reached, focus confined to
+   *  an open modal dialog, the journey file's own note. */
+  note?: string;
+}
+
+/** One journey and its last replay. */
+export interface JourneyRecord {
+  name: string;
+  /** The journey file, relative to the root. */
+  file: string;
+  keyboard: boolean;
+  status: JourneyStepStatus;
+  reason?: string;
+  steps: JourneyStepRecord[];
+}
+
+/** `scope.journeys`: every journey known to the run. */
+export interface JourneyScope {
+  manifest: string;
+  journeys: JourneyRecord[];
 }
 
 /** One route of the application and how it was observed (`scope.routes`). */

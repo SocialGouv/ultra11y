@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Démo parcours</title>
+<style>
+  body { font-family: system-ui, sans-serif; color: #1e1e1e; background: #fff; margin: 0; padding: 1rem; }
+  a, button { color: #000091; }
+  button, .btn { font: inherit; padding: .4rem .8rem; border: 1px solid #000091; background: #fff; cursor: pointer; display: inline-block; }
+  .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .4); }
+  .dialog { position: fixed; top: 4rem; left: 4rem; background: #fff; padding: 1rem; border: 2px solid #1e1e1e; min-width: 20rem; }
+  .error { color: #ce0500; }
+  #editor { border: 1px solid #1e1e1e; min-height: 3rem; padding: .5rem; margin: .5rem 0; }
+</style>
+</head>
+<body>
+<header>
+  <nav aria-label="Principal">
+    <a href="#/menu">Menu</a> · <a href="#/modales">Modales</a> · <a href="#/formulaire">Formulaire</a> ·
+    <a href="#/editeur">Éditeur</a> · <a href="#/rapport">Rapport</a>
+  </nav>
+</header>
+<main id="view"></main>
+<script>
+// A plain-JS single-page application: one view per hash route, rendered client side. Each view
+// carries one interaction a journey has to drive — and, on purpose, one accessibility defect.
+const views = {
+  // A disclosure menu, correctly built: aria-expanded + aria-controls, hidden toggled.
+  menu: `<h1>Menu</h1>
+    <button type="button" id="menu-btn" aria-expanded="false" aria-controls="menu-list">Rubriques</button>
+    <ul id="menu-list" hidden><li><a href="#/formulaire">Contact</a></li><li><a href="#/rapport">Rapports</a></li></ul>`,
+  // Two modal dialogs. The first one moves focus in, holds it, and gives it back on close.
+  // The second moves focus in but drops it on close: focus is lost to the page.
+  modales: `<h1>Modales</h1>
+    <p><button type="button" id="open-good">Conditions d'utilisation</button></p>
+    <p><button type="button" id="open-bad">Aide en ligne</button></p>
+    <div id="good" hidden><div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="good-title">
+        <h2 id="good-title">Conditions</h2><p>Texte des conditions.</p>
+        <button type="button" id="good-accept">Accepter</button> <button type="button" id="good-close">Fermer les conditions</button>
+      </div></div>
+    <div id="bad" hidden><div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="bad-title">
+        <h2 id="bad-title">Aide</h2><p>Texte d'aide.</p>
+        <button type="button" id="bad-close">Fermer l'aide</button>
+      </div></div>`,
+  // A form whose error message is shown but tied to no field, and a draft button whose
+  // confirmation lands outside any live region.
+  formulaire: `<h1>Formulaire</h1>
+    <form id="contact" novalidate>
+      <p><label for="email">Courriel</label><br><input id="email" name="email" type="email"></p>
+      <p id="email-slot"></p>
+      <p><button type="button" id="draft">Enregistrer le brouillon</button> <button type="submit">Envoyer</button></p>
+      <div id="draft-status"></div>
+    </form>`,
+  // A rich-text widget that confiscates Tab and Shift+Tab: a keyboard trap.
+  editeur: `<h1>Éditeur</h1>
+    <div id="editor" role="textbox" aria-multiline="true" aria-label="Contenu" tabindex="0"></div>
+    <p><button type="button" id="publish">Publier</button></p>`,
+  // Correct controls whose label sits in an inner <span>: a text locator lands on the span, and
+  // focus on the button around it. A disclosure, and a dialog that gives focus back.
+  boutons: `<h1>Boutons</h1>
+    <p><button type="button" id="details-btn" aria-expanded="false" aria-controls="details"><span>Afficher les détails</span></button></p>
+    <div id="details" hidden></div>
+    <p><button type="button" id="summary-btn"><span>Ouvrir le résumé</span></button></p>
+    <div id="summary" hidden><div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-label="Résumé">
+        <p>Résumé du dossier.</p><button type="button" id="summary-close"><span>Fermer le résumé</span></button>
+      </div></div>`,
+  // A "button" that is a bare div: clickable with a mouse, out of the tab order.
+  rapport: `<h1>Rapport</h1>
+    <p><a href="#/menu">Retour au menu</a></p>
+    <div class="btn" id="download">Télécharger le rapport</div>
+    <p id="ready" hidden>Le rapport est prêt.</p>`,
+};
+
+function wire(name) {
+  const $ = (id) => document.getElementById(id);
+  if (name === "menu") {
+    $("menu-btn").addEventListener("click", () => {
+      const open = $("menu-btn").getAttribute("aria-expanded") === "true";
+      $("menu-btn").setAttribute("aria-expanded", String(!open));
+      $("menu-list").hidden = open;
+    });
+  }
+  if (name === "modales") {
+    const trap = (dialog) => (e) => {
+      if (e.key === "Escape") { close(dialog); return; }
+      if (e.key !== "Tab") return;
+      const f = Array.from(dialog.querySelectorAll("button"));
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    let opener = null;
+    const open = (id, btn) => { opener = btn; $(id).hidden = false; $(id).querySelector("button").focus(); };
+    const close = (id) => {
+      $(id).hidden = true;
+      // The defect: only the conditions dialog gives focus back to its opener.
+      if (id === "good" && opener) opener.focus();
+      else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    };
+    $("open-good").addEventListener("click", () => open("good", $("open-good")));
+    $("open-bad").addEventListener("click", () => open("bad", $("open-bad")));
+    $("good").addEventListener("keydown", trap("good"));
+    $("bad").addEventListener("keydown", trap("bad"));
+    $("good-accept").addEventListener("click", () => close("good"));
+    $("good-close").addEventListener("click", () => close("good"));
+    $("bad-close").addEventListener("click", () => close("bad"));
+  }
+  if (name === "formulaire") {
+    $("contact").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const v = $("email").value;
+      $("email-slot").innerHTML = /.+@.+\..+/.test(v) ? "" : '<span class="error">Adresse invalide : saisissez une adresse comme nom@domaine.fr</span>';
+    });
+    $("draft").addEventListener("click", () => { $("draft-status").textContent = "Brouillon enregistré"; });
+  }
+  if (name === "editeur") {
+    $("editor").addEventListener("keydown", (e) => { if (e.key === "Tab") e.preventDefault(); });
+    $("publish").addEventListener("click", () => {});
+  }
+  if (name === "boutons") {
+    $("details-btn").addEventListener("click", () => {
+      $("details-btn").setAttribute("aria-expanded", "true");
+      $("details").hidden = false;
+      $("details").textContent = "Dossier déposé le 3 mars, en cours d'instruction.";
+    });
+    $("summary-btn").addEventListener("click", () => { $("summary").hidden = false; $("summary-close").focus(); });
+    $("summary-close").addEventListener("click", () => { $("summary").hidden = true; $("summary-btn").focus(); });
+  }
+  if (name === "rapport") {
+    $("download").addEventListener("click", () => { $("ready").hidden = false; });
+  }
+}
+
+function route() {
+  const name = (location.hash.replace(/^#\//, "") || "menu");
+  document.getElementById("view").innerHTML = views[name] || "<h1>Introuvable</h1>";
+  wire(name);
+}
+window.addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "formulaire",
+  "startUrl": "/#/formulaire",
+  "steps": [
+    { "action": "fill", "target": { "label": "Courriel" }, "value": "pas-un-courriel" },
+    { "action": "click", "target": { "role": "button", "name": "Envoyer" }, "note": "invalid submit" },
+    { "action": "click", "target": { "role": "button", "name": "Enregistrer le brouillon" } }
+  ]
+}

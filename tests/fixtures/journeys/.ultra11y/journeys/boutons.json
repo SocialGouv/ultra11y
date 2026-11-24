@@ -1,0 +1,10 @@
+{
+  "name": "boutons",
+  "description": "Correct buttons whose label is an inner span, reached by text locators.",
+  "startUrl": "/#/boutons",
+  "steps": [
+    { "action": "click", "target": { "text": "Afficher les détails" } },
+    { "action": "click", "target": { "text": "Ouvrir le résumé" } },
+    { "action": "click", "target": { "text": "Fermer le résumé" } }
+  ]
+}

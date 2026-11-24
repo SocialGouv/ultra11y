@@ -31,6 +31,10 @@ export const PROBE_WCAG: Record<Exclude<DynamicEngine, "axe" | "reflow">, string
   "input-overflow-zoom": "1.4.4", // typed value clipped at 200% zoom
   "input-overflow-spacing": "1.4.12", // typed value clipped under the WCAG text-spacing override
   "live-region": "4.1.3", // Status Messages — content updated by an interaction outside any live region
+  // Journey observations (`journey run`). Each is measured on a state a replayed journey built.
+  "keyboard-unreachable": "2.1.1", // Keyboard — Tab walked the whole ring and never reached the control
+  "dialog-focus": "2.4.3", // Focus Order — focus not moved into an opened dialog, or not returned to its trigger
+  "error-unassociated": "3.3.1", // Error Identification — an error shown after a submit, tied to no field
 };
 
 // Probe severities are deliberately conservative: focus + zoom are real blockers
@@ -55,6 +59,12 @@ export const PROBE_SEVERITY: Record<Exclude<DynamicEngine, "axe" | "reflow">, Se
   "input-overflow-zoom": "majeur",
   "input-overflow-spacing": "majeur",
   "live-region": "mineur",
+  // A control the keyboard cannot reach is a function a keyboard user cannot perform at all —
+  // the journey only went on because the replay fell back on the pointer.
+  "keyboard-unreachable": "bloquant",
+  "dialog-focus": "majeur",
+  // Same severity as the static twin (`error-not-associated`), which reads the same defect in source.
+  "error-unassociated": "majeur",
 };
 
 export const AXE_WCAG: Record<string, string> = {

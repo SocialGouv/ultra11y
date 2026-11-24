@@ -159,6 +159,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |
 | `references/e2e.md` | `ultra11y/playwright` · `ultra11y/cypress`: auditing a page during your E2E run |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
+| `references/journeys.md` | Journeys you write (`.ultra11y/journeys/`), replayed by `journey run` with axe and keyboard checks |
 | `references/scale.md` | Focusing an audit on a large repository |
 | `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
 | `references/prd.md` | The auditor block as a backlog (markdown) |

@@ -1,0 +1,9 @@
+{
+  "name": "menu",
+  "description": "Open the section menu (a correct disclosure).",
+  "startUrl": "/#/menu",
+  "steps": [
+    { "action": "click", "target": { "role": "button", "name": "Rubriques" }, "note": "disclosure" },
+    { "action": "expect", "target": { "role": "link", "name": "Contact" } }
+  ]
+}

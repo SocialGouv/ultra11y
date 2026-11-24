@@ -6,7 +6,7 @@
 // (never silently C).
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import type { AuditResult, Auditor, DecidedBy, Finding, Lang, PageResult, RenderScope, RouteCoverage, Severity, Status } from "./types.js";
+import type { AuditResult, Auditor, DecidedBy, Finding, JourneyScope, Lang, PageResult, RenderScope, RouteCoverage, Severity, Status } from "./types.js";
 import { isAdjudicated } from "./types.js";
 import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits, type PrdUnit } from "./prd.js";
@@ -356,6 +356,20 @@ const L = {
             : `au-delà de --max-routes${detail ? ` ${detail}` : ""}`,
     routesTodo: (n: number) =>
       `${n} route(s) non atteinte(s). Pour les couvrir : \`ultra11y scan --sample --all-routes --merge <audit.json>\`, ou un test Playwright avec \`ultra11y/playwright\` pour celles qui exigent un état (session, parcours).`,
+    annexJourneysTitle: "H. Parcours utilisateur — couverture",
+    journeysIntro: (n: number, done: number, failed: number, notRun: number) =>
+      `${n} parcours écrit(s) dans \`.ultra11y/journeys/\` et rejoué(s) par \`ultra11y journey run\` (axe-core et sondes à chaque étape) : ${done} terminé(s), ${failed} en échec avec la raison, ${notRun} non joué(s). Chaque étape est listée, avec l'état de page enregistré ; aucune n'est omise.`,
+    journeysHead: "| Parcours | Étape | Action | Statut | Page | Remarque |",
+    journeyStatus: { done: "terminée", failed: "en échec", "not-run": "non jouée" } as Record<string, string>,
+    journeyKeyboard: (k: string) =>
+      k === "focus"
+        ? "atteinte au clavier"
+        : k === "unreachable"
+          ? "non atteignable au clavier — jouée au pointeur"
+          : "piège clavier sur le chemin — jouée au pointeur",
+    journeyMode: (keyboard: boolean) => (keyboard ? "clavier seul" : "pointeur"),
+    journeysTodo: (n: number) =>
+      `${n} parcours non terminé(s). Corrigez l'étape en échec (ou le localisateur), puis \`ultra11y journey run <nom> --keyboard --merge <audit.json>\`.`,
     annexRendersTitle: "G. Composants rendus par le moteur ultra11y",
     rendersIntro: (n: number, rendered: number, skipped: number, notAttempted: number, tools: string) =>
       `${n} unité(s) trouvée(s) dans le code (composants exportés, pages du framework, stories) : ${rendered} rendue(s), ${skipped} en échec avec la raison, ${notAttempted} non tentée(s)${tools ? ` — ${tools}` : ""}. Le react-dom/server du projet rend, hors de ses tests, les composants qui ne prennent pas de props et les stories avec leurs args ; un composant qui prend des props n'est rendu que par ses stories. Aucun fichier de test ni instantané n'est lu. Un rendu serveur ne calcule aucun style (\`styles="none"\`) : les critères de rendu restent à évaluer sur ces captures.`,
@@ -642,6 +656,20 @@ const L = {
             : `beyond --max-routes${detail ? ` ${detail}` : ""}`,
     routesTodo: (n: number) =>
       `${n} route(s) not reached. To cover them: \`ultra11y scan --sample --all-routes --merge <audit.json>\`, or a Playwright test with \`ultra11y/playwright\` for those that need a state (a session, a funnel).`,
+    annexJourneysTitle: "H. User journeys — coverage",
+    journeysIntro: (n: number, done: number, failed: number, notRun: number) =>
+      `${n} journey(s) written in \`.ultra11y/journeys/\` and replayed by \`ultra11y journey run\` (axe-core and the probes at every step): ${done} done, ${failed} failed with the reason, ${notRun} not run. Every step is listed, with the page state it recorded; none is omitted.`,
+    journeysHead: "| Journey | Step | Action | Status | Page | Note |",
+    journeyStatus: { done: "done", failed: "failed", "not-run": "not run" } as Record<string, string>,
+    journeyKeyboard: (k: string) =>
+      k === "focus"
+        ? "reached with the keyboard"
+        : k === "unreachable"
+          ? "not reachable by keyboard — played with the pointer"
+          : "keyboard trap on the way — played with the pointer",
+    journeyMode: (keyboard: boolean) => (keyboard ? "keyboard only" : "pointer"),
+    journeysTodo: (n: number) =>
+      `${n} journey(s) not completed. Fix the failing step (or its locator), then \`ultra11y journey run <name> --keyboard --merge <audit.json>\`.`,
     annexRendersTitle: "G. Components rendered by ultra11y's engine",
     rendersIntro: (n: number, rendered: number, skipped: number, notAttempted: number, tools: string) =>
       `${n} unit(s) found in the code (exported components, framework pages, stories): ${rendered} rendered, ${skipped} failed with the reason, ${notAttempted} not attempted${tools ? ` — ${tools}` : ""}. The project's own react-dom/server renders, outside its tests, the components that take no props and the stories with their args; a component that takes props is rendered through its stories only. No test file or snapshot is read. A server render computes no style (\`styles="none"\`): the rendering criteria stay to assess on these captures.`,
@@ -2078,6 +2106,8 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   if (r.scope.routes?.length) ax.push("", ...renderRoutes(r.scope.routes, lang));
   // G. every unit ultra11y's render engine found, and what it did with it — none omitted.
   if (r.scope.renders?.units.length) ax.push("", ...renderRenderUnits(r.scope.renders, lang));
+  // H. every journey the agent wrote and every step of it: done, failed with the reason, or not run.
+  if (r.scope.journeys?.journeys.length) ax.push("", ...renderJourneys(r.scope.journeys, lang));
 
   return { report: out.join("\n"), annex: ax.join("\n"), reportFile, annexFile };
 }
@@ -2095,6 +2125,45 @@ export function renderRoutes(routes: readonly RouteCoverage[], lang: Lang): stri
   const missing = routes.filter((r) => r.observed === "not-reached").length;
   out.push("");
   if (missing) out.push(`> ${s.routesTodo(missing)}`, "");
+  return out;
+}
+
+/** The annex's journey table: every journey of `scope.journeys`, every step. Worklist-inert and
+ *  criterion-free, like the route table. */
+export function renderJourneys(journeys: JourneyScope, lang: Lang): string[] {
+  const s = L[lang];
+  const cell = (t: string) => t.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const list = journeys.journeys;
+  const count = (st: string) => list.filter((j) => j.status === st).length;
+  const out = [
+    `## ${s.annexJourneysTitle}`,
+    "",
+    s.journeysIntro(list.length, count("done"), count("failed"), count("not-run")),
+    "",
+    s.journeysHead,
+    "|---|---|---|---|---|---|",
+  ];
+  for (const j of list) {
+    out.push(
+      `| **${cell(j.name)}** (${s.journeyMode(j.keyboard)}) | — | \`${cell(j.file)}\` | ${s.journeyStatus[j.status] ?? j.status} | — | ${j.reason ? cell(j.reason) : ""} |`,
+    );
+    for (const st of j.steps) {
+      const note = [
+        st.reason,
+        st.keyboard && st.keyboard !== "focus" ? s.journeyKeyboard(st.keyboard) : "",
+        st.observed?.length ? st.observed.join(", ") : "",
+        st.note,
+      ]
+        .filter(Boolean)
+        .join(" — ");
+      out.push(
+        `| ${cell(j.name)} | ${st.n} | ${cell(st.label)} | ${s.journeyStatus[st.status] ?? st.status} | ${st.page ? `\`${cell(st.page)}\`` : "—"} | ${cell(note)} |`,
+      );
+    }
+  }
+  out.push("");
+  const open = count("failed") + count("not-run");
+  if (open) out.push(`> ${s.journeysTodo(open)}`, "");
   return out;
 }
 

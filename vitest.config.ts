@@ -26,6 +26,8 @@ export default defineConfig({
       "audits/**",
       "tests/perf-shape.test.ts",
       "tests/browser-tier.e2e.test.ts",
+      // The journey replay (`journey run`) drives a real browser too: same job, same command.
+      "tests/journey.e2e.test.ts",
       "tests/opencode-smoke.e2e.test.ts",
       "tests/codex-smoke.e2e.test.ts",
     ],

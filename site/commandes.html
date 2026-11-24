@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Commandes : les quelques commandes utiles à la main — ultra11y</title>
-<meta name="description" content="Les commandes d’ultra11y qu’une personne peut lancer elle-même : audit, scan, report, pages, check, tickets, criteria, status et install, et les fichiers de référence de la skill.">
+<meta name="description" content="Les commandes d’ultra11y qu’une personne peut lancer elle-même : audit, scan, journey, report, pages, check, tickets, criteria, status et install, et les fichiers de référence de la skill.">
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/site.js"></script>
 </head>
@@ -40,6 +40,7 @@
     <tr><th scope="row"><code>audit &lt;chemins&gt; --standard rgaa --out audits --json</code></th><td>Passe le moteur statique sur le code et écrit <code>audits/audit-latest.json</code>.</td></tr>
     <tr><th scope="row"><code>render .</code></th><td>Rend chaque composant, page et story du projet avec son propre <code>react-dom/server</code>, sans lire ses tests, vers <code>.ultra11y/captures/</code>. Ce qui n’a pas pu être rendu est listé avec la raison dans l’annexe du rapport.</td></tr>
     <tr><th scope="row"><code>scan &lt;url&gt; --merge audits/audit-latest.json</code></th><td>Ouvre une page dans un navigateur, la mesure et fusionne le résultat. <code>--sample</code> parcourt l’échantillon déclaré.</td></tr>
+    <tr><th scope="row"><code>journey run --all --keyboard --merge audits/audit-latest.json</code></th><td>Rejoue au clavier, dans un navigateur, les parcours que l’agent a écrits dans <code>.ultra11y/journeys/</code> (connexion, formulaire, modale). Chaque étape devient une page auditée ; une étape en échec arrête son parcours, avec la raison.</td></tr>
     <tr><th scope="row"><code>report --in audits/audit-latest.json --standard rgaa --html</code></th><td>Écrit le rapport RGAA daté, en Markdown et en HTML imprimable.</td></tr>
     <tr><th scope="row"><code>pages --in audits/audit-latest.json --format report --split page</code></th><td>Écrit un dossier par page, avec sa capture d’écran.</td></tr>
     <tr><th scope="row"><code>check --report &lt;rapport.md&gt;</code></th><td>Contrôle l’intégrité d’un rapport : aucun critère inventé, aucun NA sans justification.</td></tr>
@@ -60,6 +61,7 @@
   <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/methodology.md"><code>methodology.md</code></a> : statuts, taux, gravités, format du rapport</li>
   <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/pages.md"><code>pages.md</code></a> : copies de pages et grille page par page</li>
   <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/e2e.md"><code>e2e.md</code></a> : Playwright et Cypress</li>
+  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/journeys.md"><code>journeys.md</code></a> : les parcours écrits par l’agent et rejoués au clavier</li>
   <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/rendered.md"><code>rendered.md</code></a> : le moteur de rendu des composants</li>
   <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/ci.md"><code>ci.md</code></a> : la CI avec le bot <code>rgaa-audit</code> d’iterion</li>
   <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/harnesses.md"><code>harnesses.md</code></a> : les différences entre Claude Code, Codex et OpenCode</li>
