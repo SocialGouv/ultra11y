@@ -123,7 +123,7 @@ const JOURNEY_LIB = `(() => { ${PRELUDE}
       const a = deep(); const body = isBody(a);
       const t = document.querySelector('[data-u11y-jt]');
       return { key: body ? 0 : key(a), label: label(a), body: body, frame: !!(a && a.tagName === 'IFRAME'),
-        role: body ? '' : roleOf(a), onTarget: !!(t && a && (t === a || t.contains(a))), modal: !!(a && !body && modalOf(a)) };
+        role: body ? '' : roleOf(a), onTarget: !!(t && a && !body && (t === a || t.contains(a) || a.contains(t))), modal: !!(a && !body && modalOf(a)) };
     },
     tabbables() { return Array.from(document.querySelectorAll(FOCUSABLE)).filter(tabbable).length; },
     region(keys) {
@@ -176,7 +176,7 @@ const JOURNEY_LIB = `(() => { ${PRELUDE}
         if (i < 0) continue;
         const tr = S.stack[i].trigger; S.stack.splice(i, 1);
         if (!tr || !tr.isConnected || !__vis(tr)) continue;
-        if (a === tr || (a && tr.contains(a))) continue;
+        if (a === tr || (a && !isBody(a) && (tr.contains(a) || a.contains(tr)))) continue;
         out.dialogReturn.push({ selector: __sel(tr), html: __html(tr), dialog: label(d), trigger: label(tr), focus: label(a) });
       }
       const ids = referenced();
@@ -221,6 +221,10 @@ const JOURNEY_LIB = `(() => { ${PRELUDE}
 })()`;
 
 const HAS_LIB = "!!window.__u11yJ";
+/** What a target resolves to: its nearest focusable or interactive ancestor (itself included). */
+export const CONTROL_SELECTOR =
+  'a[href],area[href],button,input,select,textarea,summary,[tabindex]:not([tabindex^="-"]),[contenteditable=""],[contenteditable="true"],' +
+  "[role=button],[role=link],[role=menuitem],[role=menuitemcheckbox],[role=menuitemradio],[role=tab],[role=checkbox],[role=radio],[role=switch],[role=option],[role=combobox]";
 const TARGET_INFO = `(() => { ${PRELUDE} const e = document.querySelector('[data-u11y-jt]'); return e ? { selector: __sel(e), html: __html(e) } : null; })()`;
 const UNTAG_TARGET = `(() => { for (const e of Array.from(document.querySelectorAll('[data-u11y-jt]'))) e.removeAttribute('data-u11y-jt'); return true; })()`;
 /** Every `data-u11y-*` attribute a probe or the replay left on the page, removed before the
@@ -527,6 +531,9 @@ async function runOne(
     opts.onStep?.(journey.name, step);
     return record;
   };
+  // First, before anything can fail: a journey that stops before its first step must not leave
+  // the previous replay's page states in the grid, contradicting its own annex row.
+  clearJourneySnapshots(opts.root, journey.name);
   // The journey's own session wins over the run-wide one, as a sample page's does in `scan`.
   const storageState = journey.storageState ? resolve(opts.root, journey.storageState) : opts.storageState;
   if (storageState && !existsSync(storageState)) return fail(start, `storageState not found: ${storageState}`);
@@ -536,7 +543,6 @@ async function runOne(
   } catch {
     return fail(start, `startUrl "${journey.startUrl}" is not an absolute URL — pass --base-url <url> to resolve it`);
   }
-  clearJourneySnapshots(opts.root, journey.name);
   const context = await browser.newContext(storageState ? { storageState } : {});
   const page = await context.newPage();
   const traps = new Set<string>();
@@ -580,7 +586,11 @@ async function runOne(
           const r = await resolveTarget(page, def, timeout);
           if ("reason" in r) return fail(rec, r.reason);
           loc = r.loc;
-          await loc.evaluate((el: Any) => el.setAttribute("data-u11y-jt", "")).catch(() => {});
+          // THE CONTROL, not the node the locator landed on: `getByText` resolves to the deepest
+          // match — the <span> inside a <button> — and focus lands on the button around it. Tagging
+          // the span made every focus check miss (a false 2.1.1, a false 2.4.3 on dialog close) and
+          // read `aria-controls` off the wrong element (a false 4.1.3).
+          await loc.evaluate((el: Any, sel: string) => (el.closest(sel) ?? el).setAttribute("data-u11y-jt", ""), CONTROL_SELECTOR).catch(() => {});
         }
         if (def.action === "waitFor" || def.action === "expect") {
           const state = def.state ?? "visible";

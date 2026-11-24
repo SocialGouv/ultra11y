@@ -7,7 +7,18 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { PROBE_SEVERITY, PROBE_WCAG } from "../src/axe-map.js";
-import { JOURNEYS_DIR, journeyScopeFor, listJourneyFiles, readJourneyRuns, stepLabel, stepPageId, validateJourney, writeJourneyRuns } from "../src/journey.js";
+import { main } from "../src/cli.js";
+import {
+  duplicateJourneyNames,
+  JOURNEYS_DIR,
+  journeyScopeFor,
+  listJourneyFiles,
+  readJourneyRuns,
+  stepLabel,
+  stepPageId,
+  validateJourney,
+  writeJourneyRuns,
+} from "../src/journey.js";
 import { journeySources } from "../src/journey-run.js";
 import { renderJourneys } from "../src/report.js";
 import { routeCoverage, routesToScan } from "../src/routes.js";
@@ -240,6 +251,52 @@ describe("routes: a journey state is ultra11y's browser, not the project's E2E r
       { captured: [{ url: "https://example.test/contact", runner: "journey" }] },
     );
     expect(plan.scan).toEqual(["https://example.test/contact"]);
+  });
+});
+
+describe("journey names are unique", () => {
+  const root = mkdtempSync(join(tmpdir(), "u11y-dupes-"));
+  mkdirSync(join(root, JOURNEYS_DIR), { recursive: true });
+  writeFileSync(join(root, JOURNEYS_DIR, "connexion.json"), JSON.stringify(ok));
+  writeFileSync(join(root, JOURNEYS_DIR, "connexion-copie.json"), JSON.stringify(ok));
+  writeFileSync(join(root, JOURNEYS_DIR, "autre.json"), JSON.stringify({ ...ok, name: "autre" }));
+  const quiet = async (argv: string[]) => {
+    const out: string[] = [];
+    const log = console.log;
+    const err = console.error;
+    console.log = (m: unknown) => out.push(String(m));
+    console.error = (m: unknown) => out.push(String(m));
+    try {
+      return { code: await main(argv), out: out.join("\n") };
+    } finally {
+      console.log = log;
+      console.error = err;
+    }
+  };
+
+  it("finds the files that share a name", () => {
+    expect([...duplicateJourneyNames(listJourneyFiles(root))]).toEqual([
+      ["connexion", [`${JOURNEYS_DIR}/connexion-copie.json`, `${JOURNEYS_DIR}/connexion.json`]],
+    ]);
+  });
+
+  it("`journey run` refuses them, naming both files, before any browser starts", async () => {
+    for (const argv of [["--all"], ["connexion-copie"]]) {
+      const { code, out } = await quiet(["journey", "run", ...argv, "--root", root, "--lang", "en"]);
+      expect(code).toBe(2);
+      expect(out).toContain(`the journey name "connexion" is declared by several files (${JOURNEYS_DIR}/connexion-copie.json, ${JOURNEYS_DIR}/connexion.json)`);
+    }
+  });
+
+  it("`journey list` flags them", async () => {
+    const { code, out } = await quiet(["journey", "list", "--root", root, "--json"]);
+    expect(code).toBe(1);
+    const rows = JSON.parse(out) as { name: string; file: string; valid: boolean }[];
+    expect(rows.map((r) => [r.file, r.valid])).toEqual([
+      [`${JOURNEYS_DIR}/autre.json`, true],
+      [`${JOURNEYS_DIR}/connexion-copie.json`, false],
+      [`${JOURNEYS_DIR}/connexion.json`, false],
+    ]);
   });
 });
 

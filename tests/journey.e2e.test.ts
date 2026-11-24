@@ -4,7 +4,7 @@
 // Runs in the browser tier (`pnpm test:browser`, vitest.browser.config.ts) and SKIPS where no
 // Chromium can launch — unless ULTRA11Y_REQUIRE_BROWSER=1, where a skip would be a green lie.
 import { createServer, type Server } from "node:http";
-import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,7 +84,7 @@ const engines = (name: string) => run!.findings.filter((f) => f.sample?.id.start
 
 describe("journey run — keyboard replay over the fixture SPA", () => {
   bit("completes every well-formed journey and records a snapshot per step", () => {
-    for (const name of ["menu", "modales", "formulaire", "editeur", "rapport"]) {
+    for (const name of ["menu", "modales", "formulaire", "editeur", "rapport", "boutons"]) {
       const r = rec(name);
       expect(r.status, `${name}: ${r.reason}`).toBe("done");
       expect(r.keyboard).toBe(true);
@@ -159,6 +159,37 @@ describe("journey run — keyboard replay over the fixture SPA", () => {
     const st = at("formulaire", 3).filter((f) => f.engine === "live-region");
     expect(st).toHaveLength(1);
     expect(st[0]!.message).toMatch(/Brouillon enregistré/);
+  });
+
+  bit("a text locator on a button's inner <span> resolves to the button: no false 2.1.1, 2.4.3 or 4.1.3", () => {
+    const r = rec("boutons");
+    for (const st of r.steps.slice(1)) expect(st.keyboard, st.label).toBe("focus");
+    expect(r.steps[1]!.focus?.at(-1)).toBe('button "Afficher les détails"');
+    const own = run!.findings.filter((f) => f.sample?.id.startsWith("boutons-") && ["2.1.1", "2.4.3", "4.1.3"].includes(f.criteriaId));
+    expect(own).toEqual([]);
+  });
+
+  bit("a journey that fails before its first step leaves no state of its previous replay", async () => {
+    const stale = join(root, PAGES_DIR, "vieux-01-click-button-x");
+    mkdirSync(stale, { recursive: true });
+    writeFileSync(
+      join(stale, "meta.json"),
+      JSON.stringify({
+        v: 1,
+        id: "vieux-01-click-button-x",
+        name: "vieux",
+        url: "http://x/",
+        runner: "journey",
+        journey: { name: "vieux", step: 1, action: "click", keyboard: true },
+      }),
+    );
+    const r = await runJourneys(
+      [{ journey: { name: "vieux", startUrl: "/relatif", steps: [{ action: "press", key: "Tab" }] }, file: ".ultra11y/journeys/vieux.json" }],
+      { root, cwd: process.cwd(), lang: "en", keyboard: true },
+    );
+    expect(r.records[0]!.status).toBe("failed");
+    expect(r.records[0]!.steps[0]!.reason).toMatch(/--base-url/);
+    expect(existsSync(stale)).toBe(false);
   });
 
   bit("a locator that matches nothing stops its journey, with the reason, and the rest is not run", () => {

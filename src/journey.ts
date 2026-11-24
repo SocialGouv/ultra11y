@@ -229,6 +229,18 @@ export function listJourneyFiles(root: string): JourneyFile[] {
     });
 }
 
+/** Journey names declared by more than one file, with those files. A name is the identity of
+ *  a journey's snapshots (`<name>-<nn>-…`) and of its run record, so two files sharing one
+ *  would overwrite each other's page states and findings, silently. */
+export function duplicateJourneyNames(files: readonly JourneyFile[]): Map<string, string[]> {
+  const byName = new Map<string, string[]>();
+  for (const f of files) {
+    const name = f.validation.journey?.name;
+    if (name) byName.set(name, [...(byName.get(name) ?? []), f.file]);
+  }
+  return new Map([...byName].filter(([, list]) => list.length > 1));
+}
+
 export interface JourneyRunsManifest {
   v: 1;
   journeys: JourneyRecord[];

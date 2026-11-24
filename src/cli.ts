@@ -127,7 +127,7 @@ import { runPackCheck, packScaffold } from "./pack.js";
 import { buildManifest, listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
 import { buildTrialSummary, formatTrialSummary } from "./trial-summary.js";
 import { readStdin, readText, today } from "./util.js";
-import { journeyScopeFor, listJourneyFiles, readJourneyRuns, writeJourneyRuns, JOURNEYS_DIR, JOURNEY_RUNS_FILE } from "./journey.js";
+import { duplicateJourneyNames, journeyScopeFor, listJourneyFiles, readJourneyRuns, writeJourneyRuns, JOURNEYS_DIR, JOURNEY_RUNS_FILE } from "./journey.js";
 import { JOURNEY_ENGINE, runJourneys } from "./journey-run.js";
 import type { RenderSignals } from "./types.js";
 
@@ -3983,14 +3983,20 @@ async function cmdJourney(p: ParsedArgs): Promise<number> {
   if (sub === "list") {
     const lang = resolveLang(p.flags);
     const runs = new Map((readJourneyRuns(root)?.journeys ?? []).map((r) => [r.name, r]));
+    const dupes = duplicateJourneyNames(files);
     const rows = files.map((f) => {
       const j = f.validation.journey;
       const last = j ? runs.get(j.name) : undefined;
+      const twins = j ? dupes.get(j.name)?.filter((x) => x !== f.file) : undefined;
+      const issues = [
+        ...f.validation.issues,
+        ...(twins?.length ? [{ path: "name", message: `the journey name "${j!.name}" is also declared by ${twins.join(", ")} — names must be unique` }] : []),
+      ];
       return {
         name: j?.name ?? f.base,
         file: f.file,
-        valid: f.validation.ok,
-        ...(f.validation.ok ? {} : { issues: f.validation.issues }),
+        valid: issues.length === 0,
+        ...(issues.length ? { issues } : {}),
         steps: j?.steps.length ?? 0,
         keyboardOnly: j?.keyboardOnly === true,
         lastRun: last ? last.status : "not-run",
@@ -4038,6 +4044,18 @@ async function cmdJourney(p: ParsedArgs): Promise<number> {
         ? `ultra11y journey run : parcours introuvable(s) dans ${JOURNEYS_DIR}/ : ${unknown.join(", ") || "(aucun fichier)"}.`
         : `ultra11y journey run: journey(s) not found in ${JOURNEYS_DIR}/: ${unknown.join(", ") || "(no file)"}.`,
     );
+    return 2;
+  }
+  // Over EVERY file, not only the chosen ones: a name is the identity of the snapshots on disk,
+  // so replaying one of two same-named journeys would still overwrite the other's states.
+  const dupes = [...duplicateJourneyNames(files)].filter(([name]) => chosen.some((f) => f.validation.journey?.name === name));
+  if (dupes.length) {
+    for (const [name, list] of dupes)
+      console.error(
+        lang === "fr"
+          ? `ultra11y journey run : le nom de parcours « ${name} » est déclaré par plusieurs fichiers (${list.join(", ")}) — leurs états de page s'écraseraient. Renommez-en un.`
+          : `ultra11y journey run: the journey name "${name}" is declared by several files (${list.join(", ")}) — their page states would overwrite each other. Rename one.`,
+      );
     return 2;
   }
   const invalid = chosen.filter((f) => !f.validation.ok);

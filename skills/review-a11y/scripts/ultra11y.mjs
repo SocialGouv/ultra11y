@@ -63806,6 +63806,14 @@ function listJourneyFiles(root) {
     return { file, base: f2.replace(/\.json$/, ""), validation };
   });
 }
+function duplicateJourneyNames(files) {
+  const byName = /* @__PURE__ */ new Map();
+  for (const f2 of files) {
+    const name = f2.validation.journey?.name;
+    if (name) byName.set(name, [...byName.get(name) ?? [], f2.file]);
+  }
+  return new Map([...byName].filter(([, list]) => list.length > 1));
+}
 function readJourneyRuns(root) {
   const file = join32(root, JOURNEY_RUNS_FILE);
   if (!existsSync32(file)) return void 0;
@@ -63948,7 +63956,7 @@ var JOURNEY_LIB = `(() => { ${PRELUDE}
       const a = deep(); const body = isBody(a);
       const t = document.querySelector('[data-u11y-jt]');
       return { key: body ? 0 : key(a), label: label(a), body: body, frame: !!(a && a.tagName === 'IFRAME'),
-        role: body ? '' : roleOf(a), onTarget: !!(t && a && (t === a || t.contains(a))), modal: !!(a && !body && modalOf(a)) };
+        role: body ? '' : roleOf(a), onTarget: !!(t && a && !body && (t === a || t.contains(a) || a.contains(t))), modal: !!(a && !body && modalOf(a)) };
     },
     tabbables() { return Array.from(document.querySelectorAll(FOCUSABLE)).filter(tabbable).length; },
     region(keys) {
@@ -64001,7 +64009,7 @@ var JOURNEY_LIB = `(() => { ${PRELUDE}
         if (i < 0) continue;
         const tr = S.stack[i].trigger; S.stack.splice(i, 1);
         if (!tr || !tr.isConnected || !__vis(tr)) continue;
-        if (a === tr || (a && tr.contains(a))) continue;
+        if (a === tr || (a && !isBody(a) && (tr.contains(a) || a.contains(tr)))) continue;
         out.dialogReturn.push({ selector: __sel(tr), html: __html(tr), dialog: label(d), trigger: label(tr), focus: label(a) });
       }
       const ids = referenced();
@@ -64045,6 +64053,7 @@ var JOURNEY_LIB = `(() => { ${PRELUDE}
   return true;
 })()`;
 var HAS_LIB = "!!window.__u11yJ";
+var CONTROL_SELECTOR = 'a[href],area[href],button,input,select,textarea,summary,[tabindex]:not([tabindex^="-"]),[contenteditable=""],[contenteditable="true"],[role=button],[role=link],[role=menuitem],[role=menuitemcheckbox],[role=menuitemradio],[role=tab],[role=checkbox],[role=radio],[role=switch],[role=option],[role=combobox]';
 var TARGET_INFO = `(() => { ${PRELUDE} const e = document.querySelector('[data-u11y-jt]'); return e ? { selector: __sel(e), html: __html(e) } : null; })()`;
 var UNTAG_TARGET = `(() => { for (const e of Array.from(document.querySelectorAll('[data-u11y-jt]'))) e.removeAttribute('data-u11y-jt'); return true; })()`;
 var STRIP_TAGS = `(() => {
@@ -64248,6 +64257,7 @@ async function runOne(browser, axe, journey, file, opts, result, tested) {
     opts.onStep?.(journey.name, step);
     return record;
   };
+  clearJourneySnapshots(opts.root, journey.name);
   const storageState = journey.storageState ? resolve14(opts.root, journey.storageState) : opts.storageState;
   if (storageState && !existsSync33(storageState)) return fail(start, `storageState not found: ${storageState}`);
   let startUrl;
@@ -64256,7 +64266,6 @@ async function runOne(browser, axe, journey, file, opts, result, tested) {
   } catch {
     return fail(start, `startUrl "${journey.startUrl}" is not an absolute URL \u2014 pass --base-url <url> to resolve it`);
   }
-  clearJourneySnapshots(opts.root, journey.name);
   const context = await browser.newContext(storageState ? { storageState } : {});
   const page = await context.newPage();
   const traps = /* @__PURE__ */ new Set();
@@ -64300,7 +64309,7 @@ async function runOne(browser, axe, journey, file, opts, result, tested) {
           const r2 = await resolveTarget(page, def, timeout);
           if ("reason" in r2) return fail(rec, r2.reason);
           loc = r2.loc;
-          await loc.evaluate((el) => el.setAttribute("data-u11y-jt", "")).catch(() => {
+          await loc.evaluate((el, sel) => (el.closest(sel) ?? el).setAttribute("data-u11y-jt", ""), CONTROL_SELECTOR).catch(() => {
           });
         }
         if (def.action === "waitFor" || def.action === "expect") {
@@ -67321,14 +67330,20 @@ async function cmdJourney(p2) {
   if (sub === "list") {
     const lang2 = resolveLang(p2.flags);
     const runs = new Map((readJourneyRuns(root)?.journeys ?? []).map((r2) => [r2.name, r2]));
+    const dupes2 = duplicateJourneyNames(files);
     const rows = files.map((f2) => {
       const j = f2.validation.journey;
       const last = j ? runs.get(j.name) : void 0;
+      const twins = j ? dupes2.get(j.name)?.filter((x2) => x2 !== f2.file) : void 0;
+      const issues = [
+        ...f2.validation.issues,
+        ...twins?.length ? [{ path: "name", message: `the journey name "${j.name}" is also declared by ${twins.join(", ")} \u2014 names must be unique` }] : []
+      ];
       return {
         name: j?.name ?? f2.base,
         file: f2.file,
-        valid: f2.validation.ok,
-        ...f2.validation.ok ? {} : { issues: f2.validation.issues },
+        valid: issues.length === 0,
+        ...issues.length ? { issues } : {},
         steps: j?.steps.length ?? 0,
         keyboardOnly: j?.keyboardOnly === true,
         lastRun: last ? last.status : "not-run",
@@ -67372,6 +67387,14 @@ async function cmdJourney(p2) {
     console.error(
       lang === "fr" ? `ultra11y journey run : parcours introuvable(s) dans ${JOURNEYS_DIR}/ : ${unknown.join(", ") || "(aucun fichier)"}.` : `ultra11y journey run: journey(s) not found in ${JOURNEYS_DIR}/: ${unknown.join(", ") || "(no file)"}.`
     );
+    return 2;
+  }
+  const dupes = [...duplicateJourneyNames(files)].filter(([name]) => chosen.some((f2) => f2.validation.journey?.name === name));
+  if (dupes.length) {
+    for (const [name, list] of dupes)
+      console.error(
+        lang === "fr" ? `ultra11y journey run : le nom de parcours \xAB ${name} \xBB est d\xE9clar\xE9 par plusieurs fichiers (${list.join(", ")}) \u2014 leurs \xE9tats de page s'\xE9craseraient. Renommez-en un.` : `ultra11y journey run: the journey name "${name}" is declared by several files (${list.join(", ")}) \u2014 their page states would overwrite each other. Rename one.`
+      );
     return 2;
   }
   const invalid = chosen.filter((f2) => !f2.validation.ok);

@@ -57,6 +57,16 @@ const views = {
   editeur: `<h1>Éditeur</h1>
     <div id="editor" role="textbox" aria-multiline="true" aria-label="Contenu" tabindex="0"></div>
     <p><button type="button" id="publish">Publier</button></p>`,
+  // Correct controls whose label sits in an inner <span>: a text locator lands on the span, and
+  // focus on the button around it. A disclosure, and a dialog that gives focus back.
+  boutons: `<h1>Boutons</h1>
+    <p><button type="button" id="details-btn" aria-expanded="false" aria-controls="details"><span>Afficher les détails</span></button></p>
+    <div id="details" hidden></div>
+    <p><button type="button" id="summary-btn"><span>Ouvrir le résumé</span></button></p>
+    <div id="summary" hidden><div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-label="Résumé">
+        <p>Résumé du dossier.</p><button type="button" id="summary-close"><span>Fermer le résumé</span></button>
+      </div></div>`,
   // A "button" that is a bare div: clickable with a mouse, out of the tab order.
   rapport: `<h1>Rapport</h1>
     <p><a href="#/menu">Retour au menu</a></p>
@@ -109,6 +119,15 @@ function wire(name) {
   if (name === "editeur") {
     $("editor").addEventListener("keydown", (e) => { if (e.key === "Tab") e.preventDefault(); });
     $("publish").addEventListener("click", () => {});
+  }
+  if (name === "boutons") {
+    $("details-btn").addEventListener("click", () => {
+      $("details-btn").setAttribute("aria-expanded", "true");
+      $("details").hidden = false;
+      $("details").textContent = "Dossier déposé le 3 mars, en cours d'instruction.";
+    });
+    $("summary-btn").addEventListener("click", () => { $("summary").hidden = false; $("summary-close").focus(); });
+    $("summary-close").addEventListener("click", () => { $("summary").hidden = true; $("summary-btn").focus(); });
   }
   if (name === "rapport") {
     $("download").addEventListener("click", () => { $("ready").hidden = false; });
