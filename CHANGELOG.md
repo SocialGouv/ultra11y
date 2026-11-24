@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [8.2.0](https://github.com/SocialGouv/ultra11y/compare/v8.1.0...v8.2.0) (2026-11-24)
+
+
+### Bug Fixes
+
+* **adjudicate:** briefs print the RGAA definitions whole, the ones that decide the verdict included ([#188](https://github.com/SocialGouv/ultra11y/issues/188)) ([fc77b04](https://github.com/SocialGouv/ultra11y/commit/fc77b047120bf6538c0e1c7b9a313818e96576fe)), closes [#182](https://github.com/SocialGouv/ultra11y/issues/182) [#182](https://github.com/SocialGouv/ultra11y/issues/182)
+
+
+### Features
+
+* **pages:** a deterministic RGAA sample proposal, the same site gives the same pages ([#187](https://github.com/SocialGouv/ultra11y/issues/187)) ([0287591](https://github.com/SocialGouv/ultra11y/commit/02875913a1ef738a3c80521718489159dfc580aa)), closes [#185](https://github.com/SocialGouv/ultra11y/issues/185) [#185](https://github.com/SocialGouv/ultra11y/issues/185)
+
 # [8.1.0](https://github.com/SocialGouv/ultra11y/compare/v8.0.0...v8.1.0) (2026-11-24)
 
 
