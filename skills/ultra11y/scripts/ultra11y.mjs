@@ -65190,6 +65190,8 @@ async function capture(page, axe, lang) {
       }
     }
   }
+  const behaviour = snapshot ? await startBehaviour(page) : void 0;
+  await behaviour?.idle();
   const axeRun = await runAxe(axe, page, "journey");
   const violations = axeRun.violations.map((v2) => ({
     id: v2.id,
@@ -65213,6 +65215,7 @@ async function capture(page, axe, lang) {
   }));
   await page.evaluate("window.__u11yJ && window.__u11yJ.restore()").catch(() => {
   });
+  if (behaviour && snapshot) snapshot.scripts = await behaviour.finish();
   await page.evaluate(STRIP_TAGS).catch(() => {
   });
   return {
@@ -65284,6 +65287,8 @@ async function runOne(browser, axe, journey, file, opts, result, tested) {
   }
   const context = await browser.newContext(storageState ? { storageState } : {});
   const page = await context.newPage();
+  await page.addInitScript(TIMER_HOOK).catch(() => {
+  });
   const traps = /* @__PURE__ */ new Set();
   try {
     const steps = [

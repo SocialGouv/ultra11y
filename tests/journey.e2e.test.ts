@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { buildAdjudicationWorklist } from "../src/adjudicate.js";
 import { runAudit } from "../src/audit.js";
 import { main } from "../src/cli.js";
 import { journeyScopeFor, listJourneyFiles, writeJourneyRuns } from "../src/journey.js";
@@ -17,7 +18,7 @@ import { type JourneyRunResult, runJourneys } from "../src/journey-run.js";
 import { pageScopesFrom } from "../src/pages.js";
 import { renderJourneys } from "../src/report.js";
 import { PAGES_DIR, readSnapshots } from "../src/snapshot.js";
-import type { JourneyRecord } from "../src/types.js";
+import type { JourneyRecord, ScriptsDigest } from "../src/types.js";
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "journeys");
 
@@ -122,6 +123,24 @@ describe("journey run — keyboard replay over the fixture SPA", () => {
     expect(trap[0]!.criteriaId).toBe("2.1.2");
     expect(trap[0]!.severity).toBe("bloquant");
     expect(trap.some((f) => /Piège clavier/.test(f.message))).toBe(true);
+  });
+
+  // #190 — each step's state carries the page's JS behaviour, read through CDP like `scan`, and
+  // it reaches the brief of the criterion it informs.
+  bit("records the page's behaviour at each step: the div-button's click listener, flagged, reaches 7.1", () => {
+    for (const st of rec("rapport").steps) {
+      const s = JSON.parse(readFileSync(join(root, PAGES_DIR, st.page!, "scripts.json"), "utf8")) as ScriptsDigest;
+      expect(s.collected, `${st.page}: ${s.why}`).toBe("cdp");
+      expect(s.timers?.source).toBe("init");
+      const div = s.listeners?.find((l) => l.selector === "div#download");
+      expect(div, `${st.page}: ${JSON.stringify(s.listeners)}`).toMatchObject({ tag: "div", events: ["click"], native: false, flagged: true });
+    }
+    const page = rec("rapport").steps[0]!.page!;
+    const audit = runAudit({ inputs: [join(root, PAGES_DIR, page, "dom.html")] });
+    const ev = (buildAdjudicationWorklist(audit, { standard: "rgaa" }).find((i) => i.criteriaId === "7.1")?.evidence ?? []).map(
+      (e) => `${e.selector} :: ${e.note ?? ""}`,
+    );
+    expect(ev.some((e) => e.startsWith("div#download") && /neither role nor tabindex/.test(e))).toBe(true);
   });
 
   bit("detects a div-button Tab never reaches — 2.1.1 — and still completes the journey", () => {
