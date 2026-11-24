@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [8.0.0](https://github.com/SocialGouv/ultra11y/compare/v7.2.0...v8.0.0) (2026-11-24)
+
+
+* feat!: ultra11y renders the HTML itself and no longer reads the project's tests ([#181](https://github.com/SocialGouv/ultra11y/issues/181)) ([6e9b3ac](https://github.com/SocialGouv/ultra11y/commit/6e9b3ac0e7976d4d3ce00dcdc8f1cf6b7989b345)), closes [#178](https://github.com/SocialGouv/ultra11y/issues/178) [#178](https://github.com/SocialGouv/ultra11y/issues/178)
+
+
+### BREAKING CHANGES
+
+* the ultra11y/vitest and ultra11y/jest exports, `capture
+write`, render --setup and render --scaffold are removed, .snap files are no
+longer audited, and `render [<dir>]` now runs the snapshot engine.
+
 # [7.2.0](https://github.com/SocialGouv/ultra11y/compare/v7.1.0...v7.2.0) (2026-11-23)
 
 
