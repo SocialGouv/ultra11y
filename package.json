@@ -51,6 +51,7 @@
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:opencode": "vitest run --config vitest.opencode.config.ts",
+    "test:codex": "vitest run --config vitest.codex.config.ts",
     "bench": "node scripts/bench.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome ci .",
