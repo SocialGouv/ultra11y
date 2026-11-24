@@ -468,6 +468,10 @@ export interface ReflowClipped {
   textCount: number;
   controls: { selector: string; html: string; detail: string }[];
   controlCount: number;
+  /** The text walk stopped at its cap (REFLOW_TEXT_CAP): `textCount` is a lower bound and a
+   *  zero there proves nothing. `textNodesWalked` is how many text nodes it measured. */
+  capped?: boolean;
+  textNodesWalked?: number;
 }
 
 /** The signals attached to a Doc parsed from a page snapshot's `dom.html`. Absent for every
@@ -1045,6 +1049,9 @@ export interface DynamicFinding {
    *  a capture older than the measure. */
   clippedText?: string;
   clippedControls?: string;
+  /** Set when the text walk hit its cap: the text nodes it measured. The counts are then a
+   *  lower bound, and the sentence says the measure is incomplete. */
+  clippedCapped?: string;
 }
 
 export interface DynamicResult {

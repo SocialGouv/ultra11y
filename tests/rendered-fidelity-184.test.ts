@@ -112,4 +112,18 @@ describe("the 320px reflow measure in the brief and in the finding (#184)", () =
     expect(fr({ ...none, textCount: 2, controlCount: 1 })).toContain("2 bloc(s) de texte et 1 contrôle(s)");
     expect(fr(undefined)).toBe("Défilement horizontal à 320px de large — la page est élargie par footer img.logo.");
   });
+
+  it("a capped walk says the measure is incomplete, never that only boxes overflow", () => {
+    const capped: ReflowClipped = { ...none, capped: true, textNodesWalked: 5000 };
+    const fr = resolveMessage({ message: "", msg: { id: "dyn-reflow", params: reflowClippedParams(capped) } }, "fr");
+    expect(fr).toContain("INCOMPLÈTE");
+    expect(fr).not.toContain("seules des boîtes débordent");
+    const en = resolveMessage({ message: "", msg: { id: "dyn-reflow", params: reflowClippedParams(capped) } }, "en");
+    expect(en).toContain("INCOMPLETE");
+    expect(en).not.toContain("only boxes overflow");
+    const out = SUBJECTS["rendered:1.4.10"]!([snap("a", { horizontalScroll: true, widening: [logo], clipped: capped })]);
+    const line = out.find((x) => (x.ev.note ?? "").startsWith('page="a"'))!;
+    expect(line.ev.note).toContain("INCOMPLETE measure");
+    expect(line.ev.note).not.toContain("content beyond the viewport: NONE");
+  });
 });

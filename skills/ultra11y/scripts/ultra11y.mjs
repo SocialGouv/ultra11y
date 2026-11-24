@@ -23630,7 +23630,12 @@ var PROBES_VERSION = 2;
 var WALK_DEPENDENT_SCS = ["1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
 function reflowClippedParams(clipped) {
   if (!clipped || typeof clipped.textCount !== "number" || typeof clipped.controlCount !== "number") return {};
-  return { clippedText: String(clipped.textCount), clippedControls: String(clipped.controlCount) };
+  return {
+    clippedText: String(clipped.textCount),
+    clippedControls: String(clipped.controlCount),
+    // A capped walk is a lower bound, never a zero: the sentence says the measure is incomplete.
+    ...clipped.capped ? { clippedCapped: String(clipped.textNodesWalked ?? "") } : {}
+  };
 }
 var PRELUDE = `
 const __sel = (e) => {
@@ -23698,6 +23703,7 @@ const __frames = () => new Promise((res) => {
   try { requestAnimationFrame(() => requestAnimationFrame(end)); } catch { end(); }
 });
 `;
+var REFLOW_TEXT_CAP = 5e3;
 var REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
   await __frames();
   const el = document.scrollingElement || document.documentElement;
@@ -23744,11 +23750,15 @@ var REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
   // replaced elements (a link, a field, an image) do. A box whose own text fits reports neither.
   const textOver = new Map();
   const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+  // BOUNDED, AND SAYS SO. A walk that stops at the cap has not looked at the rest of the page,
+  // so it must never read as \xAB no text beyond the viewport \xBB: capped travels with the counts.
   let seenText = 0;
-  for (let t = walker.nextNode(); t && seenText < 5000; t = walker.nextNode()) {
+  let capped = false;
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
     if (!t.nodeValue || !t.nodeValue.trim()) continue;
     const p = t.parentElement;
     if (!p) continue;
+    if (seenText >= ${REFLOW_TEXT_CAP}) { capped = true; break; }
     seenText++;
     const ps = getComputedStyle(p);
     if (ps.visibility === 'hidden' || ps.display === 'none') continue;
@@ -23786,6 +23796,7 @@ var REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
     textCount: textHits.length,
     controls: controlHits.slice(0, 5).map(([e, over, w, kind]) => ({ selector: __sel(e), html: __html(e), detail: (kind === 'replaced' ? '\xE9l\xE9ment remplac\xE9' : 'contr\xF4le') + ' pos\xE9 ' + Math.round(over) + 'px au-del\xE0 du bord droit du viewport (largeur ' + Math.round(w) + 'px)' })),
     controlCount: controlHits.length,
+    ...(capped ? { capped: true, textNodesWalked: seenText } : {}),
   };
   return { horizontalScroll, widening, clipped };
 })()`;
@@ -26410,8 +26421,8 @@ var MSG_CATALOG = {
   // the scroll and nothing else, never a cause nobody measured.
   "dyn-reflow": {
     message: {
-      fr: (p2) => `D\xE9filement horizontal \xE0 320px de large${p2.widening ? ` \u2014 la page est \xE9largie par ${String(p2.widening)}` : ""}${p2.clippedText === void 0 ? "" : p2.clippedText === "0" && p2.clippedControls === "0" ? " ; aucun texte ni contr\xF4le n'est pos\xE9 au-del\xE0 du viewport : seules des bo\xEEtes d\xE9bordent" : ` ; ${String(p2.clippedText)} bloc(s) de texte et ${String(p2.clippedControls)} contr\xF4le(s) ou \xE9l\xE9ment(s) remplac\xE9(s) pos\xE9s au-del\xE0 du viewport`}.`,
-      en: (p2) => `Horizontal scrolling at 320px width${p2.widening ? ` \u2014 the page is widened by ${String(p2.widening)}` : ""}${p2.clippedText === void 0 ? "" : p2.clippedText === "0" && p2.clippedControls === "0" ? "; no text or control lies beyond the viewport: only boxes overflow" : `; ${String(p2.clippedText)} text block(s) and ${String(p2.clippedControls)} control(s) or replaced element(s) lie beyond the viewport`}.`
+      fr: (p2) => `D\xE9filement horizontal \xE0 320px de large${p2.widening ? ` \u2014 la page est \xE9largie par ${String(p2.widening)}` : ""}${p2.clippedText === void 0 ? "" : p2.clippedCapped !== void 0 ? ` ; mesure du contenu hors viewport INCOMPL\xC8TE (arr\xEAt\xE9e apr\xE8s ${String(p2.clippedCapped)} n\u0153uds de texte) : au moins ${String(p2.clippedText)} bloc(s) de texte et ${String(p2.clippedControls)} contr\xF4le(s) ou \xE9l\xE9ment(s) remplac\xE9(s) pos\xE9s au-del\xE0 du viewport` : p2.clippedText === "0" && p2.clippedControls === "0" ? " ; aucun texte ni contr\xF4le n'est pos\xE9 au-del\xE0 du viewport : seules des bo\xEEtes d\xE9bordent" : ` ; ${String(p2.clippedText)} bloc(s) de texte et ${String(p2.clippedControls)} contr\xF4le(s) ou \xE9l\xE9ment(s) remplac\xE9(s) pos\xE9s au-del\xE0 du viewport`}.`,
+      en: (p2) => `Horizontal scrolling at 320px width${p2.widening ? ` \u2014 the page is widened by ${String(p2.widening)}` : ""}${p2.clippedText === void 0 ? "" : p2.clippedCapped !== void 0 ? `; the measure of content beyond the viewport is INCOMPLETE (stopped after ${String(p2.clippedCapped)} text nodes): at least ${String(p2.clippedText)} text block(s) and ${String(p2.clippedControls)} control(s) or replaced element(s) lie beyond the viewport` : p2.clippedText === "0" && p2.clippedControls === "0" ? "; no text or control lies beyond the viewport: only boxes overflow" : `; ${String(p2.clippedText)} text block(s) and ${String(p2.clippedControls)} control(s) or replaced element(s) lie beyond the viewport`}.`
     },
     remediation: {
       fr: () => `V\xE9rifi\xE9 au rendu par axe-core ; corrigez l'\xE9l\xE9ment cit\xE9.`,
@@ -35433,10 +35444,14 @@ function reflowNote(reflow, shared) {
   let note = ` horizontal scroll at 320px: YES${wide.length ? ` (widened by ${wide.join(", ")})` : ""};`;
   const c = reflow.clipped;
   if (c && typeof c.textCount === "number") {
-    if (!c.textCount && !c.controlCount) note += " content beyond the viewport: NONE \u2014 no text and no control lies past the right edge, only boxes overflow;";
+    const incomplete = c.capped ? ` (INCOMPLETE measure: the text walk stopped after ${c.textNodesWalked ?? "its cap of"} text nodes, so these counts are a lower bound and the rest of the page was not measured)` : "";
+    if (!c.textCount && !c.controlCount && !c.capped)
+      note += " content beyond the viewport: NONE \u2014 no text and no control lies past the right edge, only boxes overflow;";
+    else if (!c.textCount && !c.controlCount)
+      note += ` content beyond the viewport: none found in the part measured${incomplete} \u2014 not established that only boxes overflow;`;
     else {
       const list = (kind) => items.filter((w2) => w2.kind === kind).map((w2) => `${name(w2)} (${w2.detail.slice(0, 90)})`).join("; ");
-      note += ` content beyond the viewport: ${c.textCount} text block(s)${c.textCount ? ` \u2014 ${list("text")}` : ""}, ${c.controlCount} control(s)/replaced element(s)${c.controlCount ? ` \u2014 ${list("control")}` : ""};`;
+      note += ` content beyond the viewport: ${c.textCount} text block(s)${c.textCount ? ` \u2014 ${list("text")}` : ""}, ${c.controlCount} control(s)/replaced element(s)${c.controlCount ? ` \u2014 ${list("control")}` : ""}${incomplete};`;
     }
   }
   return note;
@@ -58746,7 +58761,8 @@ function toDynamicResult(out, target, lang = "en", engine = "axe-core@playwright
       engine: "reflow",
       page,
       ...widening ? { widening } : {},
-      ...clipped.clippedText !== void 0 ? { clippedText: clipped.clippedText, clippedControls: clipped.clippedControls } : {}
+      ...clipped.clippedText !== void 0 ? { clippedText: clipped.clippedText, clippedControls: clipped.clippedControls } : {},
+      ...clipped.clippedCapped !== void 0 ? { clippedCapped: clipped.clippedCapped } : {}
     });
   }
   for (const { key: key2, engine: probe } of PROBE_FIELDS) {
@@ -58883,7 +58899,8 @@ function mergeDynamic(audit, dynamic, lang = "en") {
     const msg = df.engine === "reflow" ? (() => {
       const params = {
         ...df.widening ? { widening: df.widening } : {},
-        ...df.clippedText !== void 0 && df.clippedControls !== void 0 ? { clippedText: df.clippedText, clippedControls: df.clippedControls } : {}
+        ...df.clippedText !== void 0 && df.clippedControls !== void 0 ? { clippedText: df.clippedText, clippedControls: df.clippedControls } : {},
+        ...df.clippedCapped !== void 0 ? { clippedCapped: df.clippedCapped } : {}
       };
       return { id: "dyn-reflow", ...Object.keys(params).length ? { params } : {} };
     })() : { id: "dyn-remediation", params: { message: df.message } };

@@ -1306,17 +1306,21 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
         `Défilement horizontal à 320px de large${p.widening ? ` — la page est élargie par ${String(p.widening)}` : ""}${
           p.clippedText === undefined
             ? ""
-            : p.clippedText === "0" && p.clippedControls === "0"
-              ? " ; aucun texte ni contrôle n'est posé au-delà du viewport : seules des boîtes débordent"
-              : ` ; ${String(p.clippedText)} bloc(s) de texte et ${String(p.clippedControls)} contrôle(s) ou élément(s) remplacé(s) posés au-delà du viewport`
+            : p.clippedCapped !== undefined
+              ? ` ; mesure du contenu hors viewport INCOMPLÈTE (arrêtée après ${String(p.clippedCapped)} nœuds de texte) : au moins ${String(p.clippedText)} bloc(s) de texte et ${String(p.clippedControls)} contrôle(s) ou élément(s) remplacé(s) posés au-delà du viewport`
+              : p.clippedText === "0" && p.clippedControls === "0"
+                ? " ; aucun texte ni contrôle n'est posé au-delà du viewport : seules des boîtes débordent"
+                : ` ; ${String(p.clippedText)} bloc(s) de texte et ${String(p.clippedControls)} contrôle(s) ou élément(s) remplacé(s) posés au-delà du viewport`
         }.`,
       en: (p) =>
         `Horizontal scrolling at 320px width${p.widening ? ` — the page is widened by ${String(p.widening)}` : ""}${
           p.clippedText === undefined
             ? ""
-            : p.clippedText === "0" && p.clippedControls === "0"
-              ? "; no text or control lies beyond the viewport: only boxes overflow"
-              : `; ${String(p.clippedText)} text block(s) and ${String(p.clippedControls)} control(s) or replaced element(s) lie beyond the viewport`
+            : p.clippedCapped !== undefined
+              ? `; the measure of content beyond the viewport is INCOMPLETE (stopped after ${String(p.clippedCapped)} text nodes): at least ${String(p.clippedText)} text block(s) and ${String(p.clippedControls)} control(s) or replaced element(s) lie beyond the viewport`
+              : p.clippedText === "0" && p.clippedControls === "0"
+                ? "; no text or control lies beyond the viewport: only boxes overflow"
+                : `; ${String(p.clippedText)} text block(s) and ${String(p.clippedControls)} control(s) or replaced element(s) lie beyond the viewport`
         }.`,
     },
     remediation: {

@@ -352,6 +352,7 @@ export function toDynamicResult(out: RunnerOutput, target: string, lang: Lang = 
       page,
       ...(widening ? { widening } : {}),
       ...(clipped.clippedText !== undefined ? { clippedText: clipped.clippedText, clippedControls: clipped.clippedControls } : {}),
+      ...(clipped.clippedCapped !== undefined ? { clippedCapped: clipped.clippedCapped } : {}),
     });
   }
   // Residual-criteria probes (local runtime). Each hit the probe OBSERVED becomes a
@@ -567,6 +568,7 @@ export function mergeDynamic(audit: AuditResult, dynamic: DynamicResult, lang: L
             const params: Record<string, string> = {
               ...(df.widening ? { widening: df.widening } : {}),
               ...(df.clippedText !== undefined && df.clippedControls !== undefined ? { clippedText: df.clippedText, clippedControls: df.clippedControls } : {}),
+              ...(df.clippedCapped !== undefined ? { clippedCapped: df.clippedCapped } : {}),
             };
             return { id: "dyn-reflow", ...(Object.keys(params).length ? { params } : {}) };
           })()

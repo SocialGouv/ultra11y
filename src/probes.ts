@@ -42,7 +42,12 @@ import type { ReflowClipped } from "./types.js";
  *  about it rather than claiming a zero nobody measured. */
 export function reflowClippedParams(clipped: ReflowClipped | undefined): Record<string, string> {
   if (!clipped || typeof clipped.textCount !== "number" || typeof clipped.controlCount !== "number") return {};
-  return { clippedText: String(clipped.textCount), clippedControls: String(clipped.controlCount) };
+  return {
+    clippedText: String(clipped.textCount),
+    clippedControls: String(clipped.controlCount),
+    // A capped walk is a lower bound, never a zero: the sentence says the measure is incomplete.
+    ...(clipped.capped ? { clippedCapped: String(clipped.textNodesWalked ?? "") } : {}),
+  };
 }
 
 /** One thing a probe observed. Structurally identical to `ProbeHit` in src/scan.ts, restated
@@ -182,6 +187,9 @@ const __frames = () => new Promise((res) => {
 // the viewport too, and listing them would bury the one rule a developer has to change. A box
 // inside its own horizontal scroller (a data table in `overflow-x: auto`) does not widen the
 // page and is not named; neither is a `position: fixed` box, which the viewport never scrolls to.
+/** How many non-empty text nodes the reflow probe measures before it stops, and says so. */
+export const REFLOW_TEXT_CAP = 5000;
+
 export const REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
   await __frames();
   const el = document.scrollingElement || document.documentElement;
@@ -228,11 +236,15 @@ export const REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
   // replaced elements (a link, a field, an image) do. A box whose own text fits reports neither.
   const textOver = new Map();
   const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+  // BOUNDED, AND SAYS SO. A walk that stops at the cap has not looked at the rest of the page,
+  // so it must never read as « no text beyond the viewport »: capped travels with the counts.
   let seenText = 0;
-  for (let t = walker.nextNode(); t && seenText < 5000; t = walker.nextNode()) {
+  let capped = false;
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
     if (!t.nodeValue || !t.nodeValue.trim()) continue;
     const p = t.parentElement;
     if (!p) continue;
+    if (seenText >= ${REFLOW_TEXT_CAP}) { capped = true; break; }
     seenText++;
     const ps = getComputedStyle(p);
     if (ps.visibility === 'hidden' || ps.display === 'none') continue;
@@ -270,6 +282,7 @@ export const REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
     textCount: textHits.length,
     controls: controlHits.slice(0, 5).map(([e, over, w, kind]) => ({ selector: __sel(e), html: __html(e), detail: (kind === 'replaced' ? 'élément remplacé' : 'contrôle') + ' posé ' + Math.round(over) + 'px au-delà du bord droit du viewport (largeur ' + Math.round(w) + 'px)' })),
     controlCount: controlHits.length,
+    ...(capped ? { capped: true, textNodesWalked: seenText } : {}),
   };
   return { horizontalScroll, widening, clipped };
 })()`;

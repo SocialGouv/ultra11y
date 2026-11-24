@@ -1429,6 +1429,30 @@ describe("rendered fidelity (#184)", () => {
     expect(r.clipped).toMatchObject({ textCount: 0, controlCount: 0 });
   }, 60_000);
 
+  // Above the cap, the walk stops — and the clipped paragraph AFTER it is never seen. That must
+  // read as « incomplete », never as « no text beyond the viewport ».
+  it("a page above the text-walk cap reports the measure as capped, not as box-only overflow", async () => {
+    if (!browserAvailable) return;
+    const { REFLOW_PROBE, REFLOW_TEXT_CAP } = await import("../src/probes.js");
+    const many = Array.from({ length: REFLOW_TEXT_CAP + 10 }, (_, i) => `<span>m${i}</span>`).join(" ");
+    const r = (await onPage(
+      doc(
+        ".band { width: 400px; height: 4px; } .wide { width: 640px; }",
+        `<div class="band"></div><p>${many}</p><p class="wide">${"Texte coupé au-delà du bord droit. ".repeat(6)}</p>`,
+      ),
+      (page) => page.evaluate(REFLOW_PROBE),
+      { width: 320, height: 800 },
+    )) as { horizontalScroll: boolean; clipped?: { textCount: number; capped?: boolean; textNodesWalked?: number } };
+    expect(r.horizontalScroll).toBe(true);
+    expect(r.clipped?.capped).toBe(true);
+    expect(r.clipped?.textNodesWalked).toBe(REFLOW_TEXT_CAP);
+    const { reflowClippedParams } = await import("../src/probes.js");
+    const { resolveMessage } = await import("../src/messages.js");
+    const sentence = resolveMessage({ message: "", msg: { id: "dyn-reflow", params: reflowClippedParams(r.clipped as never) } }, "en");
+    expect(sentence).toContain("INCOMPLETE");
+    expect(sentence).not.toContain("only boxes overflow");
+  }, 60_000);
+
   it("a paragraph laid out wider than 320px measures clipped text", async () => {
     if (!browserAvailable) return;
     const { REFLOW_PROBE } = await import("../src/probes.js");

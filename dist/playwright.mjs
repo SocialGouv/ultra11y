@@ -559,6 +559,7 @@ const __frames = () => new Promise((res) => {
   try { requestAnimationFrame(() => requestAnimationFrame(end)); } catch { end(); }
 });
 `;
+var REFLOW_TEXT_CAP = 5e3;
 var REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
   await __frames();
   const el = document.scrollingElement || document.documentElement;
@@ -605,11 +606,15 @@ var REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
   // replaced elements (a link, a field, an image) do. A box whose own text fits reports neither.
   const textOver = new Map();
   const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+  // BOUNDED, AND SAYS SO. A walk that stops at the cap has not looked at the rest of the page,
+  // so it must never read as \xAB no text beyond the viewport \xBB: capped travels with the counts.
   let seenText = 0;
-  for (let t = walker.nextNode(); t && seenText < 5000; t = walker.nextNode()) {
+  let capped = false;
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
     if (!t.nodeValue || !t.nodeValue.trim()) continue;
     const p = t.parentElement;
     if (!p) continue;
+    if (seenText >= ${REFLOW_TEXT_CAP}) { capped = true; break; }
     seenText++;
     const ps = getComputedStyle(p);
     if (ps.visibility === 'hidden' || ps.display === 'none') continue;
@@ -647,6 +652,7 @@ var REFLOW_PROBE = `(async () => { ${PRELUDE} ${FRAMES}
     textCount: textHits.length,
     controls: controlHits.slice(0, 5).map(([e, over, w, kind]) => ({ selector: __sel(e), html: __html(e), detail: (kind === 'replaced' ? '\xE9l\xE9ment remplac\xE9' : 'contr\xF4le') + ' pos\xE9 ' + Math.round(over) + 'px au-del\xE0 du bord droit du viewport (largeur ' + Math.round(w) + 'px)' })),
     controlCount: controlHits.length,
+    ...(capped ? { capped: true, textNodesWalked: seenText } : {}),
   };
   return { horizontalScroll, widening, clipped };
 })()`;

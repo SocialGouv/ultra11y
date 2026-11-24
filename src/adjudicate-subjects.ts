@@ -680,14 +680,21 @@ function reflowNote(reflow: NonNullable<NonNullable<Doc["signals"]>["probes"]>["
   let note = ` horizontal scroll at 320px: YES${wide.length ? ` (widened by ${wide.join(", ")})` : ""};`;
   const c = reflow.clipped;
   if (c && typeof c.textCount === "number") {
-    if (!c.textCount && !c.controlCount) note += " content beyond the viewport: NONE — no text and no control lies past the right edge, only boxes overflow;";
+    // A capped walk never concludes « nothing clipped »: it measured part of the page only.
+    const incomplete = c.capped
+      ? ` (INCOMPLETE measure: the text walk stopped after ${c.textNodesWalked ?? "its cap of"} text nodes, so these counts are a lower bound and the rest of the page was not measured)`
+      : "";
+    if (!c.textCount && !c.controlCount && !c.capped)
+      note += " content beyond the viewport: NONE — no text and no control lies past the right edge, only boxes overflow;";
+    else if (!c.textCount && !c.controlCount)
+      note += ` content beyond the viewport: none found in the part measured${incomplete} — not established that only boxes overflow;`;
     else {
       const list = (kind: ReflowItem["kind"]) =>
         items
           .filter((w) => w.kind === kind)
           .map((w) => `${name(w)} (${w.detail.slice(0, 90)})`)
           .join("; ");
-      note += ` content beyond the viewport: ${c.textCount} text block(s)${c.textCount ? ` — ${list("text")}` : ""}, ${c.controlCount} control(s)/replaced element(s)${c.controlCount ? ` — ${list("control")}` : ""};`;
+      note += ` content beyond the viewport: ${c.textCount} text block(s)${c.textCount ? ` — ${list("text")}` : ""}, ${c.controlCount} control(s)/replaced element(s)${c.controlCount ? ` — ${list("control")}` : ""}${incomplete};`;
     }
   }
   return note;
