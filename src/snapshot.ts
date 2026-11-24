@@ -79,6 +79,17 @@ export interface SnapshotMeta {
    *  « capture en état de chargement » and never concludes a conformity by silence: the
    *  content it would have been about was not on the page. */
   loading?: string[];
+  /** The journey step this page state was recorded at (`journey run`, src/journey-run.ts):
+   *  the journey's name, the step (0 is the start page), the action it performed, and whether the journey
+   *  was replayed with the keyboard alone. Absent on every other producer's capture. */
+  journey?: SnapshotJourney;
+}
+
+export interface SnapshotJourney {
+  name: string;
+  step: number;
+  action: string;
+  keyboard: boolean;
 }
 
 /** What the LIVE probes measured on this page, when the producer ran them. Persisted beside
@@ -107,6 +118,12 @@ export interface SnapshotProbes {
   keyboardTrap?: { selector: string; html: string; detail: string }[];
   /** 4.1.3 — content updated by an interaction and landing outside any live region. */
   liveRegion?: { selector: string; html: string; detail: string }[];
+  /** Journey observations (`journey run`): a control Tab never reached (2.1.1), focus not
+   *  moved into a dialog or not returned to its trigger (2.4.3), an error tied to no field
+   *  (3.3.1). Written by the journey replay only. */
+  keyboardUnreachable?: { selector: string; html: string; detail: string }[];
+  dialogFocus?: { selector: string; html: string; detail: string }[];
+  errorUnassociated?: { selector: string; html: string; detail: string }[];
   /** The three stresses applied to a FILLED input, each folding onto the criterion its own
    *  stress evidences (320px reflow 1.4.10, 200% zoom 1.4.4, text spacing 1.4.12). */
   inputOverflowReflow?: { selector: string; html: string; detail: string }[];
@@ -244,6 +261,17 @@ export function validateSnapshotMeta(raw: unknown): SnapshotValidation {
     err("meta.loading", "loading must be an array of strings");
   if (m.sources !== undefined && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
     err("meta.sources", "sources must be an array of strings");
+  const j = m.journey as Record<string, unknown> | undefined;
+  if (
+    j !== undefined &&
+    (typeof j !== "object" ||
+      j === null ||
+      typeof j.name !== "string" ||
+      !Number.isInteger(j.step) ||
+      typeof j.action !== "string" ||
+      typeof j.keyboard !== "boolean")
+  )
+    err("meta.journey", "journey must be { name: string, step: integer, action: string, keyboard: boolean }");
 
   if (issues.length) return { ok: false, issues };
   return {
@@ -271,6 +299,7 @@ export function validateSnapshotMeta(raw: unknown): SnapshotValidation {
       ...(typeof m.notes === "string" ? { notes: m.notes } : {}),
       // Kept only when it says something: an empty list is a page that was ready.
       ...(Array.isArray(m.loading) && m.loading.length ? { loading: m.loading as string[] } : {}),
+      ...(j ? { journey: { name: j.name as string, step: j.step as number, action: j.action as string, keyboard: j.keyboard as boolean } } : {}),
     },
   };
 }

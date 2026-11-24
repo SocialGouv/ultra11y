@@ -70,6 +70,10 @@ export interface RunnerOutput {
   inputOverflowZoom?: ProbeHit[];
   inputOverflowSpacing?: ProbeHit[];
   liveRegion?: ProbeHit[];
+  // Journey observations (`journey run`, src/journey-run.ts) — absent from every scan.
+  keyboardUnreachable?: ProbeHit[];
+  dialogFocus?: ProbeHit[];
+  errorUnassociated?: ProbeHit[];
   // WHICH SUCCESS CRITERIA THIS RUN ACTUALLY MEASURED ON THIS PAGE — the load-bearing half.
   //
   // A probe array is silent for two different reasons: the probe ran and found nothing, or the
@@ -138,6 +142,9 @@ function probesOf(out: RunnerOutput): SnapshotProbes {
     ...(out.inputOverflowReflow ? { inputOverflowReflow: out.inputOverflowReflow } : {}),
     ...(out.inputOverflowZoom ? { inputOverflowZoom: out.inputOverflowZoom } : {}),
     ...(out.inputOverflowSpacing ? { inputOverflowSpacing: out.inputOverflowSpacing } : {}),
+    ...(out.keyboardUnreachable?.length ? { keyboardUnreachable: out.keyboardUnreachable } : {}),
+    ...(out.dialogFocus?.length ? { dialogFocus: out.dialogFocus } : {}),
+    ...(out.errorUnassociated?.length ? { errorUnassociated: out.errorUnassociated } : {}),
     reflow: out.reflow,
     // The contract this file is written under, so a future reader knows what `probed` means
     // here (src/probes.ts PROBES_VERSION).
@@ -158,7 +165,13 @@ function probesOf(out: RunnerOutput): SnapshotProbes {
  *  grid. The browser is already on the page — collecting it costs one `evaluate`.
  *
  *  Nothing here is fatal: a page that cannot be persisted is simply not a snapshot. */
-export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: string, page?: SamplePage): string | undefined {
+export function writeRunnerSnapshot(
+  root: string,
+  out: RunnerOutput,
+  target: string,
+  page?: SamplePage,
+  extra: { runner?: string; journey?: SnapshotMeta["journey"] } = {},
+): string | undefined {
   const collected = out.snapshot;
   if (!collected?.dom) return undefined;
   // Cite what a reader can open: the host path for a file scan, the served URL otherwise —
@@ -187,7 +200,8 @@ export function writeRunnerSnapshot(root: string, out: RunnerOutput, target: str
     id,
     name,
     url,
-    runner: "scan",
+    runner: extra.runner ?? "scan",
+    ...(extra.journey ? { journey: extra.journey } : {}),
     ...(collected.viewport ? { viewport: collected.viewport } : {}),
     // The doctype, which `dom` cannot carry: `documentElement.outerHTML` starts at <html>.
     // The collector reads it and every OTHER producer forwards it; this one dropped it, so a
@@ -256,6 +270,9 @@ const PROBE_FIELDS: { key: keyof RunnerOutput; engine: Exclude<DynamicEngine, "a
   { key: "inputOverflowZoom", engine: "input-overflow-zoom" },
   { key: "inputOverflowSpacing", engine: "input-overflow-spacing" },
   { key: "liveRegion", engine: "live-region" },
+  { key: "keyboardUnreachable", engine: "keyboard-unreachable" },
+  { key: "dialogFocus", engine: "dialog-focus" },
+  { key: "errorUnassociated", engine: "error-unassociated" },
 ];
 
 /** Map the runner's reported page back to a HOST-meaningful citation: the container mount

@@ -110,6 +110,22 @@ the reason. Use `--crawl <url> --max 0` instead when the project has neither a s
 inventory. A rendering criterion stays undecidable when no browser measurement exists; source
 inspection does not replace the scan.
 
+**Then write and replay the journeys.** The scan never logs in, submits or opens a funnel. Read
+the application (its routes, forms and interactive components) and write in
+`.ultra11y/journeys/` the journeys that matter: authentication, the main form including an
+invalid submit, search, every modal, menu or disclosure, and the multi-step funnel if there is
+one. Format and examples are in `references/journeys.md`. Replay them with the keyboard alone:
+
+```sh
+node scripts/ultra11y.mjs journey run --all --keyboard --base-url <url> \
+  --standard <standard> --merge audits/audit-latest.json --out audits
+```
+
+Each step becomes an audited page state. The replay also records keyboard reachability and
+traps, focus into and out of dialogs, errors not tied to their field and unannounced status
+messages. A failing step stops its journey with the reason, and annex H lists every step.
+Fix the journey and run it again. Do not drop it.
+
 `scan` and `ultra11y/playwright` run the same axe: ultra11y's own pinned `axe-core` and rule
 tags, whatever version the project installs. The annex names the version that ran. If it says
 « copie du projet audité », ultra11y's own copy could not be resolved; reinstall ultra11y with

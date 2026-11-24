@@ -33,6 +33,9 @@ function emittedMsgIds(): Set<string> {
   }
   const scanSrc = readFileSync(join(SRC_DIR, "scan.ts"), "utf8");
   for (const m of scanSrc.matchAll(/\bid:\s*"([^"]+)"/g)) ids.add(m[1]!);
+  // The journey replay words its observations through the catalog: `say("journey-…", …)`.
+  const journeySrc = readFileSync(join(SRC_DIR, "journey-run.ts"), "utf8");
+  for (const m of journeySrc.matchAll(/\bsay\(\s*"([^"]+)"/g)) ids.add(m[1]!);
   return ids;
 }
 

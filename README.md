@@ -46,7 +46,8 @@ dans `.ultra11yrc.json`. Détails : [`references/harnesses.md`](skills/ultra11y/
 tous les agents :
 
 1. passage du moteur statique sur le code source ;
-2. capture des pages rendues dans un vrai navigateur (axe-core, sondes de focus, zoom, survol) ;
+2. capture des pages rendues dans un vrai navigateur (axe-core, sondes de focus, zoom, survol),
+   puis des parcours que l’agent écrit (connexion, formulaire, modale) et rejoue au clavier ;
 3. arbitrage par l’agent des critères qui demandent un jugement, preuve à l’appui ;
 4. contre-vérification de chaque NC, C et NA : une NC réfutée est retirée, un C ou un NA
    réfuté repart « à évaluer » ;
@@ -90,6 +91,7 @@ lancer elle-même, avec `npx ultra11y <commande>` (tout le reste : `npx ultra11y
 |---|---|
 | `audit <chemins> --standard rgaa --out audits --json` | passe le moteur statique sur le code |
 | `scan <url> --merge audits/audit-latest.json` | mesure une page dans un navigateur |
+| `journey run --all --keyboard --merge audits/audit-latest.json` | rejoue au clavier les parcours écrits par l’agent ([`journeys.md`](skills/ultra11y/references/journeys.md)) |
 | `report --in audits/audit-latest.json --standard rgaa --html` | écrit le rapport daté |
 | `pages --in audits/audit-latest.json --format report --split page` | un dossier par page |
 | `check --report <rapport.md>` | contrôle l’intégrité d’un rapport |

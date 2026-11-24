@@ -1,0 +1,5 @@
+{
+  "name": "editeur",
+  "startUrl": "/#/editeur",
+  "steps": [{ "action": "click", "target": { "role": "button", "name": "Publier" } }]
+}

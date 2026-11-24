@@ -1310,6 +1310,77 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
       en: () => `Verified at render time by axe-core; fix the cited element.`,
     },
   },
+  // ---- Journey observations (`journey run`, src/journey-run.ts) ----
+  // Worded once, in the run's language, into the probe hit's `detail` — the same channel the
+  // live probes use — so a snapshot re-audited offline carries the sentence the replay wrote.
+  "journey-keyboard-unreachable": {
+    message: {
+      fr: (p) =>
+        `${p.control} n'a jamais reçu le focus : ${p.tabs} appui(s) sur Tab ont parcouru tout l'ordre de tabulation sans l'atteindre. L'étape « ${p.step} » n'est pas réalisable au clavier seul (elle a été jouée au pointeur pour poursuivre le parcours).`,
+      en: (p) =>
+        `${p.control} never received focus: ${p.tabs} Tab press(es) walked the whole tab order without reaching it. The step "${p.step}" cannot be performed with the keyboard alone (it was played with the pointer so the journey could go on).`,
+    },
+    remediation: {
+      fr: () => `Utilisez un élément natif (<button>, <a href>) ou donnez au composant tabindex="0", un rôle et la gestion des touches Entrée et Espace.`,
+      en: () => `Use a native element (<button>, <a href>), or give the component tabindex="0", a role and Enter/Space key handling.`,
+    },
+  },
+  "journey-keyboard-trap": {
+    message: {
+      fr: (p) =>
+        `Piège clavier : le focus reste sur ${p.region} (${p.count} élément(s)) — ni Tab ni Maj+Tab ne permettent d'en sortir, alors que la page compte ${p.total} élément(s) focalisable(s).`,
+      en: (p) =>
+        `Keyboard trap: focus stays within ${p.region} (${p.count} element(s)) — neither Tab nor Shift+Tab moves it out, while the page has ${p.total} focusable element(s).`,
+    },
+    remediation: {
+      fr: () => `Laissez Tab et Maj+Tab sortir du composant, ou annoncez une touche standard (Échap) qui rend le focus à la page.`,
+      en: () => `Let Tab and Shift+Tab leave the component, or announce a standard key (Escape) that hands focus back to the page.`,
+    },
+  },
+  "journey-dialog-focus-in": {
+    message: {
+      fr: (p) => `La boîte de dialogue ${p.dialog} s'est ouverte, mais le focus est resté sur ${p.focus} : il n'a pas été déplacé dans la boîte.`,
+      en: (p) => `The dialog ${p.dialog} opened, but focus stayed on ${p.focus}: it was not moved into the dialog.`,
+    },
+    remediation: {
+      fr: () => `À l'ouverture, déplacez le focus sur le premier élément pertinent de la boîte de dialogue (ou sur la boîte elle-même, tabindex="-1").`,
+      en: () => `On opening, move focus to the first relevant element of the dialog (or to the dialog itself, tabindex="-1").`,
+    },
+  },
+  "journey-dialog-focus-return": {
+    message: {
+      fr: (p) => `La boîte de dialogue ${p.dialog} s'est fermée, mais le focus n'est pas revenu sur ${p.trigger} qui l'avait ouverte (il est sur ${p.focus}).`,
+      en: (p) => `The dialog ${p.dialog} closed, but focus did not return to ${p.trigger}, which opened it (it is on ${p.focus}).`,
+    },
+    remediation: {
+      fr: () => `À la fermeture, rendez le focus à l'élément qui a ouvert la boîte de dialogue.`,
+      en: () => `On closing, return focus to the element that opened the dialog.`,
+    },
+  },
+  "journey-error-unassociated": {
+    message: {
+      fr: (p) =>
+        `Message d'erreur affiché après l'action « ${p.step} » (« ${p.text} ») sans lien programmatique avec ${p.field} : ni aria-describedby, ni aria-errormessage, ni <label> ne le relient au champ.`,
+      en: (p) =>
+        `Error message shown after the action "${p.step}" ("${p.text}") with no programmatic link to ${p.field}: no aria-describedby, aria-errormessage or <label> ties it to the field.`,
+    },
+    remediation: {
+      fr: () => `Reliez le message au champ par aria-describedby (ou aria-errormessage avec aria-invalid="true"), ou placez-le dans son <label>.`,
+      en: () => `Tie the message to its field with aria-describedby (or aria-errormessage with aria-invalid="true"), or put it inside its <label>.`,
+    },
+  },
+  "journey-status-message": {
+    message: {
+      fr: (p) =>
+        `Après l'action « ${p.step} », le texte « ${p.text} » est apparu hors de tout conteneur aria-live (ou role=status|alert|log) — probablement non restitué aux technologies d'assistance.`,
+      en: (p) =>
+        `After the action "${p.step}", the text "${p.text}" appeared outside any live region (aria-live / role=status|alert|log) — likely not announced to assistive technology.`,
+    },
+    remediation: {
+      fr: () => `Si ce texte est un message de statut, placez-le dans un conteneur role="status" (ou aria-live="polite") présent avant la mise à jour.`,
+      en: () => `If this text is a status message, render it inside a role="status" (or aria-live="polite") container that exists before the update.`,
+    },
+  },
   "dyn-remediation": {
     // Covers axe-core findings and the residual-criteria probes (focus-visible,
     // text-spacing, hover, reflow-zoom). Their message is authored by the engine

@@ -2865,7 +2865,7 @@
       ],
       "wcag": ["1.3.1", "2.1.1", "2.4.7"],
       "appliesTo": {
-        "ruleIds": ["clickable-noninteractive"]
+        "ruleIds": ["clickable-noninteractive", "dyn-keyboard-unreachable"]
       },
       "automation": {
         "tests": {
@@ -2876,6 +2876,12 @@
           {
             "id": "clickable-noninteractive",
             "tests": ["1"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-keyboard-unreachable",
+            "tests": ["1", "2"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           }
@@ -5005,7 +5011,7 @@
       ],
       "wcag": ["3.3.1", "3.3.2"],
       "appliesTo": {
-        "ruleIds": ["aria-invalid-no-description", "error-not-associated"]
+        "ruleIds": ["aria-invalid-no-description", "dyn-error-unassociated", "error-not-associated"]
       },
       "automation": {
         "tests": {
@@ -5021,6 +5027,12 @@
           {
             "id": "aria-invalid-no-description",
             "tests": ["3", "4", "6", "7"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-error-unassociated",
+            "tests": ["1", "2", "3", "4", "5", "6", "7"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
@@ -5513,7 +5525,7 @@
       "techniques": ["G59", "H4", "F44", "F85", "SCR26", "SCR27", "SCR37", "C27"],
       "wcag": ["2.4.3"],
       "appliesTo": {
-        "ruleIds": ["axe:tabindex", "positive-tabindex"]
+        "ruleIds": ["axe:tabindex", "dyn-dialog-focus", "positive-tabindex"]
       },
       "automation": {
         "tests": {
@@ -5524,6 +5536,12 @@
           {
             "id": "axe:tabindex",
             "tests": ["1"],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-dialog-focus",
+            "tests": ["1", "2"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },

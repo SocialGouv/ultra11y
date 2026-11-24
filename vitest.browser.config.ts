@@ -6,7 +6,7 @@ import { defineConfig } from "vitest/config";
 // anything else moves the cwd out from under it.
 export default defineConfig({
   test: {
-    include: ["tests/browser-tier.e2e.test.ts"],
+    include: ["tests/browser-tier.e2e.test.ts", "tests/journey.e2e.test.ts"],
     pool: "forks",
     maxWorkers: 1,
     isolate: false,

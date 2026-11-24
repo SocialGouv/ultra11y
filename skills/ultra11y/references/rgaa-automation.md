@@ -49,7 +49,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 6.2 | 1 / 0 / 0 | 3 / 0 / 0 | no | deterministic NC + AI residual |
 | 7.1 | 2 / 0 / 1 | 5 / 29 / 0 | no | deterministic NC + AI residual |
 | 7.2 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
-| 7.3 | 0 / 0 / 2 | 0 / 1 / 0 | no | AI + signals |
+| 7.3 | 0 / 0 / 2 | 0 / 2 / 0 | no | AI + signals |
 | 7.4 | 0 / 0 / 1 | 0 / 1 / 0 | no | AI + signals |
 | 7.5 | 0 / 0 / 3 | 0 / 3 / 0 | no | AI + signals |
 | 8.1 | 0 / 1 / 2 | 1 / 0 / 0 | no | deterministic NC + AI residual |
@@ -89,7 +89,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 11.7 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
 | 11.8 | 1 / 0 / 2 | 1 / 0 / 0 | no | deterministic NC + AI residual |
 | 11.9 | 2 / 0 / 0 | 2 / 2 / 0 | no | deterministic NC + AI residual |
-| 11.10 | 0 / 0 / 7 | 0 / 2 / 0 | no | AI + signals |
+| 11.10 | 0 / 0 / 7 | 0 / 3 / 0 | no | AI + signals |
 | 11.11 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
 | 11.12 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
 | 11.13 | 0 / 0 / 1 | 0 / 3 / 0 | no | AI + signals |
@@ -100,7 +100,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 12.5 | 0 / 0 / 3 | 0 / 0 / 0 | no | AI |
 | 12.6 | 0 / 0 / 1 | 0 / 6 / 0 | no | AI + signals |
 | 12.7 | 0 / 0 / 2 | 0 / 4 / 0 | no | AI + signals |
-| 12.8 | 0 / 0 / 2 | 0 / 2 / 0 | no | AI + signals |
+| 12.8 | 0 / 0 / 2 | 0 / 3 / 0 | no | AI + signals |
 | 12.9 | 0 / 0 / 1 | 0 / 1 / 0 | no | AI + signals |
 | 12.10 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
 | 12.11 | 0 / 0 / 1 | 0 / 0 / 0 | no | AI |
@@ -248,8 +248,8 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 7.1.3 | static | `label-in-name-mismatch` | `aria-hidden-focusable`, `aria-prohibited-attr`, `aria-ref-missing-id`, `aria-required-attr`, `aria-required-children`, `axe:aria-allowed-attr`, `axe:aria-allowed-role`, `axe:aria-command-name`, `axe:aria-dialog-name`, `axe:aria-hidden-focus`, `axe:aria-meter-name`, `axe:aria-progressbar-name`, `axe:aria-required-attr`, `axe:aria-required-children`, `axe:aria-required-parent`, `axe:aria-roles`, `axe:aria-tooltip-name`, `axe:aria-valid-attr`, `axe:aria-valid-attr-value`, `axe:nested-interactive`, `axe:presentation-role-conflict`, `cross-prop-drilled-name-lost`, `disabled-context-content`, `invalid-aria-attr`, `invalid-aria-role`, `invalid-aria-value`, `nested-interactive`, `redundant-aria` |
 | 7.2.1 | judgment | — | — |
 | 7.2.2 | judgment | — | — |
-| 7.3.1 | judgment | — | `clickable-noninteractive` |
-| 7.3.2 | judgment | — | — |
+| 7.3.1 | judgment | — | `clickable-noninteractive`, `dyn-keyboard-unreachable` |
+| 7.3.2 | judgment | — | `dyn-keyboard-unreachable` |
 | 7.4.1 | judgment | — | `on-input-context-change` |
 | 7.5.1 | judgment | — | `dyn-live-region`, `live-region-conflict`, `status-message-not-assertive` |
 | 7.5.2 | judgment | — | `dyn-live-region`, `live-region-conflict`, `status-message-not-assertive` |
@@ -327,13 +327,13 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 11.8.3 | judgment | — | — |
 | 11.9.1 | static | `form-button-empty-name` | `cross-icon-only-unnamed`, `icon-only-control-unnamed` |
 | 11.9.2 | static | `form-label-in-name-mismatch` | — |
-| 11.10.1 | judgment | — | — |
-| 11.10.2 | judgment | — | — |
-| 11.10.3 | judgment | — | `aria-invalid-no-description`, `error-not-associated` |
-| 11.10.4 | judgment | — | `aria-invalid-no-description`, `error-not-associated` |
-| 11.10.5 | judgment | — | — |
-| 11.10.6 | judgment | — | `aria-invalid-no-description`, `error-not-associated` |
-| 11.10.7 | judgment | — | `aria-invalid-no-description`, `error-not-associated` |
+| 11.10.1 | judgment | — | `dyn-error-unassociated` |
+| 11.10.2 | judgment | — | `dyn-error-unassociated` |
+| 11.10.3 | judgment | — | `aria-invalid-no-description`, `dyn-error-unassociated`, `error-not-associated` |
+| 11.10.4 | judgment | — | `aria-invalid-no-description`, `dyn-error-unassociated`, `error-not-associated` |
+| 11.10.5 | judgment | — | `dyn-error-unassociated` |
+| 11.10.6 | judgment | — | `aria-invalid-no-description`, `dyn-error-unassociated`, `error-not-associated` |
+| 11.10.7 | judgment | — | `aria-invalid-no-description`, `dyn-error-unassociated`, `error-not-associated` |
 | 11.11.1 | judgment | — | — |
 | 11.11.2 | judgment | — | — |
 | 11.12.1 | judgment | — | — |
@@ -353,8 +353,8 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 12.6.1 | judgment | — | `axe:landmark-one-main`, `bypass-blocks-missing`, `missing-main-landmark`, `multiple-main-landmark`, `nav-landmark-missing`, `nav-landmark-unnamed` |
 | 12.7.1 | judgment | — | `axe:bypass`, `bypass-blocks-missing` |
 | 12.7.2 | judgment | — | `axe:skip-link`, `bypass-blocks-missing`, `skip-link-target-missing` |
-| 12.8.1 | judgment | — | `axe:tabindex`, `positive-tabindex` |
-| 12.8.2 | judgment | — | — |
+| 12.8.1 | judgment | — | `axe:tabindex`, `dyn-dialog-focus`, `positive-tabindex` |
+| 12.8.2 | judgment | — | `dyn-dialog-focus` |
 | 12.9.1 | judgment | — | `dyn-keyboard-trap` |
 | 12.10.1 | judgment | — | — |
 | 12.11.1 | judgment | — | — |

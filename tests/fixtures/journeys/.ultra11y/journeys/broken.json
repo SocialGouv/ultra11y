@@ -1,0 +1,8 @@
+{
+  "name": "broken",
+  "startUrl": "/#/menu",
+  "steps": [
+    { "action": "click", "target": { "role": "button", "name": "Bouton inexistant" }, "timeoutMs": 1000 },
+    { "action": "click", "target": { "role": "button", "name": "Rubriques" } }
+  ]
+}

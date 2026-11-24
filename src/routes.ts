@@ -135,7 +135,8 @@ export function routeCoverage(input: RouteCoverageInput): RouteCoverage[] {
   }
   for (const p of input.pages ?? []) {
     const row = ensure(p.url);
-    const observed: RouteCoverage["observed"] = p.runner === "scan" ? "scanned" : "captured";
+    // A journey replay is ultra11y's browser too (`journey run`), not the project's E2E run.
+    const observed: RouteCoverage["observed"] = p.runner === "scan" || p.runner === "journey" ? "scanned" : "captured";
     // The strongest observation wins: a route the E2E run captured AND the scan visited is
     // reported as captured, the state the project's own tests built.
     if (ORDER[observed] < ORDER[row.observed] || (observed === row.observed && !row.page)) {
@@ -171,7 +172,7 @@ export function routesToScan(
   opts: { sample?: readonly { url: string }[]; captured?: readonly ObservedPage[]; max?: number },
 ): { scan: string[]; captured: string[]; bounded: string[] } {
   const inSample = new Set((opts.sample ?? []).map((s) => routePath(s.url)));
-  const capturedPaths = new Set((opts.captured ?? []).filter((p) => p.runner !== "scan").map((p) => routePath(p.url)));
+  const capturedPaths = new Set((opts.captured ?? []).filter((p) => p.runner !== "scan" && p.runner !== "journey").map((p) => routePath(p.url)));
   const max = opts.max ?? ALL_ROUTES_MAX;
   const rest: string[] = [];
   const captured: string[] = [];

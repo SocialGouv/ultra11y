@@ -870,7 +870,7 @@ var require_parse = __commonJS({
       }
       const bos = { type: "bos", value: "", output: opts.prepend || "" };
       const tokens = [bos];
-      const capture = opts.capture ? "" : "?:";
+      const capture2 = opts.capture ? "" : "?:";
       const PLATFORM_CHARS = constants.globChars(opts.windows);
       const EXTGLOB_CHARS = constants.extglobChars(PLATFORM_CHARS);
       const {
@@ -888,7 +888,7 @@ var require_parse = __commonJS({
         START_ANCHOR
       } = PLATFORM_CHARS;
       const globstar = (opts2) => {
-        return `(${capture}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
+        return `(${capture2}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
       };
       const nodot = opts.dot ? "" : NO_DOT;
       const qmarkNoDot = opts.dot ? QMARK : QMARK_NO_DOT;
@@ -1224,7 +1224,7 @@ var require_parse = __commonJS({
             prev.value = escaped;
             continue;
           }
-          prev.value = `(${capture}${escaped}|${prev.value})`;
+          prev.value = `(${capture2}${escaped}|${prev.value})`;
           state.output += prev.value;
           continue;
         }
@@ -1570,7 +1570,7 @@ var require_parse = __commonJS({
       } = constants.globChars(opts.windows);
       const nodot = opts.dot ? NO_DOTS : NO_DOT;
       const slashDot = opts.dot ? NO_DOTS_SLASH : NO_DOT;
-      const capture = opts.capture ? "" : "?:";
+      const capture2 = opts.capture ? "" : "?:";
       const state = { negated: false, prefix: "" };
       let star = opts.bash === true ? ".*?" : STAR;
       if (opts.capture) {
@@ -1578,7 +1578,7 @@ var require_parse = __commonJS({
       }
       const globstar = (opts2) => {
         if (opts2.noglobstar === true) return star;
-        return `(${capture}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
+        return `(${capture2}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
       };
       const create = (str) => {
         switch (str) {
@@ -2632,8 +2632,8 @@ var require_ignore = __commonJS({
 });
 
 // src/cli.ts
-import { realpathSync as realpathSync6, writeFileSync as writeFileSync17, mkdirSync as mkdirSync17, existsSync as existsSync32, copyFileSync as copyFileSync4 } from "fs";
-import { join as join32, relative as relative10, resolve as resolve14, dirname as dirname18 } from "path";
+import { realpathSync as realpathSync6, writeFileSync as writeFileSync18, mkdirSync as mkdirSync18, existsSync as existsSync34, copyFileSync as copyFileSync4 } from "fs";
+import { join as join34, relative as relative10, resolve as resolve15, dirname as dirname19 } from "path";
 import { fileURLToPath as fileURLToPath4, pathToFileURL } from "url";
 
 // src/types.ts
@@ -23615,8 +23615,8 @@ function parseSourceWithAst(source, file, opts = {}) {
   const htmlSource = isAstro ? splitAstroFrontmatter(source).blanked : source;
   const doc = parseHtml(htmlSource, file, false, kind === "sfc");
   if (kind === "html") {
-    const capture = parseCaptureProvenance(source);
-    if (capture) doc.capture = capture;
+    const capture2 = parseCaptureProvenance(source);
+    if (capture2) doc.capture = capture2;
   }
   return { doc, ast: null };
 }
@@ -23677,6 +23677,10 @@ var PROBE_DEFAULTS = {
   actionTimeoutMs: 1e3,
   budgetMs: 2e4
 };
+function probeDeadline(budgetMs, now = Date.now) {
+  const end = now() + budgetMs;
+  return { out: () => now() >= end, left: () => Math.max(0, end - now()) };
+}
 function actionTimeout(limits, deadline) {
   const left = deadline ? deadline.left() : limits.actionTimeoutMs;
   return Math.max(1, Math.min(limits.actionTimeoutMs, left || limits.actionTimeoutMs));
@@ -24305,6 +24309,144 @@ async function probeHoverWalk(page, limits = PROBE_DEFAULTS, deadline) {
   const why = cutShort ?? (typeof capped === "number" && capped > triggers.length ? `only ${triggers.length} of the ${capped} hover triggers on this page were tagged \u2014 the rest were never opened` : void 0) ?? (unreachable > 0 ? `${unreachable} hover trigger(s) never became actionable, so their content was never opened or dismissed` : void 0);
   return { hits, complete: !why, ...why ? { why } : {} };
 }
+async function runLiveProbes(page, opts = {}) {
+  const limits = { ...PROBE_DEFAULTS, ...opts.limits };
+  const only = opts.only?.length ? new Set(opts.only) : null;
+  const want = (id) => only === null || only.has(id);
+  const deadline = probeDeadline(limits.budgetMs);
+  const canResize = typeof page.setViewportSize === "function" && typeof page.viewportSize === "function";
+  const canType = !!page.keyboard && typeof page.keyboard.press === "function";
+  const canHover = typeof page.hover === "function" && typeof page.waitForTimeout === "function";
+  const canStyle = typeof page.addStyleTag === "function";
+  const size = canResize ? page.viewportSize() ?? null : null;
+  const restore = size ?? { width: 1280, height: 900 };
+  const out = {
+    v: PROBES_VERSION,
+    focusVisible: [],
+    hover: [],
+    keyboardTrap: [],
+    reflowZoom: [],
+    textSpacing: [],
+    reflow: { horizontalScroll: false },
+    probed: [],
+    skipped: []
+  };
+  const skip = (sc, why) => {
+    out.skipped?.push({ sc, why });
+  };
+  const bounded = async (sc, run) => {
+    if (deadline.out()) {
+      skip(sc, `the probe budget of ${limits.budgetMs}ms was already spent when this criterion came up`);
+      return null;
+    }
+    let timer;
+    const CUT = /* @__PURE__ */ Symbol("cut");
+    const started = Date.now();
+    try {
+      const raced = await Promise.race([
+        run().catch((e) => {
+          throw e;
+        }),
+        new Promise((resolve16) => {
+          timer = setTimeout(() => resolve16(CUT), Math.max(1, deadline.left()));
+        })
+      ]);
+      if (raced === CUT) {
+        skip(sc, `the probe budget of ${limits.budgetMs}ms ran out after ${Date.now() - started}ms \u2014 this measurement did not complete`);
+        return null;
+      }
+      return raced;
+    } catch (e) {
+      skip(sc, String(e?.message ?? e).slice(0, 160));
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+  if (!canResize) skip("1.4.10", "the page object cannot resize its viewport");
+  if (!canType) for (const sc of ["2.4.7", "2.1.2"]) skip(sc, "the page object exposes no keyboard");
+  if (!canHover) skip("1.4.13", "the page object cannot hover");
+  if (!canStyle) skip("1.4.12", "the page object cannot inject a stylesheet");
+  if (want("1.4.4")) {
+    const r2 = await bounded("1.4.4", async () => await page.evaluate(REFLOW_ZOOM_PROBE));
+    if (r2) {
+      out.reflowZoom = r2 ?? [];
+      out.probed.push("1.4.4");
+    }
+  }
+  if (want("1.4.10") && canResize) {
+    const narrowed = await bounded("1.4.10", async () => {
+      await page.setViewportSize({ width: limits.reflowWidth, height: restore.height });
+      return true;
+    });
+    if (narrowed) {
+      const r2 = await bounded("1.4.10", async () => await page.evaluate(REFLOW_PROBE));
+      await page.setViewportSize(restore).catch(() => {
+      });
+      if (r2) {
+        out.reflow = r2;
+        out.probed.push("1.4.10");
+      }
+    }
+  }
+  if (want("1.4.12") && canStyle) {
+    const based = await bounded("1.4.12", async () => await page.evaluate(TEXT_SPACING_BASELINE_STEP));
+    const handle = based === null ? null : await bounded("1.4.12", () => page.addStyleTag({ content: TEXT_SPACING_CSS }));
+    if (handle) {
+      const r2 = await bounded("1.4.12", async () => await page.evaluate(TEXT_SPACING_PROBE));
+      await page.evaluate(REMOVE_TEXT_SPACING_STEP).catch(() => {
+      });
+      if (r2) {
+        out.textSpacing = r2;
+        out.probed.push("1.4.12");
+      }
+    }
+  }
+  if ((want("2.4.7") || want("2.4.11")) && canType) {
+    const r2 = await bounded("2.4.7", () => probeFocusRing(page, "", limits, deadline));
+    if (r2) {
+      out.focusVisible = r2.visible;
+      out.focusObscured = r2.obscured;
+      for (const sc of ["2.4.7", "2.4.11"]) {
+        if (!want(sc)) continue;
+        if (r2.complete) out.probed.push(sc);
+        else skip(sc, r2.why ?? "the walk of the tab ring did not cross the whole of it");
+      }
+    }
+  }
+  if (want("2.1.2") && canType) {
+    const r2 = await bounded("2.1.2", () => probeKeyboardTrapRing(page, limits, deadline));
+    if (r2) {
+      out.keyboardTrap = r2.hits;
+      if (r2.complete) out.probed.push("2.1.2");
+      else skip("2.1.2", r2.why ?? "the walk of the tab ring did not cross the whole of it");
+    }
+  }
+  if (want("1.4.13") && canHover && canType) {
+    const r2 = await bounded("1.4.13", () => probeHoverWalk(page, limits, deadline));
+    if (r2) {
+      out.hover = r2.hits;
+      if (r2.complete) out.probed.push("1.4.13");
+      else skip("1.4.13", r2.why ?? "the hover pass did not open every trigger on the page");
+    }
+  }
+  if (want("4.1.3") && opts.liveRegion) {
+    const clicks = typeof opts.liveRegion === "object" && opts.liveRegion.clicks === true;
+    const r2 = await bounded("4.1.3", () => probeLiveRegion(page, opts.lang ?? "fr", clicks));
+    if (r2) {
+      out.liveRegion = r2.hits;
+      if (r2.complete) out.probed.push("4.1.3");
+      else skip("4.1.3", r2.why ?? "the live-region pass did not exercise the whole page");
+    }
+  }
+  for (const [bucket, sc] of UNREADABLE_BY_OLDER) {
+    if (out[bucket]?.length) {
+      const at = out.probed.indexOf(sc);
+      if (at >= 0) out.probed.splice(at, 1);
+    }
+  }
+  return out;
+}
 var DESTRUCTIVE_NAME_RE = "\\b(supprim|retir|effac|envoy|valid|confirm|pay|achet|command|delete|remove|eras|clear|send|submit|buy|order)";
 function liveRegionExpr(detail, allowClicks) {
   const d2 = JSON.stringify(detail);
@@ -24449,6 +24591,18 @@ async function probeLiveRegion(page, lang, allowClicks) {
   }
   return { hits, complete: true };
 }
+var REMOVE_TEXT_SPACING_STEP = `(() => {
+  const sheets = Array.from(document.querySelectorAll('style'));
+  for (const s of sheets) {
+    if (s.textContent && s.textContent.indexOf('letter-spacing: 0.12em') >= 0) s.remove();
+  }
+  return true;
+})()`;
+var UNREADABLE_BY_OLDER = [
+  ["focusObscured", "2.4.11"],
+  ["keyboardTrap", "2.1.2"],
+  ["liveRegion", "4.1.3"]
+];
 
 // src/collector.ts
 var COLLECTED_CSS = [
@@ -24525,7 +24679,7 @@ async function waitForLoaded(page, timeoutMs, intervalMs = 150) {
     }
     const waitedMs = Date.now() - started;
     if (!markers.length || waitedMs >= timeoutMs) return { markers, waitedMs };
-    await new Promise((resolve15) => setTimeout(resolve15, Math.min(intervalMs, Math.max(1, timeoutMs - waitedMs))));
+    await new Promise((resolve16) => setTimeout(resolve16, Math.min(intervalMs, Math.max(1, timeoutMs - waitedMs))));
   }
 }
 var LOADING_TIMEOUT_MS = 1e4;
@@ -24695,6 +24849,9 @@ function validateSnapshotMeta(raw) {
     err("meta.loading", "loading must be an array of strings");
   if (m3.sources !== void 0 && (!Array.isArray(m3.sources) || m3.sources.some((s2) => typeof s2 !== "string")))
     err("meta.sources", "sources must be an array of strings");
+  const j = m3.journey;
+  if (j !== void 0 && (typeof j !== "object" || j === null || typeof j.name !== "string" || !Number.isInteger(j.step) || typeof j.action !== "string" || typeof j.keyboard !== "boolean"))
+    err("meta.journey", "journey must be { name: string, step: integer, action: string, keyboard: boolean }");
   if (issues.length) return { ok: false, issues };
   return {
     ok: true,
@@ -24720,7 +24877,8 @@ function validateSnapshotMeta(raw) {
       ...Array.isArray(m3.sources) ? { sources: m3.sources } : {},
       ...typeof m3.notes === "string" ? { notes: m3.notes } : {},
       // Kept only when it says something: an empty list is a page that was ready.
-      ...Array.isArray(m3.loading) && m3.loading.length ? { loading: m3.loading } : {}
+      ...Array.isArray(m3.loading) && m3.loading.length ? { loading: m3.loading } : {},
+      ...j ? { journey: { name: j.name, step: j.step, action: j.action, keyboard: j.keyboard } } : {}
     }
   };
 }
@@ -26080,6 +26238,69 @@ var MSG_CATALOG = {
       en: () => `Verified at render time by axe-core; fix the cited element.`
     }
   },
+  // ---- Journey observations (`journey run`, src/journey-run.ts) ----
+  // Worded once, in the run's language, into the probe hit's `detail` — the same channel the
+  // live probes use — so a snapshot re-audited offline carries the sentence the replay wrote.
+  "journey-keyboard-unreachable": {
+    message: {
+      fr: (p2) => `${p2.control} n'a jamais re\xE7u le focus : ${p2.tabs} appui(s) sur Tab ont parcouru tout l'ordre de tabulation sans l'atteindre. L'\xE9tape \xAB ${p2.step} \xBB n'est pas r\xE9alisable au clavier seul (elle a \xE9t\xE9 jou\xE9e au pointeur pour poursuivre le parcours).`,
+      en: (p2) => `${p2.control} never received focus: ${p2.tabs} Tab press(es) walked the whole tab order without reaching it. The step "${p2.step}" cannot be performed with the keyboard alone (it was played with the pointer so the journey could go on).`
+    },
+    remediation: {
+      fr: () => `Utilisez un \xE9l\xE9ment natif (<button>, <a href>) ou donnez au composant tabindex="0", un r\xF4le et la gestion des touches Entr\xE9e et Espace.`,
+      en: () => `Use a native element (<button>, <a href>), or give the component tabindex="0", a role and Enter/Space key handling.`
+    }
+  },
+  "journey-keyboard-trap": {
+    message: {
+      fr: (p2) => `Pi\xE8ge clavier : le focus reste sur ${p2.region} (${p2.count} \xE9l\xE9ment(s)) \u2014 ni Tab ni Maj+Tab ne permettent d'en sortir, alors que la page compte ${p2.total} \xE9l\xE9ment(s) focalisable(s).`,
+      en: (p2) => `Keyboard trap: focus stays within ${p2.region} (${p2.count} element(s)) \u2014 neither Tab nor Shift+Tab moves it out, while the page has ${p2.total} focusable element(s).`
+    },
+    remediation: {
+      fr: () => `Laissez Tab et Maj+Tab sortir du composant, ou annoncez une touche standard (\xC9chap) qui rend le focus \xE0 la page.`,
+      en: () => `Let Tab and Shift+Tab leave the component, or announce a standard key (Escape) that hands focus back to the page.`
+    }
+  },
+  "journey-dialog-focus-in": {
+    message: {
+      fr: (p2) => `La bo\xEEte de dialogue ${p2.dialog} s'est ouverte, mais le focus est rest\xE9 sur ${p2.focus} : il n'a pas \xE9t\xE9 d\xE9plac\xE9 dans la bo\xEEte.`,
+      en: (p2) => `The dialog ${p2.dialog} opened, but focus stayed on ${p2.focus}: it was not moved into the dialog.`
+    },
+    remediation: {
+      fr: () => `\xC0 l'ouverture, d\xE9placez le focus sur le premier \xE9l\xE9ment pertinent de la bo\xEEte de dialogue (ou sur la bo\xEEte elle-m\xEAme, tabindex="-1").`,
+      en: () => `On opening, move focus to the first relevant element of the dialog (or to the dialog itself, tabindex="-1").`
+    }
+  },
+  "journey-dialog-focus-return": {
+    message: {
+      fr: (p2) => `La bo\xEEte de dialogue ${p2.dialog} s'est ferm\xE9e, mais le focus n'est pas revenu sur ${p2.trigger} qui l'avait ouverte (il est sur ${p2.focus}).`,
+      en: (p2) => `The dialog ${p2.dialog} closed, but focus did not return to ${p2.trigger}, which opened it (it is on ${p2.focus}).`
+    },
+    remediation: {
+      fr: () => `\xC0 la fermeture, rendez le focus \xE0 l'\xE9l\xE9ment qui a ouvert la bo\xEEte de dialogue.`,
+      en: () => `On closing, return focus to the element that opened the dialog.`
+    }
+  },
+  "journey-error-unassociated": {
+    message: {
+      fr: (p2) => `Message d'erreur affich\xE9 apr\xE8s l'action \xAB ${p2.step} \xBB (\xAB ${p2.text} \xBB) sans lien programmatique avec ${p2.field} : ni aria-describedby, ni aria-errormessage, ni <label> ne le relient au champ.`,
+      en: (p2) => `Error message shown after the action "${p2.step}" ("${p2.text}") with no programmatic link to ${p2.field}: no aria-describedby, aria-errormessage or <label> ties it to the field.`
+    },
+    remediation: {
+      fr: () => `Reliez le message au champ par aria-describedby (ou aria-errormessage avec aria-invalid="true"), ou placez-le dans son <label>.`,
+      en: () => `Tie the message to its field with aria-describedby (or aria-errormessage with aria-invalid="true"), or put it inside its <label>.`
+    }
+  },
+  "journey-status-message": {
+    message: {
+      fr: (p2) => `Apr\xE8s l'action \xAB ${p2.step} \xBB, le texte \xAB ${p2.text} \xBB est apparu hors de tout conteneur aria-live (ou role=status|alert|log) \u2014 probablement non restitu\xE9 aux technologies d'assistance.`,
+      en: (p2) => `After the action "${p2.step}", the text "${p2.text}" appeared outside any live region (aria-live / role=status|alert|log) \u2014 likely not announced to assistive technology.`
+    },
+    remediation: {
+      fr: () => `Si ce texte est un message de statut, placez-le dans un conteneur role="status" (ou aria-live="polite") pr\xE9sent avant la mise \xE0 jour.`,
+      en: () => `If this text is a status message, render it inside a role="status" (or aria-live="polite") container that exists before the update.`
+    }
+  },
   "dyn-remediation": {
     // Covers axe-core findings and the residual-criteria probes (focus-visible,
     // text-spacing, hover, reflow-zoom). Their message is authored by the engine
@@ -26972,8 +27193,15 @@ var PROBE_WCAG = {
   // typed value clipped at 200% zoom
   "input-overflow-spacing": "1.4.12",
   // typed value clipped under the WCAG text-spacing override
-  "live-region": "4.1.3"
+  "live-region": "4.1.3",
   // Status Messages — content updated by an interaction outside any live region
+  // Journey observations (`journey run`). Each is measured on a state a replayed journey built.
+  "keyboard-unreachable": "2.1.1",
+  // Keyboard — Tab walked the whole ring and never reached the control
+  "dialog-focus": "2.4.3",
+  // Focus Order — focus not moved into an opened dialog, or not returned to its trigger
+  "error-unassociated": "3.3.1"
+  // Error Identification — an error shown after a submit, tied to no field
 };
 var PROBE_SEVERITY = {
   "focus-visible": "majeur",
@@ -26994,7 +27222,13 @@ var PROBE_SEVERITY = {
   "input-overflow-reflow": "majeur",
   "input-overflow-zoom": "majeur",
   "input-overflow-spacing": "majeur",
-  "live-region": "mineur"
+  "live-region": "mineur",
+  // A control the keyboard cannot reach is a function a keyboard user cannot perform at all —
+  // the journey only went on because the replay fell back on the pointer.
+  "keyboard-unreachable": "bloquant",
+  "dialog-focus": "majeur",
+  // Same severity as the static twin (`error-not-associated`), which reads the same defect in source.
+  "error-unassociated": "majeur"
 };
 var AXE_WCAG = {
   // images
@@ -30024,7 +30258,7 @@ var rgaa_default = {
       ],
       wcag: ["1.3.1", "2.1.1", "2.4.7"],
       appliesTo: {
-        ruleIds: ["clickable-noninteractive"]
+        ruleIds: ["clickable-noninteractive", "dyn-keyboard-unreachable"]
       },
       automation: {
         tests: {
@@ -30035,6 +30269,12 @@ var rgaa_default = {
           {
             id: "clickable-noninteractive",
             tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "dyn-keyboard-unreachable",
+            tests: ["1", "2"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           }
@@ -32164,7 +32404,7 @@ var rgaa_default = {
       ],
       wcag: ["3.3.1", "3.3.2"],
       appliesTo: {
-        ruleIds: ["aria-invalid-no-description", "error-not-associated"]
+        ruleIds: ["aria-invalid-no-description", "dyn-error-unassociated", "error-not-associated"]
       },
       automation: {
         tests: {
@@ -32180,6 +32420,12 @@ var rgaa_default = {
           {
             id: "aria-invalid-no-description",
             tests: ["3", "4", "6", "7"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "dyn-error-unassociated",
+            tests: ["1", "2", "3", "4", "5", "6", "7"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
@@ -32672,7 +32918,7 @@ var rgaa_default = {
       techniques: ["G59", "H4", "F44", "F85", "SCR26", "SCR27", "SCR37", "C27"],
       wcag: ["2.4.3"],
       appliesTo: {
-        ruleIds: ["axe:tabindex", "positive-tabindex"]
+        ruleIds: ["axe:tabindex", "dyn-dialog-focus", "positive-tabindex"]
       },
       automation: {
         tests: {
@@ -32683,6 +32929,12 @@ var rgaa_default = {
           {
             id: "axe:tabindex",
             tests: ["1"],
+            effect: "candidate",
+            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "dyn-dialog-focus",
+            tests: ["1", "2"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
           },
@@ -34718,15 +34970,15 @@ function ownRenderedText(doc, el) {
   return el.children.filter((c) => c.type === "text").map((c) => renderedData(doc, c.data)).join("").replace(/\s+/g, " ").trim();
 }
 function renderedText(doc, el) {
-  const walk3 = (e) => {
+  const walk4 = (e) => {
     let out = "";
     for (const c of e.children) {
       if (c.type === "text") out += renderedData(doc, c.data);
-      else if (!NON_RENDERED_TAGS.has(c.tag)) out += walk3(c);
+      else if (!NON_RENDERED_TAGS.has(c.tag)) out += walk4(c);
     }
     return out;
   };
-  return inNonRendered(el) ? "" : walk3(el);
+  return inNonRendered(el) ? "" : walk4(el);
 }
 var rt = (doc, el, n = 60) => renderedText(doc, el).replace(/\s+/g, " ").trim().slice(0, n);
 var TEXT_PROP = /^(?:label|title|subtitle|description|desc|hint|hinttext|text|legend|message|caption|heading|helper|helpertext|instructiontext|content|placeholder|tooltip|summary|detail|details|explanation|notice)$/i;
@@ -36736,7 +36988,7 @@ function labelledbyResolvesEmpty(el, doc) {
 }
 function nameFromContent(el, doc, includeHiddenSubtree = false) {
   let out = "";
-  const walk3 = (n) => {
+  const walk4 = (n) => {
     if (n.type === "text") {
       out += n.data;
       return;
@@ -36762,23 +37014,23 @@ function nameFromContent(el, doc, includeHiddenSubtree = false) {
       }
       return;
     }
-    for (const c of n.children) walk3(c);
+    for (const c of n.children) walk4(c);
   };
-  for (const c of el.children) walk3(c);
+  for (const c of el.children) walk4(c);
   return collapse(out);
 }
 function visibleLabelText(el) {
   let out = "";
   const nonText = /* @__PURE__ */ new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img"]);
-  const walk3 = (n) => {
+  const walk4 = (n) => {
     if (n.type === "text") {
       out += n.data;
       return;
     }
     if (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true" || nonText.has(n.tag)) return;
-    for (const child of n.children) walk3(child);
+    for (const child of n.children) walk4(child);
   };
-  for (const child of el.children) walk3(child);
+  for (const child of el.children) walk4(child);
   if (isButtonInput(el)) {
     const value = (attr(el, "value") ?? "").trim();
     if (value && !value.includes("{")) out += ` ${value}`;
@@ -36792,30 +37044,30 @@ function primaryLabelText(label) {
   if ([label, ...ancestors(label)].some((e) => VISUALLY_HIDDEN_CLASS2.test(attr(e, "class") ?? ""))) return "";
   let out = "";
   const nonText = /* @__PURE__ */ new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img", "svg"]);
-  const walk3 = (n) => {
+  const walk4 = (n) => {
     if (n.type === "text") {
       out += n.data;
       return;
     }
     if (isLocallyDisplayHidden(n) || attr(n, "aria-hidden") === "true" || nonText.has(n.tag) || FIELD_DESCENDANT.has(n.tag)) return;
     if (NOT_INTITULE_CLASS.test(attr(n, "class") ?? "")) return;
-    for (const child of n.children) walk3(child);
+    for (const child of n.children) walk4(child);
   };
-  for (const child of label.children) walk3(child);
+  for (const child of label.children) walk4(child);
   return collapse(out);
 }
 function visuallyRenderedText(el) {
   let out = "";
   const nonText = /* @__PURE__ */ new Set(["script", "style", "title", "desc", "noscript", "template", "canvas", "video", "img"]);
-  const walk3 = (n) => {
+  const walk4 = (n) => {
     if (n.type === "text") {
       out += n.data;
       return;
     }
     if (isLocallyDisplayHidden(n) || nonText.has(n.tag)) return;
-    for (const child of n.children) walk3(child);
+    for (const child of n.children) walk4(child);
   };
-  for (const child of el.children) walk3(child);
+  for (const child of el.children) walk4(child);
   return collapse(out);
 }
 function labelledbyIsDynamic(el) {
@@ -37602,12 +37854,12 @@ function ownedElements(el, doc) {
     if (isHiddenFromAT(c) || c.tag === "script" || c.tag === "template" || c.tag === "style") return;
     const explicit = (attr(c, "role") ?? "").trim().toLowerCase().split(/\s+/)[0] ?? "";
     if (explicit === "group") {
-      walk3(c);
+      walk4(c);
       return;
     }
     if (explicit === "none" || explicit === "presentation" || explicit === "generic" || !explicit && GENERIC_TAGS.has(c.tag)) {
       if (!explicit && Object.keys(c.attribs).some((k) => k.startsWith("aria-"))) out.push({ el: c, role: "?" });
-      else walk3(c);
+      else walk4(c);
       return;
     }
     if (!isIntrinsic(c.tag)) {
@@ -37616,10 +37868,10 @@ function ownedElements(el, doc) {
     }
     out.push({ el: c, role: explicit && VALID_ROLES.has(explicit) ? explicit : nativeOwnedRole(c) ?? "?" });
   };
-  const walk3 = (n) => {
+  const walk4 = (n) => {
     for (const c of n.children) if (c.type === "element") visit(c);
   };
-  walk3(el);
+  walk4(el);
   const owns = attr(el, "aria-owns");
   if (owns !== void 0) {
     if (owns.includes("{") || doc.kind !== "html") return void 0;
@@ -38284,14 +38536,14 @@ function primarySubtagUnregistered(lang) {
   return false;
 }
 function governsText(el) {
-  const walk3 = (n) => {
+  const walk4 = (n) => {
     if (n.type === "text") return n.data.trim() !== "";
     if (hasAttr(n, "lang")) return false;
     if (isDisplayHidden(n)) return false;
     if (n.tag === "img") return (attr(n, "alt") ?? "").trim() !== "" && attr(n, "aria-hidden") !== "true";
-    return n.children.some(walk3);
+    return n.children.some(walk4);
   };
-  return el.children.some(walk3);
+  return el.children.some(walk4);
 }
 function boundToExpression(doc, value) {
   const expressive = doc.kind === "jsx-ast" || doc.kind === "jsx-lossy" || doc.kind === "sfc";
@@ -43522,7 +43774,7 @@ function collectPages(doc, catalog) {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   let complete = true;
-  const walk3 = (node, inherited, depth) => {
+  const walk4 = (node, inherited, depth) => {
     if (!node) {
       complete = false;
       return;
@@ -43541,9 +43793,9 @@ function collectPages(doc, catalog) {
       return;
     }
     if (!kids && node.has("Kids")) complete = false;
-    for (const k of kids ?? []) walk3(doc.dict(k), resources, depth + 1);
+    for (const k of kids ?? []) walk4(doc.dict(k), resources, depth + 1);
   };
-  walk3(doc.dict(catalog.get("Pages")), void 0, 0);
+  walk4(doc.dict(catalog.get("Pages")), void 0, 0);
   return { pages: out, complete };
 }
 var TEXT_OPS2 = /* @__PURE__ */ new Set(["Tj", "TJ", "'", '"']);
@@ -44504,7 +44756,11 @@ function probeFindings(probes, file, page) {
     ["liveRegion", "live-region"],
     ["inputOverflowReflow", "input-overflow-reflow"],
     ["inputOverflowZoom", "input-overflow-zoom"],
-    ["inputOverflowSpacing", "input-overflow-spacing"]
+    ["inputOverflowSpacing", "input-overflow-spacing"],
+    // What a replayed journey observed on the state this snapshot holds (`journey run`).
+    ["keyboardUnreachable", "keyboard-unreachable"],
+    ["dialogFocus", "dialog-focus"],
+    ["errorUnassociated", "error-unassociated"]
   ];
   for (const [key2, engine] of buckets) {
     const hits = probes[key2];
@@ -49306,10 +49562,10 @@ function tagSecondary(f2, note) {
   return { ...f2, secondary: note ? { note } : {} };
 }
 function applySecondaryMappings(base, pc, enabled, sources, defaultLocale) {
-  const active = enabled.filter((m3) => m3.criterion === pc.id);
-  if (!active.length) return base;
+  const active2 = enabled.filter((m3) => m3.criterion === pc.id);
+  if (!active2.length) return base;
   const added = [];
-  for (const m3 of active) for (const f2 of sources) if (f2.ruleId === m3.ruleId) added.push(tagSecondary(f2, pickLocale(m3.note, defaultLocale)));
+  for (const m3 of active2) for (const f2 of sources) if (f2.ruleId === m3.ruleId) added.push(tagSecondary(f2, pickLocale(m3.note, defaultLocale)));
   if (!added.length) return base;
   const findings = [...base.findings, ...added];
   if (added.some((f2) => !f2.advisory))
@@ -51380,6 +51636,13 @@ var L6 = {
     },
     routeWhy: (reason, detail) => reason === "redirect" ? `redirig\xE9e vers ${detail ?? "une autre adresse"}` : reason === "http-status" ? `a r\xE9pondu HTTP ${detail ?? "?"}` : reason === "error" ? `\xE9chec du navigateur${detail ? ` : ${detail}` : ""}` : `au-del\xE0 de --max-routes${detail ? ` ${detail}` : ""}`,
     routesTodo: (n) => `${n} route(s) non atteinte(s). Pour les couvrir : \`ultra11y scan --sample --all-routes --merge <audit.json>\`, ou un test Playwright avec \`ultra11y/playwright\` pour celles qui exigent un \xE9tat (session, parcours).`,
+    annexJourneysTitle: "H. Parcours utilisateur \u2014 couverture",
+    journeysIntro: (n, done, failed, notRun) => `${n} parcours \xE9crit(s) dans \`.ultra11y/journeys/\` et rejou\xE9(s) par \`ultra11y journey run\` (axe-core et sondes \xE0 chaque \xE9tape) : ${done} termin\xE9(s), ${failed} en \xE9chec avec la raison, ${notRun} non jou\xE9(s). Chaque \xE9tape est list\xE9e, avec l'\xE9tat de page enregistr\xE9 ; aucune n'est omise.`,
+    journeysHead: "| Parcours | \xC9tape | Action | Statut | Page | Remarque |",
+    journeyStatus: { done: "termin\xE9e", failed: "en \xE9chec", "not-run": "non jou\xE9e" },
+    journeyKeyboard: (k) => k === "focus" ? "atteinte au clavier" : k === "unreachable" ? "non atteignable au clavier \u2014 jou\xE9e au pointeur" : "pi\xE8ge clavier sur le chemin \u2014 jou\xE9e au pointeur",
+    journeyMode: (keyboard) => keyboard ? "clavier seul" : "pointeur",
+    journeysTodo: (n) => `${n} parcours non termin\xE9(s). Corrigez l'\xE9tape en \xE9chec (ou le localisateur), puis \`ultra11y journey run <nom> --keyboard --merge <audit.json>\`.`,
     annexRendersTitle: "G. Composants rendus par le moteur ultra11y",
     rendersIntro: (n, rendered, skipped, notAttempted, tools) => `${n} unit\xE9(s) trouv\xE9e(s) dans le code (composants export\xE9s, pages du framework, stories) : ${rendered} rendue(s), ${skipped} en \xE9chec avec la raison, ${notAttempted} non tent\xE9e(s)${tools ? ` \u2014 ${tools}` : ""}. Le react-dom/server du projet rend, hors de ses tests, les composants qui ne prennent pas de props et les stories avec leurs args ; un composant qui prend des props n'est rendu que par ses stories. Aucun fichier de test ni instantan\xE9 n'est lu. Un rendu serveur ne calcule aucun style (\`styles="none"\`) : les crit\xE8res de rendu restent \xE0 \xE9valuer sur ces captures.`,
     rendersHead: "| Unit\xE9 | Fichier | Type | Statut | Raison |",
@@ -51614,6 +51877,13 @@ var L6 = {
     },
     routeWhy: (reason, detail) => reason === "redirect" ? `redirected to ${detail ?? "another address"}` : reason === "http-status" ? `answered HTTP ${detail ?? "?"}` : reason === "error" ? `the browser failed${detail ? `: ${detail}` : ""}` : `beyond --max-routes${detail ? ` ${detail}` : ""}`,
     routesTodo: (n) => `${n} route(s) not reached. To cover them: \`ultra11y scan --sample --all-routes --merge <audit.json>\`, or a Playwright test with \`ultra11y/playwright\` for those that need a state (a session, a funnel).`,
+    annexJourneysTitle: "H. User journeys \u2014 coverage",
+    journeysIntro: (n, done, failed, notRun) => `${n} journey(s) written in \`.ultra11y/journeys/\` and replayed by \`ultra11y journey run\` (axe-core and the probes at every step): ${done} done, ${failed} failed with the reason, ${notRun} not run. Every step is listed, with the page state it recorded; none is omitted.`,
+    journeysHead: "| Journey | Step | Action | Status | Page | Note |",
+    journeyStatus: { done: "done", failed: "failed", "not-run": "not run" },
+    journeyKeyboard: (k) => k === "focus" ? "reached with the keyboard" : k === "unreachable" ? "not reachable by keyboard \u2014 played with the pointer" : "keyboard trap on the way \u2014 played with the pointer",
+    journeyMode: (keyboard) => keyboard ? "keyboard only" : "pointer",
+    journeysTodo: (n) => `${n} journey(s) not completed. Fix the failing step (or its locator), then \`ultra11y journey run <name> --keyboard --merge <audit.json>\`.`,
     annexRendersTitle: "G. Components rendered by ultra11y's engine",
     rendersIntro: (n, rendered, skipped, notAttempted, tools) => `${n} unit(s) found in the code (exported components, framework pages, stories): ${rendered} rendered, ${skipped} failed with the reason, ${notAttempted} not attempted${tools ? ` \u2014 ${tools}` : ""}. The project's own react-dom/server renders, outside its tests, the components that take no props and the stories with their args; a component that takes props is rendered through its stories only. No test file or snapshot is read. A server render computes no style (\`styles="none"\`): the rendering criteria stay to assess on these captures.`,
     rendersHead: "| Unit | File | Kind | Status | Reason |",
@@ -52450,6 +52720,7 @@ function render(r2, lang, opts) {
   ax.push(...exhaustiveGrid(opts.groups, opts.standard, lang, s2.annexGridTitle));
   if (r2.scope.routes?.length) ax.push("", ...renderRoutes(r2.scope.routes, lang));
   if (r2.scope.renders?.units.length) ax.push("", ...renderRenderUnits(r2.scope.renders, lang));
+  if (r2.scope.journeys?.journeys.length) ax.push("", ...renderJourneys(r2.scope.journeys, lang));
   return { report: out.join("\n"), annex: ax.join("\n"), reportFile, annexFile };
 }
 function renderRoutes(routes, lang) {
@@ -52463,6 +52734,40 @@ function renderRoutes(routes, lang) {
   const missing = routes.filter((r2) => r2.observed === "not-reached").length;
   out.push("");
   if (missing) out.push(`> ${s2.routesTodo(missing)}`, "");
+  return out;
+}
+function renderJourneys(journeys, lang) {
+  const s2 = L6[lang];
+  const cell2 = (t3) => t3.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const list = journeys.journeys;
+  const count = (st) => list.filter((j) => j.status === st).length;
+  const out = [
+    `## ${s2.annexJourneysTitle}`,
+    "",
+    s2.journeysIntro(list.length, count("done"), count("failed"), count("not-run")),
+    "",
+    s2.journeysHead,
+    "|---|---|---|---|---|---|"
+  ];
+  for (const j of list) {
+    out.push(
+      `| **${cell2(j.name)}** (${s2.journeyMode(j.keyboard)}) | \u2014 | \`${cell2(j.file)}\` | ${s2.journeyStatus[j.status] ?? j.status} | \u2014 | ${j.reason ? cell2(j.reason) : ""} |`
+    );
+    for (const st of j.steps) {
+      const note = [
+        st.reason,
+        st.keyboard && st.keyboard !== "focus" ? s2.journeyKeyboard(st.keyboard) : "",
+        st.observed?.length ? st.observed.join(", ") : "",
+        st.note
+      ].filter(Boolean).join(" \u2014 ");
+      out.push(
+        `| ${cell2(j.name)} | ${st.n} | ${cell2(st.label)} | ${s2.journeyStatus[st.status] ?? st.status} | ${st.page ? `\`${cell2(st.page)}\`` : "\u2014"} | ${cell2(note)} |`
+      );
+    }
+  }
+  out.push("");
+  const open = count("failed") + count("not-run");
+  if (open) out.push(`> ${s2.journeysTodo(open)}`, "");
   return out;
 }
 function renderReasonLabel(reason, lang) {
@@ -58060,6 +58365,9 @@ function probesOf(out) {
     ...out.inputOverflowReflow ? { inputOverflowReflow: out.inputOverflowReflow } : {},
     ...out.inputOverflowZoom ? { inputOverflowZoom: out.inputOverflowZoom } : {},
     ...out.inputOverflowSpacing ? { inputOverflowSpacing: out.inputOverflowSpacing } : {},
+    ...out.keyboardUnreachable?.length ? { keyboardUnreachable: out.keyboardUnreachable } : {},
+    ...out.dialogFocus?.length ? { dialogFocus: out.dialogFocus } : {},
+    ...out.errorUnassociated?.length ? { errorUnassociated: out.errorUnassociated } : {},
     reflow: out.reflow,
     // The contract this file is written under, so a future reader knows what `probed` means
     // here (src/probes.ts PROBES_VERSION).
@@ -58070,7 +58378,7 @@ function probesOf(out) {
     ...out.skipped?.length ? { skipped: out.skipped } : {}
   };
 }
-function writeRunnerSnapshot(root, out, target, page) {
+function writeRunnerSnapshot(root, out, target, page, extra = {}) {
   const collected = out.snapshot;
   if (!collected?.dom) return void 0;
   const url = page?.url ?? hostPageOf(out.url ?? collected.url, target);
@@ -58081,7 +58389,8 @@ function writeRunnerSnapshot(root, out, target, page) {
     id,
     name,
     url,
-    runner: "scan",
+    runner: extra.runner ?? "scan",
+    ...extra.journey ? { journey: extra.journey } : {},
     ...collected.viewport ? { viewport: collected.viewport } : {},
     // The doctype, which `dom` cannot carry: `documentElement.outerHTML` starts at <html>.
     // The collector reads it and every OTHER producer forwards it; this one dropped it, so a
@@ -58145,7 +58454,10 @@ var PROBE_FIELDS = [
   { key: "inputOverflowReflow", engine: "input-overflow-reflow" },
   { key: "inputOverflowZoom", engine: "input-overflow-zoom" },
   { key: "inputOverflowSpacing", engine: "input-overflow-spacing" },
-  { key: "liveRegion", engine: "live-region" }
+  { key: "liveRegion", engine: "live-region" },
+  { key: "keyboardUnreachable", engine: "keyboard-unreachable" },
+  { key: "dialogFocus", engine: "dialog-focus" },
+  { key: "errorUnassociated", engine: "error-unassociated" }
 ];
 function hostPageOf(url, target) {
   if (!url) return target;
@@ -58556,7 +58868,7 @@ function routeCoverage(input) {
   }
   for (const p2 of input.pages ?? []) {
     const row = ensure(p2.url);
-    const observed = p2.runner === "scan" ? "scanned" : "captured";
+    const observed = p2.runner === "scan" || p2.runner === "journey" ? "scanned" : "captured";
     if (ORDER[observed] < ORDER[row.observed] || observed === row.observed && !row.page) {
       row.observed = observed;
       if (p2.id) row.page = p2.id;
@@ -58581,7 +58893,7 @@ function routeCounts(rows) {
 }
 function routesToScan(inventory, opts) {
   const inSample = new Set((opts.sample ?? []).map((s2) => routePath(s2.url)));
-  const capturedPaths = new Set((opts.captured ?? []).filter((p2) => p2.runner !== "scan").map((p2) => routePath(p2.url)));
+  const capturedPaths = new Set((opts.captured ?? []).filter((p2) => p2.runner !== "scan" && p2.runner !== "journey").map((p2) => routePath(p2.url)));
   const max = opts.max ?? ALL_ROUTES_MAX;
   const rest = [];
   const captured = [];
@@ -63364,6 +63676,797 @@ ${xs.map(line).join("\n")}` : t3.none;
   ].join("\n");
 }
 
+// src/journey.ts
+import { existsSync as existsSync32, mkdirSync as mkdirSync17, readFileSync as readFileSync26, readdirSync as readdirSync4, writeFileSync as writeFileSync17 } from "fs";
+import { dirname as dirname18, join as join32 } from "path";
+var JOURNEYS_DIR = ".ultra11y/journeys";
+var JOURNEY_RUNS_FILE = ".ultra11y/journey-runs.json";
+var JOURNEY_ACTIONS = ["goto", "click", "fill", "select", "check", "press", "waitFor", "expect"];
+var NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
+var MAX_STEPS = 200;
+var MAX_TIMEOUT = 6e4;
+var TOP_KEYS = /* @__PURE__ */ new Set(["$schema", "name", "description", "startUrl", "storageState", "keyboardOnly", "steps"]);
+var STEP_KEYS = /* @__PURE__ */ new Set(["action", "target", "value", "url", "key", "state", "timeoutMs", "note"]);
+var STATES = /* @__PURE__ */ new Set(["visible", "hidden", "attached", "detached"]);
+var NEEDS_TARGET = /* @__PURE__ */ new Set(["click", "fill", "select", "check", "waitFor", "expect"]);
+var isObj = (v2) => typeof v2 === "object" && v2 !== null && !Array.isArray(v2);
+var nonEmpty = (v2) => typeof v2 === "string" && v2.trim().length > 0;
+function validateTarget(raw, path, err) {
+  if (!isObj(raw)) {
+    err(path, 'target must be an object: { "role", "name"? } | { "label" } | { "text" } | { "css" }');
+    return void 0;
+  }
+  const kinds = ["role", "label", "text", "css"].filter((k) => raw[k] !== void 0);
+  if (kinds.length !== 1) {
+    err(path, `target must name exactly one of role, label, text or css (got ${kinds.length ? kinds.join(" + ") : "none"})`);
+    return void 0;
+  }
+  const kind = kinds[0];
+  const allowed = kind === "role" ? ["role", "name", "exact"] : kind === "css" ? ["css"] : [kind, "exact"];
+  for (const k of Object.keys(raw)) if (!allowed.includes(k)) err(`${path}.${k}`, `unknown key "${k}" for a ${kind} target (allowed: ${allowed.join(", ")})`);
+  if (!nonEmpty(raw[kind])) err(`${path}.${kind}`, `${kind} must be a non-empty string`);
+  if (raw.name !== void 0 && !nonEmpty(raw.name)) err(`${path}.name`, "name must be a non-empty string");
+  if (raw.exact !== void 0 && typeof raw.exact !== "boolean") err(`${path}.exact`, "exact must be a boolean");
+  return raw;
+}
+function validateJourney(raw) {
+  const issues = [];
+  const err = (path, message) => {
+    issues.push({ path, message });
+  };
+  if (!isObj(raw)) {
+    err("", "a journey must be a JSON object { name, startUrl, steps: [...] }");
+    return { ok: false, issues };
+  }
+  for (const k of Object.keys(raw)) if (!TOP_KEYS.has(k)) err(k, `unknown key "${k}" (allowed: ${[...TOP_KEYS].join(", ")})`);
+  if (!nonEmpty(raw.name)) err("name", "name must be a non-empty string");
+  else if (!NAME_RE.test(raw.name)) err("name", `name "${raw.name}" must match ${NAME_RE} (it prefixes the snapshot ids of its steps)`);
+  if (!nonEmpty(raw.startUrl)) err("startUrl", "startUrl must be a non-empty string (an http(s) URL, or a path resolved against --base-url)");
+  if (raw.storageState !== void 0 && !nonEmpty(raw.storageState)) err("storageState", "storageState must be a non-empty path");
+  if (raw.keyboardOnly !== void 0 && typeof raw.keyboardOnly !== "boolean") err("keyboardOnly", "keyboardOnly must be a boolean");
+  if (raw.description !== void 0 && typeof raw.description !== "string") err("description", "description must be a string");
+  if (!Array.isArray(raw.steps) || raw.steps.length === 0) err("steps", "steps must be a non-empty array");
+  else if (raw.steps.length > MAX_STEPS) err("steps", `a journey holds at most ${MAX_STEPS} steps (got ${raw.steps.length}); split it`);
+  else
+    raw.steps.forEach((s2, i) => {
+      const at = `steps[${i}]`;
+      if (!isObj(s2)) {
+        err(at, "a step must be an object { action, target?, value?, url?, key?, \u2026 }");
+        return;
+      }
+      for (const k of Object.keys(s2)) if (!STEP_KEYS.has(k)) err(`${at}.${k}`, `unknown key "${k}" (allowed: ${[...STEP_KEYS].join(", ")})`);
+      const action = s2.action;
+      if (!JOURNEY_ACTIONS.includes(String(s2.action))) {
+        err(`${at}.action`, `action must be one of ${JOURNEY_ACTIONS.join(", ")} (got ${JSON.stringify(s2.action)})`);
+        return;
+      }
+      if (NEEDS_TARGET.has(action)) {
+        if (s2.target === void 0) err(`${at}.target`, `a ${action} step needs a target`);
+        else validateTarget(s2.target, `${at}.target`, err);
+      } else if (s2.target !== void 0) {
+        if (action === "goto") err(`${at}.target`, "a goto step takes a url, not a target");
+        else validateTarget(s2.target, `${at}.target`, err);
+      }
+      if (action === "goto" && !nonEmpty(s2.url)) err(`${at}.url`, "a goto step needs a url");
+      if (action !== "goto" && s2.url !== void 0) err(`${at}.url`, `url belongs to a goto step, not a ${action} step`);
+      if ((action === "fill" || action === "select") && typeof s2.value !== "string") err(`${at}.value`, `a ${action} step needs a string value`);
+      if (action !== "fill" && action !== "select" && s2.value !== void 0) err(`${at}.value`, `value belongs to a fill or select step, not a ${action} step`);
+      if (action === "press" && !nonEmpty(s2.key)) err(`${at}.key`, 'a press step needs a key (e.g. "Escape", "Enter", "ArrowDown")');
+      if (action !== "press" && s2.key !== void 0) err(`${at}.key`, `key belongs to a press step, not a ${action} step`);
+      if (s2.state !== void 0) {
+        if (action !== "waitFor" && action !== "expect") err(`${at}.state`, `state belongs to a waitFor or expect step, not a ${action} step`);
+        else if (!STATES.has(String(s2.state))) err(`${at}.state`, `state must be one of ${[...STATES].join(", ")}`);
+      }
+      if (s2.timeoutMs !== void 0 && (!Number.isInteger(s2.timeoutMs) || s2.timeoutMs <= 0 || s2.timeoutMs > MAX_TIMEOUT))
+        err(`${at}.timeoutMs`, `timeoutMs must be an integer between 1 and ${MAX_TIMEOUT}`);
+      if (s2.note !== void 0 && typeof s2.note !== "string") err(`${at}.note`, "note must be a string");
+    });
+  if (issues.length) return { ok: false, issues };
+  const { $schema: _schema, ...journey } = raw;
+  return { ok: true, issues, journey };
+}
+function targetLabel(t3) {
+  if (!t3) return "";
+  if ("role" in t3) return t3.name ? `${t3.role} "${t3.name}"` : t3.role;
+  if ("label" in t3) return `label "${t3.label}"`;
+  if ("text" in t3) return `text "${t3.text}"`;
+  return `css ${t3.css}`;
+}
+function stepLabel(s2) {
+  if (s2.action === "goto") return `goto ${s2.url}`;
+  if (s2.action === "press") return `press ${s2.key}${s2.target ? ` on ${targetLabel(s2.target)}` : ""}`;
+  const value = s2.action === "fill" || s2.action === "select" ? ` = "${s2.value}"` : "";
+  const state = s2.state && s2.state !== "visible" ? ` (${s2.state})` : "";
+  return `${s2.action} ${targetLabel(s2.target)}${value}${state}`;
+}
+function stepPageId(journey, n, s2) {
+  let words = stepLabel(s2);
+  if (n === 0) words = "start";
+  else if (s2.action === "goto") {
+    try {
+      const u2 = new URL(s2.url ?? "", "http://x.invalid");
+      words = `goto ${u2.pathname}${u2.hash}`;
+    } catch {
+    }
+  }
+  const slug2 = words.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/, "");
+  return `${journey}-${String(n).padStart(2, "0")}${slug2 ? `-${slug2}` : ""}`;
+}
+function listJourneyFiles(root) {
+  const dir = join32(root, JOURNEYS_DIR);
+  if (!existsSync32(dir)) return [];
+  return readdirSync4(dir).filter((f2) => f2.endsWith(".json")).sort().map((f2) => {
+    const file = `${JOURNEYS_DIR}/${f2}`;
+    let validation;
+    try {
+      validation = validateJourney(JSON.parse(readFileSync26(join32(dir, f2), "utf8")));
+    } catch (e) {
+      validation = { ok: false, issues: [{ path: "", message: `not valid JSON: ${e instanceof Error ? e.message : String(e)}` }] };
+    }
+    return { file, base: f2.replace(/\.json$/, ""), validation };
+  });
+}
+function readJourneyRuns(root) {
+  const file = join32(root, JOURNEY_RUNS_FILE);
+  if (!existsSync32(file)) return void 0;
+  try {
+    const raw = JSON.parse(readFileSync26(file, "utf8"));
+    if (!Array.isArray(raw.journeys)) return void 0;
+    return { v: 1, journeys: raw.journeys.filter((j) => isObj(j) && typeof j.name === "string" && Array.isArray(j.steps)) };
+  } catch {
+    return void 0;
+  }
+}
+function writeJourneyRuns(root, records) {
+  const file = join32(root, JOURNEY_RUNS_FILE);
+  const byName = new Map((readJourneyRuns(root)?.journeys ?? []).map((j) => [j.name, j]));
+  for (const r2 of records) byName.set(r2.name, r2);
+  const journeys = [...byName.values()].sort((a2, b) => a2.name.localeCompare(b.name));
+  mkdirSync17(dirname18(file), { recursive: true });
+  writeFileSync17(file, `${JSON.stringify({ v: 1, journeys }, null, 2)}
+`);
+  return file;
+}
+function notRunRecord(file, journey, base, reason) {
+  const steps = (journey?.steps ?? []).map((s2, i) => ({ n: i + 1, action: s2.action, label: stepLabel(s2), status: "not-run" }));
+  return {
+    name: journey?.name ?? base,
+    file,
+    keyboard: journey?.keyboardOnly === true,
+    status: "not-run",
+    ...reason ? { reason } : {},
+    steps
+  };
+}
+function journeyScopeFor(root) {
+  const files = listJourneyFiles(root);
+  const runs = readJourneyRuns(root)?.journeys ?? [];
+  if (!files.length && !runs.length) return void 0;
+  const byName = new Map(runs.map((r2) => [r2.name, r2]));
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const f2 of files) {
+    const j = f2.validation.journey;
+    const name = j?.name ?? f2.base;
+    seen.add(name);
+    if (!j) {
+      out.push(
+        notRunRecord(
+          f2.file,
+          void 0,
+          f2.base,
+          `invalid journey file: ${f2.validation.issues.map((i) => i.path ? `${i.path}: ${i.message}` : i.message).join("; ")}`
+        )
+      );
+      continue;
+    }
+    out.push(byName.get(name) ?? notRunRecord(f2.file, j, f2.base));
+  }
+  for (const r2 of runs) if (!seen.has(r2.name)) out.push(r2);
+  return { manifest: JOURNEY_RUNS_FILE, journeys: out.sort((a2, b) => a2.name.localeCompare(b.name)) };
+}
+
+// src/journey-run.ts
+import { existsSync as existsSync33, readdirSync as readdirSync5, readFileSync as readFileSync27, rmSync as rmSync6 } from "fs";
+import { join as join33, resolve as resolve14 } from "path";
+var JOURNEY_ENGINE = "axe-core@playwright (journey)";
+var DEFAULT_TIMEOUT = 5e3;
+var MAX_TABS = 250;
+var STUCK_AFTER = 3;
+var MAX_FOCUS_LABELS = 40;
+var JOURNEY_LIB = `(() => { ${PRELUDE}
+  if (window.__u11yJ) return true;
+  const ids = new WeakMap(); const byKey = new Map(); let next = 1;
+  const key = (e) => { if (!e || e.nodeType !== 1) return 0; let k = ids.get(e); if (!k) { k = next++; ids.set(e, k); byKey.set(k, e); } return k; };
+  const deep = () => { let a = document.activeElement; while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement; return a; };
+  const isBody = (a) => !a || a === document.body || a === document.documentElement;
+  const squash = (t) => String(t || '').replace(/\\s+/g, ' ').trim();
+  const nameOf = (e) => {
+    const al = e.getAttribute('aria-label'); if (al && al.trim()) return squash(al);
+    const lb = e.getAttribute('aria-labelledby');
+    if (lb) { const t = lb.split(/\\s+/).map((id) => document.getElementById(id)).filter(Boolean).map((n) => n.textContent).join(' '); if (squash(t)) return squash(t); }
+    if (e.labels && e.labels.length) return squash(Array.from(e.labels).map((l) => l.textContent).join(' '));
+    const t = squash(e.innerText || e.textContent); if (t) return t.slice(0, 60);
+    return squash(e.getAttribute('title') || e.getAttribute('placeholder') || e.getAttribute('alt') || '');
+  };
+  const roleOf = (e) => {
+    const r = e.getAttribute('role'); if (r) return r.split(/\\s+/)[0];
+    const t = e.tagName.toLowerCase();
+    if (t === 'a' && e.hasAttribute('href')) return 'link';
+    if (t === 'button' || t === 'summary') return 'button';
+    if (t === 'select') return 'combobox';
+    if (t === 'textarea') return 'textbox';
+    if (t === 'input') { const ty = (e.getAttribute('type') || 'text').toLowerCase(); return ty === 'checkbox' ? 'checkbox' : ty === 'radio' ? 'radio' : (ty === 'submit' || ty === 'button' || ty === 'reset' || ty === 'image') ? 'button' : ty === 'range' ? 'slider' : 'textbox'; }
+    return t;
+  };
+  const label = (e) => { if (isBody(e)) return '<body>'; const n = nameOf(e); return roleOf(e) + (n ? ' "' + n.slice(0, 60) + '"' : ''); };
+  const FOCUSABLE = 'a[href],area[href],button,input:not([type=hidden]),select,textarea,summary,iframe,[contenteditable=""],[contenteditable="true"],[tabindex]';
+  const tabbable = (e) => !e.disabled && !e.closest('[inert]') && e.tabIndex >= 0 && __vis(e);
+  const modalOf = (e) => {
+    for (let n = e; n && n.nodeType === 1; n = n.parentElement) {
+      if (n.tagName === 'DIALOG' && n.open) { try { if (n.matches(':modal')) return n; } catch (_) {} }
+      const r = n.getAttribute('role');
+      if ((r === 'dialog' || r === 'alertdialog') && n.getAttribute('aria-modal') === 'true') return n;
+    }
+    return null;
+  };
+  const openDialogs = () => Array.from(document.querySelectorAll('dialog, [role=dialog], [role=alertdialog]')).filter((d) => (d.tagName !== 'DIALOG' || d.open) && __vis(d));
+  const ERR = '[role=alert],[class*="error" i],[class*="erreur" i],[class*="invalid" i],[id*="error" i],[id*="erreur" i]';
+  const errorCandidates = () => Array.from(document.querySelectorAll(ERR)).filter((e) => {
+    if (/^(input|select|textarea|button|form|fieldset|label|option|body|html)$/i.test(e.tagName)) return false;
+    if (e.querySelector('input,select,textarea,button')) return false;
+    const t = squash(e.innerText || e.textContent);
+    return t.length > 0 && t.length <= 300 && __vis(e);
+  });
+  const isLive = (n) => {
+    for (let el = n && n.nodeType === 1 ? n : (n ? n.parentElement : null); el && el !== document.documentElement; el = el.parentElement) {
+      const live = el.getAttribute('aria-live') || ''; const role = el.getAttribute('role') || '';
+      if (live === 'polite' || live === 'assertive' || role === 'status' || role === 'alert' || role === 'log' || el.tagName === 'OUTPUT') return true;
+    }
+    return false;
+  };
+  const referenced = () => {
+    const s = new Set();
+    for (const el of Array.from(document.querySelectorAll('[aria-describedby],[aria-errormessage]')))
+      for (const a of ['aria-describedby', 'aria-errormessage']) for (const id of (el.getAttribute(a) || '').split(/\\s+/)) if (id) s.add(id);
+    return s;
+  };
+  const associated = (e, ids) => {
+    for (let n = e; n && n.nodeType === 1 && n !== document.body; n = n.parentElement) { if (n.id && ids.has(n.id)) return true; if (n.tagName === 'LABEL') return true; }
+    for (const d of Array.from(e.querySelectorAll('[id]'))) if (ids.has(d.id)) return true;
+    return false;
+  };
+  const fieldNear = (e) => {
+    for (let n = e.parentElement, i = 0; n && i < 3 && n !== document.body; n = n.parentElement, i++) {
+      const f = n.querySelector('input:not([type=hidden]):not([type=submit]):not([type=button]),select,textarea'); if (f) return f;
+    }
+    return document.querySelector('[aria-invalid="true"]');
+  };
+  const S = { trigger: null, dialogs: new Set(), errors: new Set(), records: [], obs: null, stack: [], saved: null };
+  window.__u11yJ = {
+    active() {
+      const a = deep(); const body = isBody(a);
+      const t = document.querySelector('[data-u11y-jt]');
+      return { key: body ? 0 : key(a), label: label(a), body: body, frame: !!(a && a.tagName === 'IFRAME'),
+        role: body ? '' : roleOf(a), onTarget: !!(t && a && (t === a || t.contains(a))), modal: !!(a && !body && modalOf(a)) };
+    },
+    tabbables() { return Array.from(document.querySelectorAll(FOCUSABLE)).filter(tabbable).length; },
+    region(keys) {
+      const els = keys.map((k) => byKey.get(k)).filter((e) => e && e.isConnected);
+      if (!els.length) return null;
+      let anc = els[0];
+      while (anc && !els.every((e) => anc.contains(e))) anc = anc.parentElement;
+      if (!anc || anc === document.body || anc === document.documentElement) anc = els[0];
+      return { selector: __sel(anc), html: __html(anc), label: els.length === 1 ? label(els[0]) : __sel(anc) };
+    },
+    save() { S.saved = deep(); return true; },
+    restore() {
+      const a = S.saved; S.saved = null;
+      try {
+        if (a && !isBody(a) && a.isConnected) a.focus({ preventScroll: true });
+        else {
+          // blur() alone leaves the browser's sequential-navigation starting point where the
+          // probe walk ended, so the next Tab would resume from there: focus the body itself.
+          const had = document.body.hasAttribute('tabindex');
+          if (!had) document.body.setAttribute('tabindex', '-1');
+          document.body.focus({ preventScroll: true });
+          if (!had) document.body.removeAttribute('tabindex');
+        }
+      } catch (_) {}
+      return true;
+    },
+    before() {
+      const t = document.querySelector('[data-u11y-jt]'); const a = deep();
+      S.trigger = t || (isBody(a) ? null : a);
+      S.dialogs = new Set(openDialogs());
+      S.errors = new Set(errorCandidates());
+      S.records = [];
+      if (S.obs) S.obs.disconnect();
+      S.obs = new MutationObserver((m) => { for (const r of m) S.records.push(r); });
+      S.obs.observe(document.body, { subtree: true, childList: true, characterData: true });
+      return true;
+    },
+    after() {
+      const out = { dialogIn: [], dialogReturn: [], errors: [], status: [] };
+      if (S.obs) { S.obs.disconnect(); S.obs = null; }
+      const recs = S.records.splice(0);
+      const a = deep();
+      const now = openDialogs();
+      for (const d of now.filter((x) => !S.dialogs.has(x)).slice(0, 3)) {
+        S.stack.push({ dialog: d, trigger: S.trigger });
+        if (!(a && d.contains(a))) out.dialogIn.push({ selector: __sel(d), html: __html(d), dialog: label(d), focus: label(a) });
+      }
+      for (const d of Array.from(S.dialogs).filter((x) => !now.includes(x))) {
+        const i = S.stack.findIndex((x) => x.dialog === d);
+        if (i < 0) continue;
+        const tr = S.stack[i].trigger; S.stack.splice(i, 1);
+        if (!tr || !tr.isConnected || !__vis(tr)) continue;
+        if (a === tr || (a && tr.contains(a))) continue;
+        out.dialogReturn.push({ selector: __sel(tr), html: __html(tr), dialog: label(d), trigger: label(tr), focus: label(a) });
+      }
+      const ids = referenced();
+      const errsNow = errorCandidates();
+      const fresh = errsNow.filter((e) => !S.errors.has(e) && !errsNow.some((o) => o !== e && e.contains(o)));
+      for (const e of fresh.slice(0, 10)) {
+        if (associated(e, ids) || isLive(e)) continue;
+        const f = fieldNear(e);
+        out.errors.push({ selector: __sel(e), html: __html(e), text: squash(e.innerText || e.textContent).slice(0, 80), field: f ? label(f) : '' });
+      }
+      const target = document.querySelector('[data-u11y-jt]');
+      const ctlId = S.trigger && S.trigger.getAttribute && S.trigger.getAttribute('aria-controls');
+      const controlled = ctlId ? document.getElementById(ctlId) : null;
+      const seen = new Set();
+      for (const r of recs) {
+        if (out.status.length >= 5) break;
+        const nodes = r.type === 'characterData' ? [r.target] : Array.from(r.addedNodes);
+        for (const n of nodes) {
+          const host = n.nodeType === 1 ? n : n.parentElement;
+          if (!host || !host.isConnected) continue;
+          const t = squash(host.innerText || host.textContent);
+          if (!t || t.length > 200) continue;
+          if (isLive(host) || !__vis(host)) continue;
+          if (host.querySelector('a[href],button,input,select,textarea,h1,h2,h3,h4,h5,h6,[tabindex]')) continue;
+          if (now.some((d) => d.contains(host))) continue;
+          if (errsNow.some((e) => e === host || e.contains(host) || host.contains(e))) continue;
+          if (target && (target === host || target.contains(host) || host.contains(target))) continue;
+          if (S.trigger && S.trigger.contains && S.trigger.contains(host)) continue;
+          if (controlled && controlled.contains(host)) continue;
+          const k = __sel(host);
+          if (seen.has(k)) continue;
+          seen.add(k);
+          out.status.push({ selector: k, html: __html(host), text: t.slice(0, 80) });
+          if (out.status.length >= 5) break;
+        }
+      }
+      S.dialogs = new Set(now);
+      return out;
+    },
+  };
+  return true;
+})()`;
+var HAS_LIB = "!!window.__u11yJ";
+var TARGET_INFO = `(() => { ${PRELUDE} const e = document.querySelector('[data-u11y-jt]'); return e ? { selector: __sel(e), html: __html(e) } : null; })()`;
+var UNTAG_TARGET = `(() => { for (const e of Array.from(document.querySelectorAll('[data-u11y-jt]'))) e.removeAttribute('data-u11y-jt'); return true; })()`;
+var STRIP_TAGS = `(() => {
+  for (const e of Array.from(document.querySelectorAll('*'))) {
+    for (const a of Array.from(e.attributes)) if (a.name.indexOf('data-u11y-') === 0) e.removeAttribute(a.name);
+  }
+  return true;
+})()`;
+function locatorFor(page, t3) {
+  if ("role" in t3) return page.getByRole(t3.role, { ...t3.name ? { name: t3.name } : {}, ...t3.exact ? { exact: true } : {} });
+  if ("label" in t3) return page.getByLabel(t3.label, t3.exact ? { exact: true } : {});
+  if ("text" in t3) return page.getByText(t3.text, t3.exact ? { exact: true } : {});
+  return page.locator(t3.css);
+}
+var firstLine2 = (e) => String(e?.message ?? e).split("\n")[0].slice(0, 200);
+async function resolveTarget(page, step, timeout) {
+  const loc = locatorFor(page, step.target);
+  try {
+    await loc.first().waitFor({ state: "visible", timeout });
+  } catch {
+    const n2 = await loc.count().catch(() => 0);
+    return {
+      reason: n2 ? `${targetLabel(step.target)} matched ${n2} element(s), none visible within ${timeout} ms` : `no element matches ${targetLabel(step.target)} within ${timeout} ms (locator not found)`
+    };
+  }
+  const n = await loc.count().catch(() => 1);
+  if (n > 1) return { reason: `${targetLabel(step.target)} matched ${n} elements \u2014 make the target exact ("exact": true) or narrower` };
+  return { loc: loc.first() };
+}
+var active = async (page) => await page.evaluate("window.__u11yJ.active()");
+async function walk3(page, key2, max, leave) {
+  const start = await active(page);
+  const seq = [];
+  const seen = /* @__PURE__ */ new Map();
+  if (!start.body) seen.set(start.key, -1);
+  let prev = start.key;
+  let same = 0;
+  for (let i = 0; i < max; i++) {
+    await page.keyboard.press(key2);
+    const a2 = await active(page);
+    seq.push(a2);
+    if (leave && (a2.body || !leave.has(a2.key))) return { reached: a2.onTarget, seq, stuck: false, cycleFrom: -1, exhausted: false, left: true };
+    if (!leave && a2.onTarget) return { reached: true, seq, stuck: false, cycleFrom: -1, exhausted: false, left: false };
+    if (!a2.body && !a2.frame && a2.key === prev) {
+      same++;
+      if (same >= STUCK_AFTER - 1) return { reached: false, seq, stuck: true, cycleFrom: Math.max(0, seq.length - 1), exhausted: false, left: false };
+    } else same = 0;
+    prev = a2.key;
+    if (!a2.body && !a2.frame) {
+      const at = seen.get(a2.key);
+      if (at !== void 0) return { reached: false, seq, stuck: false, cycleFrom: at + 1, exhausted: false, left: false };
+      seen.set(a2.key, i);
+    }
+  }
+  return { reached: false, seq, stuck: false, cycleFrom: -1, exhausted: true, left: false };
+}
+async function reachByKeyboard(page) {
+  const start = await active(page);
+  const labels = (seq) => {
+    const out = [];
+    for (const a2 of seq) if (out[out.length - 1] !== a2.label) out.push(a2.label);
+    return out.slice(0, MAX_FOCUS_LABELS);
+  };
+  if (start.onTarget) return { kind: "focus", focus: [] };
+  const total = await page.evaluate("window.__u11yJ.tabbables()").catch(() => 0);
+  const max = Math.min(MAX_TABS, total * 2 + 10);
+  const fwd = await walk3(page, "Tab", max);
+  if (fwd.reached) return { kind: "focus", focus: labels(fwd.seq) };
+  if (fwd.exhausted) return { kind: "bound", focus: labels(fwd.seq) };
+  const loop = fwd.seq.slice(fwd.cycleFrom);
+  const loopKeys = new Set(loop.filter((a2) => !a2.body).map((a2) => a2.key));
+  const confined = !loop.some((a2) => a2.body) && loopKeys.size < total;
+  if (confined) {
+    if (loop.every((a2) => a2.modal)) return { kind: "confined", focus: labels(fwd.seq) };
+    const back = await walk3(page, "Shift+Tab", loopKeys.size + STUCK_AFTER + 2, loopKeys);
+    if (!back.left) {
+      const region = await page.evaluate(`window.__u11yJ.region(${JSON.stringify([...loopKeys])})`).catch(() => null) ?? { selector: "\u2014", html: "", label: "\u2014" };
+      return { kind: "trap", focus: labels(fwd.seq), region, count: loopKeys.size, total };
+    }
+    if (back.reached) return { kind: "focus", focus: labels([...fwd.seq, ...back.seq]) };
+    const rest = await walk3(page, "Shift+Tab", max);
+    if (rest.reached) return { kind: "focus", focus: labels([...fwd.seq, ...back.seq, ...rest.seq]) };
+    if (rest.exhausted) return { kind: "bound", focus: labels([...fwd.seq, ...back.seq, ...rest.seq]) };
+    return { kind: "unreachable", focus: labels([...fwd.seq, ...back.seq, ...rest.seq]), tabs: fwd.seq.length + back.seq.length + rest.seq.length };
+  }
+  return { kind: "unreachable", focus: labels(fwd.seq), tabs: fwd.seq.length };
+}
+async function settle(page) {
+  await page.waitForLoadState("load", { timeout: 1e4 }).catch(() => {
+  });
+  await page.waitForLoadState("networkidle", { timeout: 3e3 }).catch(() => {
+  });
+  await page.waitForTimeout(200);
+  await waitForLoaded(page, 5e3);
+}
+async function ensureLib(page) {
+  return await page.evaluate(JOURNEY_LIB).catch(() => false) === true;
+}
+async function capture(page, axe, lang) {
+  await page.evaluate(STRIP_TAGS).catch(() => {
+  });
+  let snapshot;
+  try {
+    snapshot = await page.evaluate(COLLECT_SNAPSHOT);
+  } catch {
+  }
+  if (snapshot) {
+    try {
+      snapshot.screenshot = (await page.screenshot({ fullPage: false })).toString("base64");
+    } catch {
+    }
+    const vp = snapshot.viewport;
+    const height = Math.min(snapshot.docHeight ?? 0, FULL_SCREENSHOT_MAX_HEIGHT);
+    if (vp && height > vp.height) {
+      try {
+        snapshot.screenshotFull = (await page.screenshot({ fullPage: true, clip: { x: 0, y: 0, width: vp.width, height } })).toString("base64");
+      } catch {
+      }
+    }
+  }
+  const axeRun = await runAxe(axe, page, "journey");
+  const violations = axeRun.violations.map((v2) => ({
+    id: v2.id,
+    impact: v2.impact ?? null,
+    help: v2.help,
+    tags: v2.tags,
+    nodes: v2.nodes.slice(0, 10).map((n) => ({ target: n.target.map(String), html: (n.html || "").slice(0, 200) }))
+  }));
+  await page.evaluate("window.__u11yJ && window.__u11yJ.save()").catch(() => {
+  });
+  const probes = await runLiveProbes(page, { lang }).catch((e) => ({
+    focusVisible: [],
+    hover: [],
+    keyboardTrap: [],
+    reflowZoom: [],
+    textSpacing: [],
+    reflow: { horizontalScroll: false },
+    probed: [],
+    skipped: ["1.4.4", "1.4.10", "1.4.12", "1.4.13", "2.1.2", "2.4.7", "2.4.11"].map((sc) => ({ sc, why: `the live probes failed: ${firstLine2(e)}` })),
+    focusObscured: void 0
+  }));
+  await page.evaluate("window.__u11yJ && window.__u11yJ.restore()").catch(() => {
+  });
+  await page.evaluate(STRIP_TAGS).catch(() => {
+  });
+  return {
+    url: page.url(),
+    violations,
+    axe: axeRun.engine,
+    reflow: probes.reflow,
+    focusVisible: probes.focusVisible,
+    ...probes.focusObscured ? { focusObscured: probes.focusObscured } : {},
+    hover: probes.hover,
+    keyboardTrap: probes.keyboardTrap,
+    reflowZoom: probes.reflowZoom,
+    textSpacing: probes.textSpacing,
+    probed: [...probes.probed].sort(),
+    ...probes.skipped?.length ? { skipped: probes.skipped } : {},
+    ...snapshot?.dom ? { snapshot } : {}
+  };
+}
+var say = (id, params, lang) => resolveMessage({ message: "", msg: { id, params } }, lang);
+function clearJourneySnapshots(root, name) {
+  const dir = join33(root, PAGES_DIR);
+  if (!existsSync33(dir)) return;
+  for (const id of readdirSync5(dir)) {
+    try {
+      const meta2 = JSON.parse(readFileSync27(join33(dir, id, "meta.json"), "utf8"));
+      if (meta2.runner === "journey" && meta2.journey?.name === name) rmSync6(join33(dir, id), { recursive: true, force: true });
+    } catch {
+    }
+  }
+}
+async function runJourneys(entries, opts) {
+  const { chromium, axe } = resolveLocalDeps(opts.cwd);
+  const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
+  const result = { records: [], findings: [], unsnapshotted: [], snapshots: [], testedScs: [], scanned: [] };
+  const tested = /* @__PURE__ */ new Set();
+  try {
+    for (const { journey, file } of entries) {
+      const rec = await runOne(browser, axe, journey, file, opts, result, tested);
+      result.records.push(rec);
+    }
+  } finally {
+    await browser.close();
+  }
+  result.testedScs = [...tested].sort();
+  return result;
+}
+async function runOne(browser, axe, journey, file, opts, result, tested) {
+  const keyboard = opts.keyboard || journey.keyboardOnly === true;
+  const record = notRunRecord(file, journey, journey.name);
+  record.keyboard = keyboard;
+  const start = { n: 0, action: "goto", label: `goto ${journey.startUrl}`, status: "not-run" };
+  record.steps.unshift(start);
+  const fail = (step, reason) => {
+    step.status = "failed";
+    step.reason = reason;
+    record.status = "failed";
+    record.reason = `step ${step.n} (${step.label}): ${reason}`;
+    opts.onStep?.(journey.name, step);
+    return record;
+  };
+  const storageState = journey.storageState ? resolve14(opts.root, journey.storageState) : opts.storageState;
+  if (storageState && !existsSync33(storageState)) return fail(start, `storageState not found: ${storageState}`);
+  let startUrl;
+  try {
+    startUrl = new URL(journey.startUrl, opts.baseUrl).href;
+  } catch {
+    return fail(start, `startUrl "${journey.startUrl}" is not an absolute URL \u2014 pass --base-url <url> to resolve it`);
+  }
+  clearJourneySnapshots(opts.root, journey.name);
+  const context = await browser.newContext(storageState ? { storageState } : {});
+  const page = await context.newPage();
+  const traps = /* @__PURE__ */ new Set();
+  try {
+    const steps = [
+      { def: { action: "goto", url: startUrl }, rec: start },
+      ...journey.steps.map((def, i) => ({ def, rec: record.steps[i + 1] }))
+    ];
+    for (const { def, rec } of steps) {
+      const timeout = def.timeoutMs ?? DEFAULT_TIMEOUT;
+      const hits = {
+        keyboardTrap: [],
+        keyboardUnreachable: [],
+        dialogFocus: [],
+        errorUnassociated: [],
+        liveRegion: []
+      };
+      if (def.note) rec.note = def.note;
+      if (def.action === "goto") {
+        let target;
+        try {
+          target = new URL(def.url, page.url() && page.url() !== "about:blank" ? page.url() : startUrl).href;
+        } catch {
+          return fail(rec, `"${def.url}" is not a URL`);
+        }
+        let response;
+        try {
+          response = await page.goto(target, { waitUntil: "load", timeout: Math.max(timeout, 3e4) });
+        } catch (e) {
+          return fail(rec, `navigation failed: ${firstLine2(e)}`);
+        }
+        await settle(page);
+        const status = typeof response?.status === "function" ? response.status() : void 0;
+        if (status !== void 0 && status >= 400) return fail(rec, `HTTP ${status} at ${target}`);
+        if (!landedOnRequestedPage(target, page.url())) return fail(rec, `redirected to ${page.url()}`);
+        await ensureLib(page);
+      } else {
+        await ensureLib(page);
+        let loc;
+        if (def.target && def.action !== "waitFor" && def.action !== "expect") {
+          const r2 = await resolveTarget(page, def, timeout);
+          if ("reason" in r2) return fail(rec, r2.reason);
+          loc = r2.loc;
+          await loc.evaluate((el) => el.setAttribute("data-u11y-jt", "")).catch(() => {
+          });
+        }
+        if (def.action === "waitFor" || def.action === "expect") {
+          const state = def.state ?? "visible";
+          try {
+            await locatorFor(page, def.target).first().waitFor({ state, timeout });
+          } catch {
+            return fail(rec, `${def.action === "expect" ? "expectation not met" : "timed out"}: ${targetLabel(def.target)} not ${state} within ${timeout} ms`);
+          }
+        } else {
+          let pointer = !keyboard;
+          if (keyboard && loc) {
+            const k = await reachByKeyboard(page);
+            rec.focus = k.focus;
+            if (k.kind === "focus") rec.keyboard = "focus";
+            else {
+              pointer = true;
+              if (k.kind === "trap") {
+                rec.keyboard = "trap";
+                if (!traps.has(k.region.selector)) {
+                  traps.add(k.region.selector);
+                  hits.keyboardTrap.push({
+                    selector: k.region.selector,
+                    html: k.region.html,
+                    detail: say("journey-keyboard-trap", { region: k.region.label, count: k.count, total: k.total }, opts.lang)
+                  });
+                }
+              } else if (k.kind === "unreachable") {
+                rec.keyboard = "unreachable";
+                const el = await page.evaluate(TARGET_INFO).catch(() => null) ?? {
+                  selector: targetLabel(def.target),
+                  html: ""
+                };
+                hits.keyboardUnreachable.push({
+                  selector: el.selector,
+                  html: el.html,
+                  detail: say("journey-keyboard-unreachable", { control: targetLabel(def.target), tabs: k.tabs, step: rec.label }, opts.lang)
+                });
+              } else if (k.kind === "confined") {
+                rec.note = [rec.note, "focus is confined to the open modal dialog; performed with the pointer"].filter(Boolean).join(" \u2014 ");
+              } else {
+                rec.note = [rec.note, `Tab bound of ${MAX_TABS} reached before the control; performed with the pointer`].filter(Boolean).join(" \u2014 ");
+              }
+            }
+          }
+          await page.evaluate("window.__u11yJ.before()").catch(() => {
+          });
+          try {
+            await perform(page, loc, def, pointer, timeout);
+          } catch (e) {
+            return fail(rec, `${def.action} failed: ${firstLine2(e)}`);
+          }
+          await settle(page);
+          if (await page.evaluate(HAS_LIB).catch(() => false) === true) {
+            const obs = await page.evaluate("window.__u11yJ.after()").catch(() => null);
+            if (obs) {
+              for (const d2 of obs.dialogIn)
+                hits.dialogFocus.push({
+                  selector: d2.selector,
+                  html: d2.html,
+                  detail: say("journey-dialog-focus-in", { dialog: d2.dialog, focus: d2.focus }, opts.lang)
+                });
+              for (const d2 of obs.dialogReturn)
+                hits.dialogFocus.push({
+                  selector: d2.selector,
+                  html: d2.html,
+                  detail: say("journey-dialog-focus-return", { dialog: d2.dialog, trigger: d2.trigger, focus: d2.focus }, opts.lang)
+                });
+              for (const e of obs.errors)
+                hits.errorUnassociated.push({
+                  selector: e.selector,
+                  html: e.html,
+                  detail: say(
+                    "journey-error-unassociated",
+                    { step: rec.label, text: e.text, field: e.field || (opts.lang === "fr" ? "aucun champ" : "any field") },
+                    opts.lang
+                  )
+                });
+              for (const s2 of obs.status)
+                hits.liveRegion.push({
+                  selector: s2.selector,
+                  html: s2.html,
+                  detail: say("journey-status-message", { step: rec.label, text: s2.text }, opts.lang)
+                });
+            }
+          } else await ensureLib(page);
+          await page.evaluate(UNTAG_TARGET).catch(() => {
+          });
+        }
+      }
+      const out = await capture(page, axe, opts.lang);
+      const trapped = new Set(hits.keyboardTrap.map((h3) => h3.selector));
+      out.keyboardTrap = [...(out.keyboardTrap ?? []).filter((h3) => !trapped.has(h3.selector)), ...hits.keyboardTrap];
+      if (out.keyboardTrap.length) out.probed = (out.probed ?? []).filter((sc) => sc !== "2.1.2");
+      if (hits.keyboardUnreachable.length) out.keyboardUnreachable = hits.keyboardUnreachable;
+      if (hits.dialogFocus.length) out.dialogFocus = hits.dialogFocus;
+      if (hits.errorUnassociated.length) out.errorUnassociated = hits.errorUnassociated;
+      if (hits.liveRegion.length) out.liveRegion = hits.liveRegion;
+      for (const sc of out.probed ?? []) tested.add(sc);
+      if (out.axe && !result.axe) result.axe = out.axe;
+      const id = stepPageId(journey.name, rec.n, def);
+      const name = `${journey.name} \u2014 ${rec.n}. ${rec.label}`;
+      const written = writeRunnerSnapshot(
+        opts.root,
+        out,
+        out.url,
+        { id, name, url: out.url, ...storageState ? { auth: true } : {} },
+        {
+          runner: "journey",
+          journey: { name: journey.name, step: rec.n, action: def.action, keyboard }
+        }
+      );
+      const findings = toDynamicResult(out, out.url, opts.lang, JOURNEY_ENGINE).findings;
+      for (const f2 of findings) f2.sample = { id, name };
+      result.findings.push(...findings);
+      if (written) {
+        rec.page = written;
+        result.snapshots.push(written);
+      } else result.unsnapshotted.push(...findings);
+      if (!result.scanned.includes(out.url)) result.scanned.push(out.url);
+      const observed = [
+        ...hits.keyboardTrap.length ? ["keyboard-trap"] : [],
+        ...hits.keyboardUnreachable.length ? ["keyboard-unreachable"] : [],
+        ...hits.dialogFocus.length ? ["dialog-focus"] : [],
+        ...hits.errorUnassociated.length ? ["error-unassociated"] : [],
+        ...hits.liveRegion.length ? ["live-region"] : []
+      ];
+      if (observed.length) rec.observed = observed;
+      rec.status = "done";
+      opts.onStep?.(journey.name, rec);
+    }
+    record.status = "done";
+    return record;
+  } catch (e) {
+    const open = record.steps.find((s2) => s2.status === "not-run");
+    return open ? fail(open, `the browser failed: ${firstLine2(e)}`) : record;
+  } finally {
+    await context.close().catch(() => {
+    });
+  }
+}
+var TOGGLE_ROLES = /* @__PURE__ */ new Set(["checkbox", "radio", "switch", "menuitemcheckbox", "menuitemradio", "option"]);
+async function perform(page, loc, def, pointer, timeout) {
+  if (def.action === "press") {
+    if (loc && pointer) await loc.press(def.key, { timeout });
+    else await page.keyboard.press(def.key);
+    return;
+  }
+  if (pointer) {
+    if (def.action === "click") await loc.click({ timeout });
+    else if (def.action === "check") await loc.check({ timeout });
+    else if (def.action === "fill") await loc.fill(def.value, { timeout });
+    else if (def.action === "select") await loc.selectOption(def.value, { timeout });
+    return;
+  }
+  const role = (await active(page).catch(() => void 0))?.role ?? "";
+  if (def.action === "click") await page.keyboard.press(TOGGLE_ROLES.has(role) ? "Space" : "Enter");
+  else if (def.action === "check") {
+    if (!await loc.isChecked().catch(() => false)) await page.keyboard.press("Space");
+  } else if (def.action === "fill") {
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.press("Delete");
+    await page.keyboard.type(def.value);
+  } else if (def.action === "select") await loc.selectOption(def.value, { timeout });
+}
+
 // src/cli.ts
 var HELP = `ultra11y v${VERSION}
 Audit a site against RGAA 4.1.2, the French State's accessibility standard, on a
@@ -63405,6 +64508,8 @@ Usage:
   ultra11y scan     <url|file\u2026> [--cwd <dir>] [--browser-path <file>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--all-routes [--max-routes <n>]] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample, then the rest of the route inventory)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
+  ultra11y journey  run [<name>\u2026 | --all] [--keyboard] [--base-url <url>] [--storage-state <file>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--out <dir>] [--json]   (replay .ultra11y/journeys/<name>.json with axe + keyboard checks)
+  ultra11y journey  list [--root <dir>] [--json]
   ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin \u2192 .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
@@ -63541,6 +64646,17 @@ Commands:
              (representative pages + transverse elements); each page's own
              storage-state overrides --storage-state, and the report groups the
              findings \xAB Constats par page \xBB.
+  journey    Replay the user journeys the agent wrote (.ultra11y/journeys/<name>.json:
+             startUrl + steps goto|click|fill|select|check|press|waitFor|expect on
+             role/label/text locators) in the local Playwright. Every step records a
+             page-state snapshot (.ultra11y/pages/<journey>-<nn>-<slug>/) measured
+             with the pinned axe-core and the live probes, plus what only a journey
+             sees: --keyboard reaches each control with Tab (a control never reached
+             is 2.1.1, a region Tab and Shift+Tab cannot leave is 2.1.2), focus into
+             and back out of dialogs (2.4.3), errors tied to no field (3.3.1), text
+             appearing outside a live region (4.1.3). A failing step stops its journey
+             with the reason; the annex lists every step done / failed / not run.
+             Exit 1 when a journey failed.
   sample     Normative page-sample (\xE9chantillon) helper. 'sample check' lints the
              .ultra11yrc.json sample block against the active standard's required
              page kinds (RGAA: accueil, contact, mentions l\xE9gales, d\xE9claration
@@ -63833,7 +64949,8 @@ var COMMANDS = [
   "hook",
   "install",
   "uninstall",
-  "status"
+  "status",
+  "journey"
 ];
 function isCommand(s2) {
   return !!s2 && COMMANDS.includes(s2);
@@ -63870,6 +64987,8 @@ var VALUE_FLAGS = /* @__PURE__ */ new Set([
   "search-query",
   // `scan --all-routes`: the most inventory routes visited beyond the sample (src/routes.ts).
   "max-routes",
+  // `journey run`: the base a journey's relative startUrl resolves against.
+  "base-url",
   // `scan`: most linked PDF documents downloaded per run.
   "max-pdf",
   "since",
@@ -63999,7 +65118,9 @@ var BOOLEAN_FLAGS = /* @__PURE__ */ new Set([
   // local` answers for itself, exposed so a caller (a CI harness such as iterion's rgaa-audit bot) can branch on it
   // instead of re-deriving it in shell.
   "browser",
-  "no-skills"
+  "no-skills",
+  // `journey run`: replay every click, check and fill with the keyboard alone.
+  "keyboard"
 ]);
 var KNOWN_FLAGS = /* @__PURE__ */ new Set([...VALUE_FLAGS, ...BOOLEAN_FLAGS]);
 var LIST_FLAGS = /* @__PURE__ */ new Set(["include", "exclude", "ext"]);
@@ -64175,13 +65296,13 @@ async function cmdAudit(p2) {
   const capturesFlag = typeof p2.flags.captures === "string" && p2.flags.captures ? p2.flags.captures : void 0;
   const capturesDir = capturesFlag ?? CAPTURES_DIR;
   const scopedToDiff = p2.flags.changed === true || p2.flags.staged === true || since !== void 0;
-  const capturesWanted = p2.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync32(capturesDir));
+  const capturesWanted = p2.flags["no-captures"] !== true && !inputs.includes("-") && (capturesFlag !== void 0 || existsSync34(capturesDir));
   const useCaptures = capturesWanted && !scopedToDiff && !inputs.includes(capturesDir);
-  const pagesWanted = p2.flags["no-captures"] !== true && !inputs.includes("-") && existsSync32(PAGES_DIR);
+  const pagesWanted = p2.flags["no-captures"] !== true && !inputs.includes("-") && existsSync34(PAGES_DIR);
   const usePages = pagesWanted && !scopedToDiff && !inputs.includes(PAGES_DIR);
   const pagesInScope = pagesWanted && !scopedToDiff;
   const documentsGlob = `${DOCUMENTS_DIR}/*.pdf`;
-  const useDocuments = p2.flags["no-pdf"] !== true && !inputs.includes("-") && !scopedToDiff && existsSync32(DOCUMENTS_DIR) && !inputs.includes(documentsGlob) && !inputs.includes(DOCUMENTS_DIR);
+  const useDocuments = p2.flags["no-pdf"] !== true && !inputs.includes("-") && !scopedToDiff && existsSync34(DOCUMENTS_DIR) && !inputs.includes(documentsGlob) && !inputs.includes(DOCUMENTS_DIR);
   const auditInputs = [...inputs, ...useCaptures ? [capturesDir] : [], ...usePages ? [PAGES_DIR] : [], ...useDocuments ? [documentsGlob] : []];
   if (useCaptures)
     console.error(
@@ -64223,6 +65344,10 @@ async function cmdAudit(p2) {
     }
   }
   stampRoutes(result, ".", lang, { recorded: pagesInScope });
+  if (pagesInScope) {
+    const journeys = journeyScopeFor(".");
+    if (journeys) result.scope.journeys = journeys;
+  }
   const rendersInScope = p2.flags["no-captures"] !== true && !inputs.includes("-") && !scopedToDiff;
   if (rendersInScope || inputs.includes(capturesDir)) {
     const renders = renderScopeFor(capturesDir);
@@ -64232,10 +65357,10 @@ async function cmdAudit(p2) {
   if (typeof p2.flags.out === "string") {
     const out = p2.flags.out;
     const asFile = out.toLowerCase().endsWith(".json");
-    const target = asFile ? out : join32(out, "audit-latest.json");
+    const target = asFile ? out : join34(out, "audit-latest.json");
     try {
-      mkdirSync17(asFile ? dirname18(out) : out, { recursive: true });
-      writeFileSync17(target, JSON.stringify(document, null, 2) + "\n");
+      mkdirSync18(asFile ? dirname19(out) : out, { recursive: true });
+      writeFileSync18(target, JSON.stringify(document, null, 2) + "\n");
       console.error(lang === "fr" ? `\u2192 audit \xE9crit dans ${target}` : `\u2192 audit written to ${target}`);
     } catch {
     }
@@ -64274,7 +65399,7 @@ async function cmdPagesDiscover(p2) {
     const snaps = sampleFromSnapshots(recorded);
     if (!snaps.length) {
       console.error(
-        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join32(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join32(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
+        lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join34(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join34(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
       );
       return 1;
     }
@@ -64461,9 +65586,9 @@ function proposalSummary(lang, proposal, applied) {
   return lang === "fr" ? `${n} page(s) propos\xE9e(s) sur ${proposal.considered} d\xE9couverte(s) \xB7 ${represented}/${proposal.clusters.length} gabarit(s) repr\xE9sent\xE9(s)${proposal.leftOut ? ` (${proposal.leftOut} laiss\xE9(s) par --sample-size)` : ""}${absent ? ` \xB7 sans page : ${absent}` : ""}${applied.kept.length ? ` \xB7 ${applied.kept.length} page(s) d\xE9clar\xE9e(s) conserv\xE9e(s)` : ""}${applied.dropped.length ? ` \xB7 ${applied.dropped.length} retir\xE9e(s)` : ""}` : `${n} page(s) proposed out of ${proposal.considered} discovered \xB7 ${represented}/${proposal.clusters.length} template(s) represented${proposal.leftOut ? ` (${proposal.leftOut} left out by --sample-size)` : ""}${absent ? ` \xB7 no page for: ${absent}` : ""}${applied.kept.length ? ` \xB7 ${applied.kept.length} declared page(s) kept` : ""}${applied.dropped.length ? ` \xB7 ${applied.dropped.length} dropped` : ""}`;
 }
 function persistSample(sample) {
-  const file = join32(process.cwd(), ".ultra11yrc.json");
+  const file = join34(process.cwd(), ".ultra11yrc.json");
   let doc = {};
-  if (existsSync32(file)) {
+  if (existsSync34(file)) {
     try {
       doc = JSON.parse(readText(file));
     } catch {
@@ -64472,7 +65597,7 @@ function persistSample(sample) {
     }
   }
   doc.sample = sample;
-  writeFileSync17(file, `${JSON.stringify(doc, null, 2)}
+  writeFileSync18(file, `${JSON.stringify(doc, null, 2)}
 `);
   return file;
 }
@@ -64586,8 +65711,8 @@ async function cmdPages(p2) {
     console.log(json);
     const outDir2 = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : "";
     if (outDir2) {
-      mkdirSync17(outDir2, { recursive: true });
-      writeFileSync17(join32(outDir2, "pages.json"), `${json}
+      mkdirSync18(outDir2, { recursive: true });
+      writeFileSync18(join34(outDir2, "pages.json"), `${json}
 `);
     }
     return 0;
@@ -64613,27 +65738,27 @@ async function cmdPages(p2) {
   const derived = derivePages(result, scope);
   const split = p2.flags.split === "page";
   const outDir = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : void 0;
-  const shotOf = (id) => pageScreenshot(PAGES_DIR, id) ?? join32(PAGES_DIR, id, "screen.png");
+  const shotOf = (id) => pageScreenshot(PAGES_DIR, id) ?? join34(PAGES_DIR, id, "screen.png");
   const shotsRelative = (fileDir) => {
     const m3 = /* @__PURE__ */ new Map();
     for (const pg of derived) {
-      if (existsSync32(shotOf(pg.id))) m3.set(pg.id, relative10(fileDir, shotOf(pg.id)).split("\\").join("/"));
+      if (existsSync34(shotOf(pg.id))) m3.set(pg.id, relative10(fileDir, shotOf(pg.id)).split("\\").join("/"));
     }
     return m3;
   };
   const shotPaths = (pages) => {
     const m3 = /* @__PURE__ */ new Map();
-    for (const pg of pages) if (existsSync32(shotOf(pg.id))) m3.set(pg.id, shotOf(pg.id));
+    for (const pg of pages) if (existsSync34(shotOf(pg.id))) m3.set(pg.id, shotOf(pg.id));
     return m3;
   };
   const shotsCopiedInto = (dir) => {
     const m3 = /* @__PURE__ */ new Map();
-    const assets = join32(dir, "assets");
+    const assets = join34(dir, "assets");
     for (const pg of derived) {
       const src = shotOf(pg.id);
-      if (!existsSync32(src)) continue;
-      mkdirSync17(assets, { recursive: true });
-      copyFileSync4(src, join32(assets, `${pg.id}.png`));
+      if (!existsSync34(src)) continue;
+      mkdirSync18(assets, { recursive: true });
+      copyFileSync4(src, join34(assets, `${pg.id}.png`));
       m3.set(pg.id, `./assets/${pg.id}.png`);
     }
     return m3;
@@ -64650,7 +65775,7 @@ async function cmdPages(p2) {
     console.log(renderPagesDocument(result, derived, { standard, lang, screenshots: shotsRelative(".") }));
     return 0;
   }
-  mkdirSync17(outDir, { recursive: true });
+  mkdirSync18(outDir, { recursive: true });
   const manifest = wantEvidence ? writeEvidence(result, { outDir, ...evidenceCapsOf(p2) }) : void 0;
   const cropFor = manifest ? (f2) => {
     const c = manifest.crops.get(findingId(f2));
@@ -64659,7 +65784,7 @@ async function cmdPages(p2) {
   if (manifest) {
     const total = evidenceNotice(manifest, null, lang);
     console.error(
-      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join32(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join32(outDir, "assets")}.`
+      lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join34(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join34(outDir, "assets")}.`
     );
     for (const line of total) console.error(line);
   }
@@ -64668,8 +65793,8 @@ async function cmdPages(p2) {
     ...manifest ? { evidenceNotice: (id) => evidenceNotice(manifest, id, lang) } : {}
   };
   if (!split) {
-    const file = join32(outDir, `pages-${result.date}.md`);
-    writeFileSync17(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
+    const file = join34(outDir, `pages-${result.date}.md`);
+    writeFileSync18(file, `${renderPagesDocument(result, derived, { standard, lang, screenshots: shotsCopiedInto(outDir), ...evidenceOpts })}
 `);
     const html2 = wantHtml ? emitHtml(result, {
       outDir,
@@ -64688,11 +65813,11 @@ async function cmdPages(p2) {
   const sheet = (id) => `page-${id}.md`;
   const hrefs = new Map(derived.map((pg) => [pg.id, `./${sheet(pg.id)}`]));
   for (const pg of derived) {
-    writeFileSync17(join32(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
+    writeFileSync18(join34(outDir, sheet(pg.id)), `${renderPageDocument(result, pg, { standard, lang, screenshots: shots, ...evidenceOpts })}
 `);
   }
-  const index = join32(outDir, "index.md");
-  writeFileSync17(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
+  const index = join34(outDir, "index.md");
+  writeFileSync18(index, `${renderPagesIndex(result, derived, { standard, lang, hrefs })}
 `);
   const html = wantHtml ? emitHtml(result, {
     outDir,
@@ -64743,7 +65868,7 @@ async function cmdSnapshot(p2) {
           2
         )
       );
-    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join32(root, PAGES_DIR)}.` : `No snapshot in ${join32(root, PAGES_DIR)}.`);
+    else if (!snaps.length) console.log(lang === "fr" ? `Aucun instantan\xE9 dans ${join34(root, PAGES_DIR)}.` : `No snapshot in ${join34(root, PAGES_DIR)}.`);
     else for (const s2 of snaps) console.log(`${s2.meta.id}	${s2.meta.name}	${s2.meta.url}${s2.meta.auth ? "	[auth]" : ""}`);
     return 0;
   }
@@ -64799,7 +65924,7 @@ async function cmdSnapshot(p2) {
     console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
-  const result = runAudit({ inputs: [join32(dir, "dom.html")], onWarn: (m3) => console.error(m3) });
+  const result = runAudit({ inputs: [join34(dir, "dom.html")], onWarn: (m3) => console.error(m3) });
   const failOnRaw = p2.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
@@ -65171,8 +66296,8 @@ async function cmdTickets(p2) {
   const ticketsOut = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : void 0;
   let setPath;
   if (ticketsOut) {
-    mkdirSync17(ticketsOut, { recursive: true });
-    setPath = join32(ticketsOut, `issues-${result.date}.json`);
+    mkdirSync18(ticketsOut, { recursive: true });
+    setPath = join34(ticketsOut, `issues-${result.date}.json`);
     const payload = {
       tool: "ultra11y",
       kind: "issues",
@@ -65183,7 +66308,7 @@ async function cmdTickets(p2) {
       count: plan.tickets.length,
       issues: plan.tickets
     };
-    writeFileSync17(setPath, `${JSON.stringify(payload, null, 2)}
+    writeFileSync18(setPath, `${JSON.stringify(payload, null, 2)}
 `);
     if (!json) console.log(setPath);
   }
@@ -65277,8 +66402,8 @@ async function cmdRender(p2) {
   const lang = resolveLang(p2.flags, {});
   if (p2.flags.storybook === true || typeof p2.flags.storybook === "string") {
     const sbDir = p2.positionals[0] ?? "storybook-static";
-    const indexPath = existsSync32(join32(sbDir, "index.json")) ? join32(sbDir, "index.json") : join32(sbDir, "stories.json");
-    if (!existsSync32(indexPath)) {
+    const indexPath = existsSync34(join34(sbDir, "index.json")) ? join34(sbDir, "index.json") : join34(sbDir, "stories.json");
+    if (!existsSync34(indexPath)) {
       console.error(
         lang === "fr" ? `ultra11y render : aucun index Storybook (index.json/stories.json) dans ${sbDir}.` : `ultra11y render: no Storybook index (index.json/stories.json) in ${sbDir}.`
       );
@@ -65288,7 +66413,7 @@ async function cmdRender(p2) {
     const provById = new Map(stories.map((s2) => [s2.id, storyProvenance(s2)]));
     const capturesFlag = typeof p2.flags.captures === "string" && p2.flags.captures ? p2.flags.captures : void 0;
     const htmlDir = capturesFlag ?? sbDir;
-    const htmlFiles = existsSync32(htmlDir) ? discover([htmlDir]).files.filter((f2) => /\.html?$/i.test(f2)) : [];
+    const htmlFiles = existsSync34(htmlDir) ? discover([htmlDir]).files.filter((f2) => /\.html?$/i.test(f2)) : [];
     const outDir = ".ultra11y/captures";
     let attributed = 0;
     let skipped = 0;
@@ -65310,8 +66435,8 @@ async function cmdRender(p2) {
         continue;
       }
       try {
-        mkdirSync17(outDir, { recursive: true });
-        writeFileSync17(join32(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
+        mkdirSync18(outDir, { recursive: true });
+        writeFileSync18(join34(outDir, `${hitId}.html`), `${formatCaptureComment(prov)}
 ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
         attributed++;
       } catch {
@@ -65333,11 +66458,11 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   }
   if (p2.flags.coverage === true) {
     const capturesFlag = typeof p2.flags.captures === "string" && p2.flags.captures ? p2.flags.captures : void 0;
-    const capturesDir = capturesFlag ?? join32(root, ".ultra11y/captures");
+    const capturesDir = capturesFlag ?? join34(root, ".ultra11y/captures");
     const graphExt = [...GRAPH_ONLY_EXT, ...asList(p2.flags.ext) ?? []];
     const sourceFiles = discover([root], { include: asList(p2.flags.include), exclude: asList(p2.flags.exclude), ext: graphExt }).files;
     const graph = buildGraphStreaming(sourceFiles);
-    const capFiles = existsSync32(capturesDir) ? discover([capturesDir]).files : [];
+    const capFiles = existsSync34(capturesDir) ? discover([capturesDir]).files : [];
     const entries = capFiles.map((f2) => ({ file: toPosix2(f2), provenance: parseCaptureProvenance(readText(f2)) }));
     const cov = computeCaptureCoverage(graph, entries);
     if (p2.flags.json) console.log(JSON.stringify(cov, null, 2));
@@ -65346,22 +66471,22 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   }
   if (p2.flags.detect !== true) return cmdRenderEngine(p2, root, lang);
   let deps = {};
-  const pkgPath = join32(root, "package.json");
-  if (existsSync32(pkgPath)) {
+  const pkgPath = join34(root, "package.json");
+  if (existsSync34(pkgPath)) {
     try {
       const pkg = JSON.parse(readText(pkgPath));
       deps = { ...pkg.dependencies ?? {}, ...pkg.devDependencies ?? {} };
     } catch {
     }
   }
-  const detection = detectFrameworks(deps, (f2) => existsSync32(join32(root, f2)));
+  const detection = detectFrameworks(deps, (f2) => existsSync34(join34(root, f2)));
   if (p2.flags.json) console.log(JSON.stringify(detection, null, 2));
   else console.log(renderPlan(detection, lang));
   return 0;
 }
 async function cmdRenderEngine(p2, root, lang) {
   const fr = lang === "fr";
-  if (!existsSync32(root)) {
+  if (!existsSync34(root)) {
     console.error(fr ? `ultra11y render : dossier introuvable : ${root}.` : `ultra11y render: no such directory: ${root}.`);
     return 2;
   }
@@ -65407,12 +66532,12 @@ async function cmdRenderEngine(p2, root, lang) {
       fr ? `  ${manifest.testFilesIgnored} fichier(s) de test, de mock ou d'instantan\xE9 laiss\xE9(s) de c\xF4t\xE9 sans \xEAtre lus.` : `  ${manifest.testFilesIgnored} test, mock or snapshot file(s) left out, unread.`
     );
   out.push(
-    fr ? `\u2192 captures dans ${join32(root, CAPTURES_DIR)}, manifeste ${join32(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).` : `\u2192 captures in ${join32(root, CAPTURES_DIR)}, manifest ${join32(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`
+    fr ? `\u2192 captures dans ${join34(root, CAPTURES_DIR)}, manifeste ${join34(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).` : `\u2192 captures in ${join34(root, CAPTURES_DIR)}, manifest ${join34(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`
   );
   console.log(out.join("\n"));
   if (code2)
     console.error(
-      fr ? `ultra11y render : aucune unit\xE9 rendue sur ${manifest.units.length} \u2014 chaque raison est dans ${join32(root, RENDER_MANIFEST)} et dans l'audit.` : `ultra11y render: no unit rendered out of ${manifest.units.length} \u2014 every reason is in ${join32(root, RENDER_MANIFEST)} and in the audit.`
+      fr ? `ultra11y render : aucune unit\xE9 rendue sur ${manifest.units.length} \u2014 chaque raison est dans ${join34(root, RENDER_MANIFEST)} et dans l'audit.` : `ultra11y render: no unit rendered out of ${manifest.units.length} \u2014 every reason is in ${join34(root, RENDER_MANIFEST)} and in the audit.`
     );
   return code2;
 }
@@ -65581,7 +66706,7 @@ function cmdVerify(p2) {
     const trial = conformityTrial(p2, standard, lang);
     const expected = [...expectedNc, ...buildConformityWorklist(trial.claims, expectedNc.length, Number.POSITIVE_INFINITY)];
     const r2 = applyVerdicts(items, expected);
-    const ctx = readVerifyContext(dirname18(resolve14(apply)));
+    const ctx = readVerifyContext(dirname19(resolve15(apply)));
     const absentItems = r2.failures.filter((f2) => !items.includes(f2));
     const absentC = absentItems.filter((f2) => f2.kind === "c").length;
     const sourceDiffers = ctx ? !sameConformitySource(ctx.conformities, trial.source) : absentC > 0 && !items.some((it) => it.kind === "c");
@@ -65677,7 +66802,7 @@ function cmdVerifySummary(p2) {
   if (typeof prunedFlag === "string" && prunedFlag) {
     const raw = readJson3(prunedFlag, "pruned");
     if (raw === void 0) return 2;
-    pruned = { audit: unwrapAudit(raw), path: resolve14(prunedFlag) };
+    pruned = { audit: unwrapAudit(raw), path: resolve15(prunedFlag) };
   }
   const reportMd = readReportInput(reportPath, "verify");
   if (reportMd === null) return 2;
@@ -65686,11 +66811,11 @@ function cmdVerifySummary(p2) {
     standard,
     lang,
     audit,
-    auditPath: resolve14(auditPath),
+    auditPath: resolve15(auditPath),
     verdicts,
-    verdictsPath: resolve14(verdictsPath),
+    verdictsPath: resolve15(verdictsPath),
     reportMd,
-    reportPath: resolve14(reportPath),
+    reportPath: resolve15(reportPath),
     ...pruned ? { pruned } : {},
     gate
   });
@@ -65699,9 +66824,9 @@ function cmdVerifySummary(p2) {
     return 0;
   }
   const out = typeof p2.flags.out === "string" && p2.flags.out ? p2.flags.out : ".";
-  mkdirSync17(out, { recursive: true });
-  const mdPath = join32(out, "TRIAL.md");
-  writeFileSync17(mdPath, formatTrialSummary(summary, lang));
+  mkdirSync18(out, { recursive: true });
+  const mdPath = join34(out, "TRIAL.md");
+  writeFileSync18(mdPath, formatTrialSummary(summary, lang));
   console.log(
     summary.validated ? lang === "fr" ? `\u2713 Bilan de contre-expertise \u2192 ${mdPath} \u2014 gate s\xE9mantique vert.` : `\u2713 Counter-review summary \u2192 ${mdPath} \u2014 semantic gate green.` : lang === "fr" ? `Bilan de contre-expertise \u2192 ${mdPath} \u2014 audit NON valid\xE9 (gate ${summary.gate.ok ? "vert" : "en \xE9chec"}, ${summary.contestedEngine.length} d\xE9cision(s) moteur contest\xE9e(s), ${summary.untried.length} jamais mise(s) \xE0 l'\xE9preuve, ${summary.foreign.length} \xE9trang\xE8re(s)).` : `Counter-review summary \u2192 ${mdPath} \u2014 audit NOT validated (gate ${summary.gate.ok ? "green" : "failing"}, ${summary.contestedEngine.length} contested engine decision(s), ${summary.untried.length} never tried, ${summary.foreign.length} foreign).`
   );
@@ -65727,7 +66852,7 @@ function applyPrune(p2, standard, items, lang, untried = []) {
   let ledgerRepair;
   if (ledgerFile) {
     let ledger = readLedger(ledgerFile);
-    if (!ledger && !existsSync32(ledgerFile)) {
+    if (!ledger && !existsSync34(ledgerFile)) {
       ledger = emptyLedger(standard);
       console.error(
         lang === "fr" ? `\u26A0 Aucun registre en ${ledgerFile} \u2014 un registre vide est cr\xE9\xE9. Les verdicts d\xE9j\xE0 repli\xE9s n'y figurent pas : repliez-les avec \`verify --apply <ADJUDICATE.todo.json> --ledger\` pour qu'ils soient rejouables.` : `\u26A0 No ledger at ${ledgerFile} \u2014 creating an empty one. Verdicts folded earlier are not in it: fold them with \`verify --apply <ADJUDICATE.todo.json> --ledger\` to make them replayable.`
@@ -65743,8 +66868,8 @@ function applyPrune(p2, standard, items, lang, untried = []) {
     ledgerRepair = pruneLedger(ledger, items, pruned.reopenedCriteria, pruned.clearedConformities, root);
   }
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
-  mkdirSync17(out, { recursive: true });
-  writeFileSync17(join32(out, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
+  mkdirSync18(out, { recursive: true });
+  writeFileSync18(join34(out, "audit-latest.json"), JSON.stringify(auditDocumentFor(pruned.audit, standard, lang), null, 2) + "\n");
   if (ledgerFile && ledgerRepair) {
     writeLedger(ledgerFile, ledgerRepair.ledger);
     if (!p2.flags.json)
@@ -65863,8 +66988,8 @@ function cmdVerifyWorklist(p2, langIn) {
   const contextPath = writeVerifyContext(out, {
     kind: "verify-context",
     standard,
-    report: rep === "-" ? rep : resolve14(rep),
-    ...typeof inFlag === "string" && inFlag && inFlag !== "-" ? { in: resolve14(inFlag) } : {},
+    report: rep === "-" ? rep : resolve15(rep),
+    ...typeof inFlag === "string" && inFlag && inFlag !== "-" ? { in: resolve15(inFlag) } : {},
     conformities: trial.source,
     capped: { nc: droppedNc, c: droppedC }
   });
@@ -65898,14 +67023,14 @@ function conformityTrial(p2, standard, lang) {
     if (typeof inFlag === "string" && inFlag && inFlag !== "-") {
       try {
         const audit = unwrapAudit(JSON.parse(readText(inFlag)));
-        if (Array.isArray(audit.criteria)) return { claims: conformityClaimsFromAudit(audit, standard), source: { source: "in", path: resolve14(inFlag) } };
+        if (Array.isArray(audit.criteria)) return { claims: conformityClaimsFromAudit(audit, standard), source: { source: "in", path: resolve15(inFlag) } };
       } catch {
       }
     }
   }
   const path = named3 ?? ledgerPath(standard);
-  const source = { source: named3 ? "file" : "ledger", path: resolve14(path) };
-  if (!existsSync32(path)) {
+  const source = { source: named3 ? "file" : "ledger", path: resolve15(path) };
+  if (!existsSync34(path)) {
     if (named3) {
       console.error(
         lang === "fr" ? `ultra11y verify : fichier --conformities introuvable : ${named3}.` : `ultra11y verify: --conformities file not found: ${named3}.`
@@ -65985,9 +67110,9 @@ function replayLedgerFile(p2, ledger, lang) {
     return 1;
   }
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
-  mkdirSync17(out, { recursive: true });
-  const auditPath = join32(out, "audit-latest.json");
-  writeFileSync17(auditPath, `${JSON.stringify(auditDocumentFor(r2.audit, standard, lang), null, 2)}
+  mkdirSync18(out, { recursive: true });
+  const auditPath = join34(out, "audit-latest.json");
+  writeFileSync18(auditPath, `${JSON.stringify(auditDocumentFor(r2.audit, standard, lang), null, 2)}
 `);
   if (p2.flags.json)
     console.log(
@@ -66084,9 +67209,9 @@ function applyAdjudicationFile(p2, adj, lang) {
   if (!p2.flags.json) reportNotInWorklist(r2.notInWorklist, lang);
   if (!p2.flags.json) reportDuplicateCharges(r2.duplicateCharges, lang);
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
-  mkdirSync17(out, { recursive: true });
-  const auditPath = join32(out, "audit-latest.json");
-  writeFileSync17(auditPath, JSON.stringify(auditDocumentFor(r2.audit, adj.standard, lang), null, 2) + "\n");
+  mkdirSync18(out, { recursive: true });
+  const auditPath = join34(out, "audit-latest.json");
+  writeFileSync18(auditPath, JSON.stringify(auditDocumentFor(r2.audit, adj.standard, lang), null, 2) + "\n");
   const ledgerOut = ledgerTarget(p2, adj.standard);
   if (ledgerOut) {
     const blind = unreadableCaptures(r2.audit);
@@ -66187,7 +67312,165 @@ Iterated over ${rounds} round(s) to a fixpoint \u2014 ${totalWritten} file(s) wr
 }
 function scanSnapshotRoot(flags) {
   if (flags["no-snapshot"] === true) return void 0;
-  return typeof flags.root === "string" && flags.root ? resolve14(flags.root) : process.cwd();
+  return typeof flags.root === "string" && flags.root ? resolve15(flags.root) : process.cwd();
+}
+async function cmdJourney(p2) {
+  const sub = p2.positionals[0];
+  const root = typeof p2.flags.root === "string" && p2.flags.root ? resolve15(p2.flags.root) : process.cwd();
+  const files = listJourneyFiles(root);
+  if (sub === "list") {
+    const lang2 = resolveLang(p2.flags);
+    const runs = new Map((readJourneyRuns(root)?.journeys ?? []).map((r2) => [r2.name, r2]));
+    const rows = files.map((f2) => {
+      const j = f2.validation.journey;
+      const last = j ? runs.get(j.name) : void 0;
+      return {
+        name: j?.name ?? f2.base,
+        file: f2.file,
+        valid: f2.validation.ok,
+        ...f2.validation.ok ? {} : { issues: f2.validation.issues },
+        steps: j?.steps.length ?? 0,
+        keyboardOnly: j?.keyboardOnly === true,
+        lastRun: last ? last.status : "not-run",
+        ...last?.reason ? { reason: last.reason } : {}
+      };
+    });
+    if (p2.flags.json) {
+      console.log(JSON.stringify(rows, null, 2));
+      return rows.every((r2) => r2.valid) ? 0 : 1;
+    }
+    if (!rows.length) {
+      console.log(lang2 === "fr" ? `Aucun parcours dans ${JOURNEYS_DIR}/.` : `No journey in ${JOURNEYS_DIR}/.`);
+      return 0;
+    }
+    for (const r2 of rows) {
+      console.log(
+        `${r2.valid ? "\u2022" : "\u2717"} ${r2.name} \u2014 ${r2.file}, ${r2.steps} step(s)${r2.keyboardOnly ? ", keyboard only" : ""}, last run: ${r2.lastRun}${r2.reason ? ` (${r2.reason})` : ""}`
+      );
+      for (const i of r2.issues ?? []) console.log(`    \u2717 ${i.path ? `${i.path}: ` : ""}${i.message}`);
+    }
+    return rows.every((r2) => r2.valid) ? 0 : 1;
+  }
+  if (sub !== "run") {
+    console.error("ultra11y journey: use `journey run [<name>\u2026 | --all]` or `journey list`.");
+    return 2;
+  }
+  const standard = stdOf(p2, "journey");
+  if (standard === null) return 2;
+  const mergeAudit = peekMergeAudit(p2.flags.merge);
+  const lang = resolveLang(p2.flags, mergeAudit ? { audit: mergeAudit, standard } : { standard });
+  const names = p2.positionals.slice(1);
+  if (!names.length && p2.flags.all !== true) {
+    console.error(
+      lang === "fr" ? `ultra11y journey run : nommez un parcours de ${JOURNEYS_DIR}/ ou passez --all.` : `ultra11y journey run: name a journey of ${JOURNEYS_DIR}/ or pass --all.`
+    );
+    return 2;
+  }
+  const chosen = names.length ? files.filter((f2) => names.includes(f2.base) || names.includes(f2.validation.journey?.name ?? "")) : files;
+  const unknown = names.filter((n) => !chosen.some((f2) => f2.base === n || f2.validation.journey?.name === n));
+  if (unknown.length || !chosen.length) {
+    console.error(
+      lang === "fr" ? `ultra11y journey run : parcours introuvable(s) dans ${JOURNEYS_DIR}/ : ${unknown.join(", ") || "(aucun fichier)"}.` : `ultra11y journey run: journey(s) not found in ${JOURNEYS_DIR}/: ${unknown.join(", ") || "(no file)"}.`
+    );
+    return 2;
+  }
+  const invalid = chosen.filter((f2) => !f2.validation.ok);
+  if (invalid.length) {
+    for (const f2 of invalid) {
+      console.error(lang === "fr" ? `ultra11y journey run : ${f2.file} est invalide :` : `ultra11y journey run: ${f2.file} is invalid:`);
+      for (const i of f2.validation.issues) console.error(`  \u2717 ${i.path ? `${i.path}: ` : ""}${i.message}`);
+    }
+    return 2;
+  }
+  const cwd = typeof p2.flags.cwd === "string" && p2.flags.cwd ? p2.flags.cwd : process.cwd();
+  const storageState = typeof p2.flags["storage-state"] === "string" && p2.flags["storage-state"] ? p2.flags["storage-state"] : void 0;
+  const baseUrl = typeof p2.flags["base-url"] === "string" && p2.flags["base-url"] ? p2.flags["base-url"] : void 0;
+  let result;
+  try {
+    result = await runJourneys(
+      chosen.map((f2) => ({ journey: f2.validation.journey, file: f2.file })),
+      {
+        root,
+        cwd,
+        lang,
+        keyboard: p2.flags.keyboard === true,
+        ...storageState ? { storageState } : {},
+        ...baseUrl ? { baseUrl } : {},
+        ...browserPathOf(p2.flags) ? { browserPath: browserPathOf(p2.flags) } : {},
+        onStep: (name, st) => console.error(
+          `ultra11y journey: ${name} ${st.n}. ${st.label} \u2014 ${st.status}${st.reason ? ` (${st.reason})` : ""}${st.keyboard && st.keyboard !== "focus" ? ` [${st.keyboard}]` : ""}${st.observed?.length ? ` {${st.observed.join(", ")}}` : ""}`
+        )
+      }
+    );
+  } catch (e) {
+    console.error(`ultra11y journey run: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  writeJourneyRuns(root, result.records);
+  const failed = result.records.filter((r2) => r2.status !== "done");
+  for (const r2 of failed)
+    console.error(
+      lang === "fr" ? `\u26A0\uFE0F ultra11y journey : \xAB ${r2.name} \xBB arr\xEAt\xE9 \u2014 ${r2.reason ?? "non jou\xE9"}. Les \xE9tapes suivantes ne sont pas jou\xE9es.` : `\u26A0\uFE0F ultra11y journey: "${r2.name}" stopped \u2014 ${r2.reason ?? "not run"}. The later steps are not run.`
+    );
+  const mergeIn = p2.flags.merge;
+  if (typeof mergeIn === "string" && mergeIn) {
+    let audit;
+    if (mergeAudit) audit = mergeAudit;
+    else {
+      let parsed;
+      try {
+        parsed = unwrapAudit(JSON.parse(readText(mergeIn)));
+      } catch {
+        console.error("ultra11y journey run: --merge is not valid JSON (expected an AuditResult).");
+        return 2;
+      }
+      if (!isCurrentAudit(parsed)) {
+        console.error("ultra11y journey run: --merge input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+        return 2;
+      }
+      audit = parsed;
+    }
+    let merged = mergeDynamic(
+      audit,
+      {
+        tool: "ultra11y",
+        engine: JOURNEY_ENGINE,
+        target: `${result.records.length} journey(s)`,
+        date: today(),
+        findings: result.unsnapshotted,
+        ...result.testedScs.length ? { testedScs: result.testedScs } : {},
+        ...result.axe ? { axe: result.axe } : {}
+      },
+      lang
+    );
+    if (result.snapshots.length) {
+      const doms = result.snapshots.map((id) => join34(root, PAGES_DIR, id, "dom.html")).filter((f2) => existsSync34(f2));
+      if (doms.length) merged = mergeSnapshotAudit(merged, runAudit({ inputs: doms, onWarn: (m3) => console.error(m3) }));
+      const scope = pageScopesFrom(readSnapshots(root));
+      if (scope.length) {
+        merged.scope.pages = scope;
+        attributePages(merged, scope);
+      }
+    }
+    stampRoutes(merged, root, lang, { scanned: result.scanned });
+    const journeys = journeyScopeFor(root);
+    if (journeys) merged.scope.journeys = journeys;
+    const out = typeof p2.flags.out === "string" ? p2.flags.out : "audits";
+    mkdirSync18(out, { recursive: true });
+    const doc = auditDocumentFor(merged, standard, lang);
+    writeFileSync18(join34(out, "audit-latest.json"), `${JSON.stringify(doc, null, 2)}
+`);
+    if (p2.flags.json) console.log(JSON.stringify({ journeys: result.records, ...doc }, null, 2));
+    else
+      console.log(
+        lang === "fr" ? `Parcours fusionn\xE9s \u2192 ${join34(out, "audit-latest.json")} (${result.snapshots.length} \xE9tat(s) de page dans ${PAGES_DIR}/, bilan dans ${JOURNEY_RUNS_FILE}).` : `Journeys merged \u2192 ${join34(out, "audit-latest.json")} (${result.snapshots.length} page state(s) in ${PAGES_DIR}/, run record in ${JOURNEY_RUNS_FILE}).`
+      );
+  } else if (p2.flags.json) console.log(JSON.stringify({ journeys: result.records, snapshots: result.snapshots, findings: result.findings }, null, 2));
+  else
+    console.log(
+      lang === "fr" ? `${result.records.length} parcours rejou\xE9(s), ${failed.length} en \xE9chec \u2014 ${result.snapshots.length} \xE9tat(s) de page dans ${PAGES_DIR}/, ${result.findings.length} constat(s). Bilan : ${JOURNEY_RUNS_FILE}. Fusionnez avec --merge <audit.json>.` : `${result.records.length} journey(s) replayed, ${failed.length} failed \u2014 ${result.snapshots.length} page state(s) in ${PAGES_DIR}/, ${result.findings.length} finding(s). Run record: ${JOURNEY_RUNS_FILE}. Fold them in with --merge <audit.json>.`
+    );
+  return failed.length ? 1 : 0;
 }
 async function cmdScan(p2) {
   const standard = stdOf(p2, "scan");
@@ -66195,7 +67478,7 @@ async function cmdScan(p2) {
   const mergeAudit = peekMergeAudit(p2.flags.merge);
   const lang = resolveLang(p2.flags, mergeAudit ? { audit: mergeAudit, standard } : { standard });
   for (const target of p2.positionals.filter((a2) => a2 !== "-")) {
-    if (/^https?:\/\//i.test(target) || existsSync32(target)) continue;
+    if (/^https?:\/\//i.test(target) || existsSync34(target)) continue;
     console.error(
       lang === "fr" ? `ultra11y scan : fichier introuvable (file not found) : ${target}. Passez une URL http(s):// ou un fichier HTML existant.` : `ultra11y scan: File not found: ${target}. Pass an http(s):// URL or an existing HTML file.`
     );
@@ -66240,7 +67523,7 @@ async function cmdScan(p2) {
     sampleConfig = v2.sample;
   }
   const allRoutes = p2.flags["all-routes"] === true;
-  const routesRoot = typeof p2.flags.root === "string" && p2.flags.root ? resolve14(p2.flags.root) : process.cwd();
+  const routesRoot = typeof p2.flags.root === "string" && p2.flags.root ? resolve15(p2.flags.root) : process.cwd();
   let maxRoutes = ALL_ROUTES_MAX;
   let routePlan;
   if (allRoutes) {
@@ -66374,7 +67657,7 @@ async function cmdScan(p2) {
     }
     let merged = mergeDynamic(audit, dynamic, lang);
     if (dynamic.snapshots?.length) {
-      const doms = dynamic.snapshots.map((id) => join32(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f2) => existsSync32(f2));
+      const doms = dynamic.snapshots.map((id) => join34(snapshotRoot ?? ".", PAGES_DIR, id, "dom.html")).filter((f2) => existsSync34(f2));
       if (doms.length) {
         const snapAudit = runAudit({ inputs: [...doms, ...documentFiles], onWarn: (m3) => console.error(m3) });
         merged = mergeSnapshotAudit(merged, snapAudit);
@@ -66392,9 +67675,9 @@ async function cmdScan(p2) {
       // disk: under --no-snapshot there are none, and the routes it visited are still scanned.
       ...dynamic.scanned?.length ? { scanned: dynamic.scanned } : {}
     });
-    mkdirSync17(out, { recursive: true });
+    mkdirSync18(out, { recursive: true });
     const mergedDocument = auditDocumentFor(merged, standard, lang);
-    writeFileSync17(join32(out, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
+    writeFileSync18(join34(out, "audit-latest.json"), JSON.stringify(mergedDocument, null, 2) + "\n");
     if (p2.flags.json)
       console.log(
         JSON.stringify(
@@ -66410,7 +67693,7 @@ async function cmdScan(p2) {
       );
     else {
       console.log(
-        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join32(out, "audit-latest.json")} (${merged.conformancePct}% de r\xE9ussite automatique, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join32(out, "audit-latest.json")} (${merged.conformancePct}% automatic pass rate, ${merged.findings.length} findings).`
+        lang === "fr" ? `Audit statique + dynamique fusionn\xE9 \u2192 ${join34(out, "audit-latest.json")} (${merged.conformancePct}% de r\xE9ussite automatique, ${merged.findings.length} findings).` : `Static + dynamic audit merged \u2192 ${join34(out, "audit-latest.json")} (${merged.conformancePct}% automatic pass rate, ${merged.findings.length} findings).`
       );
       if (dynamic.snapshots?.length)
         console.log(
@@ -66589,7 +67872,7 @@ function cmdOrchestrate(p2) {
   }
   const engineAbs = realpathSync6(fileURLToPath4(import.meta.url));
   if (p2.flags.list === true) {
-    if (!existsSync32(runFlag)) {
+    if (!existsSync34(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }
@@ -66597,7 +67880,7 @@ function cmdOrchestrate(p2) {
     return 0;
   }
   if (p2.flags.manifest === true) {
-    if (!existsSync32(runFlag)) {
+    if (!existsSync34(runFlag)) {
       console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
       return 2;
     }
@@ -66629,7 +67912,7 @@ function cmdOrchestrate(p2) {
     );
   } else {
     console.log(
-      lang === "fr" ? `Suivez ${join32(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join32(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
+      lang === "fr" ? `Suivez ${join34(runFlag, "orchestration", "RUNBOOK.md")} s\xE9quentiellement (chemin \xE9co).` : `Follow ${join34(runFlag, "orchestration", "RUNBOOK.md")} sequentially (the eco path).`
     );
   }
   if (p2.flags.phase === void 0 && workflows.length === 0 && p2.flags.eco !== true) {
@@ -66742,6 +68025,8 @@ async function main(argv) {
       return cmdUninstall(p2);
     case "status":
       return cmdStatus(p2);
+    case "journey":
+      return cmdJourney(p2);
     default:
       console.error(`ultra11y: "${p2.command}" is not implemented yet`);
       return 1;

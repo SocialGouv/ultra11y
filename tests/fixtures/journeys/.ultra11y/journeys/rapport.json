@@ -1,0 +1,8 @@
+{
+  "name": "rapport",
+  "startUrl": "/#/rapport",
+  "steps": [
+    { "action": "click", "target": { "text": "Télécharger le rapport" } },
+    { "action": "expect", "target": { "text": "Le rapport est prêt." } }
+  ]
+}
