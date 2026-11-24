@@ -42,6 +42,7 @@ import {
 } from "./adjudicate-subjects.js";
 import type { Doc } from "./parse/html.js";
 import { ADJUDICATION, adjudicationForWcagRefs } from "./adjudication-data.js";
+import { PACK_RULINGS, packRulingNotes, SEVERITY_RUBRIC, severityRubricLine } from "./adjudication-rulings.js";
 import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle, understanding } from "./wcag.js";
 import { groundFinding, type GroundingSummary } from "./grounding.js";
 import {
@@ -251,6 +252,7 @@ export function adjudicationContract(): AdjudicationContract {
       manual: `a reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`,
       human: `decidedBy "human" (a human auditor's verdict, instead of the default "agent") requires auditor: { name, organisation? } — the same evidence gate applies, and the verdict is reported under the auditor's name`,
       recommendations: RECOMMENDATION_SHAPE,
+      severity: `on every NC finding: ${(Object.entries(SEVERITY_RUBRIC) as [string, { en: string }][]).map(([k, v]) => `${k} = ${v.en}`).join("; ")}. One defect at one anchor keeps ONE severity, the highest, even when two criteria cite it; a recommendation is always mineur`,
     },
   };
 }
@@ -910,6 +912,10 @@ export interface ApplyAdjudicationResult {
    *  In strict mode they are also carried in `issues`, since a gap still voids the whole fold. */
   notInWorklist: string[];
   grounding: GroundingSummary;
+  /** Anchors this fold charged as NC under several criteria (`duplicateCharges`), each naming
+   *  the severities it got and the single one the rubric keeps. A WARNING: nothing was refused
+   *  or rewritten. Absent when there is none. */
+  duplicateCharges?: string[];
 }
 
 const NC_SEVERITY_DEFAULT: Severity = "majeur";
@@ -1590,7 +1596,18 @@ export function applyAdjudication(
     // resolve them — but they never touch a WCAG criterion's status.
     next.findings = [...next.findings, ...newFindings];
     next.adjudicated = { date: adj.auditDate, applied, stillManual, ...(rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {}) };
-    return { ok: complete, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, notInWorklist, grounding };
+    return {
+      ok: complete,
+      audit: next,
+      issues,
+      applied,
+      stillManual,
+      rejected: rejectedCriteria.length,
+      rejectedCriteria,
+      notInWorklist,
+      grounding,
+      ...chargedTwice(newFindings),
+    };
   }
 
   for (const it of adj.items) {
@@ -1655,7 +1672,18 @@ export function applyAdjudication(
     .map((r) => (rejectedSet.has(r.criteriaId) ? { ...r, reason: rejectedWhy(r.criteriaId) } : r));
   recomputeTallies(next);
   next.adjudicated = { date: adj.auditDate, applied, stillManual, ...(rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {}) };
-  return { ok: complete, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, notInWorklist, grounding };
+  return {
+    ok: complete,
+    audit: next,
+    issues,
+    applied,
+    stillManual,
+    rejected: rejectedCriteria.length,
+    rejectedCriteria,
+    notInWorklist,
+    grounding,
+    ...chargedTwice(newFindings),
+  };
 }
 
 /** A severity the ENGINE understands, from whatever the model wrote.
@@ -1671,11 +1699,62 @@ export function applyAdjudication(
  *  never to `mineur`, which would silently downgrade a non-conformity because a model misspelt
  *  a word. */
 export function agentSeverity(v: unknown, advisory: boolean): Severity {
+  // A RECOMMENDATION IS NEVER ABOVE A NUISANCE (#183). The rubric's `bloquant` (no access) and
+  // `majeur` (access at a significant extra effort) describe a defect that fails a test — and a
+  // defect that fails a test is an NC, not a recommendation. A model that grades a
+  // recommendation `bloquant` has misfiled a non-conformity, or overstated a good practice;
+  // either way the deliverable must not print it as blocking beside a criterion it never failed.
+  if (advisory) return "mineur";
   if (v === "bloquant" || v === "majeur" || v === "mineur") return v;
   if (v === "critical" || v === "serious") return "bloquant";
   if (v === "moderate") return "majeur";
   if (v === "minor") return "mineur";
-  return advisory ? "mineur" : NC_SEVERITY_DEFAULT;
+  return NC_SEVERITY_DEFAULT;
+}
+
+const SEVERITY_RANK: Record<Severity, number> = { bloquant: 3, majeur: 2, mineur: 1 };
+
+/** `duplicateCharges` as a spreadable result field: no key at all when there is nothing to say. */
+function chargedTwice(findings: readonly Finding[]): { duplicateCharges?: string[] } {
+  const d = duplicateCharges(findings);
+  return d.length ? { duplicateCharges: d } : {};
+}
+
+/** The anchors one fold charges as NC under SEVERAL criteria, each with the severity it got
+ *  under each criterion (#183).
+ *
+ *  A WARNING, never a refusal, and never a rewrite. Three options were weighed:
+ *   - deduplicating the report's counts would erase a non-conformity the standard itself counts
+ *     PER CRITERION (one element can legitimately fail 6.1 and 12.3, and both criteria are NC);
+ *   - refusing would turn down true findings, the same trap the presupposition check in the
+ *     gate is narrowed to avoid (« two defects on one element are not one defect charged twice »);
+ *   - raising every copy to the highest severity would inflate the very counts it means to fix.
+ *  What stays robust is to name the anchor, the criteria and their severities, and the single
+ *  severity the rubric says the defect keeps: whoever reads the fold (or re-adjudicates) settles
+ *  it with that in hand. Keyed on the exact anchor — file, line and selector — like every other
+ *  cross-criterion check here. Agent findings only: the engine's own are graded by its rules,
+ *  not by a model. */
+export function duplicateCharges(findings: readonly Finding[]): string[] {
+  const byAnchor = new Map<string, Finding[]>();
+  for (const f of findings) {
+    if (f.advisory || !f.ruleId.startsWith("agent:") || !f.file?.trim()) continue;
+    const k = anchorKey(f.file, f.line, f.selectorHint ?? "");
+    const list = byAnchor.get(k);
+    if (list) list.push(f);
+    else byAnchor.set(k, [f]);
+  }
+  const out: string[] = [];
+  for (const list of byAnchor.values()) {
+    const criteria = [...new Set(list.map((f) => f.criteriaId))];
+    if (criteria.length < 2) continue;
+    const top = list.reduce((a, b) => (SEVERITY_RANK[b.severity] > SEVERITY_RANK[a.severity] ? b : a));
+    const per = criteria.map((id) => `${id} ${list.find((f) => f.criteriaId === id)?.severity}`).join(", ");
+    const f0 = list[0] as Finding;
+    out.push(
+      `${f0.file}:${f0.line}${f0.selectorHint ? ` (${f0.selectorHint})` : ""} is charged under ${criteria.length} criteria (${per}) — one defect keeps ONE severity, the highest (${top.severity}); keep the others only if each is a different failure`,
+    );
+  }
+  return out;
 }
 
 /** One element, keyed the way the double-charge check compares them: file, line and selector,
@@ -1947,6 +2026,7 @@ const T = {
       "Le texte ci-dessus est celui du référentiel : c'est LUI qui tranche. Si une formulation reste ambiguë et que vous disposez d'un outil web, vous POUVEZ consulter la page officielle ci-dessus pour la lever — jamais pour la contredire, jamais pour élargir un test, et une page web n'est jamais un `normativeRef` : seules les références normatives listées ci-dessous en sont.",
     technicalNote: "Note technique",
     particularCases: "Cas particuliers",
+    rulings: (name: string) => `Comment le texte ${name} tranche les cas récurrents de ce critère`,
     glossary: "Termes définis par le référentiel",
     neighbours: "Ce constat appartient-il bien ici ?",
     neighboursLead: () =>
@@ -2001,6 +2081,7 @@ const T = {
       "The text above is the standard's own, and it is what decides. If a wording stays ambiguous and you have a web tool, you MAY consult the official page above to settle it — never to contradict it, never to widen a test, and a web page is never a `normativeRef`: only the normative references listed below are.",
     technicalNote: "Technical note",
     particularCases: "Particular cases",
+    rulings: (name: string) => `How the ${name} text settles this criterion's recurring cases`,
     glossary: "Terms the standard defines",
     neighbours: "Does this observation belong here?",
     neighboursLead: () =>
@@ -2027,7 +2108,7 @@ const MAX_REFS = 12;
  *  worklist uses, so the page an agent reads and the prompt it answers can never drift. */
 export function renderAdjudicationReference(lang: Lang = "en"): string {
   const out: string[] = [];
-  out.push("<!-- GENERATED from src/data/adjudication.json by `pnpm run build:adjudication` — do not edit by hand. -->", "");
+  out.push("<!-- GENERATED from src/data/adjudication.json and src/adjudication-rulings.ts by `pnpm run build:adjudication` — do not edit by hand. -->", "");
   out.push("# Deciding the criteria the engine hands you", "");
   out.push(
     "The static engine decides 3 of the 55 WCAG 2.2 AA success criteria outright. The other 52",
@@ -2064,6 +2145,37 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
   for (const [guideline, lines] of byGuideline) {
     out.push(`## ${guideline} ${guidelineTitle(guideline, lang) ?? ""}`.trimEnd(), "");
     out.push(...lines);
+  }
+  // THE SEVERITY RUBRIC and THE PACK RULING NOTES (#183) — the same text the briefs carry, so
+  // this page and the worklist cannot disagree on them either.
+  out.push(
+    "## Severity",
+    "",
+    "Every NC finding carries a `severity`. The rubric is this tool's — the standards rule conformity, not severity:",
+    "",
+    ...(Object.entries(SEVERITY_RUBRIC) as [string, { fr: string; en: string }][]).map(([k, v]) => `- **\`${k}\`** — ${v[lang]};`),
+    "",
+    "A defect observed at the same anchor under two criteria keeps ONE severity, the highest, not one per",
+    "criterion — the fold warns when it is charged twice. A recommendation is never above `mineur`: a",
+    "defect that leaves no access fails a test, and is an NC.",
+    "",
+  );
+  for (const [packKey, byCriterion] of Object.entries(PACK_RULINGS)) {
+    const name = packKey === "rgaa" ? "RGAA 4.1.2" : packKey;
+    out.push(
+      `## ${name} — how the standard's own text settles the recurring cases`,
+      "",
+      "Each note rests on the quoted words of the standard (its tests, methodology, particular cases or",
+      "glossary), and the brief of the criterion prints it under the criterion's own text.",
+      "",
+    );
+    const ids = Object.keys(byCriterion).sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+    for (const id of ids) {
+      const r = byCriterion[id]!;
+      out.push(`### ${name} ${id}`, "");
+      for (const n of r.notes) out.push(`- ${n[lang]}`);
+      out.push("", `**Grounds.** ${r.grounds.map((g) => `« ${plainTest(g)} »`).join(" · ")}`, "");
+    }
   }
   return out.join("\n");
 }
@@ -2266,8 +2378,8 @@ export function formatAdjudication(
     opts.contract === false
       ? []
       : opts.preamble === false
-        ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, ""]
-        : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", s.then, ""];
+        ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", `> ${severityRubricLine(lang)}`, ""]
+        : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", `> ${severityRubricLine(lang)}`, "", s.then, ""];
   // THE RENDERED PAGE, WHEN THERE IS ONE.
   //
   // A `needs-rendering` criterion used to arrive with one instruction — answer
@@ -2486,6 +2598,15 @@ export function formatAdjudication(
       }
       if (crit?.technicalNote?.length) out.push(`> **${s.technicalNote}** — ${crit.technicalNote.map(plainTest).join(" ")}`, "");
       if (crit?.particularCases?.length) out.push(`> **${s.particularCases}** — ${crit.particularCases.map(plainTest).join(" ")}`, "");
+      // THE RULING NOTES, right under the text they read (#183): the recurring cases where the
+      // deciding sentence was in the brief and the verdict still took the broader reading.
+      // Every note rests on quoted words of the pack itself (src/adjudication-rulings.ts).
+      const rulings = packRulingNotes(pack.key, it.criteriaId, lang);
+      if (rulings.length) {
+        out.push(`> **${s.rulings(pack.name)}**`, "");
+        for (const n of rulings) out.push(`- ${n}`);
+        out.push("");
+      }
       out.push(...packGuidanceBlock(standard, it.criteriaId, lang));
       out.push(...sourceBlock(s, pack.name, it.criteriaId, criterionUrl(pack, it.criteriaId), opts.web === true));
       // Labelled for the standard in play. The core's wording names W3C techniques, which is

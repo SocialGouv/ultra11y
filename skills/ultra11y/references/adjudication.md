@@ -1,4 +1,4 @@
-<!-- GENERATED from src/data/adjudication.json by `pnpm run build:adjudication` — do not edit by hand. -->
+<!-- GENERATED from src/data/adjudication.json and src/adjudication-rulings.ts by `pnpm run build:adjudication` — do not edit by hand. -->
 
 # Deciding the criteria the engine hands you
 
@@ -197,6 +197,7 @@ this page can never disagree. Two rules govern every verdict below:
 **Ask.**
 
 - Does the remaining horizontal scrolling apply to genuinely exempt content, or to the whole page?
+- Is some information or functionality actually lost (text cut off, a control clipped or out of reach)? A small overflow of a decorative image, or of a box alone whose text and controls stay available, is a recommendation, not a non-conformity — and a shared component (a header, a footer) is one finding, not one per page.
 
 **Citable references.** C34, C37
 
@@ -597,3 +598,62 @@ this page can never disagree. Two rules govern every verdict below:
 - Is the politeness right: `polite` for a status, `alert`/`assertive` for a blocking error?
 
 **Citable references.** ARIA19, ARIA22, ARIA23
+
+## Severity
+
+Every NC finding carries a `severity`. The rubric is this tool's — the standards rule conformity, not severity:
+
+- **`bloquant`** — no access, no workaround;
+- **`majeur`** — access at the cost of a significant extra effort;
+- **`mineur`** — a nuisance;
+
+A defect observed at the same anchor under two criteria keeps ONE severity, the highest, not one per
+criterion — the fold warns when it is charged twice. A recommendation is never above `mineur`: a
+defect that leaves no access fails a test, and is an NC.
+
+## RGAA 4.1.2 — how the standard's own text settles the recurring cases
+
+Each note rests on the quoted words of the standard (its tests, methodology, particular cases or
+glossary), and the brief of the criterion prints it under the criterion's own text.
+
+### RGAA 4.1.2 6.1
+
+- A link whose label means nothing to ANYONE — a placeholder link (« Inaccessible », « Lien », « XXX ») that neither its label nor its context explains to a reader with no functional limitation — is the « ambigu pour tout le monde » case: 6.1.1 to 6.1.4 are NOT APPLICABLE to that link, not blocking. It is worth a recommendation at most (replace or remove the link); if it is broken, another criterion owns that (12.3.2 in a site map, for instance).
+- The `title` attribute is NOT a link context: the glossary lists six (the sentence, the paragraph, the list item, the preceding heading, the table header and the table cell), and `title` is not among them. It enters the label only as the last fallback of the accessible name, when the link has no content — so a `title` does not make explicit a link whose content is ambiguous.
+
+**Grounds.** « Il existe une gestion de cas particuliers pour les tests 6.1.1, 6.1.2, 6.1.3 et 6.1.4 lorsque le lien est ambigu pour tout le monde. Dans cette situation, où il n’est pas possible de rendre le lien explicite dans son contexte, le critère est non applicable. » · « un lecteur sans limitation fonctionnelle ne connaîtrait pas la fonction d’un lien avant de l’activer » · « Note 1 : l’un des 6 contextes de lien combiné à l’ intitulé du lien doit permettre de comprendre la fonction et la destination du lien. » · « sinon, contenu de l’attribut title »
+
+### RGAA 4.1.2 8.7
+
+- The harvest's « candidate passages » are LEADS, never NCs: a proper noun, a foreign-origin word present in the dictionary of the page's language, or a word in common use whose pronunciation causes no misunderstanding is exempt. An 8.7.1 NC needs a passage genuinely in a foreign language, with no `lang` on it or on a parent, whose speech rendering would be unintelligible (« deep linking » read with French phonetics, a whole English sentence).
+
+**Grounds.** « Des mots d’origine étrangère et d’usage courant dont la prononciation ne provoque pas d’incompréhension. » · « le critère est applicable, uniquement lorsque l’absence d’indication de langue peut provoquer une incompréhension pour la restitution. »
+
+### RGAA 4.1.2 9.4
+
+- A citation is the words of a THIRD PARTY, presented as reproduced verbatim, in the page's running content. The standard's glossary does not define « citation », so the word keeps that ordinary sense. NOT a citation: the definition of a term in a glossary tooltip, a paraphrase or summary of a law, a page or section title, a label, a key or field name, a slogan in quotation marks. A recommendation at most, never an NC.
+- An INLINE quotation (inside a sentence) can only fail 9.4.1 (`<q>`). 9.4.2 is about a BLOCK of quotation: never cite it for text inside a paragraph.
+- Never propose `<blockquote>` where only phrasing content is allowed (inside a `<span>`, an `<a>`, a `<label>`, a heading or a `<p>`): HTML forbids it there, and the fix would itself be a markup error. An inline quotation is fixed with `<q>`.
+
+**Grounds.** « Retrouver dans le document les citations courtes (ou en ligne) ; » · « Dans chaque page web, chaque citation courte utilise-t-elle une balise `<q>` ? » · « Dans chaque page web, chaque bloc de citation utilise-t-il une balise `<blockquote>` ? »
+
+### RGAA 4.1.2 10.10
+
+- 10.10 fails only when the information is given ONLY by shape, size or position. A reference that NAMES its target (« the Accessibility tools button », « see the Contact section ») is precisely the alternative means: it passes, even when the name it uses is stale (a button since relabelled). A stale name is a matter of content accuracy: a recommendation, not a 10.10 NC.
+- A 10.10 NC is cited on an instruction that points only at a shape, a size or a position (« click the button on the right », « the active tab is the one in front ») with no other way to recover the information.
+
+**Grounds.** « vérifier que le moyen alternatif de récupérer cette information est pertinent, c’est-à-dire qu’il permet de transmettre l’information dans tous les contextes de consultation et pour tous les utilisateurs. » · « l’information ne doit pas être donnée uniquement [par la forme, taille ou position] »
+
+### RGAA 4.1.2 10.11
+
+- An NC requires that at 320 px some INFORMATION or FUNCTION is no longer available without horizontal scrolling: text cut off, a control clipped or out of reach. A small overflow of a decorative image, or of a box alone (a background, a border) while all its text and controls stay available, is a recommendation. Images, graphics, videos, data tables and interfaces that need a horizontal scrollbar are the criterion's own exceptions.
+- A convention of this report (not a rule of the standard): a shared component (a header, footer or navigation rendered on every page) is ONE finding, anchored on the component or on the first page it is observed on — not one per page. Name the other pages in the message.
+
+**Grounds.** « l’ensemble des informations et des fonctionnalités sont-elles disponibles sans aucun défilement horizontal (hors cas particuliers) ? » · « sans perte d’information ou de fonctionnalité » · « - Les images, les graphiques ou les vidéos ; »
+
+### RGAA 4.1.2 12.3
+
+- Placeholder entries in a site map (a label that names no page, an `href="#"`) are AT MOST one minor (`mineur`) NC on 12.3.3 — a link that does not lead to the page its label indicates —, cited once on those entries, or a recommendation. And only AFTER checking where the links lead: a link in error belongs to 12.3.2, and a site map that omits pages still passes 12.3.1 if they can be reached otherwise.
+- These are the very links 6.1 rules « ambigu pour tout le monde »: do not charge them a second time with another severity.
+
+**Grounds.** « Les liens du plan du site renvoient-ils bien vers les pages indiquées par l’intitulé ? » · « vérifier qu’ils sont à jour (ni obsolètes ni en erreur) et conduisent à la page indiquée par leur intitulé » · « Il n'est pas obligatoire que toutes les pages soient présentes dans le plan du site si elles peuvent être atteintes, par exemple, à partir de la page d'accueil d'une rubrique ou d'un catalogue. »

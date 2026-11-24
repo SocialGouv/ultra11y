@@ -3547,6 +3547,19 @@ function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): num
 /** Name the open criteria a fold did not carry, APART from the refusals. A lot (a partial
  *  worklist) leaves every other criterion out by construction; listing them under « refused by
  *  the gate » read as if verdicts had been turned down that nobody wrote (#132). */
+/** One defect, one severity (#183): the anchors the fold saw charged under several criteria.
+ *  A warning — nothing was refused — so it goes to stderr beside the other fold notes. */
+function reportDuplicateCharges(list: string[] | undefined, lang: Lang): void {
+  if (!list?.length) return;
+  console.error(
+    lang === "fr"
+      ? `⚠ ${list.length} ancre(s) facturée(s) sous plusieurs critères — un défaut garde UNE gravité, la plus haute (rien n'a été refusé) :`
+      : `⚠ ${list.length} anchor(s) charged under several criteria — one defect keeps ONE severity, the highest (nothing was refused):`,
+  );
+  for (const d of list.slice(0, 20)) console.error(`  ⚠ ${d}`);
+  if (list.length > 20) console.error(`  … +${list.length - 20}`);
+}
+
 function reportNotInWorklist(ids: string[], lang: Lang): void {
   if (!ids.length) return;
   const shown = ids.slice(0, 40).join(", ") + (ids.length > 40 ? ` … +${ids.length - 40}` : "");
@@ -3607,6 +3620,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
     for (const i of r.issues) console.error(`  ✗ ${i}`);
   }
   if (!p.flags.json) reportNotInWorklist(r.notInWorklist, lang);
+  if (!p.flags.json) reportDuplicateCharges(r.duplicateCharges, lang);
   // Persist the updated audit so report/prd re-render with the adjudicated statuses.
   const out = typeof p.flags.out === "string" ? (p.flags.out as string) : ".";
   mkdirSync(out, { recursive: true });
@@ -3665,6 +3679,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
           rejectedCriteria: r.rejectedCriteria,
           notInWorklist: r.notInWorklist,
           issues: r.issues,
+          ...(r.duplicateCharges ? { duplicateCharges: r.duplicateCharges } : {}),
           conformancePct: r.audit.conformancePct,
           ...foldRates(r.audit, adj.standard),
           findings: r.audit.findings.length,

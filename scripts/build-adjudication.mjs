@@ -185,7 +185,13 @@ const ADJUDICATION = {
       "Décidé sur le rendu : à 320 px de large (équivalent 400 % sur 1280 px), aucun défilement bidirectionnel n'est requis, sauf pour un contenu qui l'exige par nature (carte, tableau de données larges).",
       "Decided on the render: at 320 CSS px wide (equivalent to 400% on 1280px), no two-dimensional scrolling is required, except for content that inherently needs it (a map, a wide data table).",
     ),
-    questions: [q("Le défilement horizontal restant concerne-t-il un contenu réellement exempté, ou toute la page ?", "Does the remaining horizontal scrolling apply to genuinely exempt content, or to the whole page?")],
+    questions: [
+      q("Le défilement horizontal restant concerne-t-il un contenu réellement exempté, ou toute la page ?", "Does the remaining horizontal scrolling apply to genuinely exempt content, or to the whole page?"),
+      q(
+        "Une information ou une fonctionnalité est-elle réellement perdue (texte coupé, contrôle rogné ou hors d'atteinte) ? Le petit débordement d'une image décorative, ou d'une boîte seule dont le texte et les contrôles restent disponibles, est une recommandation, pas une non-conformité — et un composant partagé (en-tête, pied de page) fait un seul constat, pas un par page.",
+        "Is some information or functionality actually lost (text cut off, a control clipped or out of reach)? A small overflow of a decorative image, or of a box alone whose text and controls stay available, is a recommendation, not a non-conformity — and a shared component (a header, a footer) is one finding, not one per page.",
+      ),
+    ],
   },
   "1.4.11": {
     decide: q(

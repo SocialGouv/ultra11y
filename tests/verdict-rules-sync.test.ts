@@ -36,6 +36,11 @@ const CLAUSES: [name: string, probe: RegExp][] = [
   // rather than on relevance shipped as an accessibility claim.
   ["a C will be attacked too", /A `C` WILL BE ATTACKED/],
   ["presence is not relevance", /a present `alt` is not a relevant `alt`/],
+  // #183: the severity was a bare enum, and the same defect came back majeur in one run and
+  // mineur in the next. The rubric, and the one-defect-one-severity rule, travel everywhere.
+  ["the severity rubric", /`bloquant` — no access, no workaround; `majeur` — access at the cost of a significant extra effort; `mineur` — a nuisance/],
+  ["one defect keeps one severity", /keeps ONE severity, the highest, not one per criterion/],
+  ["a recommendation is never above mineur", /A recommendation is never above `mineur`/],
 ];
 
 const SURFACES: [name: string, text: () => string][] = [
@@ -86,6 +91,6 @@ describe("the numbering is the only thing that varies between surfaces", () => {
         .split("\n")
         .filter((l) => /^\d+\. /.test(l))
         .map((l) => l.split(".")[0]),
-    ).toEqual(["2", "3", "4", "5", "6", "7", "8"]);
+    ).toEqual(["2", "3", "4", "5", "6", "7", "8", "9"]);
   });
 });
