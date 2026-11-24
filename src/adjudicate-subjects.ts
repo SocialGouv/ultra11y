@@ -413,6 +413,50 @@ const ROUTER_IMPORT =
 const FOREIGN_LEXICON =
   /(?<![\p{L}\p{N}_'’-])(?:the|and|with|your|you|our|we|this|that|these|those|from|for|of|to|is|are|was|were|will|would|should|can't|don't|do|does|not|here|there|what|which|who|how|why|when|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)(?![\p{L}\p{N}_'’-])/iu;
 
+// ENGLISH TERMS WITH NO FUNCTION WORD IN THEM — the recall gap of `FOREIGN_LEXICON` (#183).
+//
+// A field run had nothing to show RGAA 8.7 on a French page whose copy said « deep linking »:
+// two English words, neither of them a function word or an interface label, so the lexicon
+// above never matched and the criterion was ruled on an empty set. Two leads close that gap,
+// both deliberately narrow:
+//
+//   • a short list of English product and web phrases that French copy borrows verbatim and
+//     that are not French words (« feedback », « workflow », « call to action »…);
+//   • a two-word English compound ending in -ing (« deep linking », « load balancing »), with
+//     the -ing borrowings the French dictionary has adopted (« parking », « marketing »…) and the
+//     French determiners in front of them (« le », « du »…) ruled out.
+//
+// Still a LEAD, never a finding: RGAA 8.7 exempts a borrowing « d'usage courant dont la
+// prononciation ne provoque pas d'incompréhension », and only a reader can tell. The note says so.
+const ENGLISH_TERMS =
+  /(?<![\p{L}\p{N}_'’-])(?:feedbacks?|workflows?|roadmaps?|use cases?|user experience|user interface|best practices?|dark mode|light mode|design system|call to action|landing pages?|onboarding|offboarding|self-service|back[- ]office|release notes|pull requests?|merge requests?|privacy policy|cookie policy|terms of (?:use|service)|home ?page|site ?map|skip to (?:main )?content|back to top|contact us|about us|follow us|sign out|log out|checkout|look and feel|user-friendly|wishlist|early access|show more|see more|view all|load more)(?![\p{L}\p{N}_'’-])/iu;
+const ING_COMPOUND = /(?<![\p{L}\p{N}_'’-])([a-z]{3,})[ -]([a-z]{3,}ing)(?![\p{L}\p{N}_'’-])/giu;
+/** -ing words the French dictionary has adopted, and so no lead on their own. */
+const FRENCH_ING = new Set(
+  "parking camping marketing shopping meeting planning briefing debriefing casting coaching jogging lifting piercing pressing smoking sponsoring standing timing training zapping brushing footing building dancing karting leasing lobbying mailing listing holding branding ranking rafting surfing bowling catering consulting crowdfunding dumping forcing merchandising monitoring networking outsourcing phishing pudding living doping dressing feeling happening jumping peeling reporting scouting shampooing sitting skating sterling string swing thing travelling trekking yachting streaming coworking cocooning packaging benchmarking recycling ring king".split(
+    " ",
+  ),
+);
+/** French words that can stand right before a borrowed -ing word (« le parking », « du coaching »). */
+const FRENCH_LEAD = new Set(
+  "le la les l du de des un une en et ou au aux son sa ses ce cet cette ces mon ma mes ton ta tes notre nos votre vos leur leurs pour par sur sous dans avec sans vers chez entre bon grand petit gros nouveau faire fait".split(
+    " ",
+  ),
+);
+/** The English terms a text run carries that `FOREIGN_LEXICON` cannot see, deduplicated. */
+export function englishTermsIn(text: string): string[] {
+  const out = new Set<string>();
+  const listed = text.match(new RegExp(ENGLISH_TERMS.source, "giu"));
+  for (const m of listed ?? []) out.add(m.toLowerCase());
+  for (const m of text.matchAll(ING_COMPOUND)) {
+    const lead = (m[1] ?? "").toLowerCase();
+    const ing = (m[2] ?? "").toLowerCase();
+    if (FRENCH_LEAD.has(lead) || FRENCH_ING.has(ing) || FRENCH_ING.has(lead)) continue;
+    out.add(`${lead} ${ing}`);
+  }
+  return [...out];
+}
+
 const CONTROL_TAGS = ["input", "select", "textarea"] as const;
 // The rest of the glossary's « champ de saisie de formulaire »: the native output elements it
 // names, and the ARIA roles that stand in for a field. A form built of ARIA widgets is still a
@@ -1368,6 +1412,42 @@ export const SUBJECTS: Record<string, Subject> = {
           ),
         ),
     ]),
+
+  // RGAA 8.7 — English TERMS on a page that is not in English (#183): the candidates
+  // `langParts` cannot see because they carry no function word (« deep linking »). A run that
+  // `langParts` already lists is left to it, so one text never becomes two candidates; a page
+  // that declares English is skipped whole, since there English is the default language.
+  foreignTerms: (docs) =>
+    docs.flatMap((d) => {
+      const root = elementsByTag(d, "html")[0];
+      const declared = ((root && attr(root, "lang")) ?? "").trim().toLowerCase();
+      if (declared.startsWith("en")) return [];
+      return textRuns(d)
+        .filter(
+          ({ el: e, text }) =>
+            !FOREIGN_LEXICON.test(text) &&
+            ![e, ...ancestors(e)].some((a) => a.tag !== "html" && attr(a, "lang") !== undefined) &&
+            roleOf(e) !== "img" &&
+            !insideRoleImg(e),
+        )
+        .flatMap(({ el: e, text }) => {
+          const terms = englishTermsIn(text);
+          if (!terms.length) return [];
+          const shown = terms
+            .slice(0, 3)
+            .map((x) => `"${x}"`)
+            .join(", ");
+          return [
+            h(
+              d,
+              e,
+              `candidate English term(s) ${shown}, NOT marked with lang, in "${text.slice(0, 80)}" — a lead, not an NC: exempt when the word is in the French dictionary or in common use and its pronunciation causes no misunderstanding (RGAA 8.7, particular cases)`,
+              `foreignterm|${terms.join("+")}|${text.slice(0, 40)}`,
+            ),
+          ];
+        })
+        .slice(0, 20);
+    }),
 
   // The document's own language declaration.
   // THE LANGUAGE CODE THAT IS ACTUALLY THERE — RGAA 8.4's own subject, and NOT `docLang`.
@@ -2534,7 +2614,7 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // — which is how « non applicable » got written for a criterion every page is subject to.
     "8.2": ["markupValidity", "aria"],
     "8.6": ["docTitle"],
-    "8.7": ["langParts"],
+    "8.7": ["langParts", "foreignTerms"],
     "8.8": ["langParts"],
     "8.9": ["structure"],
     "8.10": ["readingOrder", "langParts"],

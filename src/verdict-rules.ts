@@ -55,8 +55,18 @@ export const SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce 
  *  and it is the same bar the criterion's own wording sets. */
 export const CONFORMITY_RULE = `A \`C\` WILL BE ATTACKED, exactly as an \`NC\` is. Every conformity you record goes into an adversarial worklist where a second reader opens your citations and asks whether they ESTABLISH the criterion or merely show that its subject exists — a present \`alt\` is not a relevant \`alt\`, a present \`<title>\` is not a title that describes the page. Cite the evidence that answers the criterion's own question, and when the evidence only proves presence, the honest verdict is \`manual\`.`;
 
+/** The severity of an NC finding is not the adjudicator's taste (#183).
+ *
+ *  `severity` used to be offered as a bare enum. Measured on a field review: the same duplicate
+ *  id came back `majeur` in one run and `mineur` in the others, and placeholder links nobody
+ *  could use were `bloquant` under 6.1 AND `majeur` under 12.3 — one defect, two severities.
+ *  The rubric is this tool's own (the standards rule conformity, not severity), and the fold
+ *  holds the two cheap halves of it: a recommendation is capped at `mineur`, and an anchor
+ *  charged under several criteria is reported back. */
+export const SEVERITY_RULE = `SEVERITY FOLLOWS ONE RUBRIC. Give every NC finding a \`severity\`: \`bloquant\` — no access, no workaround; \`majeur\` — access at the cost of a significant extra effort; \`mineur\` — a nuisance. A defect observed at the same anchor under two criteria keeps ONE severity, the highest, not one per criterion: charge it where it fails most directly, and repeat it elsewhere only for a different failure. A recommendation is never above \`mineur\` — a defect that leaves no access fails a test, and is an NC.`;
+
 /** The clauses in the order every surface states them, after the verdict kinds. */
-const TAIL = [WORKLIST_RULE, ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE];
+const TAIL = [WORKLIST_RULE, ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE, SEVERITY_RULE];
 
 /** Render the rules as a numbered Markdown list starting at `startAt`.
  *

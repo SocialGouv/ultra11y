@@ -1,6 +1,6 @@
 import { basename, join } from "node:path";
 import type { OrchestrationBatch, OrchestrationManifest, PhaseBatches } from "./orchestrate.js";
-import { verdictRulesMd } from "./verdict-rules.js";
+import { SEVERITY_RULE, verdictRulesMd } from "./verdict-rules.js";
 
 // ---------------------------------------------------------------------------
 // Templates for `ultra11y orchestrate` — the generator that turns the run's
@@ -328,6 +328,7 @@ For EACH of your criteria:
    - \`NC\` (non-conforming) — REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test — under a country standard, one of the item's OWN tests, which its brief lists for you under « tests to rule on ». A WCAG id looks alike, denotes an unrelated test, and is rejected.
    - \`NA\` (not applicable) — REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
    - \`manual\` (still undecidable) — REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide, e.g. computed contrast) or \`undecidable\` (the evidence cannot settle it either way).
+2b. ${SEVERITY_RULE}
 3. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with a reason — that is a valid, honest verdict; the scan tier or a human picks it up.
 
 Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "citations", "reason", "findings" }] }\` — your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`, and every C (plus every evidenced NA) carrying its \`citations\`. A verdict that clears a criterion without naming what it cleared is refused by the fold; the refusal costs THAT criterion — which stays « to assess » carrying the reason — and leaves every other verdict standing. So never guess to fill a gap: an honest \`manual\` is worth more than a verdict the gate throws away.

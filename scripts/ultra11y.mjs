@@ -34821,6 +34821,30 @@ var TEMPORAL_MEDIA_HOST = /(youtube|youtu\.be|vimeo|dailymotion|soundcloud|spoti
 var TEMPORAL_MEDIA_VALUE = /(?:^|[/.?=&_-])(?:audio|video|player|podcast|mp[34]|webm|ogg|ogv|wav|m4a|mov|avi|mpeg)(?:$|[/.?=&_-])/i;
 var ROUTER_IMPORT = /['"](?:react-router(?:-dom)?|next\/(?:router|navigation)|vue-router|@remix-run\/[\w-]+|@tanstack\/[\w-]*router|@sveltejs\/kit|\$app\/(?:navigation|stores))['"]/;
 var FOREIGN_LEXICON = /(?<![\p{L}\p{N}_'’-])(?:the|and|with|your|you|our|we|this|that|these|those|from|for|of|to|is|are|was|were|will|would|should|can't|don't|do|does|not|here|there|what|which|who|how|why|when|about|please|download|settings|welcome|dashboard|overview|read more|learn more|sign in|sign up|log in|get started|coming soon|powered by)(?![\p{L}\p{N}_'’-])/iu;
+var ENGLISH_TERMS = /(?<![\p{L}\p{N}_'’-])(?:feedbacks?|workflows?|roadmaps?|use cases?|user experience|user interface|best practices?|dark mode|light mode|design system|call to action|landing pages?|onboarding|offboarding|self-service|back[- ]office|release notes|pull requests?|merge requests?|privacy policy|cookie policy|terms of (?:use|service)|home ?page|site ?map|skip to (?:main )?content|back to top|contact us|about us|follow us|sign out|log out|checkout|look and feel|user-friendly|wishlist|early access|show more|see more|view all|load more)(?![\p{L}\p{N}_'’-])/iu;
+var ING_COMPOUND = /(?<![\p{L}\p{N}_'’-])([a-z]{3,})[ -]([a-z]{3,}ing)(?![\p{L}\p{N}_'’-])/giu;
+var FRENCH_ING = new Set(
+  "parking camping marketing shopping meeting planning briefing debriefing casting coaching jogging lifting piercing pressing smoking sponsoring standing timing training zapping brushing footing building dancing karting leasing lobbying mailing listing holding branding ranking rafting surfing bowling catering consulting crowdfunding dumping forcing merchandising monitoring networking outsourcing phishing pudding living doping dressing feeling happening jumping peeling reporting scouting shampooing sitting skating sterling string swing thing travelling trekking yachting streaming coworking cocooning packaging benchmarking recycling ring king".split(
+    " "
+  )
+);
+var FRENCH_LEAD = new Set(
+  "le la les l du de des un une en et ou au aux son sa ses ce cet cette ces mon ma mes ton ta tes notre nos votre vos leur leurs pour par sur sous dans avec sans vers chez entre bon grand petit gros nouveau faire fait".split(
+    " "
+  )
+);
+function englishTermsIn(text) {
+  const out = /* @__PURE__ */ new Set();
+  const listed = text.match(new RegExp(ENGLISH_TERMS.source, "giu"));
+  for (const m3 of listed ?? []) out.add(m3.toLowerCase());
+  for (const m3 of text.matchAll(ING_COMPOUND)) {
+    const lead = (m3[1] ?? "").toLowerCase();
+    const ing = (m3[2] ?? "").toLowerCase();
+    if (FRENCH_LEAD.has(lead) || FRENCH_ING.has(ing) || FRENCH_ING.has(lead)) continue;
+    out.add(`${lead} ${ing}`);
+  }
+  return [...out];
+}
 var CONTROL_TAGS = ["input", "select", "textarea"];
 var FIELD_TAGS = /* @__PURE__ */ new Set(["datalist", "output", "progress", "meter"]);
 var FIELD_ROLES = /* @__PURE__ */ new Set(["textbox", "searchbox", "combobox", "listbox", "checkbox", "radio", "switch", "slider", "spinbutton", "progressbar", "option"]);
@@ -35490,6 +35514,30 @@ var SUBJECTS = {
       )
     )
   ]),
+  // RGAA 8.7 — English TERMS on a page that is not in English (#183): the candidates
+  // `langParts` cannot see because they carry no function word (« deep linking »). A run that
+  // `langParts` already lists is left to it, so one text never becomes two candidates; a page
+  // that declares English is skipped whole, since there English is the default language.
+  foreignTerms: (docs) => docs.flatMap((d2) => {
+    const root = elementsByTag(d2, "html")[0];
+    const declared = ((root && attr(root, "lang")) ?? "").trim().toLowerCase();
+    if (declared.startsWith("en")) return [];
+    return textRuns(d2).filter(
+      ({ el: e, text }) => !FOREIGN_LEXICON.test(text) && ![e, ...ancestors(e)].some((a2) => a2.tag !== "html" && attr(a2, "lang") !== void 0) && roleOf(e) !== "img" && !insideRoleImg(e)
+    ).flatMap(({ el: e, text }) => {
+      const terms = englishTermsIn(text);
+      if (!terms.length) return [];
+      const shown = terms.slice(0, 3).map((x2) => `"${x2}"`).join(", ");
+      return [
+        h(
+          d2,
+          e,
+          `candidate English term(s) ${shown}, NOT marked with lang, in "${text.slice(0, 80)}" \u2014 a lead, not an NC: exempt when the word is in the French dictionary or in common use and its pronunciation causes no misunderstanding (RGAA 8.7, particular cases)`,
+          `foreignterm|${terms.join("+")}|${text.slice(0, 40)}`
+        )
+      ];
+    }).slice(0, 20);
+  }),
   // The document's own language declaration.
   // THE LANGUAGE CODE THAT IS ACTUALLY THERE — RGAA 8.4's own subject, and NOT `docLang`.
   //
@@ -36424,7 +36472,7 @@ var PACK_SUBJECTS = {
     // — which is how « non applicable » got written for a criterion every page is subject to.
     "8.2": ["markupValidity", "aria"],
     "8.6": ["docTitle"],
-    "8.7": ["langParts"],
+    "8.7": ["langParts", "foreignTerms"],
     "8.8": ["langParts"],
     "8.9": ["structure"],
     "8.10": ["readingOrder", "langParts"],
@@ -55453,6 +55501,10 @@ var adjudication_default = {
       {
         fr: "Le d\xE9filement horizontal restant concerne-t-il un contenu r\xE9ellement exempt\xE9, ou toute la page ?",
         en: "Does the remaining horizontal scrolling apply to genuinely exempt content, or to the whole page?"
+      },
+      {
+        fr: "Une information ou une fonctionnalit\xE9 est-elle r\xE9ellement perdue (texte coup\xE9, contr\xF4le rogn\xE9 ou hors d'atteinte) ? Le petit d\xE9bordement d'une image d\xE9corative, ou d'une bo\xEEte seule dont le texte et les contr\xF4les restent disponibles, est une recommandation, pas une non-conformit\xE9 \u2014 et un composant partag\xE9 (en-t\xEAte, pied de page) fait un seul constat, pas un par page.",
+        en: "Is some information or functionality actually lost (text cut off, a control clipped or out of reach)? A small overflow of a decorative image, or of a box alone whose text and controls stay available, is a recommendation, not a non-conformity \u2014 and a shared component (a header, a footer) is one finding, not one per page."
       }
     ]
   },
@@ -55986,7 +56038,7 @@ function adjudicationText(sc, lang) {
   return {
     decide: p2.decide[lang],
     ...p2.na ? { na: p2.na[lang] } : {},
-    questions: p2.questions.map((q2) => q2[lang])
+    questions: p2.questions.map((q3) => q3[lang])
   };
 }
 function adjudicationForWcagRefs(scs, lang) {
@@ -55996,6 +56048,129 @@ function adjudicationForWcagRefs(scs, lang) {
     if (p2) out.push({ sc, ...p2 });
   }
   return out;
+}
+
+// src/adjudication-rulings.ts
+var q2 = (fr, en2) => ({ fr, en: en2 });
+var PACK_RULINGS = {
+  rgaa: {
+    "6.1": {
+      notes: [
+        q2(
+          "Un lien dont l'intitul\xE9 ne signifie rien pour PERSONNE \u2014 un lien de remplissage (\xAB Inaccessible \xBB, \xAB Lien \xBB, \xAB XXX \xBB) que ni son intitul\xE9 ni son contexte n'expliquent \xE0 un lecteur sans limitation fonctionnelle \u2014 est le cas \xAB ambigu pour tout le monde \xBB : 6.1.1 \xE0 6.1.4 sont NON APPLICABLES pour ce lien, pas bloquants. Il vaut au plus une recommandation (remplacer ou retirer le lien) ; s'il est cass\xE9, c'est l'affaire d'un autre crit\xE8re (12.3.2 dans un plan du site, par exemple).",
+          "A link whose label means nothing to ANYONE \u2014 a placeholder link (\xAB Inaccessible \xBB, \xAB Lien \xBB, \xAB XXX \xBB) that neither its label nor its context explains to a reader with no functional limitation \u2014 is the \xAB ambigu pour tout le monde \xBB case: 6.1.1 to 6.1.4 are NOT APPLICABLE to that link, not blocking. It is worth a recommendation at most (replace or remove the link); if it is broken, another criterion owns that (12.3.2 in a site map, for instance)."
+        ),
+        q2(
+          "L'attribut `title` n'est PAS un contexte du lien : le glossaire en \xE9num\xE8re six (la phrase, le paragraphe, l'item de liste, le titre pr\xE9c\xE9dent, l'en-t\xEAte et la cellule de tableau), et `title` n'en fait pas partie. Il n'entre dans l'intitul\xE9 que comme dernier recours du nom accessible, quand le lien n'a aucun contenu \u2014 un `title` ne rend donc pas explicite un lien dont le contenu est ambigu.",
+          "The `title` attribute is NOT a link context: the glossary lists six (the sentence, the paragraph, the list item, the preceding heading, the table header and the table cell), and `title` is not among them. It enters the label only as the last fallback of the accessible name, when the link has no content \u2014 so a `title` does not make explicit a link whose content is ambiguous."
+        )
+      ],
+      grounds: [
+        "Il existe une gestion de cas particuliers pour les tests 6.1.1, 6.1.2, 6.1.3 et 6.1.4 lorsque le lien est [ambigu pour tout le monde](#ambigu-pour-tout-le-monde). Dans cette situation, o\xF9 il n\u2019est pas possible de rendre le lien explicite dans son contexte, le crit\xE8re est non applicable.",
+        "un lecteur sans limitation fonctionnelle ne conna\xEEtrait pas la fonction d\u2019un lien avant de l\u2019activer",
+        "Note 1 : l\u2019un des 6 contextes de lien combin\xE9 \xE0 l\u2019 intitul\xE9 du lien doit permettre de comprendre la fonction et la destination du lien.",
+        "sinon, contenu de l\u2019attribut title"
+      ]
+    },
+    "8.7": {
+      notes: [
+        q2(
+          "Les \xAB passages candidats \xBB de la moisson sont des PISTES, jamais des NC : un nom propre, un mot d'origine \xE9trang\xE8re pr\xE9sent dans le dictionnaire de la langue de la page, ou un mot pass\xE9 dans l'usage courant dont la prononciation ne g\xEAne pas la compr\xE9hension sont exempt\xE9s. Une NC 8.7.1 exige un passage r\xE9ellement en langue \xE9trang\xE8re, sans `lang` sur lui ni sur un parent, dont la restitution vocale serait incompr\xE9hensible (\xAB deep linking \xBB lu \xE0 la fran\xE7aise, une phrase enti\xE8re en anglais).",
+          "The harvest's \xAB candidate passages \xBB are LEADS, never NCs: a proper noun, a foreign-origin word present in the dictionary of the page's language, or a word in common use whose pronunciation causes no misunderstanding is exempt. An 8.7.1 NC needs a passage genuinely in a foreign language, with no `lang` on it or on a parent, whose speech rendering would be unintelligible (\xAB deep linking \xBB read with French phonetics, a whole English sentence)."
+        )
+      ],
+      grounds: [
+        "Des mots d\u2019origine \xE9trang\xE8re et d\u2019usage courant dont la prononciation ne provoque pas d\u2019incompr\xE9hension.",
+        "le crit\xE8re est applicable, uniquement lorsque l\u2019absence d\u2019indication de langue peut provoquer une incompr\xE9hension pour la restitution."
+      ]
+    },
+    "9.4": {
+      notes: [
+        q2(
+          "Une citation, ce sont les mots d'un TIERS, pr\xE9sent\xE9s comme reproduits \xE0 l'identique, dans le contenu courant de la page. Le glossaire du r\xE9f\xE9rentiel ne d\xE9finit pas \xAB citation \xBB : le mot garde ce sens ordinaire. N'en sont PAS : la d\xE9finition d'un terme dans une infobulle de glossaire, la paraphrase ou le r\xE9sum\xE9 d'un texte de loi, un titre de page ou de section, une \xE9tiquette, un nom de cl\xE9 ou de champ, un slogan entre guillemets. Au plus une recommandation, jamais une NC.",
+          "A citation is the words of a THIRD PARTY, presented as reproduced verbatim, in the page's running content. The standard's glossary does not define \xAB citation \xBB, so the word keeps that ordinary sense. NOT a citation: the definition of a term in a glossary tooltip, a paraphrase or summary of a law, a page or section title, a label, a key or field name, a slogan in quotation marks. A recommendation at most, never an NC."
+        ),
+        q2(
+          "Une citation EN LIGNE (dans une phrase) ne peut \xE9chouer qu'\xE0 9.4.1 (`<q>`). 9.4.2 porte sur un BLOC de citation : ne le citez jamais pour un texte pris dans un paragraphe.",
+          "An INLINE quotation (inside a sentence) can only fail 9.4.1 (`<q>`). 9.4.2 is about a BLOCK of quotation: never cite it for text inside a paragraph."
+        ),
+        q2(
+          "Ne proposez jamais `<blockquote>` l\xE0 o\xF9 seul du contenu phras\xE9 est permis (dans un `<span>`, un `<a>`, un `<label>`, un titre ou un `<p>`) : HTML l'y interdit, et la correction serait elle-m\xEAme une erreur de balisage. Une citation en ligne se corrige par `<q>`.",
+          "Never propose `<blockquote>` where only phrasing content is allowed (inside a `<span>`, an `<a>`, a `<label>`, a heading or a `<p>`): HTML forbids it there, and the fix would itself be a markup error. An inline quotation is fixed with `<q>`."
+        )
+      ],
+      grounds: [
+        "Retrouver dans le document les citations courtes (ou en ligne) ;",
+        "Dans chaque page web, chaque citation courte utilise-t-elle une balise `<q>` ?",
+        "Dans chaque page web, chaque bloc de citation utilise-t-il une balise `<blockquote>` ?"
+      ]
+    },
+    "10.10": {
+      notes: [
+        q2(
+          "10.10 n'\xE9choue que si l'information est donn\xE9e UNIQUEMENT par la forme, la taille ou la position. Une r\xE9f\xE9rence qui NOMME sa cible (\xAB le bouton Outils d'accessibilit\xE9 \xBB, \xAB voir la rubrique Contact \xBB) est pr\xE9cis\xE9ment le moyen alternatif : elle est conforme, m\xEAme quand le nom employ\xE9 est p\xE9rim\xE9 (un bouton renomm\xE9 depuis). Un nom p\xE9rim\xE9 rel\xE8ve de l'exactitude du contenu : une recommandation, pas une NC 10.10.",
+          "10.10 fails only when the information is given ONLY by shape, size or position. A reference that NAMES its target (\xAB the Accessibility tools button \xBB, \xAB see the Contact section \xBB) is precisely the alternative means: it passes, even when the name it uses is stale (a button since relabelled). A stale name is a matter of content accuracy: a recommendation, not a 10.10 NC."
+        ),
+        q2(
+          "Une NC 10.10 se cite sur une consigne qui ne renvoie qu'\xE0 une forme, une taille ou une position (\xAB cliquez sur le bouton de droite \xBB, \xAB l'onglet actif est celui en avant-plan \xBB) sans aucun autre moyen de retrouver l'information.",
+          "A 10.10 NC is cited on an instruction that points only at a shape, a size or a position (\xAB click the button on the right \xBB, \xAB the active tab is the one in front \xBB) with no other way to recover the information."
+        )
+      ],
+      grounds: [
+        "v\xE9rifier que le moyen alternatif de r\xE9cup\xE9rer cette information est pertinent, c\u2019est-\xE0-dire qu\u2019il permet de transmettre l\u2019information dans tous les contextes de consultation et pour tous les utilisateurs.",
+        "l\u2019information ne doit pas \xEAtre donn\xE9e uniquement [par la forme, taille ou position]"
+      ]
+    },
+    "10.11": {
+      notes: [
+        q2(
+          "Une NC exige qu'\xE0 320 px une INFORMATION ou une FONCTIONNALIT\xC9 ne soit plus disponible sans d\xE9filement horizontal : un texte coup\xE9, un contr\xF4le rogn\xE9 ou hors d'atteinte. Le petit d\xE9bordement d'une image d\xE9corative, ou d'une bo\xEEte seule (fond, bordure) alors que tout son texte et ses contr\xF4les restent disponibles, est une recommandation. Images, graphiques, vid\xE9os, tableaux de donn\xE9es et interfaces \xE0 ascenseur horizontal sont des exceptions du crit\xE8re.",
+          "An NC requires that at 320 px some INFORMATION or FUNCTION is no longer available without horizontal scrolling: text cut off, a control clipped or out of reach. A small overflow of a decorative image, or of a box alone (a background, a border) while all its text and controls stay available, is a recommendation. Images, graphics, videos, data tables and interfaces that need a horizontal scrollbar are the criterion's own exceptions."
+        ),
+        q2(
+          "Convention de ce rapport (pas une r\xE8gle du r\xE9f\xE9rentiel) : un composant partag\xE9 (en-t\xEAte, pied de page, navigation rendus sur chaque page) fait UN constat, ancr\xE9 sur le composant ou sur la premi\xE8re page o\xF9 il est observ\xE9 \u2014 pas un par page. Nommez les autres pages dans le message.",
+          "A convention of this report (not a rule of the standard): a shared component (a header, footer or navigation rendered on every page) is ONE finding, anchored on the component or on the first page it is observed on \u2014 not one per page. Name the other pages in the message."
+        )
+      ],
+      grounds: [
+        "l\u2019ensemble des informations et des fonctionnalit\xE9s sont-elles disponibles sans aucun d\xE9filement horizontal (hors cas particuliers) ?",
+        "sans perte d\u2019information ou de fonctionnalit\xE9",
+        "- Les images, les graphiques ou les vid\xE9os ;"
+      ]
+    },
+    "12.3": {
+      notes: [
+        q2(
+          'Des entr\xE9es de remplissage dans un plan du site (un intitul\xE9 qui ne nomme aucune page, un `href="#"`) valent AU PLUS une NC mineure sur 12.3.3 \u2014 un lien qui ne conduit pas \xE0 la page indiqu\xE9e par son intitul\xE9 \u2014, cit\xE9e une fois sur ces entr\xE9es, ou une recommandation. Et seulement APR\xC8S avoir v\xE9rifi\xE9 o\xF9 m\xE8nent les liens : un lien en erreur rel\xE8ve de 12.3.2, et un plan qui omet des pages reste conforme \xE0 12.3.1 si elles sont atteignables autrement.',
+          'Placeholder entries in a site map (a label that names no page, an `href="#"`) are AT MOST one minor (`mineur`) NC on 12.3.3 \u2014 a link that does not lead to the page its label indicates \u2014, cited once on those entries, or a recommendation. And only AFTER checking where the links lead: a link in error belongs to 12.3.2, and a site map that omits pages still passes 12.3.1 if they can be reached otherwise.'
+        ),
+        q2(
+          "Ce sont les m\xEAmes liens que ceux que 6.1 juge \xAB ambigus pour tout le monde \xBB : ne les facturez pas une seconde fois avec une autre gravit\xE9.",
+          "These are the very links 6.1 rules \xAB ambigu pour tout le monde \xBB: do not charge them a second time with another severity."
+        )
+      ],
+      grounds: [
+        "Les liens du [plan du site](#page-plan-du-site) renvoient-ils bien vers les pages indiqu\xE9es par l\u2019intitul\xE9 ?",
+        "v\xE9rifier qu\u2019ils sont \xE0 jour (ni obsol\xE8tes ni en erreur) et conduisent \xE0 la page indiqu\xE9e par leur intitul\xE9",
+        "Il n'est pas obligatoire que toutes les pages soient pr\xE9sentes dans le plan du site si elles peuvent \xEAtre atteintes, par exemple, \xE0 partir de la page d'accueil d'une rubrique ou d'un catalogue."
+      ]
+    }
+  }
+};
+function packRuling(standard, criterionId) {
+  return PACK_RULINGS[standard]?.[criterionId];
+}
+function packRulingNotes(standard, criterionId, lang) {
+  return packRuling(standard, criterionId)?.notes.map((n) => n[lang]) ?? [];
+}
+var SEVERITY_RUBRIC = {
+  bloquant: q2("aucun acc\xE8s, aucun contournement", "no access, no workaround"),
+  majeur: q2("acc\xE8s au prix d'un effort suppl\xE9mentaire important", "access at the cost of a significant extra effort"),
+  mineur: q2("une g\xEAne", "a nuisance")
+};
+function severityRubricLine(lang) {
+  const r2 = SEVERITY_RUBRIC;
+  return lang === "fr" ? `**GRAVIT\xC9** (\`severity\`, sur chaque constat NC) \u2014 \`bloquant\` : ${r2.bloquant.fr} ; \`majeur\` : ${r2.majeur.fr} ; \`mineur\` : ${r2.mineur.fr}. Un d\xE9faut constat\xE9 au m\xEAme endroit sous deux crit\xE8res garde UNE gravit\xE9, la plus haute, pas une par crit\xE8re. Une recommandation n'est jamais au-dessus de \`mineur\`.` : `**SEVERITY** (\`severity\`, on every NC finding) \u2014 \`bloquant\`: ${r2.bloquant.en}; \`majeur\`: ${r2.majeur.en}; \`mineur\`: ${r2.mineur.en}. A defect observed at the same place under two criteria keeps ONE severity, the highest, not one per criterion. A recommendation is never above \`mineur\`.`;
 }
 
 // src/adjudicate.ts
@@ -56013,7 +56188,8 @@ function adjudicationContract() {
       NC: "at least one groundable finding, each naming the `file` it was observed in (an NC with no location is refused as flatly as an uncited C \u2014 and a non-conformity that rests on an ABSENCE is still observed on an element of a page, so cite that element) and each citing a normativeRef that resolves against the active standard",
       manual: `a reason \u2208 {${MANUAL_REASON_VALUES.join(", ")}}`,
       human: `decidedBy "human" (a human auditor's verdict, instead of the default "agent") requires auditor: { name, organisation? } \u2014 the same evidence gate applies, and the verdict is reported under the auditor's name`,
-      recommendations: RECOMMENDATION_SHAPE
+      recommendations: RECOMMENDATION_SHAPE,
+      severity: `on every NC finding: ${Object.entries(SEVERITY_RUBRIC).map(([k, v2]) => `${k} = ${v2.en}`).join("; ")}. One defect at one anchor keeps ONE severity, the highest, even when two criteria cite it; a recommendation is always mineur`
     }
   };
 }
@@ -56724,7 +56900,18 @@ function applyAdjudication(audit, adj, opts = {}) {
     next.packAdjudication = { standard: adj.standard, criteria: [...carried.values()] };
     next.findings = [...next.findings, ...newFindings];
     next.adjudicated = { date: adj.auditDate, applied, stillManual, ...rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {} };
-    return { ok: complete, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, notInWorklist, grounding };
+    return {
+      ok: complete,
+      audit: next,
+      issues,
+      applied,
+      stillManual,
+      rejected: rejectedCriteria.length,
+      rejectedCriteria,
+      notInWorklist,
+      grounding,
+      ...chargedTwice(newFindings)
+    };
   }
   for (const it of adj.items) {
     const c = critById.get(it.criteriaId);
@@ -56768,14 +56955,53 @@ function applyAdjudication(audit, adj, opts = {}) {
   next.residualRisks = next.residualRisks.filter((r2) => byId2.get(r2.criteriaId)?.verdict === "manual" || rejectedSet.has(r2.criteriaId)).map((r2) => rejectedSet.has(r2.criteriaId) ? { ...r2, reason: rejectedWhy(r2.criteriaId) } : r2);
   recomputeTallies(next);
   next.adjudicated = { date: adj.auditDate, applied, stillManual, ...rejectedCriteria.length ? { rejected: rejectedCriteria.length } : {} };
-  return { ok: complete, audit: next, issues, applied, stillManual, rejected: rejectedCriteria.length, rejectedCriteria, notInWorklist, grounding };
+  return {
+    ok: complete,
+    audit: next,
+    issues,
+    applied,
+    stillManual,
+    rejected: rejectedCriteria.length,
+    rejectedCriteria,
+    notInWorklist,
+    grounding,
+    ...chargedTwice(newFindings)
+  };
 }
 function agentSeverity(v2, advisory) {
+  if (advisory) return "mineur";
   if (v2 === "bloquant" || v2 === "majeur" || v2 === "mineur") return v2;
   if (v2 === "critical" || v2 === "serious") return "bloquant";
   if (v2 === "moderate") return "majeur";
   if (v2 === "minor") return "mineur";
-  return advisory ? "mineur" : NC_SEVERITY_DEFAULT;
+  return NC_SEVERITY_DEFAULT;
+}
+var SEVERITY_RANK = { bloquant: 3, majeur: 2, mineur: 1 };
+function chargedTwice(findings) {
+  const d2 = duplicateCharges(findings);
+  return d2.length ? { duplicateCharges: d2 } : {};
+}
+function duplicateCharges(findings) {
+  const byAnchor = /* @__PURE__ */ new Map();
+  for (const f2 of findings) {
+    if (f2.advisory || !f2.ruleId.startsWith("agent:") || !f2.file?.trim()) continue;
+    const k = anchorKey(f2.file, f2.line, f2.selectorHint ?? "");
+    const list = byAnchor.get(k);
+    if (list) list.push(f2);
+    else byAnchor.set(k, [f2]);
+  }
+  const out = [];
+  for (const list of byAnchor.values()) {
+    const criteria = [...new Set(list.map((f2) => f2.criteriaId))];
+    if (criteria.length < 2) continue;
+    const top = list.reduce((a2, b) => SEVERITY_RANK[b.severity] > SEVERITY_RANK[a2.severity] ? b : a2);
+    const per = criteria.map((id) => `${id} ${list.find((f2) => f2.criteriaId === id)?.severity}`).join(", ");
+    const f0 = list[0];
+    out.push(
+      `${f0.file}:${f0.line}${f0.selectorHint ? ` (${f0.selectorHint})` : ""} is charged under ${criteria.length} criteria (${per}) \u2014 one defect keeps ONE severity, the highest (${top.severity}); keep the others only if each is a different failure`
+    );
+  }
+  return out;
 }
 var anchorKey = (file, line, selector) => `${file.trim()}|${line}|${selector.trim()}`;
 var EMPTY_IDS = /* @__PURE__ */ new Set();
@@ -56963,6 +57189,7 @@ var T2 = {
     webLookup: "Le texte ci-dessus est celui du r\xE9f\xE9rentiel : c'est LUI qui tranche. Si une formulation reste ambigu\xEB et que vous disposez d'un outil web, vous POUVEZ consulter la page officielle ci-dessus pour la lever \u2014 jamais pour la contredire, jamais pour \xE9largir un test, et une page web n'est jamais un `normativeRef` : seules les r\xE9f\xE9rences normatives list\xE9es ci-dessous en sont.",
     technicalNote: "Note technique",
     particularCases: "Cas particuliers",
+    rulings: (name) => `Comment le texte ${name} tranche les cas r\xE9currents de ce crit\xE8re`,
     glossary: "Termes d\xE9finis par le r\xE9f\xE9rentiel",
     neighbours: "Ce constat appartient-il bien ici ?",
     neighboursLead: () => `un constat d'absence ou de forme appartient au crit\xE8re \xAB m\xE9canique \xBB ci-dessous, un jugement de pertinence au crit\xE8re \xAB jugement \xBB. Aide \xE0 la lecture : ne dispense d'aucun test de CE crit\xE8re.`,
@@ -57008,6 +57235,7 @@ var T2 = {
     webLookup: "The text above is the standard's own, and it is what decides. If a wording stays ambiguous and you have a web tool, you MAY consult the official page above to settle it \u2014 never to contradict it, never to widen a test, and a web page is never a `normativeRef`: only the normative references listed below are.",
     technicalNote: "Technical note",
     particularCases: "Particular cases",
+    rulings: (name) => `How the ${name} text settles this criterion's recurring cases`,
     glossary: "Terms the standard defines",
     neighbours: "Does this observation belong here?",
     neighboursLead: () => `an observation of absence or of malformed markup belongs to the \xAB mechanical \xBB criterion below, a judgement of relevance to the \xAB judgment \xBB one. A reading aid: it excuses no test of THIS criterion.`,
@@ -57085,7 +57313,7 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   const s2 = T2[lang];
   const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? void 0 : loadPack(standard);
-  const out = opts.contract === false ? [] : opts.preamble === false ? [s2.briefContract, "", ...s2.verdicts, "", s2.rule, "", s2.absenceRule, ""] : [s2.title, "", s2.intro, "", ...s2.verdicts, "", s2.rule, "", s2.absenceRule, "", s2.then, ""];
+  const out = opts.contract === false ? [] : opts.preamble === false ? [s2.briefContract, "", ...s2.verdicts, "", s2.rule, "", s2.absenceRule, "", `> ${severityRubricLine(lang)}`, ""] : [s2.title, "", s2.intro, "", ...s2.verdicts, "", s2.rule, "", s2.absenceRule, "", `> ${severityRubricLine(lang)}`, "", s2.then, ""];
   if (items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
     out.push(
       `> ${s2.renderedAvailable(
@@ -57154,7 +57382,7 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
           if (p2.na) out.push(`> **${s2.na}** \u2014 ${p2.na}`, "");
           if (p2.questions.length) {
             out.push(`> ${s2.questions}:`, "");
-            for (const q2 of p2.questions) out.push(`- ${q2}`);
+            for (const q3 of p2.questions) out.push(`- ${q3}`);
             out.push("");
           }
         }
@@ -57166,7 +57394,7 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
         if (protocol.na) out.push(`> **${s2.na}** \u2014 ${protocol.na[lang]}`, "");
         if (protocol.questions.length) {
           out.push(`> ${s2.questions}:`, "");
-          for (const q2 of protocol.questions) out.push(`- ${q2[lang]}`);
+          for (const q3 of protocol.questions) out.push(`- ${q3[lang]}`);
           out.push("");
         }
       }
@@ -57203,6 +57431,12 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
       }
       if (crit?.technicalNote?.length) out.push(`> **${s2.technicalNote}** \u2014 ${crit.technicalNote.map(plainTest).join(" ")}`, "");
       if (crit?.particularCases?.length) out.push(`> **${s2.particularCases}** \u2014 ${crit.particularCases.map(plainTest).join(" ")}`, "");
+      const rulings = packRulingNotes(pack.key, it.criteriaId, lang);
+      if (rulings.length) {
+        out.push(`> **${s2.rulings(pack.name)}**`, "");
+        for (const n of rulings) out.push(`- ${n}`);
+        out.push("");
+      }
       out.push(...packGuidanceBlock(standard, it.criteriaId, lang));
       out.push(...sourceBlock(s2, pack.name, it.criteriaId, criterionUrl(pack, it.criteriaId), opts.web === true));
       if (keys.length) out.push(`> ${s2.packRefs(pack.name)}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
@@ -58249,11 +58483,11 @@ function routePath(url) {
   } catch {
     path = url;
   }
-  const [p2, q2] = path.split("?", 2);
+  const [p2, q3] = path.split("?", 2);
   let base = p2.replace(/\/index\.html?$/i, "/");
   if (base.length > 1) base = base.replace(/\/+$/, "");
   if (!base) base = "/";
-  return q2 ? `${base}?${q2}` : base;
+  return q3 ? `${base}?${q3}` : base;
 }
 function readRoutes(root) {
   const file = join20(root, ROUTES_FILE);
@@ -61631,7 +61865,8 @@ var CAPTURE_RULE = `THE RENDERED PAGE MAY BE ON DISK. When a criterion's evidenc
 var NEVER_GUESS_RULE = `Never guess. A criterion you cannot decide from real evidence stays \`manual\` with its reason \u2014 that is a valid, honest verdict, and it is worth more than a verdict the gate throws away.`;
 var SCOPE_RULE = `Rule ONLY on the criteria presented. Never introduce another \u2014 a verdict for a criterion nobody asked about is dropped, and under the fold it would otherwise overwrite what the deterministic engine already decided.`;
 var CONFORMITY_RULE = `A \`C\` WILL BE ATTACKED, exactly as an \`NC\` is. Every conformity you record goes into an adversarial worklist where a second reader opens your citations and asks whether they ESTABLISH the criterion or merely show that its subject exists \u2014 a present \`alt\` is not a relevant \`alt\`, a present \`<title>\` is not a title that describes the page. Cite the evidence that answers the criterion's own question, and when the evidence only proves presence, the honest verdict is \`manual\`.`;
-var TAIL = [WORKLIST_RULE, ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE];
+var SEVERITY_RULE = `SEVERITY FOLLOWS ONE RUBRIC. Give every NC finding a \`severity\`: \`bloquant\` \u2014 no access, no workaround; \`majeur\` \u2014 access at the cost of a significant extra effort; \`mineur\` \u2014 a nuisance. A defect observed at the same anchor under two criteria keeps ONE severity, the highest, not one per criterion: charge it where it fails most directly, and repeat it elsewhere only for a different failure. A recommendation is never above \`mineur\` \u2014 a defect that leaves no access fails a test, and is an NC.`;
+var TAIL = [WORKLIST_RULE, ABSENCE_RULE, CAPTURE_RULE, NEVER_GUESS_RULE, SCOPE_RULE, CONFORMITY_RULE, SEVERITY_RULE];
 function verdictRulesMd(startAt) {
   const lines = [`${startAt}. ${VERDICT_KINDS}`];
   TAIL.forEach((rule, i) => lines.push(`${startAt + 1 + i}. ${rule}`));
@@ -61890,6 +62125,7 @@ For EACH of your criteria:
    - \`NC\` (non-conforming) \u2014 REQUIRES \`findings\`: at least one groundable \`{ file, line, selector?, message, snippet?, severity?, normativeRef }\` pointing at REAL source. The fold re-grounds every finding; an invented file:line is rejected. \`normativeRef\` MUST cite the precise failed test \u2014 under a country standard, one of the item's OWN tests, which its brief lists for you under \xAB tests to rule on \xBB. A WCAG id looks alike, denotes an unrelated test, and is rejected.
    - \`NA\` (not applicable) \u2014 REQUIRES \`justification\`, AND \`citations[]\` whenever evidence WAS presented, to say which of those items fall outside the criterion's scope.
    - \`manual\` (still undecidable) \u2014 REQUIRES \`reason\`: \`needs-rendered-dom\` (only a rendered DOM can decide, e.g. computed contrast) or \`undecidable\` (the evidence cannot settle it either way).
+2b. ${SEVERITY_RULE}
 3. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with a reason \u2014 that is a valid, honest verdict; the scan tier or a human picks it up.
 
 Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "citations", "reason", "findings" }] }\` \u2014 your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`, and every C (plus every evidenced NA) carrying its \`citations\`. A verdict that clears a criterion without naming what it cleared is refused by the fold; the refusal costs THAT criterion \u2014 which stays \xAB to assess \xBB carrying the reason \u2014 and leaves every other verdict standing. So never guess to fill a gap: an honest \`manual\` is worth more than a verdict the gate throws away.
@@ -65129,6 +65365,14 @@ function replayLedgerFile(p2, ledger, lang) {
   }
   return 0;
 }
+function reportDuplicateCharges(list, lang) {
+  if (!list?.length) return;
+  console.error(
+    lang === "fr" ? `\u26A0 ${list.length} ancre(s) factur\xE9e(s) sous plusieurs crit\xE8res \u2014 un d\xE9faut garde UNE gravit\xE9, la plus haute (rien n'a \xE9t\xE9 refus\xE9) :` : `\u26A0 ${list.length} anchor(s) charged under several criteria \u2014 one defect keeps ONE severity, the highest (nothing was refused):`
+  );
+  for (const d2 of list.slice(0, 20)) console.error(`  \u26A0 ${d2}`);
+  if (list.length > 20) console.error(`  \u2026 +${list.length - 20}`);
+}
 function reportNotInWorklist(ids2, lang) {
   if (!ids2.length) return;
   const shown = ids2.slice(0, 40).join(", ") + (ids2.length > 40 ? ` \u2026 +${ids2.length - 40}` : "");
@@ -65171,6 +65415,7 @@ function applyAdjudicationFile(p2, adj, lang) {
     for (const i of r2.issues) console.error(`  \u2717 ${i}`);
   }
   if (!p2.flags.json) reportNotInWorklist(r2.notInWorklist, lang);
+  if (!p2.flags.json) reportDuplicateCharges(r2.duplicateCharges, lang);
   const out = typeof p2.flags.out === "string" ? p2.flags.out : ".";
   mkdirSync17(out, { recursive: true });
   const auditPath = join32(out, "audit-latest.json");
@@ -65203,6 +65448,7 @@ function applyAdjudicationFile(p2, adj, lang) {
           rejectedCriteria: r2.rejectedCriteria,
           notInWorklist: r2.notInWorklist,
           issues: r2.issues,
+          ...r2.duplicateCharges ? { duplicateCharges: r2.duplicateCharges } : {},
           conformancePct: r2.audit.conformancePct,
           ...foldRates(r2.audit, adj.standard),
           findings: r2.audit.findings.length,
