@@ -53673,6 +53673,17 @@ const units = [];
 if (job.kind === "stories") {
   const meta = exp.default && typeof exp.default === "object" ? exp.default : {};
   const title = typeof meta.title === "string" ? meta.title.split("/").pop().trim() : "";
+  // The component a story shows is named by its export in the sibling module (by identity:
+  // an anonymous forwardRef/memo, an explicit displayName or an aliased export all have a
+  // function name that is not the export's), with its display name as a fallback.
+  let sibling = null;
+  if (job.sibling) { try { const s = require(job.sibling); if (s && (typeof s === "object" || typeof s === "function")) sibling = s; } catch (e) {} }
+  const exportOf = (c) => {
+    if (!c || !sibling) return "";
+    if (sibling === c) return "default";
+    for (const k of Object.keys(sibling)) { try { if (sibling[k] === c) return k; } catch (e) {} }
+    return "";
+  };
   const names = Array.isArray(exp.__namedExportsOrder) ? exp.__namedExportsOrder : Object.keys(exp).filter((k) => k !== "default" && k !== "__esModule" && k !== "__namedExportsOrder");
   for (const k of names) {
     const story = exp[k];
@@ -53686,6 +53697,7 @@ if (job.kind === "stories") {
       name: k,
       component: title || displayName(comp, k),
       of: comp ? displayName(comp, "") : "",
+      ofExport: exportOf(comp),
       props: false,
       target: render || comp,
       element: () => (render ? React.createElement(function Story() { return render(args, { args, component: comp }); }) : comp ? React.createElement(comp, args) : null),
@@ -53697,13 +53709,23 @@ if (job.kind === "stories") {
   const take = (k, v) => {
     if (!isComponent(v) || seen.has(v)) return;
     seen.add(v);
-    units.push({ name: k, component: k === "default" ? displayName(v, job.fallbackName) : k, props: takesProps(v), target: v, element: () => React.createElement(v, {}) });
+    units.push({ name: k, component: k === "default" ? displayName(v, job.fallbackName) : k, displayName: displayName(v, ""), props: takesProps(v), target: v, element: () => React.createElement(v, {}) });
   };
   for (const k of named) { let v; try { v = exp[k]; } catch (e) { continue; } take(k, v); }
   if (typeof mod === "function") take("default", mod);
   else { let v; try { v = exp.default; } catch (e) {} if (v !== undefined) take("default", v); }
 }
-emit({ type: "units", units: units.map((u) => ({ export: u.name, component: u.component, props: u.props, ...(u.of ? { of: u.of } : {}) })) });
+emit({
+  type: "units",
+  units: units.map((u) => ({
+    export: u.name,
+    component: u.component,
+    props: u.props,
+    ...(u.displayName ? { displayName: u.displayName } : {}),
+    ...(u.of ? { of: u.of } : {}),
+    ...(u.ofExport ? { ofExport: u.ofExport } : {}),
+  })),
+});
 for (const u of units) {
   if (u.props || job.skip.includes(u.name)) continue;
   emit({ type: "start", export: u.name });
@@ -53892,6 +53914,7 @@ async function runRenderEngine(opts) {
               file: join14(root, t3.file),
               kind: t3.kind === "stories" ? "stories" : "module",
               fallbackName: componentFallback(t3.file),
+              ...t3.kind === "stories" && storySource(root, t3.file) !== t3.file ? { sibling: join14(root, storySource(root, t3.file)) } : {},
               transpiler: { name: transpilerName, path: tool.path },
               paths: aliases.paths,
               ...aliases.baseUrl ? { baseUrl: aliases.baseUrl } : {},
@@ -53909,8 +53932,12 @@ async function runRenderEngine(opts) {
     for (const t3 of runnable) {
       if (t3.kind !== "stories") continue;
       const src = storySource(root, t3.file);
-      for (const u2 of outcomes.get(t3)?.units ?? []) if (u2.of) storied.add(`${src}#${u2.of}`);
+      for (const u2 of outcomes.get(t3)?.units ?? []) {
+        if (u2.ofExport) storied.add(`${src}#export:${u2.ofExport}`);
+        if (u2.of) storied.add(`${src}#name:${u2.of}`);
+      }
     }
+    const isStoried = (file, u2) => storied.has(`${file}#export:${u2.export}`) || storied.has(`${file}#name:${u2.component}`) || !!u2.displayName && storied.has(`${file}#name:${u2.displayName}`);
     for (const t3 of runnable) {
       const o = outcomes.get(t3);
       if (o.fileFailure && !o.units.length) {
@@ -53931,9 +53958,7 @@ async function runRenderEngine(opts) {
           status: "skipped"
         };
         if (u2.props)
-          units.push(
-            storied.has(`${t3.file}#${u2.component}`) ? { ...base, status: "not-attempted", reason: "via-story" } : { ...base, status: "not-attempted", reason: "props" }
-          );
+          units.push(isStoried(t3.file, u2) ? { ...base, status: "not-attempted", reason: "via-story" } : { ...base, status: "not-attempted", reason: "props" });
         else if (!r2) units.push({ ...base, reason: "error", detail: "the render process ended before this unit was tried" });
         else if (r2.timeout) units.push({ ...base, reason: "timeout", detail: `${unitMs} ms` });
         else if (!r2.ok)
@@ -63424,7 +63449,8 @@ async function cmdAudit(p2) {
     }
   }
   stampRoutes(result, ".", lang, { recorded: pagesInScope });
-  if (useCaptures || inputs.includes(capturesDir)) {
+  const rendersInScope = p2.flags["no-captures"] !== true && !inputs.includes("-") && !scopedToDiff;
+  if (rendersInScope || inputs.includes(capturesDir)) {
     const renders = renderScopeFor(capturesDir);
     if (renders) result.scope.renders = renders;
   }
@@ -64456,11 +64482,12 @@ async function cmdRenderEngine(p2, root, lang) {
     stories: p2.flags["no-stories"] !== true,
     onProgress: p2.flags.json ? void 0 : (done, total, file) => console.error(`ultra11y render: [${done}/${total}] ${file}`)
   });
+  const n = renderCounts(manifest.units);
+  const code2 = manifest.units.length > 0 && n.rendered === 0 ? 1 : 0;
   if (p2.flags.json) {
     console.log(JSON.stringify(manifest, null, 2));
-    return 0;
+    return code2;
   }
-  const n = renderCounts(manifest.units);
   const out = [];
   out.push(
     fr ? `ultra11y render : ${n.rendered} rendu(s), ${n.skipped} \xE9chec(s) avec la raison, ${n.notAttempted} non tent\xE9(s) \u2014 ${manifest.renderer ?? "aucun moteur de rendu React"}, ${manifest.transpiler ?? "aucun transpileur"}.` : `ultra11y render: ${n.rendered} rendered, ${n.skipped} failed with the reason, ${n.notAttempted} not attempted \u2014 ${manifest.renderer ?? "no React renderer"}, ${manifest.transpiler ?? "no transpiler"}.`
@@ -64480,8 +64507,11 @@ async function cmdRenderEngine(p2, root, lang) {
     fr ? `\u2192 captures dans ${join32(root, CAPTURES_DIR)}, manifeste ${join32(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).` : `\u2192 captures in ${join32(root, CAPTURES_DIR)}, manifest ${join32(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`
   );
   console.log(out.join("\n"));
-  if (!manifest.units.length) return 0;
-  return n.rendered === 0 && n.skipped === 0 ? 1 : 0;
+  if (code2)
+    console.error(
+      fr ? `ultra11y render : aucune unit\xE9 rendue sur ${manifest.units.length} \u2014 chaque raison est dans ${join32(root, RENDER_MANIFEST)} et dans l'audit.` : `ultra11y render: no unit rendered out of ${manifest.units.length} \u2014 every reason is in ${join32(root, RENDER_MANIFEST)} and in the audit.`
+    );
+  return code2;
 }
 function cmdCheck(p2) {
   const standard = stdOf(p2, "check");

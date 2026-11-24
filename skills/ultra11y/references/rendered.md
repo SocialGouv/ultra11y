@@ -66,8 +66,8 @@ node scripts/ultra11y.mjs audit .       # ingests .ultra11y/captures; findings n
   fetch; `transpile`; `module` — an unresolved import; `timeout`; `empty`; `error`), or
   `not-attempted` (`props`, `via-story`, `unsupported-renderer` for `.vue`/`.svelte`/`.astro`,
   `no-renderer`, `no-transpiler`). `audit` reads it into `scope.renders`, and the report's
-  annex (section G) lists every unit with its status and reason. A unit that throws is never
-  dropped.
+  annex (section G) lists every unit with its status and reason, even when no capture was
+  written. A unit that throws is never dropped, and a run that renders none of its units exits 1.
 - **What a server render cannot decide.** It computes no style and lays out no box
   (`styles="none"`): colour, contrast, reflow, focus visibility stay « à évaluer » on these
   captures. A component capture is a fragment, so the page-level criteria (language, title)

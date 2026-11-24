@@ -1123,8 +1123,12 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   // Only the snapshots this audit actually read count as observations: under --no-captures or a
   // diff scope they were left out, and a route must not read « capturée » / « scannée » then.
   stampRoutes(result, ".", lang, { recorded: pagesInScope });
-  // What ultra11y's render engine did, when the captures it wrote are part of this audit.
-  if (useCaptures || inputs.includes(capturesDir)) {
+  // What ultra11y's render engine did, whenever its manifest is there and the captures are in
+  // scope — NOT gated on the captures directory existing: a run where every unit failed or was
+  // not attempted writes no capture at all, and that is exactly when its reasons must reach
+  // the audit (scope.renders → annex G). --no-captures, stdin and a diff scope leave it out.
+  const rendersInScope = p.flags["no-captures"] !== true && !inputs.includes("-") && !scopedToDiff;
+  if (rendersInScope || inputs.includes(capturesDir)) {
     const renders = renderScopeFor(capturesDir);
     if (renders) result.scope.renders = renders;
   }
@@ -2552,11 +2556,14 @@ async function cmdRenderEngine(p: ParsedArgs, root: string, lang: Lang): Promise
     stories: p.flags["no-stories"] !== true,
     onProgress: p.flags.json ? undefined : (done, total, file) => console.error(`ultra11y render: [${done}/${total}] ${file}`),
   });
+  const n = renderCounts(manifest.units);
+  // A run with units that rendered none of them fails, so it is never a green no-op: a CI step
+  // must see it. The manifest is written either way, and `audit` reports every reason.
+  const code = manifest.units.length > 0 && n.rendered === 0 ? 1 : 0;
   if (p.flags.json) {
     console.log(JSON.stringify(manifest, null, 2));
-    return 0;
+    return code;
   }
-  const n = renderCounts(manifest.units);
   const out: string[] = [];
   out.push(
     fr
@@ -2582,9 +2589,13 @@ async function cmdRenderEngine(p: ParsedArgs, root: string, lang: Lang): Promise
       : `→ captures in ${join(root, CAPTURES_DIR)}, manifest ${join(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`,
   );
   console.log(out.join("\n"));
-  if (!manifest.units.length) return 0;
-  // Nothing could be tried at all: say so with a failing exit, never a green no-op.
-  return n.rendered === 0 && n.skipped === 0 ? 1 : 0;
+  if (code)
+    console.error(
+      fr
+        ? `ultra11y render : aucune unité rendue sur ${manifest.units.length} — chaque raison est dans ${join(root, RENDER_MANIFEST)} et dans l'audit.`
+        : `ultra11y render: no unit rendered out of ${manifest.units.length} — every reason is in ${join(root, RENDER_MANIFEST)} and in the audit.`,
+    );
+  return code;
 }
 
 function cmdCheck(p: ParsedArgs): number {

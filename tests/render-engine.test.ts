@@ -2,7 +2,7 @@
 // project's react-dom/server in ultra11y's throwaway harness, without any test file being read,
 // and the audit then reports the rendered markup against the source components.
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -116,6 +116,14 @@ describe.skipIf(!REACT)("render engine — rendering the fixture app", () => {
     expect(unit(manifest, "src/components/Button.tsx", "Button")).toMatchObject({ status: "not-attempted", reason: "via-story" });
   });
 
+  it("knows a story's component by the export it is, not by its function or display name", () => {
+    // An anonymous forwardRef exported under an alias, and a memo whose displayName is not its export.
+    expect(unit(manifest, "src/components/TextField.stories.tsx", "Default")?.status).toBe("rendered");
+    expect(unit(manifest, "src/components/TextField.stories.tsx", "New")?.status).toBe("rendered");
+    expect(unit(manifest, "src/components/TextField.tsx", "TextField")).toMatchObject({ status: "not-attempted", reason: "via-story" });
+    expect(unit(manifest, "src/components/TextField.tsx", "Badge")).toMatchObject({ status: "not-attempted", reason: "via-story" });
+  });
+
   it("records every failure with its reason, never drops one", () => {
     expect(unit(manifest, "src/components/ThemedCard.tsx", "ThemedCard")).toMatchObject({ status: "skipped", reason: "provider" });
     expect(unit(manifest, "src/components/WindowWidth.tsx", "WindowWidth")).toMatchObject({ status: "skipped", reason: "browser-api" });
@@ -203,6 +211,59 @@ describe.skipIf(!REACT)("render engine — the CLI, then audit and report", () =
       vi.restoreAllMocks();
     }
   });
+});
+
+describe.skipIf(!REACT)("render engine — a run that renders nothing", () => {
+  let root: string;
+  const cwd = process.cwd();
+  beforeAll(() => {
+    // Only components that cannot render alone: one needs a provider, one takes props.
+    root = mkdtempSync(join(tmpdir(), "u11y-render-none-"));
+    mkdirSync(join(root, "src/components"), { recursive: true });
+    for (const f of ["package.json", "tsconfig.json", "src/components/ThemedCard.tsx", "src/components/Greeting.tsx"]) cpSync(join(FIXTURE, f), join(root, f));
+    symlinkSync(resolve("node_modules"), join(root, "node_modules"), "dir");
+  });
+  afterAll(() => {
+    process.chdir(cwd);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("`render` exits 1, and `audit` and the annex still carry every reason though no capture was written", async () => {
+    const out: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((m: unknown) => void out.push(String(m)));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await main(["render", root, "--timeout", "1500", "--transpiler", "typescript", "--json"])).toBe(1);
+      const manifest = JSON.parse(out.join("\n")) as RenderManifest;
+      expect(manifest.units.filter((u) => u.status === "rendered")).toHaveLength(0);
+      expect(existsSync(join(root, ".ultra11y/captures"))).toBe(false);
+      expect(await main(["render", root, "--timeout", "1500", "--transpiler", "typescript"])).toBe(1);
+
+      process.chdir(root);
+      expect(await main(["audit", ".", "--out", "audits", "--json"])).toBe(0);
+      const audit = JSON.parse(readFileSync(join(root, "audits/audit-latest.json"), "utf8")) as AuditResult;
+      expect(audit.scope.renders).toMatchObject({ manifest: ".ultra11y/render.json", rendered: 0 });
+      expect(audit.scope.renders?.units).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ file: "src/components/ThemedCard.tsx", status: "skipped", reason: "provider" }),
+          expect.objectContaining({ file: "src/components/Greeting.tsx", status: "not-attempted", reason: "props" }),
+        ]),
+      );
+      // Opting out of the captures leaves the render scope out too.
+      expect(await main(["audit", ".", "--no-captures", "--out", "audits-nocap", "--json"])).toBe(0);
+      expect((JSON.parse(readFileSync(join(root, "audits-nocap/audit-latest.json"), "utf8")) as AuditResult).scope.renders).toBeUndefined();
+
+      expect(await main(["report", "--in", "audits/audit-latest.json", "--standard", "rgaa", "--lang", "fr", "--out", "audits"])).toBe(0);
+      const annex = readdirSync(join(root, "audits")).find((f) => /annex/.test(f) && f.includes("rgaa"));
+      const md = readFileSync(join(root, "audits", annex as string), "utf8");
+      expect(md).toContain("## G. Composants rendus par le moteur ultra11y");
+      expect(md).toMatch(/\| ThemedCard \| `src\/components\/ThemedCard\.tsx` \| composant \| échec \| fournisseur de contexte manquant/);
+      expect(md).toMatch(/\| Greeting \| `src\/components\/Greeting\.tsx` \| composant \|/);
+    } finally {
+      process.chdir(cwd);
+      vi.restoreAllMocks();
+    }
+  }, 90_000);
 });
 
 // The esbuild path, when this checkout has one to hand in (tsup ships it).

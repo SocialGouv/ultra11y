@@ -414,6 +414,17 @@ const units = [];
 if (job.kind === "stories") {
   const meta = exp.default && typeof exp.default === "object" ? exp.default : {};
   const title = typeof meta.title === "string" ? meta.title.split("/").pop().trim() : "";
+  // The component a story shows is named by its export in the sibling module (by identity:
+  // an anonymous forwardRef/memo, an explicit displayName or an aliased export all have a
+  // function name that is not the export's), with its display name as a fallback.
+  let sibling = null;
+  if (job.sibling) { try { const s = require(job.sibling); if (s && (typeof s === "object" || typeof s === "function")) sibling = s; } catch (e) {} }
+  const exportOf = (c) => {
+    if (!c || !sibling) return "";
+    if (sibling === c) return "default";
+    for (const k of Object.keys(sibling)) { try { if (sibling[k] === c) return k; } catch (e) {} }
+    return "";
+  };
   const names = Array.isArray(exp.__namedExportsOrder) ? exp.__namedExportsOrder : Object.keys(exp).filter((k) => k !== "default" && k !== "__esModule" && k !== "__namedExportsOrder");
   for (const k of names) {
     const story = exp[k];
@@ -427,6 +438,7 @@ if (job.kind === "stories") {
       name: k,
       component: title || displayName(comp, k),
       of: comp ? displayName(comp, "") : "",
+      ofExport: exportOf(comp),
       props: false,
       target: render || comp,
       element: () => (render ? React.createElement(function Story() { return render(args, { args, component: comp }); }) : comp ? React.createElement(comp, args) : null),
@@ -438,13 +450,23 @@ if (job.kind === "stories") {
   const take = (k, v) => {
     if (!isComponent(v) || seen.has(v)) return;
     seen.add(v);
-    units.push({ name: k, component: k === "default" ? displayName(v, job.fallbackName) : k, props: takesProps(v), target: v, element: () => React.createElement(v, {}) });
+    units.push({ name: k, component: k === "default" ? displayName(v, job.fallbackName) : k, displayName: displayName(v, ""), props: takesProps(v), target: v, element: () => React.createElement(v, {}) });
   };
   for (const k of named) { let v; try { v = exp[k]; } catch (e) { continue; } take(k, v); }
   if (typeof mod === "function") take("default", mod);
   else { let v; try { v = exp.default; } catch (e) {} if (v !== undefined) take("default", v); }
 }
-emit({ type: "units", units: units.map((u) => ({ export: u.name, component: u.component, props: u.props, ...(u.of ? { of: u.of } : {}) })) });
+emit({
+  type: "units",
+  units: units.map((u) => ({
+    export: u.name,
+    component: u.component,
+    props: u.props,
+    ...(u.displayName ? { displayName: u.displayName } : {}),
+    ...(u.of ? { of: u.of } : {}),
+    ...(u.ofExport ? { ofExport: u.ofExport } : {}),
+  })),
+});
 for (const u of units) {
   if (u.props || job.skip.includes(u.name)) continue;
   emit({ type: "start", export: u.name });
@@ -476,6 +498,8 @@ interface RunnerJob {
   paths: PathAlias[];
   baseUrl?: string;
   jsxImportSource?: string;
+  /** For a stories file: the sibling module whose exports its stories show. */
+  sibling?: string;
   skip: string[];
 }
 
@@ -487,12 +511,15 @@ interface UnitOutcome {
 }
 
 /** A unit as the runner lists it: `props` when the component declares props (not rendered
- *  without them), `of` the component a story shows. */
+ *  without them), `displayName` a module export's own name, `of` the display name of the
+ *  component a story shows and `ofExport` the sibling module's export that IS that component. */
 interface ListedUnit {
   export: string;
   component: string;
   props?: boolean;
+  displayName?: string;
   of?: string;
+  ofExport?: string;
 }
 
 interface FileOutcome {
@@ -719,6 +746,7 @@ export async function runRenderEngine(opts: RenderRunOptions): Promise<RenderMan
               file: join(root, t.file),
               kind: t.kind === "stories" ? "stories" : "module",
               fallbackName: componentFallback(t.file),
+              ...(t.kind === "stories" && storySource(root, t.file) !== t.file ? { sibling: join(root, storySource(root, t.file)) } : {}),
               transpiler: { name: transpilerName, path: tool.path },
               paths: aliases.paths,
               ...(aliases.baseUrl ? { baseUrl: aliases.baseUrl } : {}),
@@ -733,12 +761,22 @@ export async function runRenderEngine(opts: RenderRunOptions): Promise<RenderMan
       rmSync(tmp, { recursive: true, force: true });
     }
     // The components a story shows, by source file: they are rendered through their stories.
+    // Matched on the export the story's component IS (identity, in the runner), else on a name:
+    // the export name of a named export differs from the function or display name whenever the
+    // component is an anonymous forwardRef/memo, sets a displayName or is exported under an alias.
     const storied = new Set<string>();
     for (const t of runnable) {
       if (t.kind !== "stories") continue;
       const src = storySource(root, t.file);
-      for (const u of outcomes.get(t)?.units ?? []) if (u.of) storied.add(`${src}#${u.of}`);
+      for (const u of outcomes.get(t)?.units ?? []) {
+        if (u.ofExport) storied.add(`${src}#export:${u.ofExport}`);
+        if (u.of) storied.add(`${src}#name:${u.of}`);
+      }
     }
+    const isStoried = (file: string, u: ListedUnit): boolean =>
+      storied.has(`${file}#export:${u.export}`) ||
+      storied.has(`${file}#name:${u.component}`) ||
+      (!!u.displayName && storied.has(`${file}#name:${u.displayName}`));
     for (const t of runnable) {
       const o = outcomes.get(t) as FileOutcome;
       if (o.fileFailure && !o.units.length) {
@@ -759,11 +797,7 @@ export async function runRenderEngine(opts: RenderRunOptions): Promise<RenderMan
           status: "skipped",
         };
         if (u.props)
-          units.push(
-            storied.has(`${t.file}#${u.component}`)
-              ? { ...base, status: "not-attempted", reason: "via-story" }
-              : { ...base, status: "not-attempted", reason: "props" },
-          );
+          units.push(isStoried(t.file, u) ? { ...base, status: "not-attempted", reason: "via-story" } : { ...base, status: "not-attempted", reason: "props" });
         else if (!r) units.push({ ...base, reason: "error", detail: "the render process ended before this unit was tried" });
         else if (r.timeout) units.push({ ...base, reason: "timeout", detail: `${unitMs} ms` });
         else if (!r.ok)
