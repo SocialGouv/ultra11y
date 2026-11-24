@@ -171,7 +171,7 @@
     "12.9": { "verdict": "C", "justification": "The keyboard-trap probe found nothing and no widget captures focus.", "cite": "all" },
     "12.10": { "verdict": "NA", "justification": "No keyboard shortcut." },
     "12.11": { "verdict": "C", "justification": "No additional content on hover or focus beyond the skip link.", "cite": "all" },
-    "13.1": { "verdict": "NA", "justification": "No time limit, no refresh, no redirect." },
+    "13.1": { "verdict": "NA", "justification": "No time limit, no refresh, no redirect: every page's behaviour digest (scripts.json) records no interval, no timeout and no meta refresh.", "cite": "all" },
     "13.2": { "verdict": "NA", "justification": "No link opens a new window." },
     "13.3": {
       "verdict": "NC",
@@ -192,7 +192,7 @@
       "reason": "undecidable",
       "justification": "The image files are not served, so whether they flash cannot be seen; a human has to open the original assets."
     },
-    "13.8": { "verdict": "NA", "justification": "No moving or blinking content." },
+    "13.8": { "verdict": "NA", "justification": "No moving or blinking content: every page's behaviour digest (scripts.json) records no self-updating element and no CSS animation longer than 5 s.", "cite": "all" },
     "13.9": { "verdict": "C", "justification": "No orientation lock; the orientation probe found nothing.", "cite": "all" },
     "13.10": { "verdict": "NA", "justification": "No gesture-driven feature." },
     "13.11": { "verdict": "C", "justification": "The only pointer action is a native button, which fires on release.", "cite": "all" },
