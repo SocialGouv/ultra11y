@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [8.3.0](https://github.com/SocialGouv/ultra11y/compare/v8.2.0...v8.3.0) (2026-11-24)
+
+
+### Bug Fixes
+
+* **scan:** autofocus no longer fakes a missing focus, reflow reports clipped content, consent placeholders are tagged ([#193](https://github.com/SocialGouv/ultra11y/issues/193)) ([8379e87](https://github.com/SocialGouv/ultra11y/commit/8379e8747d57f510ed9f556b6ddc141cde7233a7)), closes [#184](https://github.com/SocialGouv/ultra11y/issues/184) [#184](https://github.com/SocialGouv/ultra11y/issues/184)
+
+
+### Features
+
+* **journey:** the agent writes journeys, ultra11y replays them with axe and keyboard checks ([#192](https://github.com/SocialGouv/ultra11y/issues/192)) ([1846ed2](https://github.com/SocialGouv/ultra11y/commit/1846ed219f8d833d6e6f006b67d5b01c46d24c3e)), closes [#189](https://github.com/SocialGouv/ultra11y/issues/189) [#189](https://github.com/SocialGouv/ultra11y/issues/189)
+
 # [8.2.0](https://github.com/SocialGouv/ultra11y/compare/v8.1.0...v8.2.0) (2026-11-24)
 
 
