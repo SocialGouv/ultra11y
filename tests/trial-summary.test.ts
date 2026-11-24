@@ -7,11 +7,13 @@
 // semantic gate is green. On the Egapro audit that bilan had to be written by hand from 932
 // verdicts. `verify --summary` writes it — read-only, from an audit and a verdicts file both named
 // explicitly, never from a ledger it would have to guess.
-import { copyFileSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { main } from "../src/cli.js";
+import { derivePackResults } from "../src/standards/index.js";
+import type { AuditResult, PackCriterionAdjudication } from "../src/types.js";
 import type { VerifyItem } from "../src/verify.js";
 
 async function cli(argv: string[]): Promise<{ code: number; out: string; err: string }> {
@@ -296,6 +298,81 @@ describe("verify --summary — a mixed trial (#60)", () => {
     expect(s.foreign.map((e) => e.criteriaId).sort()).toEqual(["1.2", "3.2", "8.6"]);
     expect(s.coverage.complete).toBe(false);
     expect(s.validated).toBe(false);
+  });
+
+  // #184: 10.7 listed under « Retraits appliqués » while the engine's NC stayed. The criterion
+  // was AGENT-ruled, so the prune acted on it and emptied the record — but the record's finding
+  // was the engine's own anchor, and `derivePackResults` keeps a measured NC under an abstention.
+  it("an agent-ruled claim on an anchor the engine still carries is contested, never an applied withdrawal", async () => {
+    // The core, WCAG-keyed result every `--in` consumer unwraps (src/standards/document.ts).
+    const raw = JSON.parse(readFileSync(join(D, "folded", "audit-latest.json"), "utf8")) as { core?: AuditResult } & AuditResult;
+    const audit = raw.core ?? raw;
+    const engine = derivePackResults(audit, "rgaa").find((c) => c.id === "8.3")!;
+    expect(engine.status).toBe("NC");
+    const anchor = engine.findings.find((f) => !f.advisory)!;
+    audit.packAdjudication!.criteria.push({
+      id: "8.3",
+      status: "NC",
+      decidedBy: "agent",
+      findings: [{ ...anchor, ruleId: "agent:8.3" }],
+    } as PackCriterionAdjudication);
+    mkdirSync(join(D, "agent-engine"), { recursive: true });
+    const auditPath = join(D, "agent-engine", "audit.json");
+    writeFileSync(auditPath, JSON.stringify(audit));
+    await cli(["report", "--in", auditPath, "--standard", "rgaa", "--lang", "fr", "--out", join(D, "agent-engine", "report")]);
+    const dir = join(D, "agent-engine", "report");
+    const report = join(dir, readdirSync(dir).find((f) => f.startsWith("rgaa-") && f.endsWith(".md"))!);
+    await cli([
+      "verify",
+      "--report",
+      report,
+      "--in",
+      auditPath,
+      "--standard",
+      "rgaa",
+      "--lang",
+      "fr",
+      "--max-verify",
+      "0",
+      "--out",
+      join(D, "agent-engine", "trial"),
+    ]);
+    const items = (JSON.parse(readFileSync(join(D, "agent-engine", "trial", "VERIFY.todo.json"), "utf8")) as VerifyItem[]).map((it) => ({
+      ...it,
+      verdict: it.criteriaId === "8.3" ? "refuted" : "supported",
+      note: "",
+    }));
+    expect(items.some((it) => it.criteriaId === "8.3")).toBe(true);
+    const verdicts = join(D, "agent-engine", "VERIFY.json");
+    writeFileSync(verdicts, JSON.stringify(items));
+    await cli([
+      "verify",
+      "--apply",
+      verdicts,
+      "--report",
+      report,
+      "--in",
+      auditPath,
+      "--standard",
+      "rgaa",
+      "--lang",
+      "fr",
+      "--prune",
+      "--out",
+      join(D, "agent-engine", "pruned"),
+    ]);
+    const s = await summary([
+      "--verdicts",
+      verdicts,
+      "--report",
+      report,
+      "--in",
+      auditPath,
+      "--pruned",
+      join(D, "agent-engine", "pruned", "audit-latest.json"),
+    ]);
+    expect(s.withdrawals.applied.map((e) => e.criteriaId)).not.toContain("8.3");
+    expect(s.contestedEngine.map((e) => e.criteriaId)).toContain("8.3");
   });
 
   it("refuses to guess its inputs: --verdicts, --report and --in are all required", async () => {

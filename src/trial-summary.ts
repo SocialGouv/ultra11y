@@ -24,7 +24,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { SemanticResult } from "./check.js";
 import { pruneRefuted } from "./refute.js";
-import { type StandardId, isCore } from "./standards/index.js";
+import { type StandardId, derivePackResults, isCore } from "./standards/index.js";
 import type { AuditResult, Finding, Lang } from "./types.js";
 import { applyVerdicts, buildConformityWorklist, buildWorklist, claimKey, conformityClaimsFromAudit, type VerifyItem } from "./verify.js";
 
@@ -117,19 +117,44 @@ const norm = (v: unknown): string | null => (typeof v === "string" && v.trim() ?
 
 const emptyCounts = (): VerdictCounts => ({ supported: 0, partial: 0, refuted: 0, unsupported: 0, unadjudicated: 0, invalid: 0, missing: 0 });
 
-/** The record `--prune` writes to for this criterion — the pack's adjudication under a pack. */
-function recordOf(audit: AuditResult, standard: StandardId, id: string): { status?: string; findings: Finding[] } | undefined {
-  if (!isCore(standard)) return audit.packAdjudication?.standard === standard ? audit.packAdjudication.criteria.find((c) => c.id === id) : undefined;
+/** What the audit SHOWS for this criterion: the status and the findings a report built from it
+ *  publishes. Under a pack that is the DERIVED result, not the adjudication record `--prune`
+ *  writes to, because a record pruned back to `manual` keeps an NC the engine or the rendered
+ *  tier proved (`derivePackResults`: an abstention never erases a measured NC). Reading the
+ *  record alone is how a withdrawn claim on 10.7 was listed under « Retraits appliqués » while
+ *  the engine's `dyn-focus-visible` NC still stood on the same element (#184). */
+function shownOf(audit: AuditResult, standard: StandardId, id: string): { status?: string; findings: Finding[] } | undefined {
+  if (!isCore(standard)) {
+    try {
+      return derivePackResults(audit, standard).find((c) => c.id === id);
+    } catch {
+      return audit.packAdjudication?.standard === standard ? audit.packAdjudication.criteria.find((c) => c.id === id) : undefined;
+    }
+  }
   return audit.criteria.find((c) => c.id === id);
 }
 
-/** Does the pruned audit SHOW this withdrawal? A non-conformity: its anchor is gone from the
- *  criterion. A conformity: the criterion no longer clears (back to « to assess »). */
+const anchorOf = (it: VerifyItem): string => `${it.file.trim()}|${it.line}|${(it.selector ?? "").trim()}`;
+const findingAnchor = (f: Finding): string => `${f.file.trim()}|${f.line}|${(f.selectorHint ?? "").trim()}`;
+
+/** Does the pruned audit SHOW this withdrawal? A non-conformity: its anchor is gone from what the
+ *  criterion publishes. A conformity: the criterion no longer clears (back to « to assess »). */
 function withdrawalLanded(pruned: AuditResult, standard: StandardId, it: VerifyItem): boolean {
-  const rec = recordOf(pruned, standard, it.criteriaId);
+  const rec = shownOf(pruned, standard, it.criteriaId);
   if (it.kind === "c") return !rec || (rec.status !== "C" && rec.status !== "NA");
-  const k = `${it.file.trim()}|${it.line}|${(it.selector ?? "").trim()}`;
-  return !rec?.findings.some((f) => `${f.file.trim()}|${f.line}|${(f.selectorHint ?? "").trim()}` === k);
+  const k = anchorOf(it);
+  return !rec?.findings.some((f) => !f.advisory && findingAnchor(f) === k);
+}
+
+/** A withdrawn NC the prune acts on (the criterion was agent-ruled) whose anchor the ENGINE still
+ *  carries once the prune is done: the agent's copy goes, the rule's finding stays. That is a
+ *  contested engine decision, exactly like a refuted NC on an engine-ruled criterion, and never a
+ *  withdrawal applied. */
+function engineStillCarries(afterPrune: AuditResult, standard: StandardId, it: VerifyItem): boolean {
+  if (it.kind === "c") return false;
+  const rec = shownOf(afterPrune, standard, it.criteriaId);
+  const k = anchorOf(it);
+  return !!rec?.findings.some((f) => !f.advisory && !f.ruleId.startsWith("agent:") && findingAnchor(f) === k);
 }
 
 const ids = (xs: TrialEntry[]): string[] => [...new Set(xs.map((x) => x.criteriaId))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
@@ -159,9 +184,15 @@ export function buildTrialSummary(input: TrialSummaryInput): TrialSummary {
   const dry = pruneRefuted(audit, standard, verdicts, input.lang, untriedForPrune);
   // A withdrawal the prune leaves standing is CONTESTED, whoever decided it: the engine, or a
   // named human auditor (`decidedBy: "human"`, never overturned by the automatic trial).
-  const contested = new Set([...dry.skippedEngineClaims, ...dry.skippedHumanClaims]);
   const foreign = new Set(foreignItems);
-  const withdrawnAgent = verdicts.filter((it) => !foreign.has(it) && !contested.has(it) && ["refuted", "unsupported"].includes(norm(it.verdict) ?? ""));
+  const withdrawnNamed = verdicts.filter((it) => !foreign.has(it) && ["refuted", "unsupported"].includes(norm(it.verdict) ?? ""));
+  const contested = new Set([
+    ...dry.skippedEngineClaims,
+    ...dry.skippedHumanClaims,
+    // Agent-ruled but engine-anchored: the prune deletes the agent's finding, the engine's stays.
+    ...withdrawnNamed.filter((it) => engineStillCarries(dry.audit, standard, it)),
+  ]);
+  const withdrawnAgent = withdrawnNamed.filter((it) => !contested.has(it));
   const applied: TrialEntry[] = [];
   const notApplied: TrialEntry[] = [];
   for (const it of withdrawnAgent) (input.pruned && withdrawalLanded(input.pruned.audit, standard, it) ? applied : notApplied).push(entry(it));

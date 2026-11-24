@@ -13,6 +13,7 @@
 //     boxes.json    bounding boxes, same join key
 //     axtree.json   accessibility tree as the browser computed it
 //     screen.png    viewport screenshot (pixel tier — shares boxes.json's coordinates)
+//     screen-320.png   the page at the 320px reflow viewport, as the probe measured it (#184)
 //     screen-full.png  the whole page, height-bounded, when it is taller than the viewport —
 //                   what a reviewer judges; never read by a rule
 //
@@ -34,7 +35,7 @@ import { dirname, join } from "node:path";
 import { formatCaptureComment } from "./capture.js";
 import { parseHtml } from "./parse/html.js";
 import type { Doc } from "./parse/html.js";
-import type { AxNode, BoxDigest, BoxEntry, CssDigest, RenderSignals, StyleDigest, StyleEntry } from "./types.js";
+import type { AxNode, BoxDigest, BoxEntry, CssDigest, ReflowClipped, RenderSignals, StyleDigest, StyleEntry } from "./types.js";
 
 export type { AxNode, BoxDigest, BoxEntry, CssDigest, RenderSignals, StyleDigest, StyleEntry };
 
@@ -79,6 +80,14 @@ export interface SnapshotMeta {
    *  « capture en état de chargement » and never concludes a conformity by silence: the
    *  content it would have been about was not on the page. */
   loading?: string[];
+  /** The consent state the page was captured in (#184). `"none"`: consent placeholders or a
+   *  consent banner were on the page — the capture never accepted cookies, so third-party
+   *  content shows as its placeholder (src/consent.ts). `"accepted"`: reserved for a producer
+   *  that accepted consent before capturing. Absent = no consent manager seen (or a producer
+   *  that predates the field). */
+  consent?: "none" | "accepted";
+  /** The consent markers seen, as « kind vendor selector » (CONSENT_STATE). */
+  consentMarkers?: string[];
   /** The journey step this page state was recorded at (`journey run`, src/journey-run.ts):
    *  the journey's name, the step (0 is the start page), the action it performed, and whether the journey
    *  was replayed with the keyboard alone. Absent on every other producer's capture. */
@@ -130,7 +139,7 @@ export interface SnapshotProbes {
   inputOverflowZoom?: { selector: string; html: string; detail: string }[];
   inputOverflowSpacing?: { selector: string; html: string; detail: string }[];
   /** `widening` — the outermost boxes wider than the 320px viewport, when the producer named them. */
-  reflow?: { horizontalScroll: boolean; widening?: { selector: string; html: string; detail: string }[] };
+  reflow?: { horizontalScroll: boolean; widening?: { selector: string; html: string; detail: string }[]; clipped?: ReflowClipped };
   probed?: string[];
   /** Why a probe did not run — or did not FINISH — when it did not. The complement of
    *  `probed`, carried for the report and never for a verdict. */
@@ -158,6 +167,11 @@ export interface Snapshot {
   screenshotFullBase64?: string;
   /** Path of the full-page screenshot on disk, relative to the snapshot dir. Set on READ. */
   screenshotFull?: string;
+  /** The page at the 320px reflow viewport, base64, as the probe measured it — written as
+   *  `screen-320.png` (#184). For the reviewer of a 1.4.10 finding; never read by a rule. */
+  screenshot320Base64?: string;
+  /** Path of the 320px screenshot on disk, relative to the snapshot dir. Set on READ. */
+  screenshot320?: string;
 }
 
 /** What the browser-side collector (`COLLECT_SNAPSHOT`) returns. Every snapshot producer —
@@ -179,6 +193,9 @@ export interface CollectedPage {
   /** The loading markers still on the page when it was collected (LOADING_STATE); empty or
    *  absent when it was ready. */
   loading?: string[];
+  /** The consent placeholders and banners on the page (CONSENT_STATE); empty or absent when
+   *  it showed none. */
+  consent?: string[];
   /** The document's scroll height — whether a full-page screenshot adds anything. */
   docHeight?: number;
 }
@@ -259,6 +276,9 @@ export function validateSnapshotMeta(raw: unknown): SnapshotValidation {
   if (m.doctype !== undefined && typeof m.doctype !== "string") err("meta.doctype", "doctype must be a string");
   if (m.loading !== undefined && (!Array.isArray(m.loading) || m.loading.some((s) => typeof s !== "string")))
     err("meta.loading", "loading must be an array of strings");
+  if (m.consent !== undefined && m.consent !== "none" && m.consent !== "accepted") err("meta.consent", 'consent must be "none" or "accepted"');
+  if (m.consentMarkers !== undefined && (!Array.isArray(m.consentMarkers) || m.consentMarkers.some((s) => typeof s !== "string")))
+    err("meta.consentMarkers", "consentMarkers must be an array of strings");
   if (m.sources !== undefined && (!Array.isArray(m.sources) || m.sources.some((s) => typeof s !== "string")))
     err("meta.sources", "sources must be an array of strings");
   const j = m.journey as Record<string, unknown> | undefined;
@@ -299,6 +319,9 @@ export function validateSnapshotMeta(raw: unknown): SnapshotValidation {
       ...(typeof m.notes === "string" ? { notes: m.notes } : {}),
       // Kept only when it says something: an empty list is a page that was ready.
       ...(Array.isArray(m.loading) && m.loading.length ? { loading: m.loading as string[] } : {}),
+      // Same whitelist lesson as `doctype`: a field the rebuild does not name dies here.
+      ...(m.consent === "none" || m.consent === "accepted" ? { consent: m.consent } : {}),
+      ...(Array.isArray(m.consentMarkers) && m.consentMarkers.length ? { consentMarkers: m.consentMarkers as string[] } : {}),
       ...(j ? { journey: { name: j.name as string, step: j.step as number, action: j.action as string, keyboard: j.keyboard as boolean } } : {}),
     },
   };
@@ -348,6 +371,13 @@ export function writeSnapshot(root: string, snap: Snapshot): string {
       /* the report shows the viewport shot instead */
     }
   }
+  if (snap.screenshot320Base64) {
+    try {
+      writeFileSync(join(dir, "screen-320.png"), Buffer.from(snap.screenshot320Base64, "base64"));
+    } catch {
+      /* the brief still carries the reflow measure itself */
+    }
+  }
   return dir;
 }
 
@@ -384,6 +414,7 @@ export function readSnapshot(dir: string): Snapshot | null {
   const axe = readJson<NonNullable<RenderSignals["axe"]>>(join(dir, "axe.json"));
   const shot = join(dir, "screen.png");
   const full = join(dir, "screen-full.png");
+  const narrow = join(dir, "screen-320.png");
   return {
     meta: v.meta,
     dom,
@@ -395,6 +426,7 @@ export function readSnapshot(dir: string): Snapshot | null {
     ...(axe ? { axe } : {}),
     ...(existsSync(shot) ? { screenshot: "screen.png" } : {}),
     ...(existsSync(full) ? { screenshotFull: "screen-full.png" } : {}),
+    ...(existsSync(narrow) ? { screenshot320: "screen-320.png" } : {}),
   };
 }
 

@@ -1357,3 +1357,149 @@ describe("scan --all-routes --no-snapshot reads --root and labels what it scanne
     expect(by["/introuvable"]).toMatchObject({ observed: "not-reached", why: { reason: "http-status" } });
   }, 180_000);
 });
+
+// #184 — three ways the rendered tier misread a real page. Synthetic fixtures only.
+// `any`: the probes and the plugin are typed against Playwright's Page structurally.
+type Any = any;
+describe("rendered fidelity (#184)", () => {
+  async function onPage<T>(html: string, run: (page: Any) => Promise<T>, viewport?: { width: number; height: number }): Promise<T> {
+    const context = await browser!.newContext(viewport ? { viewport } : {});
+    const page = await context.newPage();
+    try {
+      // A real navigation, not `setContent`: `autofocus` is applied on a document load.
+      await page.route("http://fixture.test/", (route: Any) => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }));
+      await page.goto("http://fixture.test/");
+      return await run(page);
+    } finally {
+      await page.close();
+      await context.close();
+    }
+  }
+  const doc = (css: string, body: string) =>
+    `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>F</title><style>body { margin: 8px; } ${css}</style></head><body><main><h1>F</h1>${body}</main></body></html>`;
+
+  // A login form's username field carries `autofocus`. The setup used to photograph it already
+  // focused, so the ring it draws was its « rest » state and Tab back onto it changed nothing:
+  // a decisive « focus not visible » on a ring that is plainly there.
+  it("an autofocus field with a :focus outline is not reported as focus-not-visible", async () => {
+    if (!browserAvailable) return;
+    const { probeFocusRing } = await import("../src/probes.js");
+    const ring = await onPage(
+      doc(
+        "input, a { outline: none; } input:focus, a:focus { outline: 3px solid rgb(0, 80, 160); }",
+        '<form><label for="u">Identifiant</label><input id="u" name="u" autofocus><a href="/aide">Aide</a></form>',
+      ),
+      async (page) => {
+        // The premise: the field really holds focus at load, or this test proves nothing.
+        // Chromium flushes autofocus candidates on a rendering update, which a headless page
+        // may not have run yet; the script fallback is what an app's own focus() call does.
+        await page.waitForFunction("document.activeElement && document.activeElement.id === 'u'", undefined, { timeout: 2000 }).catch(() => {});
+        await page.evaluate("document.activeElement && document.activeElement.id === 'u' || document.getElementById('u').focus()");
+        expect(await page.evaluate("document.activeElement && document.activeElement.id")).toBe("u");
+        const r = await probeFocusRing(page);
+        // …and the focus is handed back where the page put it.
+        return r;
+      },
+    );
+    expect(ring.visible).toEqual([]);
+    expect(ring.complete).toBe(true);
+  }, 60_000);
+
+  it("a field with no indicator at all is still reported after the blur", async () => {
+    if (!browserAvailable) return;
+    const { probeFocusRing } = await import("../src/probes.js");
+    const ring = await onPage(
+      doc("input, input:focus { outline: none; }", '<label for="u">Identifiant</label><input id="u" autofocus><a href="/a">A</a>'),
+      (page) => probeFocusRing(page),
+    );
+    expect(ring.visible.map((h) => h.html)).toEqual([expect.stringContaining('id="u"')]);
+  }, 60_000);
+
+  // A box sticking out of the 320px viewport with its text in view is not lost content — the
+  // stray 8px footer logo that was reported on a dozen pages.
+  it("a box-only overflow at 320px measures no clipped text", async () => {
+    if (!browserAvailable) return;
+    const { REFLOW_PROBE } = await import("../src/probes.js");
+    const r = (await onPage(
+      doc(".band { width: 400px; height: 24px; background: #ddd; }", '<div class="band"></div><p>Un texte court.</p>'),
+      (page) => page.evaluate(REFLOW_PROBE),
+      { width: 320, height: 800 },
+    )) as { horizontalScroll: boolean; clipped?: { textCount: number; controlCount: number } };
+    expect(r.horizontalScroll).toBe(true);
+    expect(r.clipped).toMatchObject({ textCount: 0, controlCount: 0 });
+  }, 60_000);
+
+  // Above the cap, the walk stops — and the clipped paragraph AFTER it is never seen. That must
+  // read as « incomplete », never as « no text beyond the viewport ».
+  it("a page above the text-walk cap reports the measure as capped, not as box-only overflow", async () => {
+    if (!browserAvailable) return;
+    const { REFLOW_PROBE, REFLOW_TEXT_CAP } = await import("../src/probes.js");
+    const many = Array.from({ length: REFLOW_TEXT_CAP + 10 }, (_, i) => `<span>m${i}</span>`).join(" ");
+    const r = (await onPage(
+      doc(
+        ".band { width: 400px; height: 4px; } .wide { width: 640px; }",
+        `<div class="band"></div><p>${many}</p><p class="wide">${"Texte coupé au-delà du bord droit. ".repeat(6)}</p>`,
+      ),
+      (page) => page.evaluate(REFLOW_PROBE),
+      { width: 320, height: 800 },
+    )) as { horizontalScroll: boolean; clipped?: { textCount: number; capped?: boolean; textNodesWalked?: number } };
+    expect(r.horizontalScroll).toBe(true);
+    expect(r.clipped?.capped).toBe(true);
+    expect(r.clipped?.textNodesWalked).toBe(REFLOW_TEXT_CAP);
+    const { reflowClippedParams } = await import("../src/probes.js");
+    const { resolveMessage } = await import("../src/messages.js");
+    const sentence = resolveMessage({ message: "", msg: { id: "dyn-reflow", params: reflowClippedParams(r.clipped as never) } }, "en");
+    expect(sentence).toContain("INCOMPLETE");
+    expect(sentence).not.toContain("only boxes overflow");
+  }, 60_000);
+
+  it("a paragraph laid out wider than 320px measures clipped text", async () => {
+    if (!browserAvailable) return;
+    const { REFLOW_PROBE } = await import("../src/probes.js");
+    const r = (await onPage(
+      doc(".wide { width: 640px; }", `<p class="wide">${"Un paragraphe assez long pour dépasser largement le bord droit. ".repeat(4)}</p>`),
+      (page) => page.evaluate(REFLOW_PROBE),
+      { width: 320, height: 800 },
+    )) as { horizontalScroll: boolean; clipped?: { text: { selector: string; detail: string }[]; textCount: number } };
+    expect(r.horizontalScroll).toBe(true);
+    expect(r.clipped?.textCount).toBeGreaterThan(0);
+    expect(r.clipped?.text[0]?.selector).toContain("p");
+    expect(r.clipped?.text[0]?.detail).toMatch(/au-delà du bord droit/);
+  }, 60_000);
+
+  // A headless capture never accepts cookies, so a consent manager's placeholder is what gets
+  // captured where the video was. Recorded as such, through the real Playwright integration.
+  it("a consent placeholder is recorded as consent: none in the page's meta.json", async () => {
+    if (!browserAvailable) return;
+    const { checkA11y } = await import("../src/integrations/playwright.js");
+    const html = doc(
+      "",
+      '<div class="fr-consent-placeholder"><p class="fr-h6">Le service vidéo est désactivé</p><button type="button">Autoriser</button></div><p>Contenu réel.</p>',
+    );
+    const context = await browser!.newContext();
+    const page = await context.newPage();
+    const cwd = process.cwd();
+    const dir = mkdtempSync(join(tmpdir(), "u11y-consent-"));
+    process.chdir(dir);
+    try {
+      await page.route("http://consent.test/", (route: Any) => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }));
+      await page.goto("http://consent.test/");
+      await checkA11y(page as Any, { as: "consent", name: "Consentement", failOn: false });
+    } finally {
+      process.chdir(cwd);
+      await page.close();
+      await context.close();
+    }
+    const meta = JSON.parse(readFileSync(join(dir, PAGES_DIR, "consent", "meta.json"), "utf8")) as { consent?: string; consentMarkers?: string[] };
+    expect(meta.consent).toBe("none");
+    expect(meta.consentMarkers).toEqual([expect.stringContaining("placeholder dsfr div.fr-consent-placeholder")]);
+    // …and the brief's harvest tags what sits inside it.
+    const { harvestSubjects } = await import("../src/adjudicate-subjects.js");
+    const { parseHtml } = await import("../src/parse/html.js");
+    const dom = readFileSync(join(dir, PAGES_DIR, "consent", "dom.html"), "utf8");
+    const evidence = harvestSubjects(["buttons", "focusables"], [parseHtml(dom, join(PAGES_DIR, "consent", "dom.html"))]);
+    const inPlaceholder = evidence.filter((x) => (x.ev.note ?? "").includes("Autoriser"));
+    expect(inPlaceholder.length).toBeGreaterThan(0);
+    for (const x of inPlaceholder) expect(x.ev.note).toContain("état sans consentement");
+  }, 120_000);
+});

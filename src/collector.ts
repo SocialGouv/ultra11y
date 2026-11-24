@@ -7,6 +7,10 @@
 // Nothing here may ever import from the engine.
 //
 // snapshot.ts re-exports all three names, so every existing importer is unaffected.
+//
+// The one import below is another LEAF (src/consent.ts imports nothing): the consent markers
+// are read on both sides, and a second copy here is how the two would drift.
+import { CONSENT_STATE } from "./consent.js";
 
 // The computed declarations the rendered tier consumes. Kept as one list so the collector
 // and the rules that read it cannot drift. Extend here when a rendered rule needs a new one.
@@ -248,6 +252,9 @@ export const COLLECT_SNAPSHOT = `(() => {
     // Still loading at the instant of collection: the markers, or none. Every producer runs
     // this same collector, so every producer can say so — see LOADING_STATE.
     loading: ${LOADING_STATE},
+    // The consent placeholders and banners on the page (#184): a headless capture never
+    // accepts cookies, so what they show is « état sans consentement », not content.
+    consent: ${CONSENT_STATE},
     styles: { v: 1, entries: styles, truncated: truncated },
     boxes: { v: 1, entries: boxes, truncated: truncated }
   };
