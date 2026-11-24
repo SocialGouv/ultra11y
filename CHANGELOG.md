@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [8.4.0](https://github.com/SocialGouv/ultra11y/compare/v8.3.0...v8.4.0) (2026-11-24)
+
+
+### Features
+
+* **snapshot:** the page's JS behaviour is recorded and reaches the criteria it decides ([#195](https://github.com/SocialGouv/ultra11y/issues/195)) ([b7a98c9](https://github.com/SocialGouv/ultra11y/commit/b7a98c95186ec69a4d52acdcb7d09f626fe368c0)), closes [#190](https://github.com/SocialGouv/ultra11y/issues/190) [#190](https://github.com/SocialGouv/ultra11y/issues/190) [#190](https://github.com/SocialGouv/ultra11y/issues/190) [#190](https://github.com/SocialGouv/ultra11y/issues/190)
+
 # [8.3.0](https://github.com/SocialGouv/ultra11y/compare/v8.2.0...v8.3.0) (2026-11-24)
 
 
