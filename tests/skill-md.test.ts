@@ -136,6 +136,11 @@ describe("skill docs stay in sync with the CLI", () => {
       "--prefix",
       "--yes",
       "--with-deps",
+      // The Codex CLI, cited by the Codex section of harnesses.md (hook trust, the sandbox).
+      "--dangerously-bypass-hook-trust",
+      "--sandbox",
+      "--ask-for-approval",
+      "--log-denials",
     ]);
     for (const f of flags) {
       if (removed.has(f) || foreign.has(f)) continue;

@@ -275,3 +275,106 @@ jobs:
         env:
           ULTRA11Y_REQUIRE_BROWSER: "1"
         run: pnpm run test:browser
+
+  # THE OPENCODE PLUGIN, IN A REAL OPENCODE — BOTH MAJORS.
+  #
+  # The install-bundle job above only proves the plugin file parses. This boots each pinned
+  # OpenCode as a server in a throwaway HOME, against a local mock model (no credentials, no
+  # paid model), and checks that the plugin loads, registers both skills and blocks a push
+  # carrying a blocking finding exactly once (tests/opencode-smoke.e2e.test.ts).
+  #
+  # Pinned on purpose: a new OpenCode release is a change to review, not something that turns
+  # a PR red on its own. Bump both pins (and the V2 checksum) together, deliberately.
+  opencode-smoke:
+    runs-on: ubuntu-latest
+    name: opencode-smoke (the plugin in real OpenCode 1 and 2)
+    timeout-minutes: 15
+    env:
+      OPENCODE_V1_VERSION: 1.19.5
+      OPENCODE_V2_VERSION: 2.4.1
+      # sha256 of opencode-linux-x64-baseline.tar.gz for OPENCODE_V2_VERSION (the same digest
+      # the anomalyco/homebrew-tap formula pins).
+      OPENCODE_V2_SHA256: 9ddd18e3faf64eaeccf6a0fcbc96a5c7a14520ae5fd5b61e5be51d894f478b47
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Outside the checkout: the pinned binaries are no part of the tree under test.
+      - run: echo "HARNESS_DIR=$HOME/.cache/ultra11y-harness" >> "$GITHUB_ENV"
+      # Two binaries of ~130 MB each: downloaded once per pin, then restored.
+      - name: Cache the pinned OpenCode binaries
+        id: opencode-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.HARNESS_DIR }}
+          key: opencode-${{ runner.os }}-${{ env.OPENCODE_V1_VERSION }}-${{ env.OPENCODE_V2_VERSION }}
+      - name: Install OpenCode ${{ env.OPENCODE_V1_VERSION }} (npm) and ${{ env.OPENCODE_V2_VERSION }} (release binary)
+        if: steps.opencode-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          npm install --prefix "$HARNESS_DIR/opencode-v1" --no-save --no-audit --no-fund "opencode-ai@$OPENCODE_V1_VERSION"
+          mkdir -p "$HARNESS_DIR/opencode-v2"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/opencode-v2.tar.gz" "https://opencode.ai/files/bin/$OPENCODE_V2_VERSION/opencode-linux-x64-baseline.tar.gz"
+          echo "$OPENCODE_V2_SHA256  $RUNNER_TEMP/opencode-v2.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/opencode-v2.tar.gz" -C "$HARNESS_DIR/opencode-v2"
+      # ULTRA11Y_REQUIRE_OPENCODE turns the test's skip-when-absent into a failure: both majors
+      # are installed here on purpose, and a skip would make the job decoration.
+      - name: The plugin in real OpenCode, against a mock model
+        env:
+          OPENCODE_V1_BIN: ${{ env.HARNESS_DIR }}/opencode-v1/node_modules/.bin/opencode
+          OPENCODE_V2_BIN: ${{ env.HARNESS_DIR }}/opencode-v2/opencode
+          ULTRA11Y_REQUIRE_OPENCODE: "1"
+        run: |
+          "$OPENCODE_V1_BIN" --version
+          "$OPENCODE_V2_BIN" --version
+          pnpm run test:opencode
+
+  # THE GUARD HOOK, IN A REAL CODEX.
+  #
+  # The install-bundle job feeds the guard a Codex-SHAPED payload; this installs the plugin
+  # from the checkout with a pinned Codex CLI (`codex plugin marketplace add` + `codex plugin
+  # add`, and separately `ultra11y install --codex`), into a throwaway CODEX_HOME, then has
+  # `codex exec` run `git commit` on a staged blocking finding against a local mock of the
+  # Responses API: no login, no API key, no model call. The PreToolUse hook fires for real,
+  # through the command line hooks/hooks.json writes (tests/codex-smoke.e2e.test.ts).
+  codex-smoke:
+    runs-on: ubuntu-latest
+    name: codex-smoke (the guard hook in a real Codex)
+    timeout-minutes: 10
+    env:
+      CODEX_VERSION: 0.172.0
+    steps:
+      # No persisted token: Codex clones the checkout into the plugin cache, .git/config included.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Outside the checkout: the pinned binaries are no part of the tree under test.
+      - run: echo "HARNESS_DIR=$HOME/.cache/ultra11y-harness" >> "$GITHUB_ENV"
+      - name: Cache the pinned Codex CLI
+        id: codex-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.HARNESS_DIR }}
+          key: codex-${{ runner.os }}-${{ env.CODEX_VERSION }}
+      - name: Install Codex CLI ${{ env.CODEX_VERSION }}
+        if: steps.codex-cache.outputs.cache-hit != 'true'
+        run: npm install --prefix "$HARNESS_DIR/codex" --no-save --no-audit --no-fund "@openai/codex@$CODEX_VERSION"
+      - name: The guard hook in real Codex, against a mock model
+        env:
+          CODEX_BIN: ${{ env.HARNESS_DIR }}/codex/node_modules/.bin/codex
+          ULTRA11Y_REQUIRE_CODEX: "1"
+        run: |
+          "$CODEX_BIN" --version
+          pnpm run test:codex

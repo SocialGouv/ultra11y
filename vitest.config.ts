@@ -18,7 +18,8 @@ export default defineConfig({
     // landed somewhere else entirely (language resolution, which reads the repo it is in).
     //
     // tests/opencode-smoke.e2e.test.ts boots real OpenCode servers (both majors, when
-    // installed) and is run on its own: `pnpm run test:opencode`.
+    // installed) and is run on its own: `pnpm run test:opencode`. tests/codex-smoke.e2e.test.ts
+    // likewise drives a real Codex CLI: `pnpm run test:codex`. Both have their own CI job.
     exclude: [
       ...configDefaults.exclude,
       "tests/fixtures/**",
@@ -26,6 +27,7 @@ export default defineConfig({
       "tests/perf-shape.test.ts",
       "tests/browser-tier.e2e.test.ts",
       "tests/opencode-smoke.e2e.test.ts",
+      "tests/codex-smoke.e2e.test.ts",
     ],
     // An installed veraPDF adds its result to the 13.3 brief (src/verapdf.ts). Off for the suite,
     // so a brief renders the same on a machine that has it and on CI that does not; the tests

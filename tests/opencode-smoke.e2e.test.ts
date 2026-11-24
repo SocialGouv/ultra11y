@@ -24,7 +24,9 @@
 // It SKIPS when no OpenCode is installed. `pnpm test:opencode` runs it; point it at binaries
 // with OPENCODE_V1_BIN / OPENCODE_V2_BIN, otherwise the `opencode` on PATH is used for
 // whichever major it is. V1 is `npx -y opencode-ai@1.19.5` away; its first run downloads the
-// `@ai-sdk/openai-compatible` provider package the mock is spoken to through.
+// `@ai-sdk/openai-compatible` provider package the mock is spoken to through. V2 is the
+// release binary (opencode.ai/files/bin/<version>/). The `opencode-smoke` CI job pins both
+// and sets ULTRA11Y_REQUIRE_OPENCODE=1, which turns a skip into a failure.
 import { type ChildProcess, execFileSync, spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -353,6 +355,12 @@ async function toolParts1(srv: Running, id: string): Promise<ToolOutcome[]> {
 }
 
 // ---------------------------------------------------------------------------------------
+
+// CI installs both majors on purpose; there a silent skip would make this file decoration.
+if (process.env.ULTRA11Y_REQUIRE_OPENCODE === "1") {
+  const missing = ([1, 2] as const).filter((m) => !binFor(m));
+  if (missing.length) throw new Error(`ultra11y: ULTRA11Y_REQUIRE_OPENCODE=1 but no OpenCode ${missing.join(" or ")} was found — the smoke did not run.`);
+}
 
 for (const major of [1, 2] as const) {
   const bin = binFor(major);
