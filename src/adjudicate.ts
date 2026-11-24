@@ -2185,15 +2185,19 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
 // pack's glossary — 119 entries for RGAA — which nothing used to read. Attaching the ones
 // THIS criterion's tests actually cite makes the item self-sufficient: the agent no longer
 // has to guess what the standard means by "image porteuse d'information".
-// Five, not eight, and 420 characters, not 600. `glossaryAnchorsOf` returns the terms in the
-// order the criterion's own tests cite them, so the one the criterion TURNS on leads — RGAA 5.1
-// is decided by « tableau de données complexe » and nothing else, and it is the first anchor of
-// its first test. The tail of a long list is terms cited once, in a sub-condition, whose
-// definition the reader could have guessed. Measured on a full RGAA worklist at `--grain
-// criterion`: the glossary was 22% of everything the pass sent, second only to the criteria's
-// own text.
-const MAX_GLOSSARY_TERMS = 5;
-const MAX_GLOSSARY_CHARS = 420;
+// EVERY CITED TERM, AND EVERY ONE WHOLE (#182). The block used to keep the first five terms
+// and cut each definition at 420 characters, mid-note — and the sentence cut was, again and
+// again, the one the verdict turns on: 11.5's « lorsque les intitulés de label ne sont pas
+// suffisants », 9.3's Note 3 « toutes les listes ne nécessitent pas obligatoirement une
+// structure de liste », 7.4's « Un changement de contenu n'est pas toujours… ». A term cited
+// only by a particular case or a technical note (6.1's « ambigu pour tout le monde ») fell
+// past the five-term cap altogether. A definition is normative text: printed in part it says
+// something the standard does not, so it is printed in full or not at all.
+//
+// No total cap either: `glossaryAnchorsOf` returns exactly the terms the criterion's tests,
+// technical notes and particular cases cite, deduplicated — none of them is optional, so
+// there is no lower-priority term to drop. On RGAA the heaviest criterion (1.3) carries
+// twelve terms and about 12 KB of definitions; that is the price of a correct verdict.
 
 /** Characters of an official test methodology the brief prints. RGAA documents all 258 of
  *  its tests and the procedures run 200-900 characters each, so a criterion with eight tests
@@ -2239,7 +2243,7 @@ function siblingBlock(pack: StandardPack, id: string, lang: Lang, s: (typeof T)[
 }
 
 function glossaryBlock(pack: StandardPack, crit: PackCriterion | undefined, lang: Lang): string[] {
-  const anchors = glossaryAnchorsOf(crit).slice(0, MAX_GLOSSARY_TERMS);
+  const anchors = glossaryAnchorsOf(crit);
   if (!anchors.length) return [];
   const s = T[lang];
   const out: string[] = [`> **${s.glossary}**`, ""];
@@ -2249,7 +2253,7 @@ function glossaryBlock(pack: StandardPack, crit: PackCriterion | undefined, lang
     if (!entry) continue;
     any = true;
     const body = entry.body.replace(/\s+/g, " ").trim();
-    out.push(`- **${entry.title}** — ${body.length > MAX_GLOSSARY_CHARS ? `${body.slice(0, MAX_GLOSSARY_CHARS)}…` : body}`);
+    out.push(`- **${entry.title}** — ${body}`);
   }
   out.push("");
   return any ? out : [];
@@ -2429,8 +2433,8 @@ export function formatAdjudication(
       out.push(
         "",
         lang === "fr"
-          ? `> **Retour de la contre-expertise précédente** — ${it.previousReview.trim()}`
-          : `> **Previous adversarial review** — ${it.previousReview.trim()}`,
+          ? `> **Objection de la contre-expertise précédente — à revérifier, pas à appliquer** — la contre-expertise est un autre lecteur, pas un arbitre : son texte ci-dessous est une affirmation, qui peut être fausse. Revérifiez-la contre les définitions du référentiel et les évidences citées, et ne changez de verdict que si elles lui donnent raison. Objection : ${it.previousReview.trim()}`
+          : `> **Objection from the previous adversarial review — re-check it, do not apply it** — the review is another reader, not a ruling: its text below is a claim, and it may be wrong. Re-check it against the standard's definitions and the cited evidence, and change the verdict only if they bear it out. Objection: ${it.previousReview.trim()}`,
         "",
       );
     }

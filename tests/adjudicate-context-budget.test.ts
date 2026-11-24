@@ -13,8 +13,9 @@
 //   system prompt is sending it twice. Only `judge` sets the flag, and only because it is the
 //   one caller that provably ships a system prompt.
 //
-//   PAID — the glossary's tail and the procedure of a test whose mechanism the harvest did not
-//   find. Both are bounded rather than removed, and the WORDING of every test stays whole.
+//   PAID — the procedure of a test whose mechanism the harvest did not find. It is bounded
+//   rather than removed, and the WORDING of every test stays whole. The glossary is NOT on this
+//   list any more (#182): every term the criterion cites is printed, each definition whole.
 //
 // This file pins both, and the ceiling, so context cost cannot drift without a diff saying so.
 import { describe, it, expect } from "vitest";
@@ -71,10 +72,10 @@ describe("the contract is dropped only where a system prompt already carries it"
 describe("the bounded blocks stay bounded", () => {
   const all = () => items().map((it) => formatAdjudication([it], "fr", "rgaa", { preamble: false, contract: false }));
 
-  it("never prints more than five glossary terms for one criterion", () => {
+  it("never cuts a glossary definition — the glossary is not a bounded block (#182)", () => {
     for (const md of all()) {
       const block = md.split("**Termes définis par le référentiel**")[1]?.split("\n\n")[0] ?? "";
-      expect(block.split("\n").filter((l) => l.startsWith("- **")).length).toBeLessThanOrEqual(5);
+      for (const line of block.split("\n").filter((l) => l.startsWith("- **"))) expect(line.endsWith("…"), line.slice(0, 60)).toBe(false);
     }
   });
 
@@ -102,12 +103,16 @@ describe("the bounded blocks stay bounded", () => {
 // WHEN THIS GOES RED after a `standards-refresh`, the pack's own text grew and the ceiling
 // moves with a one-line diff that says so. When it goes red after a change to the BRIEF, ask
 // what was added and whether a model that already has the criterion's tests needed it.
+//
+// 5600 → 6500 (#182): the glossary is printed whole, every cited term and every definition in
+// full. A cut definition was the main cause of disputed non-conformities in a field review;
+// the ~700 characters per criterion it costs were voted for.
 describe("the context bill", () => {
   it("stays under its ceiling for a full RGAA worklist at criterion grain", () => {
     const rendered = items().map((it) => formatAdjudication([it], "fr", "rgaa", { preamble: false, contract: false }));
     const total = rendered.reduce((a, md) => a + md.length, 0);
     const perCriterion = Math.round(total / rendered.length);
     expect(rendered.length).toBeGreaterThan(50);
-    expect(perCriterion, `${perCriterion} characters per criterion × ${rendered.length} criteria = ${total}`).toBeLessThan(5600);
+    expect(perCriterion, `${perCriterion} characters per criterion × ${rendered.length} criteria = ${total}`).toBeLessThan(6500);
   });
 });

@@ -57244,8 +57244,6 @@ var T2 = {
   }
 };
 var MAX_REFS = 12;
-var MAX_GLOSSARY_TERMS = 5;
-var MAX_GLOSSARY_CHARS = 420;
 var MAX_METHODOLOGY_CHARS = 900;
 var MAX_UNTOUCHED_METHODOLOGY_CHARS = 260;
 function siblingBlock(pack, id, lang, s2) {
@@ -57257,7 +57255,7 @@ function siblingBlock(pack, id, lang, s2) {
   return out;
 }
 function glossaryBlock(pack, crit, lang) {
-  const anchors = glossaryAnchorsOf(crit).slice(0, MAX_GLOSSARY_TERMS);
+  const anchors = glossaryAnchorsOf(crit);
   if (!anchors.length) return [];
   const s2 = T2[lang];
   const out = [`> **${s2.glossary}**`, ""];
@@ -57267,7 +57265,7 @@ function glossaryBlock(pack, crit, lang) {
     if (!entry2) continue;
     any = true;
     const body = entry2.body.replace(/\s+/g, " ").trim();
-    out.push(`- **${entry2.title}** \u2014 ${body.length > MAX_GLOSSARY_CHARS ? `${body.slice(0, MAX_GLOSSARY_CHARS)}\u2026` : body}`);
+    out.push(`- **${entry2.title}** \u2014 ${body}`);
   }
   out.push("");
   return any ? out : [];
@@ -57334,7 +57332,7 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
     if (it.previousReview?.trim()) {
       out.push(
         "",
-        lang === "fr" ? `> **Retour de la contre-expertise pr\xE9c\xE9dente** \u2014 ${it.previousReview.trim()}` : `> **Previous adversarial review** \u2014 ${it.previousReview.trim()}`,
+        lang === "fr" ? `> **Objection de la contre-expertise pr\xE9c\xE9dente \u2014 \xE0 rev\xE9rifier, pas \xE0 appliquer** \u2014 la contre-expertise est un autre lecteur, pas un arbitre : son texte ci-dessous est une affirmation, qui peut \xEAtre fausse. Rev\xE9rifiez-la contre les d\xE9finitions du r\xE9f\xE9rentiel et les \xE9vidences cit\xE9es, et ne changez de verdict que si elles lui donnent raison. Objection : ${it.previousReview.trim()}` : `> **Objection from the previous adversarial review \u2014 re-check it, do not apply it** \u2014 the review is another reader, not a ruling: its text below is a claim, and it may be wrong. Re-check it against the standard's definitions and the cited evidence, and change the verdict only if they bear it out. Objection: ${it.previousReview.trim()}`,
         ""
       );
     }
