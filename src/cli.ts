@@ -1255,7 +1255,14 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
       return writeProposedSample(
         p,
         lang,
-        recorded.map((s) => ({ url: s.meta.url, title: extractTitle(s.dom) ?? s.meta.name, html: s.dom, skeleton: skeletonOf(s.dom) })),
+        recorded.map((s) => ({
+          id: s.meta.id,
+          url: s.meta.url,
+          title: extractTitle(s.dom) ?? s.meta.name,
+          html: s.dom,
+          skeleton: skeletonOf(s.dom),
+          ...(s.meta.auth !== undefined ? { auth: s.meta.auth } : {}),
+        })),
       );
     return writeDiscoveredSample(p, lang, snaps, snaps.length);
   }
@@ -1333,16 +1340,26 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
     // The template fingerprint comes from a snapshot when the project has one for the route:
     // the served HTML of a client-rendered page is a shell, the snapshot is what it renders.
     const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
-    const skeletons = new Map<string, string>();
-    for (const s of readSnapshots(root)) {
+    // The snapshot also lends its id (the directory the page is captured under) and its auth
+    // flag, so the declared page stays aligned with its capture. Several snapshots on one route
+    // (a base page and its state-reached pages): the shortest id, then the smallest, is the base.
+    const snapshotOf = new Map<string, { id: string; skeleton: string; auth?: boolean }>();
+    const recorded = readSnapshots(root).sort((a, b) => a.meta.id.length - b.meta.id.length || (a.meta.id < b.meta.id ? -1 : a.meta.id > b.meta.id ? 1 : 0));
+    for (const s of recorded) {
       const key = routePath(s.meta.url);
-      if (!skeletons.has(key)) skeletons.set(key, skeletonOf(s.dom));
+      if (!snapshotOf.has(key))
+        snapshotOf.set(key, { id: s.meta.id, skeleton: skeletonOf(s.dom), ...(s.meta.auth !== undefined ? { auth: s.meta.auth } : {}) });
     }
     const inputs: ProposalInput[] = urls.map((url) => {
       const html = cache.get(url);
       const title = titles.get(url);
-      const skeleton = skeletons.get(routePath(url));
-      return { url, ...(title ? { title } : {}), ...(html ? { html } : {}), ...(skeleton ? { skeleton } : {}) };
+      const snap = snapshotOf.get(routePath(url));
+      return {
+        url,
+        ...(title ? { title } : {}),
+        ...(html ? { html } : {}),
+        ...(snap ? { id: snap.id, skeleton: snap.skeleton, ...(snap.auth !== undefined ? { auth: snap.auth } : {}) } : {}),
+      };
     });
     return writeProposedSample(p, lang, inputs);
   }
@@ -1396,6 +1413,13 @@ function writeProposedSample(p: ParsedArgs, lang: Lang, inputs: ProposalInput[])
     return 1;
   }
   const summary = proposalSummary(lang, proposal, applied);
+  // A declared page leaves the sample by name, never in silence.
+  for (const d of applied.dropped)
+    console.error(
+      lang === "fr"
+        ? `ultra11y pages discover : retirée de l'échantillon — ${d.id} (${d.url}), hors proposition et sans auth, storageState, sources ni notes${p.flags.write === true ? "" : " (rien n'est écrit sans --write)"}`
+        : `ultra11y pages discover: dropped from the sample — ${d.id} (${d.url}), outside the proposal and carrying no auth, storageState, sources or notes${p.flags.write === true ? "" : " (nothing is written without --write)"}`,
+    );
   if (p.flags.json)
     console.log(
       JSON.stringify(

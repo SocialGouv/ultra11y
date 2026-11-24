@@ -59065,7 +59065,7 @@ function matchKind(kind, pages) {
       const k = kws[ki];
       const where = keywordMatches(page.urlHay, k) ? "URL" : keywordMatches(page.titleHay, k) ? "title" : void 0;
       if (!where) continue;
-      const rank = [page.depth, page.hasQuery, where === "URL" ? 0 : 1, ki, page.url.length, page.url];
+      const rank = [page.depth, page.hasQuery, where === "URL" ? 0 : 1, ki, page.url.length, page.url, page.key.length, page.key];
       if (!best || cmpTuple(rank, best.rank) < 0) best = { page, keyword: kind.keywords[ki] ?? k, where, rank };
     }
   }
@@ -59075,19 +59075,28 @@ function proposeSample(inputs, opts) {
   const size = opts.size !== void 0 && Number.isFinite(opts.size) && opts.size > 0 ? Math.floor(opts.size) : DEFAULT_SAMPLE_SIZE;
   const query = opts.searchQuery?.trim() || FIXED_SEARCH_QUERY;
   const locale = opts.locale ?? "fr";
-  const sorted = inputs.map((i) => ({ ...i, url: i.url.split("#", 1)[0] })).filter((i) => i.url).sort((a2, b) => cmpTuple([a2.url, a2.title ?? "", a2.skeleton ?? "", a2.html ?? ""], [b.url, b.title ?? "", b.skeleton ?? "", b.html ?? ""]));
+  const keyOf = (i) => i.id ? `id:${i.id}` : `url:${i.url}`;
+  const sorted = inputs.map((i) => ({ ...i, url: i.url.split("#", 1)[0] })).filter((i) => i.url).sort(
+    (a2, b) => cmpTuple(
+      [keyOf(a2), a2.url, a2.title ?? "", a2.skeleton ?? "", a2.html ?? "", a2.auth ? 1 : 0],
+      [keyOf(b), b.url, b.title ?? "", b.skeleton ?? "", b.html ?? "", b.auth ? 1 : 0]
+    )
+  );
   const unique = [];
-  for (const i of sorted) if (unique[unique.length - 1]?.url !== i.url) unique.push(i);
+  for (const i of sorted) if (!unique.length || keyOf(unique[unique.length - 1]) !== keyOf(i)) unique.push(i);
   const documents = unique.filter((i) => isDownloadUrl(i.url));
   const pageInputs = unique.filter((i) => !isDownloadUrl(i.url));
   const titles = /* @__PURE__ */ new Map();
-  for (const i of pageInputs) if (i.title?.trim()) titles.set(i.url, i.title.trim());
+  for (const i of pageInputs) if (i.title?.trim()) titles.set(keyOf(i), i.title.trim());
   const bare = strippedTitles(titles);
   const pages = pageInputs.map((i) => {
     const parsed = parseUrl(i.url);
     const words = parsed.segments.map((s2) => s2.replace(/\.x?html?$/i, "")).join(" ");
     const root = parsed.segments.length === 0 || /^index\.x?html?$/i.test(parsed.segments.join("/"));
     return {
+      key: keyOf(i),
+      ...i.id ? { id: i.id } : {},
+      ...i.auth !== void 0 ? { auth: i.auth } : {},
       url: i.url,
       ...i.title?.trim() ? { title: i.title.trim() } : {},
       ...i.html ? { html: i.html } : {},
@@ -59096,22 +59105,31 @@ function proposeSample(inputs, opts) {
       depth: root ? 0 : parsed.segments.length,
       hasQuery: parsed.query.length ? 1 : 0,
       urlHay: norm4(`${words.replace(/[-_.+~]+/g, " ")}${root ? " home index" : ""}`),
-      titleHay: norm4(bare.get(i.url) ?? ""),
+      titleHay: norm4(bare.get(keyOf(i)) ?? ""),
       ...i.html ? { facts: readFacts(i.html, i.url) } : {}
     };
   });
-  const byShallow = [...pages].sort((a2, b) => cmpTuple([a2.depth, a2.hasQuery, a2.url], [b.depth, b.hasQuery, b.url]));
+  const byShallow = [...pages].sort((a2, b) => cmpTuple([a2.depth, a2.hasQuery, a2.url, a2.key], [b.depth, b.hasQuery, b.url, b.key]));
   const picks = [];
   const pickOf = /* @__PURE__ */ new Map();
-  const take = (url, title, reason) => {
-    const hit = pickOf.get(url);
+  const take = (page, reason) => {
+    const key2 = "key" in page ? page.key : `url:${page.url}`;
+    const hit = pickOf.get(key2);
     if (hit) {
       if (!hit.reasons.includes(reason)) hit.reasons.push(reason);
       return;
     }
-    const p2 = { url, ...title ? { title } : {}, reasons: [reason] };
+    const from = "key" in page ? page : void 0;
+    const p2 = {
+      key: key2,
+      url: page.url,
+      ...from?.id ? { id: from.id } : {},
+      ...from?.auth !== void 0 ? { auth: from.auth } : {},
+      ...from?.title ? { title: from.title } : {},
+      reasons: [reason]
+    };
     picks.push(p2);
-    pickOf.set(url, p2);
+    pickOf.set(key2, p2);
   };
   const absent = [];
   const pathOf2 = (p2) => p2.parsed.path + (p2.parsed.query.length ? `?${new URLSearchParams(p2.parsed.query).toString()}` : "");
@@ -59122,7 +59140,7 @@ function proposeSample(inputs, opts) {
       const withForm = byShallow.find((p2) => p2.facts?.searchForm);
       if (withForm?.facts?.searchForm) {
         const { action, param: param2 } = withForm.facts.searchForm;
-        take(searchUrl(action, param2, query), void 0, `required kind "${label}", fixed query "${query}" through the search form of ${pathOf2(withForm)}`);
+        take({ url: searchUrl(action, param2, query) }, `required kind "${label}", fixed query "${query}" through the search form of ${pathOf2(withForm)}`);
         continue;
       }
       const withParam = byShallow.find(
@@ -59131,8 +59149,7 @@ function proposeSample(inputs, opts) {
       const param = withParam?.parsed.query.find(([k]) => SEARCH_PARAMS.has(k.toLowerCase()))?.[0];
       if (withParam && param) {
         take(
-          searchUrl(`${withParam.parsed.origin}${new URL(withParam.url).pathname}`, param, query),
-          void 0,
+          { url: searchUrl(`${withParam.parsed.origin}${new URL(withParam.url).pathname}`, param, query) },
           `required kind "${label}", fixed query "${query}" on the discovered search URL ${pathOf2(withParam)}`
         );
         continue;
@@ -59141,13 +59158,13 @@ function proposeSample(inputs, opts) {
     const m3 = matchKind(kind, pages);
     if (m3) {
       const extra = /recherche|search/.test(kind.id) ? `; no search parameter known \u2014 search "${query}" by hand on this page` : "";
-      take(m3.page.url, m3.page.title, `required kind "${label}", keyword "${m3.keyword}" in the ${m3.where}${extra}`);
+      take(m3.page, `required kind "${label}", keyword "${m3.keyword}" in the ${m3.where}${extra}`);
       continue;
     }
     if (/document/.test(kind.id)) {
       const linking = byShallow.find((p2) => (p2.facts?.documentLinks ?? 0) > 0);
       if (linking) {
-        take(linking.url, linking.title, `required kind "${label}", the shallowest page linking downloadable documents (${linking.facts.documentLinks})`);
+        take(linking, `required kind "${label}", the shallowest page linking downloadable documents (${linking.facts.documentLinks})`);
         continue;
       }
     }
@@ -59166,7 +59183,7 @@ function proposeSample(inputs, opts) {
   }
   const clusters = [...groups].map(([key2, members]) => ({
     key: key2,
-    members: members.sort((a2, b) => cmpTuple([a2.hasQuery, a2.url], [b.hasQuery, b.url])),
+    members: members.sort((a2, b) => cmpTuple([a2.hasQuery, a2.url, a2.key], [b.hasQuery, b.url, b.key])),
     pattern: [...new Set(members.map((m3) => patterns.get(m3.url)))].sort(cmp).join(" ")
   })).sort((a2, b) => cmpTuple([-a2.members.length, a2.pattern, a2.key], [-b.members.length, b.pattern, b.key]));
   const representativeKind = opts.methodology.requiredKinds.find(isRepresentativeKind);
@@ -59175,7 +59192,7 @@ function proposeSample(inputs, opts) {
   let leftOut = 0;
   let represented = 0;
   for (const c of clusters) {
-    const sampled = c.members.find((m3) => pickOf.has(m3.url));
+    const sampled = c.members.find((m3) => pickOf.has(m3.key));
     if (sampled) {
       out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: sampled.url });
       continue;
@@ -59187,7 +59204,7 @@ function proposeSample(inputs, opts) {
     }
     const rep = c.members[0];
     const what = c.key.startsWith("template:") ? `template ${c.key.slice("template:".length)} (${c.pattern})` : `template cluster ${c.pattern}`;
-    take(rep.url, rep.title, `${repLabel}: ${what}, ${c.members.length} page(s), first by URL`);
+    take(rep, `${repLabel}: ${what}, ${c.members.length} page(s), first by URL`);
     represented++;
     out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: rep.url });
   }
@@ -59196,13 +59213,22 @@ function proposeSample(inputs, opts) {
       kind: representativeKind.id,
       reason: `${PROPOSAL_NOTE}every discovered page is already sampled for a required kind \u2014 no other template found`
     });
-  const used = /* @__PURE__ */ new Set();
+  const used = new Set(picks.flatMap((p2) => p2.id ? [p2.id] : []));
   const samplePages = picks.map((p2) => {
-    const base = slugifyPageId(p2.url);
-    let id = base;
-    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
-    used.add(id);
-    return { id, name: p2.title ?? nameFromUrl(p2.url), url: p2.url, notes: `${PROPOSAL_NOTE}${p2.reasons.join("; ")}` };
+    let id = p2.id;
+    if (!id) {
+      const base = slugifyPageId(p2.url);
+      id = base;
+      for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+      used.add(id);
+    }
+    return {
+      id,
+      name: p2.title ?? nameFromUrl(p2.url),
+      url: p2.url,
+      ...p2.auth !== void 0 ? { auth: p2.auth } : {},
+      notes: `${PROPOSAL_NOTE}${p2.reasons.join("; ")}`
+    };
   });
   return {
     sample: { pages: samplePages, ...carryAbsent(absent) },
@@ -59217,28 +59243,50 @@ function humanNotes(notes) {
 }
 function applyProposal(existing, proposal) {
   const declared = existing?.pages ?? [];
-  const byUrl = new Map(declared.map((p2) => [p2.url, p2]));
-  const proposedUrls = new Set(proposal.pages.map((p2) => p2.url));
-  const humanWork = (p2) => p2.auth !== void 0 || !!p2.storageState || !!p2.sources?.length || humanNotes(p2.notes) !== "";
-  const kept = declared.filter((p2) => !proposedUrls.has(p2.url) && humanWork(p2));
-  const dropped = declared.filter((p2) => !proposedUrls.has(p2.url) && !humanWork(p2));
-  const used = new Set(kept.map((p2) => p2.id));
+  const prior = /* @__PURE__ */ new Map();
+  const claimed = /* @__PURE__ */ new Set();
+  const byId2 = /* @__PURE__ */ new Map();
+  for (const d2 of declared) if (!byId2.has(d2.id)) byId2.set(d2.id, d2);
+  for (const p2 of proposal.pages) {
+    const d2 = byId2.get(p2.id);
+    if (d2 && !claimed.has(d2)) {
+      prior.set(p2, d2);
+      claimed.add(d2);
+    }
+  }
+  for (const p2 of proposal.pages) {
+    if (prior.has(p2)) continue;
+    const d2 = declared.find((x2) => x2.url === p2.url && !claimed.has(x2));
+    if (d2) {
+      prior.set(p2, d2);
+      claimed.add(d2);
+    }
+  }
+  const urlCount = /* @__PURE__ */ new Map();
+  for (const d2 of declared) urlCount.set(d2.url, (urlCount.get(d2.url) ?? 0) + 1);
+  const humanWork = (p2) => p2.auth !== void 0 || !!p2.storageState || !!p2.sources?.length || humanNotes(p2.notes) !== "" || (urlCount.get(p2.url) ?? 0) > 1;
+  const outside = declared.filter((d2) => !claimed.has(d2));
+  const kept = outside.filter(humanWork);
+  const dropped = outside.filter((d2) => !humanWork(d2));
+  const used = /* @__PURE__ */ new Set([...kept.map((p2) => p2.id), ...[...prior.values()].map((d2) => d2.id)]);
   const pages = proposal.pages.map((p2) => {
-    const prior = byUrl.get(p2.url);
-    const human = humanNotes(prior?.notes);
-    const notes = [human, p2.notes].filter(Boolean).join(" | ");
-    const base = prior?.id ?? p2.id;
-    let id = base;
-    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
-    used.add(id);
+    const d2 = prior.get(p2);
+    let id = d2?.id ?? p2.id;
+    if (!d2) {
+      const base = id;
+      for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+      used.add(id);
+    }
+    const notes = [humanNotes(d2?.notes), p2.notes].filter(Boolean).join(" | ");
+    const auth = d2?.auth ?? p2.auth;
     return {
       id,
-      name: prior?.name ?? p2.name,
+      name: d2?.name ?? p2.name,
       url: p2.url,
-      ...prior?.auth !== void 0 ? { auth: prior.auth } : {},
-      ...prior?.storageState ? { storageState: prior.storageState } : {},
+      ...auth !== void 0 ? { auth } : {},
+      ...d2?.storageState ? { storageState: d2.storageState } : {},
       ...notes ? { notes } : {},
-      ...prior?.sources?.length ? { sources: prior.sources } : {}
+      ...d2?.sources?.length ? { sources: d2.sources } : {}
     };
   });
   const humanAbsent = (existing?.absent ?? []).filter((a2) => !a2.reason.startsWith(PROPOSAL_NOTE));
@@ -64241,7 +64289,14 @@ async function cmdPagesDiscover(p2) {
       return writeProposedSample(
         p2,
         lang,
-        recorded.map((s2) => ({ url: s2.meta.url, title: extractTitle(s2.dom) ?? s2.meta.name, html: s2.dom, skeleton: skeletonOf(s2.dom) }))
+        recorded.map((s2) => ({
+          id: s2.meta.id,
+          url: s2.meta.url,
+          title: extractTitle(s2.dom) ?? s2.meta.name,
+          html: s2.dom,
+          skeleton: skeletonOf(s2.dom),
+          ...s2.meta.auth !== void 0 ? { auth: s2.meta.auth } : {}
+        }))
       );
     return writeDiscoveredSample(p2, lang, snaps, snaps.length);
   }
@@ -64295,16 +64350,23 @@ async function cmdPagesDiscover(p2) {
   );
   if (p2.flags.propose === true) {
     const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
-    const skeletons = /* @__PURE__ */ new Map();
-    for (const s2 of readSnapshots(root)) {
+    const snapshotOf = /* @__PURE__ */ new Map();
+    const recorded = readSnapshots(root).sort((a2, b) => a2.meta.id.length - b.meta.id.length || (a2.meta.id < b.meta.id ? -1 : a2.meta.id > b.meta.id ? 1 : 0));
+    for (const s2 of recorded) {
       const key2 = routePath(s2.meta.url);
-      if (!skeletons.has(key2)) skeletons.set(key2, skeletonOf(s2.dom));
+      if (!snapshotOf.has(key2))
+        snapshotOf.set(key2, { id: s2.meta.id, skeleton: skeletonOf(s2.dom), ...s2.meta.auth !== void 0 ? { auth: s2.meta.auth } : {} });
     }
     const inputs = urls.map((url) => {
       const html = cache2.get(url);
       const title = titles.get(url);
-      const skeleton = skeletons.get(routePath(url));
-      return { url, ...title ? { title } : {}, ...html ? { html } : {}, ...skeleton ? { skeleton } : {} };
+      const snap = snapshotOf.get(routePath(url));
+      return {
+        url,
+        ...title ? { title } : {},
+        ...html ? { html } : {},
+        ...snap ? { id: snap.id, skeleton: snap.skeleton, ...snap.auth !== void 0 ? { auth: snap.auth } : {} } : {}
+      };
     });
     return writeProposedSample(p2, lang, inputs);
   }
@@ -64352,6 +64414,10 @@ function writeProposedSample(p2, lang, inputs) {
     return 1;
   }
   const summary = proposalSummary(lang, proposal, applied);
+  for (const d2 of applied.dropped)
+    console.error(
+      lang === "fr" ? `ultra11y pages discover : retir\xE9e de l'\xE9chantillon \u2014 ${d2.id} (${d2.url}), hors proposition et sans auth, storageState, sources ni notes${p2.flags.write === true ? "" : " (rien n'est \xE9crit sans --write)"}` : `ultra11y pages discover: dropped from the sample \u2014 ${d2.id} (${d2.url}), outside the proposal and carrying no auth, storageState, sources or notes${p2.flags.write === true ? "" : " (nothing is written without --write)"}`
+    );
   if (p2.flags.json)
     console.log(
       JSON.stringify(

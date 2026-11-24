@@ -206,6 +206,42 @@ describe("URL patterns", () => {
 describe("applyProposal — the proposal replaces the list, not the human work", () => {
   const proposal = (): SampleConfig => proposeSample(site(), { methodology }).sample;
 
+  // Two declared pages on one URL: a state-reached page (the open menu) next to its base page.
+  // A URL-keyed match kept only one of them and the other vanished from the config unlisted.
+  it("never loses a declared page that shares its URL with another one", () => {
+    const existing: SampleConfig = {
+      pages: [
+        { id: "home", name: "Accueil", url: `${O}/` },
+        { id: "home-menu", name: "Accueil, menu ouvert", url: `${O}/`, storageState: ".auth/u.json", sources: ["src/Menu.tsx"] },
+      ],
+    };
+    const { sample, kept, dropped } = applyProposal(existing, proposal());
+    const onRoot = sample.pages.filter((p) => p.url === `${O}/`);
+    expect(onRoot.map((p) => p.id)).toEqual(["home", "home-menu"]);
+    expect(onRoot[1]).toMatchObject({ storageState: ".auth/u.json", sources: ["src/Menu.tsx"] });
+    expect(kept.map((p) => p.id)).toEqual(["home-menu"]);
+    expect(dropped).toEqual([]);
+    // Even a bare state-reached page is kept: declaring two pages on one URL is a choice.
+    const bare = applyProposal({ pages: [existing.pages[0]!, { id: "home-menu", name: "Menu", url: `${O}/` }] }, proposal());
+    expect(bare.sample.pages.filter((p) => p.url === `${O}/`).map((p) => p.id)).toEqual(["home", "home-menu"]);
+    expect(bare.dropped).toEqual([]);
+  });
+
+  it("matches a declared page by id before URL", () => {
+    const prop: SampleConfig = { pages: [{ id: "home", name: "Accueil", url: `${O}/`, notes: `${PROPOSAL_NOTE}x` }] };
+    const existing: SampleConfig = {
+      pages: [
+        { id: "home-menu", name: "Menu", url: `${O}/`, auth: true },
+        { id: "home", name: "Ma page", url: `${O}/`, notes: "page d'entrée" },
+      ],
+    };
+    const { sample } = applyProposal(existing, prop);
+    expect(sample.pages).toEqual([
+      { id: "home", name: "Ma page", url: `${O}/`, notes: `page d'entrée | ${PROPOSAL_NOTE}x` },
+      { id: "home-menu", name: "Menu", url: `${O}/`, auth: true },
+    ]);
+  });
+
   it("drops discovered pages that carry nothing, keeps hand-added ones with a reason", () => {
     const existing: SampleConfig = {
       pages: [
@@ -266,6 +302,24 @@ describe("lintSample — a dropped kind needs a recorded reason", () => {
   });
 });
 
+describe("proposeSample — snapshots keep their identity", () => {
+  const base = "<html><body><header><nav></nav></header><main><p>x</p></main></body></html>";
+  const menu = "<html><body><header><nav></nav></header><main><p>x</p></main><dialog><nav></nav></dialog></body></html>";
+
+  it("proposes a state-reached snapshot on its base page's URL, with its own id and auth", () => {
+    const inputs: ProposalInput[] = [
+      { id: "home", url: `${O}/`, title: "Accueil", skeleton: skeletonOf(base) },
+      { id: "home-menu", url: `${O}/`, title: "Accueil", skeleton: skeletonOf(menu) },
+      { id: "espace", url: `${O}/espace`, title: "Mon espace", skeleton: skeletonOf(base.replace("<p>x</p>", "<form></form>")), auth: true },
+    ];
+    const one = proposeSample(inputs, { methodology });
+    expect(one.sample.pages.map((p) => p.id).sort()).toEqual(["espace", "home", "home-menu"]);
+    expect(one.sample.pages.find((p) => p.id === "home-menu")?.notes).toContain("template");
+    expect(one.sample.pages.find((p) => p.id === "espace")?.auth).toBe(true);
+    expect(proposeSample([...inputs].reverse(), { methodology })).toEqual(one);
+  });
+});
+
 describe("`pages discover --from-snapshots --propose` (CLI)", () => {
   const run = async (argv: string[]): Promise<{ code: number; out: string; err: string }> => {
     const out: string[] = [];
@@ -319,6 +373,37 @@ describe("`pages discover --from-snapshots --propose` (CLI)", () => {
       expect(second.code).toBe(0);
       expect(readFileSync(join(d, ".ultra11yrc.json"), "utf8")).toBe(written);
       expect((await run(["pages", "discover", "--from-snapshots", "--propose", "--sample-size", "0"])).code).toBe(2);
+    } finally {
+      process.chdir(cwd);
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("declares a state-reached snapshot under its own id, and an auth snapshot with auth", async () => {
+    const cwd = process.cwd();
+    const d = mkdtempSync(join(tmpdir(), "u11y-propose-state-"));
+    try {
+      process.chdir(d);
+      const snaps: [string, string, string, boolean?][] = [
+        ["accueil", "/", page("Accueil", "<p>bienvenue</p>")],
+        ["accueil-menu", "/", page("Accueil", "<p>bienvenue</p><dialog><nav></nav></dialog>")],
+        ["mon-espace", "/espace", page("Mon espace", "<table><tr><td>1</td></tr></table>"), true],
+      ];
+      for (const [id, path, dom, auth] of snaps)
+        writeSnapshot(d, { meta: { v: SNAPSHOT_VERSION, id, name: id, url: `${O}${path}`, ...(auth ? { auth } : {}) }, dom } as Parameters<
+          typeof writeSnapshot
+        >[1]);
+      expect((await run(["pages", "discover", "--from-snapshots", "--propose", "--write"])).code).toBe(0);
+      const cfg = JSON.parse(readFileSync(join(d, ".ultra11yrc.json"), "utf8")) as { sample: SampleConfig };
+      expect(cfg.sample.pages.map((p) => [p.id, p.url, p.auth ?? false])).toEqual([
+        ["accueil", `${O}/`, false],
+        ["accueil-menu", `${O}/`, false],
+        ["mon-espace", `${O}/espace`, true],
+      ]);
+      // `sample check` sees no drift between the declared ids and the snapshot directories.
+      const check = await run(["sample", "check", "--json"]);
+      const out = JSON.parse(check.out) as { undeclared: number; uncaptured: number };
+      expect([out.undeclared, out.uncaptured]).toEqual([0, 0]);
     } finally {
       process.chdir(cwd);
       rmSync(d, { recursive: true, force: true });

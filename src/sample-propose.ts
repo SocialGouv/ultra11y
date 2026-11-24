@@ -55,6 +55,12 @@ export interface ProposalInput {
   html?: string;
   /** A DOM-skeleton fingerprint (`skeletonOf`), when a snapshot of the page exists. */
   skeleton?: string;
+  /** The snapshot's page id, when the input is a snapshot. It is the page's identity: a
+   *  state-reached page (a modal, a funnel step) shares its base page's URL and differs only by
+   *  id, and the proposed page must keep the id its snapshot directory is named after. */
+  id?: string;
+  /** The page sits behind authentication (a snapshot's `meta.auth`). */
+  auth?: boolean;
 }
 
 export interface ProposalOptions {
@@ -350,6 +356,9 @@ function strippedTitles(titles: Map<string, string>): Map<string, string> {
 // ---- the proposal ------------------------------------------------------------------------
 
 interface Page {
+  key: string; // the snapshot id when there is one, else the URL
+  id?: string;
+  auth?: boolean;
   url: string;
   title?: string;
   html?: string;
@@ -363,6 +372,9 @@ interface Page {
 }
 
 interface Pick {
+  key: string;
+  id?: string;
+  auth?: boolean;
   url: string;
   title?: string;
   reasons: string[];
@@ -386,7 +398,7 @@ function matchKind(kind: SampleRequiredKind, pages: readonly Page[]): KindMatch 
       // Shallowest first: /contact before /actualites/contact-presse. Then a page without a
       // query, a URL match before a title match, the more canonical keyword, the shorter URL,
       // and finally the URL itself — a total order, so the pick never depends on input order.
-      const rank = [page.depth, page.hasQuery, where === "URL" ? 0 : 1, ki, page.url.length, page.url];
+      const rank = [page.depth, page.hasQuery, where === "URL" ? 0 : 1, ki, page.url.length, page.url, page.key.length, page.key];
       if (!best || cmpTuple(rank, best.rank) < 0) best = { page, keyword: kind.keywords[ki] ?? k, where, rank };
     }
   }
@@ -400,25 +412,36 @@ export function proposeSample(inputs: readonly ProposalInput[], opts: ProposalOp
   const query = opts.searchQuery?.trim() || FIXED_SEARCH_QUERY;
   const locale = opts.locale ?? "fr";
 
-  // 1. Sort, then dedupe on the URL (hash dropped). On a duplicate the smallest title / HTML
-  //    wins, so even conflicting duplicates resolve the same way every time.
+  // 1. Sort, then dedupe on the page's identity: the snapshot id when there is one (a
+  //    state-reached page shares its URL with its base page and is still another page), else
+  //    the URL (hash dropped). On a duplicate the smallest title / HTML wins, so even
+  //    conflicting duplicates resolve the same way every time.
+  const keyOf = (i: ProposalInput) => (i.id ? `id:${i.id}` : `url:${i.url}`);
   const sorted = inputs
     .map((i) => ({ ...i, url: i.url.split("#", 1)[0]! }))
     .filter((i) => i.url)
-    .sort((a, b) => cmpTuple([a.url, a.title ?? "", a.skeleton ?? "", a.html ?? ""], [b.url, b.title ?? "", b.skeleton ?? "", b.html ?? ""]));
+    .sort((a, b) =>
+      cmpTuple(
+        [keyOf(a), a.url, a.title ?? "", a.skeleton ?? "", a.html ?? "", a.auth ? 1 : 0],
+        [keyOf(b), b.url, b.title ?? "", b.skeleton ?? "", b.html ?? "", b.auth ? 1 : 0],
+      ),
+    );
   const unique: ProposalInput[] = [];
-  for (const i of sorted) if (unique[unique.length - 1]?.url !== i.url) unique.push(i);
+  for (const i of sorted) if (!unique.length || keyOf(unique[unique.length - 1]!) !== keyOf(i)) unique.push(i);
   const documents = unique.filter((i) => isDownloadUrl(i.url));
   const pageInputs = unique.filter((i) => !isDownloadUrl(i.url));
 
   const titles = new Map<string, string>();
-  for (const i of pageInputs) if (i.title?.trim()) titles.set(i.url, i.title.trim());
+  for (const i of pageInputs) if (i.title?.trim()) titles.set(keyOf(i), i.title.trim());
   const bare = strippedTitles(titles);
   const pages: Page[] = pageInputs.map((i) => {
     const parsed = parseUrl(i.url);
     const words = parsed.segments.map((s) => s.replace(/\.x?html?$/i, "")).join(" ");
     const root = parsed.segments.length === 0 || /^index\.x?html?$/i.test(parsed.segments.join("/"));
     return {
+      key: keyOf(i),
+      ...(i.id ? { id: i.id } : {}),
+      ...(i.auth !== undefined ? { auth: i.auth } : {}),
       url: i.url,
       ...(i.title?.trim() ? { title: i.title.trim() } : {}),
       ...(i.html ? { html: i.html } : {}),
@@ -427,23 +450,34 @@ export function proposeSample(inputs: readonly ProposalInput[], opts: ProposalOp
       depth: root ? 0 : parsed.segments.length,
       hasQuery: parsed.query.length ? 1 : 0,
       urlHay: norm(`${words.replace(/[-_.+~]+/g, " ")}${root ? " home index" : ""}`),
-      titleHay: norm(bare.get(i.url) ?? ""),
+      titleHay: norm(bare.get(keyOf(i)) ?? ""),
       ...(i.html ? { facts: readFacts(i.html, i.url) } : {}),
     };
   });
-  const byShallow = [...pages].sort((a, b) => cmpTuple([a.depth, a.hasQuery, a.url], [b.depth, b.hasQuery, b.url]));
+  const byShallow = [...pages].sort((a, b) => cmpTuple([a.depth, a.hasQuery, a.url, a.key], [b.depth, b.hasQuery, b.url, b.key]));
 
   const picks: Pick[] = [];
   const pickOf = new Map<string, Pick>();
-  const take = (url: string, title: string | undefined, reason: string): void => {
-    const hit = pickOf.get(url);
+  // A pick is keyed like a page (snapshot id, else URL); a search URL the proposal builds is
+  // keyed by that URL.
+  const take = (page: Page | { url: string }, reason: string): void => {
+    const key = "key" in page ? page.key : `url:${page.url}`;
+    const hit = pickOf.get(key);
     if (hit) {
       if (!hit.reasons.includes(reason)) hit.reasons.push(reason);
       return;
     }
-    const p: Pick = { url, ...(title ? { title } : {}), reasons: [reason] };
+    const from = "key" in page ? page : undefined;
+    const p: Pick = {
+      key,
+      url: page.url,
+      ...(from?.id ? { id: from.id } : {}),
+      ...(from?.auth !== undefined ? { auth: from.auth } : {}),
+      ...(from?.title ? { title: from.title } : {}),
+      reasons: [reason],
+    };
     picks.push(p);
-    pickOf.set(url, p);
+    pickOf.set(key, p);
   };
   const absent: SampleAbsent[] = [];
   const pathOf = (p: Page) => p.parsed.path + (p.parsed.query.length ? `?${new URLSearchParams(p.parsed.query).toString()}` : "");
@@ -456,7 +490,7 @@ export function proposeSample(inputs: readonly ProposalInput[], opts: ProposalOp
       const withForm = byShallow.find((p) => p.facts?.searchForm);
       if (withForm?.facts?.searchForm) {
         const { action, param } = withForm.facts.searchForm;
-        take(searchUrl(action, param, query), undefined, `required kind "${label}", fixed query "${query}" through the search form of ${pathOf(withForm)}`);
+        take({ url: searchUrl(action, param, query) }, `required kind "${label}", fixed query "${query}" through the search form of ${pathOf(withForm)}`);
         continue;
       }
       const withParam = byShallow.find(
@@ -468,8 +502,7 @@ export function proposeSample(inputs: readonly ProposalInput[], opts: ProposalOp
       const param = withParam?.parsed.query.find(([k]) => SEARCH_PARAMS.has(k.toLowerCase()))?.[0];
       if (withParam && param) {
         take(
-          searchUrl(`${withParam.parsed.origin}${new URL(withParam.url).pathname}`, param, query),
-          undefined,
+          { url: searchUrl(`${withParam.parsed.origin}${new URL(withParam.url).pathname}`, param, query) },
           `required kind "${label}", fixed query "${query}" on the discovered search URL ${pathOf(withParam)}`,
         );
         continue;
@@ -478,13 +511,13 @@ export function proposeSample(inputs: readonly ProposalInput[], opts: ProposalOp
     const m = matchKind(kind, pages);
     if (m) {
       const extra = /recherche|search/.test(kind.id) ? `; no search parameter known — search "${query}" by hand on this page` : "";
-      take(m.page.url, m.page.title, `required kind "${label}", keyword "${m.keyword}" in the ${m.where}${extra}`);
+      take(m.page, `required kind "${label}", keyword "${m.keyword}" in the ${m.where}${extra}`);
       continue;
     }
     if (/document/.test(kind.id)) {
       const linking = byShallow.find((p) => (p.facts?.documentLinks ?? 0) > 0);
       if (linking) {
-        take(linking.url, linking.title, `required kind "${label}", the shallowest page linking downloadable documents (${linking.facts!.documentLinks})`);
+        take(linking, `required kind "${label}", the shallowest page linking downloadable documents (${linking.facts!.documentLinks})`);
         continue;
       }
     }
@@ -508,7 +541,7 @@ export function proposeSample(inputs: readonly ProposalInput[], opts: ProposalOp
   const clusters = [...groups]
     .map(([key, members]) => ({
       key,
-      members: members.sort((a, b) => cmpTuple([a.hasQuery, a.url], [b.hasQuery, b.url])),
+      members: members.sort((a, b) => cmpTuple([a.hasQuery, a.url, a.key], [b.hasQuery, b.url, b.key])),
       pattern: [...new Set(members.map((m) => patterns.get(m.url)!))].sort(cmp).join(" "),
     }))
     .sort((a, b) => cmpTuple([-a.members.length, a.pattern, a.key], [-b.members.length, b.pattern, b.key]));
@@ -518,7 +551,7 @@ export function proposeSample(inputs: readonly ProposalInput[], opts: ProposalOp
   let leftOut = 0;
   let represented = 0;
   for (const c of clusters) {
-    const sampled = c.members.find((m) => pickOf.has(m.url));
+    const sampled = c.members.find((m) => pickOf.has(m.key));
     if (sampled) {
       out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: sampled.url });
       continue;
@@ -530,7 +563,7 @@ export function proposeSample(inputs: readonly ProposalInput[], opts: ProposalOp
     }
     const rep = c.members[0]!;
     const what = c.key.startsWith("template:") ? `template ${c.key.slice("template:".length)} (${c.pattern})` : `template cluster ${c.pattern}`;
-    take(rep.url, rep.title, `${repLabel}: ${what}, ${c.members.length} page(s), first by URL`);
+    take(rep, `${repLabel}: ${what}, ${c.members.length} page(s), first by URL`);
     represented++;
     out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: rep.url });
   }
@@ -540,14 +573,25 @@ export function proposeSample(inputs: readonly ProposalInput[], opts: ProposalOp
       reason: `${PROPOSAL_NOTE}every discovered page is already sampled for a required kind — no other template found`,
     });
 
-  // 5. Ids: stable slugs, a numeric suffix on a collision, in pick order (itself deterministic).
-  const used = new Set<string>();
+  // 5. Ids: the snapshot's own id (its directory name) when the page is a snapshot, else a
+  //    stable slug; a numeric suffix on a collision, in pick order (itself deterministic).
+  //    Snapshot ids are reserved first, so a slug never takes one.
+  const used = new Set<string>(picks.flatMap((p) => (p.id ? [p.id] : [])));
   const samplePages: SamplePage[] = picks.map((p) => {
-    const base = slugifyPageId(p.url);
-    let id = base;
-    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
-    used.add(id);
-    return { id, name: p.title ?? nameFromUrl(p.url), url: p.url, notes: `${PROPOSAL_NOTE}${p.reasons.join("; ")}` };
+    let id = p.id;
+    if (!id) {
+      const base = slugifyPageId(p.url);
+      id = base;
+      for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+      used.add(id);
+    }
+    return {
+      id,
+      name: p.title ?? nameFromUrl(p.url),
+      url: p.url,
+      ...(p.auth !== undefined ? { auth: p.auth } : {}),
+      notes: `${PROPOSAL_NOTE}${p.reasons.join("; ")}`,
+    };
   });
   return {
     sample: { pages: samplePages, ...carryAbsent(absent) },
@@ -571,43 +615,72 @@ export function humanNotes(notes: string | undefined): string {
 export interface ProposalApply {
   sample: SampleConfig;
   kept: SamplePage[]; // declared pages outside the proposal, kept because they carry human work
-  dropped: SamplePage[]; // declared pages outside the proposal, carrying nothing to keep
+  dropped: SamplePage[]; // declared pages outside the proposal, carrying nothing to keep — listed, never silent
 }
 
 /** Replace the declared pages with the proposal, keeping the human work.
  *
  *  The proposal IS the sample: merging it into a list of 359 discovered pages would leave the
  *  359. So a declared page outside the proposal is dropped — unless it carries what someone
- *  wrote: `auth`, a `storageState`, `sources`, or notes of their own (the recorded reason for a
- *  hand-added page). A declared page the proposal also picks keeps its id (its snapshot
- *  directory), its name and that human work, and gets the proposal's reason appended.
- *  `absent` entries the proposal wrote before are replaced; a human's are kept. Re-running on
- *  the result changes nothing. */
+ *  wrote: `auth`, a `storageState`, `sources`, notes of their own (the recorded reason for a
+ *  hand-added page), or a STATE: a declared page sharing its URL with another declared page is
+ *  a state-reached page (a modal, a funnel step) someone declared on purpose. Every dropped page
+ *  is returned in `dropped`, so the caller lists it.
+ *
+ *  A declared page is matched to a proposed one by id first (a snapshot id is the page's
+ *  identity), then by URL — one declared page per proposed page, so two declared pages on one
+ *  URL never collapse into one. A matched page keeps its id (its snapshot directory), its name
+ *  and its human work, and gets the proposal's reason appended. `absent` entries the proposal
+ *  wrote before are replaced; a human's are kept. Re-running on the result changes nothing. */
 export function applyProposal(existing: SampleConfig | undefined, proposal: SampleConfig): ProposalApply {
   const declared = existing?.pages ?? [];
-  const byUrl = new Map(declared.map((p) => [p.url, p] as const));
-  const proposedUrls = new Set(proposal.pages.map((p) => p.url));
-  const humanWork = (p: SamplePage) => p.auth !== undefined || !!p.storageState || !!p.sources?.length || humanNotes(p.notes) !== "";
-  const kept = declared.filter((p) => !proposedUrls.has(p.url) && humanWork(p));
-  const dropped = declared.filter((p) => !proposedUrls.has(p.url) && !humanWork(p));
+  const prior = new Map<SamplePage, SamplePage>(); // proposed → declared
+  const claimed = new Set<SamplePage>();
+  const byId = new Map<string, SamplePage>();
+  for (const d of declared) if (!byId.has(d.id)) byId.set(d.id, d);
+  for (const p of proposal.pages) {
+    const d = byId.get(p.id);
+    if (d && !claimed.has(d)) {
+      prior.set(p, d);
+      claimed.add(d);
+    }
+  }
+  for (const p of proposal.pages) {
+    if (prior.has(p)) continue;
+    const d = declared.find((x) => x.url === p.url && !claimed.has(x));
+    if (d) {
+      prior.set(p, d);
+      claimed.add(d);
+    }
+  }
+  const urlCount = new Map<string, number>();
+  for (const d of declared) urlCount.set(d.url, (urlCount.get(d.url) ?? 0) + 1);
+  const humanWork = (p: SamplePage) =>
+    p.auth !== undefined || !!p.storageState || !!p.sources?.length || humanNotes(p.notes) !== "" || (urlCount.get(p.url) ?? 0) > 1;
+  const outside = declared.filter((d) => !claimed.has(d));
+  const kept = outside.filter(humanWork);
+  const dropped = outside.filter((d) => !humanWork(d));
 
-  const used = new Set(kept.map((p) => p.id));
+  // Ids already on disk win: the kept pages' and the matched pages' own ids are reserved first.
+  const used = new Set([...kept.map((p) => p.id), ...[...prior.values()].map((d) => d.id)]);
   const pages: SamplePage[] = proposal.pages.map((p) => {
-    const prior = byUrl.get(p.url);
-    const human = humanNotes(prior?.notes);
-    const notes = [human, p.notes].filter(Boolean).join(" | ");
-    const base = prior?.id ?? p.id;
-    let id = base;
-    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
-    used.add(id);
+    const d = prior.get(p);
+    let id = d?.id ?? p.id;
+    if (!d) {
+      const base = id;
+      for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+      used.add(id);
+    }
+    const notes = [humanNotes(d?.notes), p.notes].filter(Boolean).join(" | ");
+    const auth = d?.auth ?? p.auth;
     return {
       id,
-      name: prior?.name ?? p.name,
+      name: d?.name ?? p.name,
       url: p.url,
-      ...(prior?.auth !== undefined ? { auth: prior.auth } : {}),
-      ...(prior?.storageState ? { storageState: prior.storageState } : {}),
+      ...(auth !== undefined ? { auth } : {}),
+      ...(d?.storageState ? { storageState: d.storageState } : {}),
       ...(notes ? { notes } : {}),
-      ...(prior?.sources?.length ? { sources: prior.sources } : {}),
+      ...(d?.sources?.length ? { sources: d.sources } : {}),
     };
   });
   const humanAbsent = (existing?.absent ?? []).filter((a) => !a.reason.startsWith(PROPOSAL_NOTE));
