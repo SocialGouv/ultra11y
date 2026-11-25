@@ -1,5 +1,5 @@
 {
-  "about": "The scripted auditor of tests/full-audit.e2e.test.ts: one verdict per RGAA criterion the worklist of tests/fixtures/full-audit-app hands over. `cite: \"all\"` cites every evidence anchor the worklist harvested for that criterion (copied from the worklist, never retyped); `except` leaves out the anchors a verdict does not clear; `at` names the evidence anchor an NC finding is drawn from (by file, selector, snippet or note; `from` reads it in another criterion's evidence). A criterion missing here fails the test by name, so a worklist that changes shape is seen, not silently filled.",
+  "about": "The scripted auditor of tests/full-audit.e2e.test.ts: one verdict per RGAA criterion the worklist of tests/fixtures/full-audit-app hands over. `cite: \"all\"` cites every evidence anchor the worklist harvested for that criterion (copied from the worklist, never retyped); `except` leaves out the anchors a verdict does not clear; `at` names the evidence anchor an NC finding is drawn from (by file, selector, snippet or note; `from` reads it in another criterion's evidence). A criterion may also settle EACH PAGE of the audit (#197): `pages` maps an audited page id to its own ruling — verdict, `justification`, `cite: \"page\"` (which cites the anchors on that page's own capture, representatives or `alsoAt` siblings — never another page's) and its own `findings` (`at` an anchor on that page's capture, or `observed` there directly when the harvest anchored it on another state) — and `pagesElse` rules every page left unnamed. The run-wide verdict stays what it is; the per-page outcomes are what close every page cell of the strict `--require-decided=pages` gate. A criterion missing here fails the test by name, so a worklist that changes shape is seen, not silently filled.",
   "verdicts": {
     "1.1": {
       "verdict": "NC",
@@ -80,7 +80,39 @@
           "normativeRef": "7.5.2",
           "severity": "majeur"
         }
-      ]
+      ],
+      "pages": {
+        "contact-04-click-button-envoyer-le-message": {
+          "verdict": "NC",
+          "justification": "This state displays a status message that is not announced.",
+          "findings": [
+            {
+              "at": { "selector": "p#erreur" },
+              "from": "11.10",
+              "message": "The error displayed after the invalid submit carries no role=\"alert\": the status message it is is not announced.",
+              "normativeRef": "7.5.2",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "contact-05-expect-text-adresse-electronique-invalid": {
+          "verdict": "NC",
+          "justification": "This state displays a status message that is not announced.",
+          "findings": [
+            {
+              "observed": { "line": 46, "selector": "p#erreur", "snippet": "<p id=\"erreur\">" },
+              "message": "The format error this state displays carries no role=\"alert\": the status message it is is not announced.",
+              "normativeRef": "7.5.2",
+              "severity": "majeur"
+            }
+          ]
+        }
+      },
+      "pagesElse": {
+        "verdict": "NA",
+        "justification": "No status message is displayed on this page.",
+        "cite": "page"
+      }
     },
     "8.1": { "verdict": "C", "justification": "Every page, source and rendered, starts with <!doctype html>.", "cite": "all" },
     "8.2": {
@@ -145,7 +177,73 @@
           "normativeRef": "11.10.6",
           "severity": "majeur"
         }
-      ]
+      ],
+      "pages": {
+        "contact-04-click-button-envoyer-le-message": {
+          "verdict": "NC",
+          "justification": "This state displays a format error that is tied to no field.",
+          "findings": [
+            {
+              "at": { "selector": "p#erreur" },
+              "message": "The format error displayed by the invalid submit is tied to no field (no aria-describedby, no aria-errormessage) — a non-conformity of the state that displays it.",
+              "normativeRef": "11.10.6",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "contact-05-expect-text-adresse-electronique-invalid": {
+          "verdict": "NC",
+          "justification": "This state displays a format error that is tied to no field.",
+          "findings": [
+            {
+              "observed": { "line": 46, "selector": "p#erreur", "snippet": "<p id=\"erreur\">" },
+              "message": "The format error this state displays is tied to no field (no aria-describedby, no aria-errormessage).",
+              "normativeRef": "11.10.6",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "contact": {
+          "verdict": "C",
+          "justification": "No error message is displayed on this state: the form has not been submitted yet.",
+          "cite": "page"
+        },
+        "contact-00-start": {
+          "verdict": "C",
+          "justification": "No error message is displayed on this state: the form has not been submitted yet.",
+          "cite": "page"
+        },
+        "contact-01-fill-label-nom-exemple": {
+          "verdict": "C",
+          "justification": "No error message is displayed on this state: the form has not been submitted yet.",
+          "cite": "page"
+        },
+        "contact-02-fill-css-input-name-courriel-pas-une-adr": {
+          "verdict": "C",
+          "justification": "No error message is displayed on this state: the form has not been submitted yet.",
+          "cite": "page"
+        },
+        "contact-03-fill-label-message-message-de-test": {
+          "verdict": "C",
+          "justification": "No error message is displayed on this state: the form has not been submitted yet.",
+          "cite": "page"
+        },
+        "connexion": {
+          "verdict": "NA",
+          "justification": "This form displays no error message.",
+          "cite": "page"
+        },
+        "recherche": {
+          "verdict": "NA",
+          "justification": "This form displays no error message.",
+          "cite": "page"
+        },
+        "recherche-2": {
+          "verdict": "NA",
+          "justification": "This form displays no error message.",
+          "cite": "page"
+        }
+      }
     },
     "11.11": { "verdict": "NA", "justification": "No input control, so no error message to suggest from.", "cite": "all" },
     "11.12": { "verdict": "NA", "justification": "No form has legal, financial or personal-data consequences.", "cite": "all" },
@@ -158,7 +256,108 @@
           "normativeRef": "11.13.1",
           "severity": "majeur"
         }
-      ]
+      ],
+      "pages": {
+        "contact": {
+          "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
+          "findings": [
+            {
+              "at": { "selector": "input[type=email]" },
+              "message": "The field takes the user's email address and carries no autocomplete attribute: its purpose cannot be filled automatically.",
+              "normativeRef": "11.13.1",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "contact-00-start": {
+          "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
+          "findings": [
+            {
+              "at": { "selector": "input[type=email]" },
+              "message": "The field takes the user's email address and carries no autocomplete attribute: its purpose cannot be filled automatically.",
+              "normativeRef": "11.13.1",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "contact-01-fill-label-nom-exemple": {
+          "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
+          "findings": [
+            {
+              "at": { "selector": "input[type=email]" },
+              "message": "The field takes the user's email address and carries no autocomplete attribute: its purpose cannot be filled automatically.",
+              "normativeRef": "11.13.1",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "contact-02-fill-css-input-name-courriel-pas-une-adr": {
+          "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
+          "findings": [
+            {
+              "at": { "selector": "input[type=email]" },
+              "message": "The field takes the user's email address and carries no autocomplete attribute: its purpose cannot be filled automatically.",
+              "normativeRef": "11.13.1",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "contact-03-fill-label-message-message-de-test": {
+          "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
+          "findings": [
+            {
+              "at": { "selector": "input[type=email]" },
+              "message": "The field takes the user's email address and carries no autocomplete attribute: its purpose cannot be filled automatically.",
+              "normativeRef": "11.13.1",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "contact-04-click-button-envoyer-le-message": {
+          "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
+          "findings": [
+            {
+              "at": { "selector": "input[type=email]" },
+              "message": "The field takes the user's email address and carries no autocomplete attribute: its purpose cannot be filled automatically.",
+              "normativeRef": "11.13.1",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "contact-05-expect-text-adresse-electronique-invalid": {
+          "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
+          "findings": [
+            {
+              "at": { "selector": "input[type=email]" },
+              "message": "The field takes the user's email address and carries no autocomplete attribute: its purpose cannot be filled automatically.",
+              "normativeRef": "11.13.1",
+              "severity": "majeur"
+            }
+          ]
+        },
+        "connexion": {
+          "verdict": "C",
+          "justification": "Both fields carry a valid autocomplete token for data about the user (username on the identifier, current-password on the password).",
+          "cite": "page"
+        },
+        "recherche": {
+          "verdict": "NA",
+          "justification": "The search field takes a site query, not information about the user.",
+          "cite": "page"
+        },
+        "recherche-2": {
+          "verdict": "NA",
+          "justification": "The search field takes a site query, not information about the user.",
+          "cite": "page"
+        }
+      }
     },
     "12.1": { "verdict": "C", "justification": "A main menu, a site map and a search page.", "cite": "all" },
     "12.2": { "verdict": "C", "justification": "Header, menu and footer appear in the same place and order on every page.", "cite": "all" },
@@ -211,18 +410,6 @@
       { "criteriaId": "1.3", "reason": "The trial refuted the « non applicable » claim; a human has to rule the relevance of the alternatives once the images carry one." },
       { "criteriaId": "1.8", "reason": "The image file is not served, so whether it is an image of text needs the original asset." },
       { "criteriaId": "8.2", "reason": "Validity of the generated source needs a validator run on each page." },
-      {
-        "criteriaId": "11.13",
-        "reason": "Ruled non-conforming on the contact page; the login and search fields of the other pages are not ruled one page at a time by a scope-wide verdict."
-      },
-      {
-        "criteriaId": "7.5",
-        "reason": "Ruled non-conforming on the state the contact journey reached after its invalid submit; the other pages are not ruled one page at a time by a scope-wide verdict."
-      },
-      {
-        "criteriaId": "11.10",
-        "reason": "Ruled non-conforming on the state the contact journey reached after its invalid submit; the other forms are not ruled one page at a time by a scope-wide verdict."
-      },
       { "criteriaId": "13.7", "reason": "The image files are not served, so whether they flash needs the original assets." }
     ]
   }

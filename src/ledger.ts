@@ -36,7 +36,11 @@ import {
   type AgentFinding,
   auditorOf,
   buildAdjudicationWorklist,
+  gatedPageFindings,
   type Evidence,
+  normalizeVerdict,
+  pageJustification,
+  type PageVerdict,
   readCitation,
 } from "./adjudicate.js";
 import { PAGES_DIR } from "./snapshot.js";
@@ -53,6 +57,15 @@ export const LEDGER_DIR = ".ultra11y/verdicts";
 /** The default path for a standard's ledger. */
 export function ledgerPath(standard: StandardId, root = "."): string {
   return join(root, LEDGER_DIR, `${standard}.json`);
+}
+
+/** One page's recorded outcome inside a ledger entry (#197) — the raw verdict shape, like the
+ *  entry's own `citations`/`findings`, so a replay hands the fold exactly what it gates. */
+export interface LedgerPageEntry {
+  status: "C" | "NC" | "NA";
+  justification?: string;
+  citations?: Evidence[];
+  findings?: AgentFinding[];
 }
 
 export interface LedgerEntry {
@@ -106,6 +119,12 @@ export interface LedgerEntry {
    *  verdicts are recomputed every run and have no business in a ledger. */
   decidedBy: "agent" | "human";
   auditor?: Auditor;
+  /** Per-page outcomes carried by the verdict (#197), keyed by audited page id. A verdict
+   *  without them writes no key, so the recorded shape of every pre-existing entry is
+   *  unchanged; a replay puts them back on the rebuilt item and the fold re-gates each one —
+   *  including against the CURRENT audit's page ids, so a page that vanished from the sample
+   *  refuses there, fail-closed. */
+  pages?: Record<string, LedgerPageEntry>;
 }
 
 export interface VerdictLedger {
@@ -349,6 +368,33 @@ function reanchor<T extends { file: string; line: number; selector?: string; sni
   });
 }
 
+/** Put a stored verdict's PER-PAGE outcomes (#197) back on the rebuilt item, re-anchored like
+ *  the run-level ones: each page's citations and findings go through the same `reanchor`, against
+ *  today's evidence for the criterion. What comes back is an ordinary `PageVerdict` map, so the
+ *  fold that follows re-validates every page — its ids against the CURRENT audit's page list (a
+ *  page that vanished from the sample refuses there, fail-closed), its citations against the
+ *  criterion's own anchors, its findings against the source. Nothing about a stored page outcome
+ *  is trusted except that it was written. */
+function reanchorPages(
+  stored: Record<string, LedgerPageEntry>,
+  today: Evidence[],
+  currentFiles: ReadonlyMap<string, string>,
+  root?: string,
+): Record<string, PageVerdict> {
+  const out: Record<string, PageVerdict> = {};
+  for (const [pageId, p] of Object.entries(stored)) {
+    out[pageId] = {
+      verdict: p.status,
+      justification: p.justification ?? "",
+      ...(p.citations ? { citations: reanchor(p.citations, today, currentFiles, root) ?? [] } : {}),
+      // The stored page findings are the raw agent findings (see `entriesFrom`), so they are
+      // re-anchored as such and land back on the verdict item as what it carries.
+      ...(p.findings ? { findings: reanchor(p.findings, today, currentFiles, root) ?? [] } : {}),
+    };
+  }
+  return out;
+}
+
 export function emptyLedger(standard: StandardId = CORE): VerdictLedger {
   return { tool: "ultra11y", kind: "verdict-ledger", schemaVersion: SCHEMA_VERSION, standard, entries: [] };
 }
@@ -408,9 +454,43 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
   // findings an LLM attached to a C/NA/manual item reach here unvalidated, and the ledger
   // recorded them as they came — a write must not crash on what it never checked.
   const portable = <T extends { file?: unknown }>(xs: T[]): T[] => xs.map((x) => (typeof x.file === "string" ? { ...x, file: portableFile(x.file, root) } : x));
+  // A verdict's per-page outcomes (#197), recorded the same way the run-level citations and
+  // findings are: each page's citations normalised through `readCitation` (a bare "file:line"
+  // string is accepted there too) and respelled with `portableFile`, each page's findings
+  // respelled likewise — so the committed ledger names paths a reviewer can open and another
+  // checkout can replay. A page entry that carries no decided verdict is skipped: the fold
+  // refuses the item outright for one, so none of them ever reaches here accepted, but this
+  // reads the raw JSON and must not mint a page from junk.
+  const recordedPages = (it: AdjudicationItem): Record<string, LedgerPageEntry> | undefined => {
+    const raw = (it as { pages?: unknown }).pages;
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined;
+    const out: Record<string, LedgerPageEntry> = {};
+    for (const [pageId, rawPv] of Object.entries(raw as Record<string, unknown>)) {
+      const pv = rawPv as { verdict?: unknown; justification?: unknown; citations?: unknown; findings?: unknown };
+      const v = normalizeVerdict(pv?.verdict);
+      if (v !== "C" && v !== "NC" && v !== "NA") continue;
+      const cites = (Array.isArray(pv.citations) ? pv.citations : []).map(readCitation).filter((c): c is Evidence => c !== null);
+      const justification = pageJustification(pv.justification);
+      const findings = gatedPageFindings(pv.findings);
+      out[pageId] = {
+        status: v,
+        ...(justification ? { justification } : {}),
+        ...(cites.length ? { citations: portable(cites) } : {}),
+        ...(findings.length
+          ? // The RAW agent findings, exactly like the entry's own `findings`: the
+            // `agentFinding` conversion re-runs through the fold on replay, and converting
+            // here would lose the selector on the round-trip. Respelled with `portableFile`
+            // like every other path in this entry.
+            { findings: portable(findings) }
+          : {}),
+      };
+    }
+    return Object.keys(out).length ? out : undefined;
+  };
   for (const it of adj.items) {
     if (!accepted.has(it.criteriaId) || it.verdict === null) continue;
     const citations = (it.citations ?? []).map(readCitation).filter((c): c is Evidence => c !== null);
+    const pages = recordedPages(it);
     out.push({
       criteriaId: it.criteriaId,
       verdict: it.verdict,
@@ -421,6 +501,7 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
       ...(citations.length ? { citations: portable(citations) } : {}),
       ...(it.findings?.length ? { findings: portable(it.findings) } : {}),
       ...(it.recommendations?.length ? { recommendations: portable(it.recommendations) } : {}),
+      ...(pages ? { pages } : {}),
       evidenceFingerprint: evidenceFingerprint(it.evidence, root),
       evidenceAnchors: evidenceAnchorsOf(it.evidence, root),
       evidenceFiles: evidenceFilesOf(it.evidence, root),
@@ -486,20 +567,41 @@ export function pruneLedger(
       continue;
     }
     const anchors = withdrawn.get(entry.criteriaId);
-    if (!anchors?.size || !entry.findings?.length) {
+    if (!anchors?.size) {
       entries.push(entry);
       continue;
     }
-    const findings = entry.findings.filter((finding) => {
+    // The run-level findings, pruned by the same anchor keys as before. An entry carrying none
+    // is untouched here — the original short-circuit kept it whole, and pages are the only
+    // reason to look further.
+    const findings = entry.findings?.filter((finding) => {
       const keep = !anchors.has(findingKey(finding));
       if (!keep) removedFindings++;
       return keep;
     });
-    if (entry.verdict === "NC" && findings.length === 0) {
+    if (entry.verdict === "NC" && entry.findings?.length && findings!.length === 0) {
       removedEntries++;
       continue;
     }
-    entries.push({ ...entry, findings });
+    // …and the PER-PAGE outcomes (#197): each page's findings are withdrawn by the same anchor
+    // keys. A page entry ruled NC left with zero findings must be DROPPED — an NC with no
+    // finding must not replay, page or run — while a C/NA page entry survives; its claim was
+    // never anchored on the withdrawn findings to begin with.
+    let pages = entry.pages;
+    if (pages) {
+      const kept: Record<string, LedgerPageEntry> = {};
+      for (const [pageId, p] of Object.entries(pages)) {
+        const pf = p.findings?.filter((finding) => {
+          const keep = !anchors.has(findingKey(finding));
+          if (!keep) removedFindings++;
+          return keep;
+        });
+        if (p.status === "NC" && !pf?.length) continue;
+        kept[pageId] = { ...p, ...(pf?.length ? { findings: pf } : p.findings?.length ? { findings: [] } : {}) };
+      }
+      pages = kept;
+    }
+    entries.push({ ...entry, ...(entry.findings ? { findings: findings! } : {}), ...(entry.pages ? { pages: pages! } : {}) });
   }
   return { ledger: { ...ledger, entries }, removedEntries, removedFindings };
 }
@@ -593,6 +695,9 @@ export function replayLedger(audit: AuditResult, ledger: VerdictLedger, opts: { 
       findings: reanchor(e.findings, it.evidence, currentFiles, root) ?? [],
       ...(e.citations ? { citations: reanchor(e.citations, it.evidence, currentFiles, root) ?? [] } : {}),
       ...(e.recommendations ? { recommendations: reanchor(e.recommendations, it.evidence, currentFiles, root) ?? [] } : {}),
+      // The per-page outcomes (#197) travel with the decision, re-anchored against today's
+      // evidence exactly like the run-level citations; the fold re-gates each page.
+      ...(e.pages ? { pages: reanchorPages(e.pages, it.evidence, currentFiles, root) } : {}),
       // Who ruled travels with the decision; the fold re-checks the auditor's name.
       ...whoRuled(e),
     });

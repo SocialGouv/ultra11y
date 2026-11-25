@@ -8,12 +8,17 @@ calls. This page is the decision rule for each of them — what makes it Conform
 `NA` is legitimate, and the questions that get you there.
 
 It is the same dataset `verify --manual` loads into `ADJUDICATE.md`, so the worklist and
-this page can never disagree. Two rules govern every verdict below:
+this page can never disagree. Three rules govern every verdict below:
 
 - **A non-conformity must cite a normative test that resolves.** The worklist proposes the
   criterion's W3C techniques; `verify --apply` rejects a `normativeRef` that does not exist.
 - **A good practice with no failing test is a recommendation**, not a non-conformity — it
   never flips a criterion, never enters the conformance rate.
+- **A decided verdict may settle each page of the audit** (#197): an optional `pages` map
+  keyed by audited page id carries per-page outcomes, each passing the same fail-closed gate
+  scoped to that page — every citation and finding names the page's own capture or a source
+  it declares. A page `NC` needs a run-wide `NC`. A page left unnamed keeps the run-wide
+  verdict; a page whose subject is clean gets its own `C`, a page whose subject fails its own `NC`.
 
 ## 1.1 Text Alternatives
 
