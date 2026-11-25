@@ -58,6 +58,9 @@ export interface AxeEngine {
   origin: AxeOrigin;
   /** Set when the copy is not ultra11y's pinned one — the visible half of the fallback. */
   note?: string;
+  /** The axe locale `source` configures (`axe.configure({ locale })`), when one was asked for
+   *  and that axe-core ships it. Absent: axe speaks its built-in English. */
+  locale?: Lang;
 }
 
 const BUILDER_SPEC = "@axe-core/playwright";
@@ -66,6 +69,35 @@ const PACKAGE_SPEC = "axe-core/package.json";
 
 /** Read once per path: axe.min.js is half a megabyte, and a sweep runs it on every page. */
 const sourceCache = new Map<string, string>();
+/** The locale-configured source, once per (path, locale): `ultra11y/playwright` resolves the
+ *  engine on every checked page. */
+const localizedCache = new Map<string, string>();
+
+/** The axe locale for `lang`, read AT RUN TIME from the `locales/` directory of the very
+ *  axe-core whose build runs (`<axe-core>/locales/fr.json`, beside `axe.min.js`) — never
+ *  bundled, so the install-free skill bundle speaks the language of whichever copy it found.
+ *  English is axe's built-in language and needs none. A copy that ships no such file (or an
+ *  unreadable one) yields `undefined`: axe keeps its English text, and that is all — a message
+ *  in the wrong language is not worth a warning. */
+export function readAxeLocale(sourcePath: string, lang: Lang | undefined): Record<string, unknown> | undefined {
+  if (lang !== "fr") return undefined;
+  try {
+    const data = JSON.parse(readFileSync(join(dirname(sourcePath), "locales", `${lang}.json`), "utf8")) as unknown;
+    return data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** `source`, followed by the `axe.configure({ locale })` that makes it speak `locale`.
+ *  Appended to the injected script itself, not configured afterwards: @axe-core/playwright
+ *  injects `axeSource` into every frame AND into the blank page where `finishRun` assembles the
+ *  results (and so writes `help` and the failure summaries), so every copy that produces text
+ *  is configured the same way. Guarded in the page: a locale this build rejects leaves axe in
+ *  English rather than failing the run. */
+function withLocale(source: string, locale: Record<string, unknown>): string {
+  return `${source}\n;try{axe.configure({locale:${JSON.stringify(locale)}})}catch(e){}\n`;
+}
 
 interface Located {
   path: string;
@@ -135,7 +167,9 @@ export interface ResolveAxeOptions {
   /** ultra11y's own anchor. Defaults to this module; a test passes another to simulate a
    *  bundle with no node_modules beside it. */
   self?: string;
-  /** The language of the fallback note (default French, the CLI's default). */
+  /** The output language. It sets the fallback note's language (default French, the CLI's
+   *  default) and, when it is explicitly `fr`, axe's own locale: the rule help and failure
+   *  summaries then come in French (`readAxeLocale`). Unset or `en`, axe speaks English. */
   lang?: Lang;
 }
 
@@ -179,9 +213,29 @@ export function resolveAxeEngine(opts: ResolveAxeOptions): AxeEngine {
   // — from a skills directory inside a project it reaches the project's node_modules.
   const origin: AxeOrigin = own && insideUltra11y(self) ? (located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned") : "project";
   const note = axeFallbackNote(origin, located.version, located.path, opts.lang ?? "fr");
+  // Only the TEXT changes with the locale: rule ids, tags, impacts and selectors — what the
+  // criterion mapping (src/axe-map.ts) and every finding identity (src/baseline.ts) read — are
+  // the same in every language.
+  let locale: Lang | undefined;
+  if (opts.lang === "fr") {
+    const key = `${located.path}\n${opts.lang}`;
+    let localized = localizedCache.get(key);
+    if (localized === undefined) {
+      const data = readAxeLocale(located.path, opts.lang);
+      if (data) {
+        localized = withLocale(source, data);
+        localizedCache.set(key, localized);
+      }
+    }
+    if (localized !== undefined) {
+      source = localized;
+      locale = opts.lang;
+    }
+  }
   return {
     AxeBuilder,
     source,
+    ...(locale ? { locale } : {}),
     sourcePath: located.path,
     version: located.version,
     origin,

@@ -40,6 +40,7 @@ import { type AxeEngine, type AxeEngineInfo, resolveAxeEngine, runAxe } from "..
 import { runLiveProbes } from "../probes.js";
 import {
   type AuditLike,
+  type CheckLang,
   type CheckOptions,
   type ProbeTuning,
   auditSnapshot,
@@ -215,9 +216,10 @@ function fromConfig(): { only?: string[]; limits?: Omit<ProbeTuning, "only"> } {
 const notedAxe = new Set<string>();
 
 /** The axe engine this integration runs — exported so a test can check it is the one `scan`
- *  resolves. Prints the fallback note once per worker. */
-export function resolveIntegrationAxe(cwd = process.cwd()): AxeEngine {
-  const engine = resolveAxeEngine({ cwd });
+ *  resolves. Prints the fallback note once per worker. Under `lang: "fr"` axe's rule help comes
+ *  in French, from the locale the resolved axe-core ships (src/axe-engine.ts). */
+export function resolveIntegrationAxe(cwd = process.cwd(), lang?: CheckLang): AxeEngine {
+  const engine = resolveAxeEngine({ cwd, ...(lang ? { lang } : {}) });
   if (engine.note && !notedAxe.has(engine.sourcePath)) {
     notedAxe.add(engine.sourcePath);
     console.warn(engine.note);
@@ -239,12 +241,13 @@ export function resolveIntegrationAxe(cwd = process.cwd()): AxeEngine {
 async function runAxePass(
   page: PlaywrightPage,
   mode: boolean | "auto" | undefined,
+  lang: CheckLang,
 ): Promise<{ ran: true; violations: unknown[]; engine: AxeEngineInfo } | undefined> {
   if (mode === false) return undefined;
   const demanded = mode === true;
   let engine: AxeEngine;
   try {
-    engine = resolveIntegrationAxe();
+    engine = resolveIntegrationAxe(process.cwd(), lang);
   } catch (e) {
     if (demanded) {
       console.warn(
@@ -369,7 +372,10 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
   // recorded DOM the one the test built.
   const scripts = behaviour ? await behaviour.finish() : undefined;
   if (scripts) collected.scripts = scripts;
-  const axe = await runAxePass(page, opts.axe ?? "auto");
+  // axe's text in the language the check reports in: the `lang` option, else the one
+  // `checkLang` falls back to — the page's declared language when it is English, else French.
+  const axeLang: CheckLang = opts.lang ?? (/^en\b/i.test(String((collected as { lang?: unknown }).lang ?? "")) ? "en" : "fr");
+  const axe = await runAxePass(page, opts.axe ?? "auto", axeLang);
 
   const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe, fullShot);
   const result = auditSnapshot(payload);
