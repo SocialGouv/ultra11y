@@ -61,7 +61,7 @@ jobs:
         run: pnpm run demo # audit -> report -> check -> criteria
 
       - name: Assert a report was produced
-        run: ls /tmp/ultra11y-demo/wcag-*.md
+        run: ls /tmp/ultra11y-demo/rgaa-*.md
 
   install-bundle:
     runs-on: ubuntu-latest
@@ -213,13 +213,13 @@ jobs:
         run: |
           node scripts/ultra11y.mjs audit tests/fixtures/non-conforming/bad.html --out "$RUNNER_TEMP/u" --json > /dev/null
           node scripts/ultra11y.mjs report --in "$RUNNER_TEMP/u/audit-latest.json" --out "$RUNNER_TEMP/u"
-          node scripts/ultra11y.mjs check --report "$RUNNER_TEMP"/u/wcag-*.md
-          node scripts/ultra11y.mjs criteria 1.1.1 | grep -q "Non-text Content"
+          node scripts/ultra11y.mjs check --report "$RUNNER_TEMP"/u/rgaa-*.md
+          node scripts/ultra11y.mjs criteria 1.1 | grep -q "alternative textuelle"
 
       - name: JSX/TSX real-AST + cross-file audit runs on the floor (bundled @babel/parser)
         run: |
           node scripts/ultra11y.mjs audit "tests/fixtures/cross-file" --graph --dedup off --json > "$RUNNER_TEMP/jsx.json"
-          node -e 'const a=require(process.env.RUNNER_TEMP+"/jsx.json"); if(!a.findings.some(f=>f.ruleId==="cross-icon-only-unnamed")){console.error("::error::JSX cross-file audit produced no finding on the floor Node");process.exit(1)}'
+          node -e 'const d=require(process.env.RUNNER_TEMP+"/jsx.json"); const a=d.core??d; if(!a.findings.some(f=>f.ruleId==="cross-icon-only-unnamed")){console.error("::error::JSX cross-file audit produced no finding on the floor Node");process.exit(1)}'
 
       - name: The check gate blocks an invented criterion (exit 1)
         run: |

@@ -69331,6 +69331,18 @@ async function main(argv) {
     const v2 = p2.flags[flag];
     if (typeof v2 === "string" && v2 && !allowed.includes(v2)) console.error(`ultra11y: --${flag} "${v2}" is not one of ${allowed.join("|")} \u2014 using the default.`);
   }
+  let configPacks;
+  try {
+    configPacks = loadConfig(process.cwd())?.packs;
+  } catch {
+    configPacks = void 0;
+  }
+  if (Array.isArray(configPacks) && configPacks.length) {
+    console.error(
+      'ultra11y: .ultra11yrc.json "packs" was removed: ultra11y audits against RGAA 4.1.2 only \u2014 it is built in, there is no pack to load. Remove the "packs" entry.'
+    );
+    return 2;
+  }
   const loaded = loadRuntimeStandards(process.cwd(), [], (m3) => console.error(m3));
   if (loaded.errors.length) {
     for (const e of loaded.errors) console.error(`ultra11y: ${e}`);
@@ -69340,6 +69352,12 @@ async function main(argv) {
   const stdKey = typeof p2.flags.standard === "string" ? p2.flags.standard.toLowerCase() : "";
   if (stdKey === CORE_KEY || stdKey === "core") {
     console.error(`ultra11y: standard "${p2.flags.standard}" was ${WCAG_REMOVED}`);
+    return 2;
+  }
+  if (stdKey !== "rgaa") {
+    console.error(
+      `ultra11y: unknown standard "${String(p2.flags.standard)}" \u2014 ultra11y audits against RGAA 4.1.2 only. Use --standard rgaa, or drop the flag \u2014 it is the default.`
+    );
     return 2;
   }
   switch (p2.command) {

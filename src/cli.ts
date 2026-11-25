@@ -4853,6 +4853,21 @@ export async function main(argv: string[]): Promise<number> {
     if (typeof v === "string" && v && !allowed.includes(v)) console.error(`ultra11y: --${flag} "${v}" is not one of ${allowed.join("|")} — using the default.`);
   }
 
+  // A `.ultra11yrc.json` `packs` entry would register another standard and let a config
+  // switch the audit off RGAA (#194): refuse it before anything is loaded. An unreadable
+  // config is left to loadRuntimeStandards, which reports it.
+  let configPacks: unknown;
+  try {
+    configPacks = loadConfig(process.cwd())?.packs;
+  } catch {
+    configPacks = undefined;
+  }
+  if (Array.isArray(configPacks) && configPacks.length) {
+    console.error(
+      'ultra11y: .ultra11yrc.json "packs" was removed: ultra11y audits against RGAA 4.1.2 only — it is built in, there is no pack to load. Remove the "packs" entry.',
+    );
+    return 2;
+  }
   // Read .ultra11yrc.json (its secondary mappings and guidance) BEFORE resolving the
   // standard. A bad config is a hard error (never a silent skip).
   const loaded = loadRuntimeStandards(process.cwd(), [], (m) => console.error(m));
@@ -4866,6 +4881,13 @@ export async function main(argv: string[]): Promise<number> {
   const stdKey = typeof p.flags.standard === "string" ? p.flags.standard.toLowerCase() : "";
   if (stdKey === CORE_KEY || stdKey === "core") {
     console.error(`ultra11y: standard "${p.flags.standard}" was ${WCAG_REMOVED}`);
+    return 2;
+  }
+  // Any other id — from the flag or the config — is not a standard ultra11y reports against.
+  if (stdKey !== "rgaa") {
+    console.error(
+      `ultra11y: unknown standard "${String(p.flags.standard)}" — ultra11y audits against RGAA 4.1.2 only. Use --standard rgaa, or drop the flag — it is the default.`,
+    );
     return 2;
   }
 

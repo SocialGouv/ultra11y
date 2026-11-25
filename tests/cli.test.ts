@@ -144,6 +144,32 @@ describe("removed commands and flags fail loudly, naming the replacement", () =>
     }
   });
 
+  // A config pack must not be a back door to another standard: with `packs` registered, a
+  // `standard: "xx"` (or `--standard xx`) used to run a non-RGAA audit.
+  it.each([
+    [{ packs: ["./xx.json"], standard: "xx" }, []],
+    [{ packs: ["./xx.json"] }, ["--standard", "xx"]],
+    [{ packs: ["./xx.json"] }, []],
+    [{ standard: "section508" }, []],
+    [{}, ["--standard", "xx"]],
+  ])("a non-RGAA config %j / flags %j exits 2 naming RGAA", async (rc, flags) => {
+    const tmpd = mkdtempSync(join(tmpdir(), "u11y-rc-pack-"));
+    const cwd = process.cwd();
+    try {
+      const pack = JSON.parse(readFileSync(new URL("../src/data/standards/rgaa.json", import.meta.url), "utf8"));
+      writeFileSync(join(tmpd, "xx.json"), JSON.stringify({ ...pack, key: "xx", name: "XX" }));
+      writeFileSync(join(tmpd, ".ultra11yrc.json"), JSON.stringify(rc));
+      process.chdir(tmpd);
+      const r = await run(["audit", `${FIX}non-conforming/bad.html`, "--json", ...flags]);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain("RGAA 4.1.2");
+      expect(r.out).toBe("");
+    } finally {
+      process.chdir(cwd);
+      rmSync(tmpd, { recursive: true, force: true });
+    }
+  });
+
   it("the default standard is RGAA: audit, report and pages speak it with no flag", async () => {
     const tmpd = mkdtempSync(join(tmpdir(), "u11y-rgaa-default-"));
     try {

@@ -149,7 +149,7 @@ describe("the gates read the report and its annex together", () => {
     const out = mkdtempSync(join(tmpdir(), "ultra11y-annex-"));
     const { path, annexPath } = writeReportFiles(audit, { out, lang: "fr", standard: "wcag" });
     expect(existsSync(annexPath)).toBe(true);
-    // Never a second match for the `wcag-*.md` glob scripts use to find THE report.
+    // Never a second match for the `rgaa-*.md` glob scripts use to find THE report.
     expect(annexPath.split("/").pop()).not.toMatch(/^wcag-.*\.md$/);
     const joined = withReportAnnexes(readFileSync(path, "utf8"), path, (p) => readFileSync(p, "utf8"));
     const { report, annex } = renderReportDocuments(audit, "fr", out);
