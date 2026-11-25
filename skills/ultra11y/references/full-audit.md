@@ -183,7 +183,8 @@ quelle que soit celle que vous choisissez :
 Quand personne n’est dans la boucle (CI), l’appelant est le bot `rgaa-audit` d’iterion, qui
 tranche la même liste de travail à travers le même garde-fou ; voir `references/ci.md`.
 
-Pour trancher directement : lisez chaque petit brief
+Pour trancher directement : lisez une fois le contrat de verdict commun
+`audits/ADJUDICATE.contract.md`, puis chaque petit brief
 `audits/adjudicate/<criterion>.md`, décidez au regard de ses tests officiels, remplissez les
 verdicts dans **`audits/ADJUDICATE.todo.json`** — le seul fichier à écrire dans une session qui
 a un shell (ses items portent les preuves et les emplacements `citations[]` ;

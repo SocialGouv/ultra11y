@@ -42,6 +42,9 @@ interface Anchor {
   alsoAt?: string[];
   // The page ids this content class appears on, as the harvest's own bookkeeping recorded it.
   pages?: string[];
+  // Set by `pagePool` on an `alsoAt` sibling: matched like its representative (same content
+  // class), cited at its own bare `file:line`.
+  sibling?: boolean;
 }
 interface Match {
   file?: string;
@@ -172,7 +175,10 @@ const matches = (e: Anchor, m: Match): boolean =>
   (m.selector === undefined || e.selector === m.selector) &&
   (m.snippetIncludes === undefined || (e.snippet ?? "").includes(m.snippetIncludes)) &&
   (m.noteIncludes === undefined || (e.note ?? "").includes(m.noteIncludes));
-const anchorOf = (e: Anchor) => ({ file: e.file, line: e.line, ...(e.selector ? { selector: e.selector } : {}), ...(e.snippet ? { snippet: e.snippet } : {}) });
+const anchorOf = (e: Anchor) =>
+  e.sibling
+    ? { file: e.file, line: e.line }
+    : { file: e.file, line: e.line, ...(e.selector ? { selector: e.selector } : {}), ...(e.snippet ? { snippet: e.snippet } : {}) };
 
 /** The evidence an auditor reads to rule ONE page of a criterion: the anchors on that page's
  *  own capture (`.ultra11y/pages/<id>/dom.html`), whether the class representative sits there or
@@ -188,7 +194,9 @@ function pagePool(evidence: Anchor[], pageId: string): Anchor[] {
     const at = sib.lastIndexOf(":");
     // A sibling is a bare `file:line`, cited as such: the representative's snippet and selector
     // (often a probe's pseudo-selector, `axe:4.1.3`) describe the representative, not that file.
-    return [{ ...e, file: sib.slice(0, at), line: Number(sib.slice(at + 1)), selector: undefined, snippet: undefined, alsoAt: undefined }];
+    // It is still MATCHED on them: it is the same content class (#222 — the same candidate finding
+    // on every page is one class now, its other pages in `alsoAt`).
+    return [{ ...e, file: sib.slice(0, at), line: Number(sib.slice(at + 1)), alsoAt: undefined, sibling: true }];
   });
 }
 
@@ -559,6 +567,49 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
     expect(ev("11.1").some((e) => /screen reader would announce .*textbox — NO accessible name/.test(e.note ?? ""))).toBe(true);
     expect(ev("13.7").some((e) => e.selector === "probe:flash" && /flash measure RAN .*no luminance flash/.test(e.note ?? ""))).toBe(true);
     expect(ev("7.1").some((e) => /button "Rubriques", (?:collapsed|expanded)/.test(e.note ?? ""))).toBe(true);
+  });
+
+  // WHAT THE BRIEFS COST ON A REAL WORKLIST (#222) — the figure references/runbook.md quotes.
+  // Before: the page id was part of the repeated-blocks class and every candidate finding was its
+  // own class, so 12.2 listed 66 classes for three blocks, 12.4/12.5 70 and 7.1 60; and the
+  // verdict contract was restated in each of the 102 briefs. The measure is written next to the
+  // worklist (`audits/brief-budget.json`) so the runbook figure can be re-read from any run.
+  it("dedupes evidence across pages and writes the verdict contract once", () => {
+    if (!browserAvailable) return;
+    const todo = readJson<{ items: { criteriaId: string; population?: { classes: number; occurrences: number }; evidence?: Anchor[] }[] }>(
+      "audits/ADJUDICATE.todo.json",
+    );
+    const classes = (id: string) => todo.items.find((i) => i.criteriaId === id)?.population?.classes ?? 0;
+    const briefs = walk("audits/adjudicate").filter((f) => f.endsWith(".md"));
+    const chars = briefs.reduce((sum, f) => sum + read(f).length, 0);
+    const contract = read("audits/ADJUDICATE.contract.md");
+    const budget = {
+      pages: readJson<{ pages?: unknown[] }>("audits/ADJUDICATE.todo.json").pages?.length ?? 0,
+      briefs: briefs.length,
+      briefChars: chars,
+      contractChars: contract.length,
+      approxInputTokens: Math.round((chars + contract.length) / 4),
+      classes: Object.fromEntries(["12.2", "12.4", "12.5", "7.1", "1.3", "9.1"].map((id) => [id, classes(id)])),
+    };
+    writeFileSync(join(project, "audits", "brief-budget.json"), `${JSON.stringify(budget, null, 2)}\n`);
+    // Three repeated blocks plus the one nav the source alone carries, whatever the page count.
+    expect(budget.classes["12.2"], JSON.stringify(budget)).toBeLessThanOrEqual(8);
+    expect(budget.classes["12.4"], JSON.stringify(budget)).toBeLessThanOrEqual(12);
+    expect(budget.classes["7.1"], JSON.stringify(budget)).toBeLessThanOrEqual(30);
+    // 1.3 is about images: no landmark, no disclosure button, no scripts.json digest.
+    for (const e of todo.items.find((i) => i.criteriaId === "1.3")?.evidence ?? [])
+      expect(e.selector, e.note).not.toMatch(/^(?:header|nav|main|footer|form|button|scripts:|sr:)/);
+    // 9.1 is about headings: no <label>.
+    for (const e of todo.items.find((i) => i.criteriaId === "9.1")?.evidence ?? []) expect(e.selector, e.note).not.toMatch(/^label/);
+    // The contract is in one file; no brief restates it.
+    expect(contract).toMatch(/UNE NC EN FORME D'ABSENCE/);
+    for (const f of briefs) {
+      const md = read(f);
+      expect(md, f).toContain("ADJUDICATE.contract.md");
+      expect(md, f).not.toMatch(/UNE NC EN FORME D'ABSENCE/);
+    }
+    // The bill, as a ratchet: 1 607 526 characters of briefs on this fixture before #222.
+    expect(chars, JSON.stringify(budget)).toBeLessThan(1_300_000);
   });
 
   it("maps the application in annex I: pages and states, instruments, rendered units and criteria per source", () => {

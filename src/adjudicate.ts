@@ -493,33 +493,48 @@ function packResultNeedsAdjudication(pc: ReturnType<typeof derivePackResults>[nu
  * criterion has no subject harvester of its own (reflow is document-wide), those findings are
  * also the only concrete anchors the model can cite. Prefer persisted snapshot anchors over
  * transient URLs and keep the signal's wording as the note the adjudicator reads. */
-function candidateFindingEvidence(findings: readonly Finding[], limit: number): Evidence[] {
+function candidateFindingEvidence(findings: readonly Finding[], limit: number, anchored: ReadonlySet<string> = new Set()): Evidence[] {
   const snapshots = findings.filter((finding) => isSnapshotFile(finding.file));
   const local = findings.filter((finding) => !/^https?:\/\//i.test(finding.file));
   const pool = snapshots.length ? snapshots : local;
   const seen = new Set<string>();
-  const evidence: Evidence[] = [];
+  // ONE REPRESENTATIVE PER CONTENT CLASS, the same rule the harvest follows (#222). The same
+  // rule firing on the same markup on every captured page is one observation repeated, not
+  // forty: measured on the full-audit fixture, 7.1 listed `role="navigation" is redundant` once
+  // per page state. The class is the rule, its message, the element and its markup — never the
+  // file, which is where the page lives — so a finding whose content differs keeps its own class.
+  // Every other occurrence travels in `alsoAt` at its own `file:line`, which is what a page-scoped
+  // verdict cites (the gate reads siblings exactly like the harvest's).
+  const groups = new Map<string, Finding[]>();
   for (const finding of pool) {
-    const key = `${finding.file}:${finding.line}:${finding.selectorHint}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    evidence.push({
-      file: finding.file,
-      line: finding.line,
-      selector: finding.selectorHint === "document" ? "" : finding.selectorHint,
-      snippet: finding.snippet,
-      note: finding.message,
-      ...(finding.page ? { pages: [finding.page] } : {}),
-    });
-    if (evidence.length >= limit) break;
+    const selector = finding.selectorHint === "document" ? "" : finding.selectorHint;
+    const at = `${finding.file}:${finding.line}:${selector}`;
+    if (seen.has(at) || anchored.has(at)) continue;
+    seen.add(at);
+    const cls = `${finding.ruleId}|${finding.message}|${selector}|${(finding.snippet ?? "").trim()}`;
+    const group = groups.get(cls);
+    if (group) group.push(finding);
+    else if (groups.size < limit) groups.set(cls, [finding]);
   }
-  return evidence;
+  return [...groups.values()].map((group) => {
+    const rep = group[0]!;
+    const pages = [...new Set(group.map((f) => f.page).filter((p): p is string => p !== undefined))];
+    return {
+      file: rep.file,
+      line: rep.line,
+      selector: rep.selectorHint === "document" ? "" : rep.selectorHint,
+      snippet: rep.snippet,
+      note: rep.message,
+      ...(group.length > 1 ? { occurrences: group.length, alsoAt: group.slice(1).map((f) => `${f.file}:${f.line}`) } : {}),
+      ...(pages.length ? { pages } : {}),
+    };
+  });
 }
 
 /** The harvest, followed by the candidate findings it does not already anchor. */
 function withCandidates(harvest: Evidence[], findings: readonly Finding[], limit: number): Evidence[] {
   const anchored = new Set(harvest.map((e) => `${e.file}:${e.line}:${e.selector}`));
-  const extra = candidateFindingEvidence(findings, limit).filter((e) => !anchored.has(`${e.file}:${e.line}:${e.selector}`));
+  const extra = candidateFindingEvidence(findings, limit, anchored);
   return extra.length ? [...harvest, ...extra] : harvest;
 }
 
@@ -591,8 +606,10 @@ export function buildAdjudicationWorklist(audit: AuditResult, opts: { cwd?: stri
                 evidence: candidates,
                 population: {
                   classes: (item.evidence.length ? (item.population?.classes ?? item.evidence.length) : 0) + candidates.length - item.evidence.length,
-                  occurrences: (item.evidence.length ? (item.population?.occurrences ?? item.evidence.length) : 0) + candidates.length - item.evidence.length,
-                  files: new Set(candidates.map((evidence) => evidence.file)).size,
+                  occurrences:
+                    (item.evidence.length ? (item.population?.occurrences ?? item.evidence.length) : 0) +
+                    candidates.slice(item.evidence.length).reduce((sum, evidence) => sum + (evidence.occurrences ?? 1), 0),
+                  files: new Set(candidates.flatMap((evidence) => [evidence.file, ...(evidence.alsoAt ?? []).map((a) => a.slice(0, a.lastIndexOf(":")))])).size,
                   pages: new Set(candidates.flatMap((evidence) => evidence.pages ?? [])).size,
                 },
               }
@@ -2290,6 +2307,15 @@ const T = {
       `**AUCUN RENDU DANS CETTE PORTÉE.** ${ids.length} critère(s) exigent une page rendue, et aucune page n'a été instantanée ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule réponse honnête. Rendez AVANT d'adjuger — \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) — puis reconstruisez cette liste : la mesure en ferme la plupart sans modèle, donc sans facture. Concernés : ${ids.map((id) => `\`${id}\``).join(" · ")}`,
     briefContract:
       "> **CONTRAT DE VERDICT** — le pli est FERMÉ : un verdict auquel il manque son champ obligatoire est refusé, et son critère retourne « à évaluer » en portant le refus. Renseignez le verdict de CE critère, ici :",
+    contractTitle: "# Contrat de verdict (ultra11y) — commun à chaque brief `adjudicate/<critère>.md`",
+    contractLead:
+      "Ce fichier est écrit UNE fois par liste de travail : chaque brief y renvoie au lieu de le répéter. Lisez-le avant le premier brief ; ses règles valent pour chaque critère.",
+    sharedContract: (file: string) =>
+      `> **CONTRAT DE VERDICT** — dans \`${file}\` (à côté du dossier \`adjudicate/\`), commun à tous les critères : lisez-le UNE fois avant le premier brief. Le pli est FERMÉ : un verdict qui ne le respecte pas est refusé, et son critère retourne « à évaluer ». Un \`normativeRef\` cite un test de CE critère (liste en fin de brief), jamais un id WCAG.`,
+    renderedHere:
+      "> **RENDU DISPONIBLE pour ce critère** — ses évidences sont ancrées dans des captures (`.ultra11y/pages/<id>/`, fichiers listés dans le contrat) : tranchez depuis ces fichiers, `needs-rendered-dom` serait refusé ici.",
+    perPage:
+      "> **STATUER PAGE PAR PAGE.** Une évidence représente une CLASSE de contenu : le même élément rendu sur plusieurs pages n'est listé qu'une fois. Sa mention `sur …` donne chaque page où la classe apparaît, sous la forme `<id>:<ligne>`. Un verdict de page cite la capture de CETTE page : `file` = `.ultra11y/pages/<id>/dom.html`, `line` = la ligne indiquée, `snippet` omis ou recopié de la représentante (même contenu). Une page absente de la mention `sur …` ne porte pas cette classe. `aussi en` liste les autres occurrences hors capture (la source).",
     absenceRule:
       "> **UNE NC EN FORME D'ABSENCE S'ANCRE QUAND MÊME.** « Il n'y a pas de second système de navigation », « il n'y a pas de moteur de recherche », « aucun message d'erreur ne suggère le format attendu » : une absence se CONSTATE quelque part. Citez l'élément et la page où vous l'avez constatée — le `<nav>`, le `<header>`, le formulaire — avec son `file`, sa `line` et son `snippet`. Une NC sans `file` est refusée aussi sûrement qu'un `C` sans citations. Et si le sujet du critère n'existe nulle part dans le périmètre audité, le verdict n'est pas `NC` : c'est `NA`, avec sa justification.",
     incomplete: "LECTURE INCOMPLÈTE — un « C » sera refusé sur ce critère",
@@ -2329,12 +2355,12 @@ const T = {
       `un constat d'absence ou de forme appartient au critère « mécanique » ci-dessous, un jugement de pertinence au critère « jugement ». Aide à la lecture : ne dispense d'aucun test de CE critère.`,
     roleMechanical: "mécanique — existence / forme",
     roleJudgment: "jugement — pertinence",
-    pagesNote: (pages: readonly { id: string; name: string; url: string }[]): string => {
+    pagesNote: (pages: readonly { id: string; name: string; url: string }[], all = false): string => {
       const shown = pages
-        .slice(0, 8)
+        .slice(0, all ? pages.length : 8)
         .map((p) => `${p.id} — ${p.name} (${p.url})`)
         .join(", ");
-      return `**Pages auditées (ids utilisables comme clés de \`pages\`)** : ${shown}${pages.length > 8 ? `, … +${pages.length - 8}` : ""}`;
+      return `**Pages auditées (ids utilisables comme clés de \`pages\`)** : ${shown}${!all && pages.length > 8 ? `, … +${pages.length - 8}` : ""}`;
     },
   },
   en: {
@@ -2362,6 +2388,15 @@ const T = {
       `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating — \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) — then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids.map((id) => `\`${id}\``).join(" · ")}`,
     briefContract:
       "> **VERDICT CONTRACT** — the fold is FAIL-CLOSED: a verdict missing its required field is refused, and its criterion goes back to « to assess » carrying the refusal. Record THIS criterion's verdict, here:",
+    contractTitle: "# Verdict contract (ultra11y) — shared by every `adjudicate/<criterion>.md` brief",
+    contractLead:
+      "This file is written ONCE per worklist: every brief points here instead of repeating it. Read it before the first brief; its rules apply to every criterion.",
+    sharedContract: (file: string) =>
+      `> **VERDICT CONTRACT** — in \`${file}\` (next to the \`adjudicate/\` directory), shared by every criterion: read it ONCE before the first brief. The fold is FAIL-CLOSED: a verdict that breaks it is refused, and its criterion goes back to « to assess ». A \`normativeRef\` cites a test of THIS criterion (listed at the end of the brief), never a WCAG id.`,
+    renderedHere:
+      "> **THE RENDERED PAGE IS AVAILABLE for this criterion** — its evidence is anchored in captures (`.ultra11y/pages/<id>/`, files listed in the contract): decide from those files, `needs-rendered-dom` would be refused here.",
+    perPage:
+      "> **RULING PAGE BY PAGE.** An evidence line stands for a content CLASS: the same element rendered on several pages is listed once. Its `on …` mention gives every page the class appears on, as `<id>:<line>`. A page verdict cites THAT page's capture: `file` = `.ultra11y/pages/<id>/dom.html`, `line` = the line given, `snippet` omitted or copied from the representative (same content). A page missing from the `on …` mention does not carry that class. `also at` lists the other occurrences outside the captures (the source).",
     absenceRule:
       "> **AN NC SHAPED LIKE AN ABSENCE STILL HAS TO BE ANCHORED.** « There is no second navigation system », « there is no search engine », « no error message suggests the expected format »: an absence is OBSERVED somewhere. Cite the element and the page you observed it on — the `<nav>`, the `<header>`, the form — with its `file`, `line` and `snippet`. An NC with no `file` is refused exactly as surely as a `C` with no citations. And when the criterion's subject exists nowhere in the audited scope, the verdict is not `NC`: it is `NA`, with its justification.",
     incomplete: "INCOMPLETE READING — a C will be refused on this criterion",
@@ -2392,12 +2427,12 @@ const T = {
       `an observation of absence or of malformed markup belongs to the « mechanical » criterion below, a judgement of relevance to the « judgment » one. A reading aid: it excuses no test of THIS criterion.`,
     roleMechanical: "mechanical — existence / form",
     roleJudgment: "judgment — relevance",
-    pagesNote: (pages: readonly { id: string; name: string; url: string }[]): string => {
+    pagesNote: (pages: readonly { id: string; name: string; url: string }[], all = false): string => {
       const shown = pages
-        .slice(0, 8)
+        .slice(0, all ? pages.length : 8)
         .map((p) => `${p.id} — ${p.name} (${p.url})`)
         .join(", ");
-      return `**Audited pages (usable as \`pages\` keys)**: ${shown}${pages.length > 8 ? `, … +${pages.length - 8}` : ""}`;
+      return `**Audited pages (usable as \`pages\` keys)**: ${shown}${!all && pages.length > 8 ? `, … +${pages.length - 8}` : ""}`;
     },
   },
 } as const;
@@ -2728,6 +2763,10 @@ export function formatAdjudication(
   opts: {
     preamble?: boolean;
     contract?: boolean;
+    /** The file the run-wide contract was written to ONCE (`writeAdjudicationContract`). Set,
+     *  the brief carries a one-line pointer to it instead of the contract, the pack warning, the
+     *  capture inventory and the page list — see `writeAdjudication`. */
+    sharedContract?: string;
     cwd?: string;
     unrendered?: string[];
     web?: boolean;
@@ -2735,6 +2774,13 @@ export function formatAdjudication(
   } = {},
 ): string {
   const s = T[lang];
+  // THE CONTRACT, ONCE PER WORKLIST (#222). Repeated in each of the 102 briefs of a full RGAA
+  // run, the run-wide blocks — verdict contract, pack warning, capture inventory, page list —
+  // were ~6.5 KB a brief and ~38 % of what the briefs weighed. They do not depend on the
+  // criterion, so `writeAdjudication` writes them once (`ADJUDICATE.contract.md`) and each
+  // brief carries a pointer — plus the two facts that ARE the criterion's own: whether its
+  // evidence sits in a capture, and whether it needs a render nobody ran.
+  const shared = opts.sharedContract !== undefined && opts.contract !== false;
   // Display only — the gate always reads the complete sibling set.
   const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? undefined : loadPack(standard);
@@ -2761,12 +2807,33 @@ export function formatAdjudication(
   // the headless `judge`, the only one that provably shipped a system prompt, was removed. The
   // on-disk briefs, `verify --manual` and the emitted contracts are read with no system prompt at
   // all, and for them the contract stays exactly where it is.
-  const out: string[] =
-    opts.contract === false
+  const out: string[] = shared
+    ? [s.sharedContract(opts.sharedContract!), ""]
+    : opts.contract === false
       ? []
       : opts.preamble === false
         ? [s.briefContract, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", `> ${severityRubricLine(lang)}`, ""]
         : [s.title, "", s.intro, "", ...s.verdicts, "", s.rule, "", s.absenceRule, "", `> ${severityRubricLine(lang)}`, "", s.then, ""];
+  if (shared) {
+    if (items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) out.push(s.renderedHere, "");
+    if (opts.unrendered?.length) out.push(`> ${s.nothingRendered(opts.unrendered)}`, "");
+  } else out.push(...runWideNotes(items, lang, pack, opts));
+  out.push(...criterionSections(items, lang, standard, pack, opts, shown));
+  return out.join("\n");
+}
+
+/** The notes that hold for the whole run, not for one criterion: the capture inventory, the
+ *  unrendered residue, the pack warning, the page ids — and, in the shared contract, the
+ *  per-page citation rule. */
+function runWideNotes(
+  items: AdjudicationItem[],
+  lang: Lang,
+  pack: ReturnType<typeof loadPack> | undefined,
+  opts: { cwd?: string; unrendered?: string[]; pages?: { id: string; name: string; url: string }[] },
+  allPages = false,
+): string[] {
+  const s = T[lang];
+  const out: string[] = [];
   // THE RENDERED PAGE, WHEN THERE IS ONE.
   //
   // A `needs-rendering` criterion used to arrive with one instruction — answer
@@ -2814,7 +2881,21 @@ export function formatAdjudication(
   // adjudicator guessing an id ("contact" vs "contact-us") is a refusal for a spelling. The
   // worklist JSON carries the same list in its header; this line is the readable form of it,
   // one line so it lands on every per-criterion brief without swelling each one.
-  if (opts.pages?.length) out.push(`> ${s.pagesNote(opts.pages)}`, "");
+  if (opts.pages?.length) out.push(`> ${s.pagesNote(opts.pages, allPages)}`, "");
+  return out;
+}
+
+/** The sections of the criteria themselves: one `##` block per item. */
+function criterionSections(
+  items: AdjudicationItem[],
+  lang: Lang,
+  standard: StandardId,
+  pack: ReturnType<typeof loadPack> | undefined,
+  opts: { cwd?: string; web?: boolean },
+  shown: number,
+): string[] {
+  const s = T[lang];
+  const out: string[] = [];
   for (const it of items) {
     out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);
     if (it.previousReview?.trim()) {
@@ -2851,10 +2932,27 @@ export function formatAdjudication(
     if (!it.evidence.length) out.push(s.none, "");
     else {
       for (const e of it.evidence) {
+        // EVERY PAGE OF THE CLASS, AS `<id>:<line>` (#222). A class merged across pages is cited
+        // page by page at its own capture, so the brief has to name each one — the old « on » list
+        // stopped at four pages and the capped `alsoAt` at eight anchors, which on a 28-page run
+        // hid most of the pages a page verdict needs. Uncapped, and compact: the capture path is
+        // the same for every page (`.ultra11y/pages/<id>/dom.html`) and is stated once in the
+        // contract. Anchors outside the captures (the source) keep the capped `alsoAt`.
+        const onPages = [e.file, ...(e.alsoAt ?? [])]
+          .map((a, i) => (i === 0 ? { file: a, line: String(e.line) } : { file: a.slice(0, a.lastIndexOf(":")), line: a.slice(a.lastIndexOf(":") + 1) }))
+          .flatMap(({ file, line }) => {
+            const page = pageOfDoc(file);
+            return page !== undefined ? [`${page}:${line}`] : [];
+          });
+        const elsewhere = (e.alsoAt ?? []).filter((a) => pageOfDoc(a.slice(0, a.lastIndexOf(":"))) === undefined);
         const extra = [
           e.occurrences && e.occurrences > 1 ? `×${e.occurrences}` : "",
-          e.pages?.length ? `${s.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "…" : ""}` : "",
-          e.alsoAt?.length ? `${s.alsoAt} ${e.alsoAt.slice(0, shown).join(", ")}${e.alsoAt.length > shown ? "…" : ""}` : "",
+          onPages.length > 1 || (onPages.length === 1 && !isSnapshotFile(e.file))
+            ? `${s.on} ${onPages.join(", ")}`
+            : !onPages.length && e.pages?.length
+              ? `${s.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "…" : ""}`
+              : "",
+          elsewhere.length ? `${s.alsoAt} ${elsewhere.slice(0, shown).join(", ")}${elsewhere.length > shown ? "…" : ""}` : "",
         ]
           .filter(Boolean)
           .join(" ");
@@ -3013,7 +3111,7 @@ export function formatAdjudication(
       }
     }
   }
-  return out.join("\n");
+  return out;
 }
 
 export interface WriteAdjudicationResult {
@@ -3023,6 +3121,8 @@ export interface WriteAdjudicationResult {
   verdictsPath: string;
   /** One small Markdown brief per criterion, for one that cannot read it either. */
   itemsDir: string;
+  /** The run-wide contract every brief in `itemsDir` points to, written once. */
+  contractPath: string;
   count: number;
 }
 
@@ -3081,21 +3181,58 @@ export function writeAdjudication(
   // one honest `needs-rendered-dom` in the run looks like a guess, and the run before it spent
   // three passes discovering by hand what this line states for free.
   const unrendered = new Set(opts.unrendered ?? []);
+  // The run-wide rules, ONCE (#222): every brief below points here instead of repeating them.
+  // The page ids are in it in full (#197) — the CI adjudicator reads only this file and the
+  // briefs, so it is where it learns which ids may key a `pages` map.
+  const contractPath = join(outDir, ADJUDICATION_CONTRACT_FILE);
+  writeFileSync(contractPath, formatAdjudicationContract(items, opts.lang ?? "en", opts.standard, opts.pages?.length ? { pages: opts.pages } : {}));
   for (const it of items) {
     const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
     writeFileSync(
       join(itemsDir, `${it.criteriaId}.md`),
       formatAdjudication([it], opts.lang ?? "en", opts.standard, {
         preamble: false,
+        sharedContract: ADJUDICATION_CONTRACT_FILE,
         ...(mine.length ? { unrendered: mine } : {}),
         ...(opts.web ? { web: true } : {}),
-        // The page ids reach the per-criterion briefs too (#197): the CI adjudicator reads ONLY
-        // these sheets, so it is the one place it can learn which ids may key a `pages` map.
-        ...(opts.pages?.length ? { pages: opts.pages } : {}),
       }),
     );
   }
-  return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };
+  return { todoPath, mdPath, verdictsPath, itemsDir, contractPath, count: items.length };
+}
+
+/** Where `writeAdjudication` writes the run-wide contract, beside the worklist. */
+export const ADJUDICATION_CONTRACT_FILE = "ADJUDICATE.contract.md";
+
+/** The run-wide contract the per-criterion briefs point to: the verdict vocabulary, the citation
+ *  and absence rules, the severity rubric, how to rule page by page, and the notes that hold for
+ *  the whole run (capture inventory, pack warning, every audited page id). The same clauses a
+ *  standalone brief (`preamble: false`) carries inline — said once instead of once per criterion. */
+export function formatAdjudicationContract(
+  items: AdjudicationItem[],
+  lang: Lang = "en",
+  standard: StandardId = CORE,
+  opts: { cwd?: string; pages?: { id: string; name: string; url: string }[] } = {},
+): string {
+  const s = T[lang];
+  const pack = isCore(standard) ? undefined : loadPack(standard);
+  return [
+    s.contractTitle,
+    "",
+    s.contractLead,
+    "",
+    ...s.verdicts,
+    "",
+    s.rule,
+    "",
+    s.absenceRule,
+    "",
+    `> ${severityRubricLine(lang)}`,
+    "",
+    s.perPage,
+    "",
+    ...runWideNotes(items, lang, pack, opts, true),
+  ].join("\n");
 }
 
 /** The worklist with the evidence stripped: what an adjudicator has to WRITE, without the
