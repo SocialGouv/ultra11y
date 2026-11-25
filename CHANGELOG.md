@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [9.2.0](https://github.com/SocialGouv/ultra11y/compare/v9.1.0...v9.2.0) (2026-11-25)
+
+
+### Features
+
+* **review:** render only the pages a pull request touches, block only on new non-conformities ([#216](https://github.com/SocialGouv/ultra11y/issues/216)) ([168f232](https://github.com/SocialGouv/ultra11y/commit/168f23234f20b86f3490e30111bc37c76f6197aa)), closes [#209](https://github.com/SocialGouv/ultra11y/issues/209)
+
 # [9.1.0](https://github.com/SocialGouv/ultra11y/compare/v9.0.2...v9.1.0) (2026-11-25)
 
 
