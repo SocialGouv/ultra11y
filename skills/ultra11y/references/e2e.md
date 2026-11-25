@@ -195,6 +195,7 @@ Atteignez-les avec `ultra11y/playwright` ou avec `scan` sur les mêmes routes.
 | `as` | l’**id** de la page (nom du répertoire). Par défaut, le chemin d’URL slugifié |
 | `name` | nom lisible de la page pour le rapport. Par défaut, le titre du document |
 | `failOn` | `"blocking"` (par défaut), `"major"`, `"minor"`, ou `false` pour enregistrer sans jamais échouer |
+| `lang` | langue du message d’échec et du rapport par page : `"fr"` ou `"en"`. Par défaut, la langue que déclare la page (`<html lang>`), sinon le français |
 | `auth` | marque la page comme se trouvant derrière une authentification |
 | `sources` | fichiers sources qui l’ont rendue — les constats sont alors rapportés sur **votre code** |
 | `notes` | notes de reproduction reportées dans le ticket de l’auditeur |
