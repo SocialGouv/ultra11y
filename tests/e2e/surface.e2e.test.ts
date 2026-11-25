@@ -72,14 +72,14 @@ describe("e2e: tickets", () => {
 
   it("exits 1 on --grain page with no page in scope, instead of filing nothing in silence", () => {
     const dir = mkTmp();
-    const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "github", "--grain", "page", "--dry-run"], { env: NO_CREDS });
+    const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "github", "--grain", "page", "--dry-run", "--lang", "en"], { env: NO_CREDS });
     expect(r.code).toBe(1);
     expect(r.stderr).toContain("no page in scope");
   });
 
   it("refuses past --max-tickets rather than flooding a tracker", () => {
     const dir = mkTmp();
-    const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "github", "--max-tickets", "1", "--dry-run"], { env: NO_CREDS });
+    const r = runCli(["tickets", "--in", auditTo(dir), "--provider", "github", "--max-tickets", "1", "--dry-run", "--lang", "en"], { env: NO_CREDS });
     expect(r.code).toBe(2);
     expect(r.stderr).toContain("past the limit of 1");
   });
@@ -101,10 +101,10 @@ describe("e2e: tickets", () => {
 });
 
 describe("e2e: criteria", () => {
-  it("--list prints the WCAG success criteria", () => {
-    const r = runCli(["criteria", "--list"]);
+  it("--list prints the RGAA themes", () => {
+    const r = runCli(["criteria", "--list", "--lang", "en"]);
     expect(r.code).toBe(0);
-    expect(r.stdout).toMatch(/success criteria/i);
+    expect(r.stdout).toContain("RGAA 4.1.2 — 13 themes, 106 criteria");
   });
   it("--json emits a parseable array", () => {
     const r = runCli(["criteria", "--json"]);
@@ -142,15 +142,16 @@ describe("e2e: init --help is inert (no files written)", () => {
   });
 });
 
-describe("e2e: pack scaffold + check", () => {
-  it("scaffold prints a valid pack the checker accepts", () => {
-    const dir = mkTmp();
-    const scaffold = runCli(["pack", "scaffold"]);
-    expect(scaffold.code).toBe(0);
-    const packPath = join(dir, "pack.json");
-    writeFileSync(packPath, scaffold.stdout);
-    expect(() => JSON.parse(scaffold.stdout)).not.toThrow();
-    expect(runCli(["pack", "check", packPath]).code).toBe(0);
+describe("e2e: the country-pack surface is gone (#194)", () => {
+  it("`pack` is no longer a command, and --pack / --override / --guidance exit 2 naming RGAA", () => {
+    const pack = runCli(["pack", "scaffold"]);
+    expect(pack.code).toBe(2);
+    expect(pack.stderr).toContain("RGAA 4.1.2");
+    for (const flag of [["--pack", "x.json"], ["--override"], ["--guidance", "g.json"]]) {
+      const r = runCli(["criteria", "8.3", ...flag]);
+      expect(r.code, flag[0]).toBe(2);
+      expect(r.stderr, flag[0]).toContain("RGAA 4.1.2");
+    }
   });
 });
 
@@ -188,10 +189,10 @@ describe("e2e: check --semantic fails closed without a verdicts artifact", () =>
     const dir = mkTmp();
     const audit = auditTo(dir);
     expect(runCli(["report", "--in", audit, "--out", dir, "--lang", "en"]).code).toBe(0);
-    const reportPath = join(dir, readdirSync(dir).find((f) => f.startsWith("wcag-") && f.endsWith(".md"))!);
+    const reportPath = join(dir, readdirSync(dir).find((f) => f.startsWith("rgaa-") && f.endsWith(".md"))!);
     const r = runCli(["check", "--report", reportPath, "--semantic"]);
     expect(r.code).toBe(1);
-    expect((r.stdout + r.stderr).toLowerCase()).toMatch(/semantic/);
+    expect((r.stdout + r.stderr).toLowerCase()).toMatch(/semantic|sémantique/);
   });
 });
 

@@ -19,11 +19,14 @@ interface Audit {
   residualRisks: { criteriaId: string }[];
 }
 const statusOf = (a: Audit, id: string) => a.criteria.find((c) => c.id === id)?.status;
+/** The RGAA document `audit --json` writes carries the WCAG-keyed engine result under `core`
+ *  (internal plumbing) — the layer these engine-level assertions are about. */
+const core = (doc: unknown): Audit => ((doc as { core?: Audit }).core ?? doc) as Audit;
 
 describe("e2e: dynamic-tier delta — the static engine leaves the rendered-only criteria residual", () => {
   it("contrast-over-gradient leaves 1.4.3 manual (no static NC, no FP)", () => {
     const r = runCli(["audit", FIX.contrastOverGradient, "--json"]);
-    const a = JSON.parse(r.stdout) as Audit;
+    const a = core(JSON.parse(r.stdout));
     expect(statusOf(a, "1.4.3")).toBe("manual");
     expect(a.residualRisks.some((x) => x.criteriaId === "1.4.3")).toBe(true);
     expect(a.findings.length).toBe(0); // the static engine invents nothing here
@@ -31,7 +34,7 @@ describe("e2e: dynamic-tier delta — the static engine leaves the rendered-only
 
   it("fixed-width-reflow leaves 1.4.10 manual (no static NC, no FP)", () => {
     const r = runCli(["audit", FIX.fixedWidthReflow, "--json"]);
-    const a = JSON.parse(r.stdout) as Audit;
+    const a = core(JSON.parse(r.stdout));
     expect(statusOf(a, "1.4.10")).toBe("manual");
     expect(a.residualRisks.some((x) => x.criteriaId === "1.4.10")).toBe(true);
     expect(a.findings.length).toBe(0);
@@ -46,11 +49,11 @@ describe("e2e: dynamic-tier delta — scan --merge upgrades the residual criteri
     // static base
     expect(runCli(["audit", FIX.contrastOverGradient, "--out", dir, "--json"]).code).toBe(0);
     const auditPath = join(dir, "audit-latest.json");
-    const before = JSON.parse(readFileSync(auditPath, "utf8")) as Audit;
+    const before = core(JSON.parse(readFileSync(auditPath, "utf8")));
     // scan + merge
     const scan = runCli(["scan", FIX.contrastOverGradient, "--merge", auditPath, "--out", dir]);
     expect(scan.code).toBe(0);
-    const after = JSON.parse(readFileSync(auditPath, "utf8")) as Audit;
+    const after = core(JSON.parse(readFileSync(auditPath, "utf8")));
 
     // 1.4.3 flips manual → NC…
     expect(statusOf(before, "1.4.3")).toBe("manual");
@@ -73,7 +76,7 @@ describe("e2e: dynamic-tier delta — scan --merge upgrades the residual criteri
     expect(runCli(["audit", FIX.fixedWidthReflow, "--out", dir, "--json"]).code).toBe(0);
     const auditPath = join(dir, "audit-latest.json");
     expect(runCli(["scan", FIX.fixedWidthReflow, "--merge", auditPath, "--out", dir]).code).toBe(0);
-    const after = JSON.parse(readFileSync(auditPath, "utf8")) as Audit;
+    const after = core(JSON.parse(readFileSync(auditPath, "utf8")));
     expect(statusOf(after, "1.4.10")).toBe("NC");
   });
 });

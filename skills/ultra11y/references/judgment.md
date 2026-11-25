@@ -11,7 +11,7 @@ This phase makes each verdict defensible and recorded, never invented, never sil
 
 1. **Harvest the worklist** from the audit's cwd (harvesting re-reads the audited source files):
    ```
-   node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --in audit.json --manual --out .
+   node scripts/ultra11y.mjs verify --report audits/rgaa-YYYY-MM-DD.md --in audit.json --manual --out .
    ```
    writes an **ADJUDICATION worklist** — `ADJUDICATE.todo.json` + `ADJUDICATE.md`, one item per
    residual (`manual`) criterion, each **pre-loaded with the harvested evidence**: every image's
@@ -82,8 +82,8 @@ criteria the engine cannot decide):
 The same protocol is published as a standalone page, `references/adjudication.md`, generated
 from that dataset — read it when you want the whole picture rather than one worklist item.
 
-**It is keyed by WCAG success criterion, and under a country standard it is not the
-instrument.** A pack criterion has its own — see the next section. It is inherited through the
+**It is keyed by WCAG success criterion, and it is not the instrument.** An RGAA criterion
+has its own — see the next section. It is inherited through the
 crosswalk only by a pack criterion that carries none, and the brief says so when that happens:
 an SC routinely asks a broader question than the criterion mapped onto it.
 They are prompts, not verdicts: you still answer from the evidence and record
@@ -127,7 +127,7 @@ an anchor it was never shown is refused exactly as before.
 
 ## Adversarial verification of the claims — `verify --report`
 
-`node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --in audit.json` writes
+`node scripts/ultra11y.mjs verify --report audits/rgaa-YYYY-MM-DD.md --in audit.json` writes
 `VERIFY.md` + `VERIFY.todo.json`, one entry per detected non-conformity, each grounded in the
 **WCAG success criterion's W3C Understanding reference** + techniques — and one per
 agent-claimed `C`/`NA` (`kind: "c"`, carrying its `citations[]`). `VERIFY.todo.json` is a bare
@@ -150,7 +150,7 @@ conformities send their criterion back to « à évaluer » (never to NC), and `
 the ledger the same way — creating it, with a notice, if none exists yet. `--semantic` folds the
 support-check into the same pass.
 
-> For a country standard's own test grid, `criteria --standard rgaa <id>` shows the RGAA tests
+> For RGAA's own test grid, `criteria <id>` shows the RGAA tests
 > behind a WCAG SC. The pre-completion checklist stops you concluding too early. The rule that
 > never bends: no residual criterion reaches `C` without a recorded, gated justification.
 
@@ -201,7 +201,7 @@ Read/Grep/Glob/Edit/Write and no network (`--web` / `--no-web` override either w
 one and it is what decides; a page you fetched never contradicts it, never widens a test, and
 is never an acceptable `normativeRef` — only the references the brief lists are.
 
-Look a defined term up on its own with `criteria --standard rgaa --glossary <term>`.
+Look a defined term up on its own with `criteria --glossary <term>`.
 
 ## The fold, and who rules
 

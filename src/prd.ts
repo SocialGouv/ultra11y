@@ -58,7 +58,7 @@ const L = {
     techniques: "Techniques WCAG",
     toRuleOn: "Critères à trancher",
     toRuleOnNote:
-      "Le moteur ne peut pas les décider : ils relèvent du jugement ou du rendu. Ce ne sont PAS des non-conformités — ils sont indécidés. Générez la worklist (`verify --manual --standard <pack>`), qui porte l'énoncé complet de chaque test.",
+      "Le moteur ne peut pas les décider : ils relèvent du jugement ou du rendu. Ce ne sont PAS des non-conformités — ils sont indécidés. Générez la worklist (`verify --manual`), qui porte l'énoncé complet de chaque test.",
     tests: "tests",
     // « ancrés sur les intitulés WCAG » was both a cross-reference and, since the acceptance
     // criteria are generated from the pack's numbered tests, no longer true under a pack.
@@ -95,7 +95,7 @@ const L = {
     techniques: "WCAG techniques",
     toRuleOn: "Criteria to rule on",
     toRuleOnNote:
-      "The engine cannot decide these: they are judgment or rendering calls. They are NOT non-conformities — they are undecided. Generate the worklist (`verify --manual --standard <pack>`), which carries the full wording of every test.",
+      "The engine cannot decide these: they are judgment or rendering calls. They are NOT non-conformities — they are undecided. Generate the worklist (`verify --manual`), which carries the full wording of every test.",
     tests: "tests",
     docNote:
       "Product-requirements document generated from the static audit: one epic per theme, one user story per criterion, acceptance criteria anchored to the active standard's own test wording. Adjudicate the “to assess” criteria with `verify --manual` (AI agent, gated), rendering via `scan`.",

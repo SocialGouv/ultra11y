@@ -72,7 +72,7 @@
     "check:adjudication": "node scripts/build-adjudication.mjs --check",
     "build:site": "node scripts/build-site.mjs",
     "check:site": "node scripts/build-site.mjs --check",
-    "demo": "node scripts/ultra11y.mjs audit tests/fixtures/non-conforming/bad.html --out /tmp/ultra11y-demo --json > /dev/null && node scripts/ultra11y.mjs report --in /tmp/ultra11y-demo/audit-latest.json --out /tmp/ultra11y-demo && node scripts/ultra11y.mjs check --report /tmp/ultra11y-demo/wcag-*.md && node scripts/ultra11y.mjs criteria --list",
+    "demo": "node scripts/ultra11y.mjs audit tests/fixtures/non-conforming/bad.html --out /tmp/ultra11y-demo --json > /dev/null && node scripts/ultra11y.mjs report --in /tmp/ultra11y-demo/audit-latest.json --out /tmp/ultra11y-demo && node scripts/ultra11y.mjs check --report /tmp/ultra11y-demo/rgaa-*.md && node scripts/ultra11y.mjs criteria --list",
     "release": "semantic-release"
   },
   "license": "MIT",

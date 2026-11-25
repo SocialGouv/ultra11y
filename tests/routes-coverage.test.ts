@@ -14,6 +14,7 @@ import { ALL_ROUTES_MAX, readRoutes, routeCoverage, routePath, routesToScan, wri
 import { combineDynamic, mergeDynamic } from "../src/scan.js";
 import { PAGES_DIR, SNAPSHOT_VERSION, writeSnapshot } from "../src/snapshot.js";
 import type { DynamicResult } from "../src/types.js";
+import { unwrapAudit } from "../src/standards/document.js";
 
 const DOM = (title: string) =>
   `<!DOCTYPE html><html lang="fr"><head><title>${title}</title></head><body><main><h1>${title}</h1><p>Texte.</p></main></body></html>`;
@@ -140,7 +141,7 @@ describe("the annex lists every route and the axe-core that ran", () => {
       process.chdir(cwd);
     }
     expect(code).toBe(0);
-    const audit = JSON.parse(out.join("\n"));
+    const audit = unwrapAudit(JSON.parse(out.join("\n")));
     expect(audit.scope.axe).toEqual([{ version: "4.13.0", origin: "ultra11y", runner: "playwright,scan" }]);
     const obs = Object.fromEntries(audit.scope.routes.map((r: { path: string; observed: string }) => [r.path, r.observed]));
     expect(obs).toEqual({ "/": "captured", "/tarifs": "scanned", "/contact": "not-reached", "/plan": "not-reached" });

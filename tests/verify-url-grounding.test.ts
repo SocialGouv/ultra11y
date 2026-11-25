@@ -50,7 +50,7 @@ describe("verify --apply --prune — a trial of a rendered audit accepts its own
   const report = join(dir, "report.md");
   writeFileSync(
     report,
-    `# Report\n- **Rate** : 10%\n## 1. s\n## 2. NC\n**Success criterion** : 1.1.1 — Non-text Content\n- [ ] \`${URL_FILE}:3\` (\`img\`) — image without a text alternative\n## 3. x\n## 4. NA\n## 5. manual\n`,
+    `# Report\n- **Rate** : 10%\n## 1. s\n## 2. NC\n**Critère** : 1.1 — Chaque image porteuse d’information a-t-elle une alternative textuelle ?\n- [ ] \`${URL_FILE}:3\` (\`img\`) — image without a text alternative\n## 3. x\n## 4. NA\n## 5. manual\n`,
   );
 
   it("grounds the retained claim and exits 0", async () => {

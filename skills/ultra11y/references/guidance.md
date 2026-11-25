@@ -24,21 +24,20 @@ A guidance dataset is JSON: `{ pack, source, license, attribution, entries[] }`,
 each entry is `{ id, criterionId, wcag[], title, summary, impact?, examples[], reference }`
 and an example is `{ lang: "html"|"jsx"|"css", bad?, good?, note? }`. Two ship built in:
 `src/data/guidance/rgaa.json` (93 entries, ids mirroring the SocialGouv rule files) and
-`src/data/guidance/wcag.json` (the WCAG-keyed set). Load external guidance with
-`--pack <dir>` (a `guidance.json` beside `pack.json`) or a `.ultra11yrc.json` `guidance`
-list. `pack check --guidance` validates that every entry resolves to a real criterion,
-maps to recognized WCAG SCs, and that every example parses.
+`src/data/guidance/wcag.json` (the WCAG-keyed set, reached through each RGAA criterion's
+WCAG mapping). A `.ultra11yrc.json` `guidance` list adds project guidance; the same gate
+(`src/pack.ts`) validates that every entry resolves to a real RGAA criterion, maps to
+recognized WCAG SCs, and that every example parses.
 
-## Inheritance — why a new country pack is useful on day one
+## Inheritance — guidance through the WCAG mapping
 
 Every entry declares the WCAG success criteria it implements, and a lookup walks **every**
-registered dataset. So a pack that ships no guidance of its own still gets examples, through
-the criteria it maps onto — a freshly authored Section 508 or EN 301 549 pack inherits the
-whole corpus the moment its `wcag[]` mappings exist.
+registered dataset. So an RGAA criterion with no RGAA entry of its own still gets examples,
+through the WCAG criteria it maps onto.
 
 Resolution order (first wins, deduped by entry id):
 
-1. the pack's own entry for that criterion → `via: "pack"`, `inherited: false`
+1. the RGAA entry for that criterion → `via: "pack"`, `inherited: false`
 2. every entry keyed to each WCAG SC the criterion maps to, in the pack's own SC order →
    `via: "wcag:<sc>"`, `inherited: true`
 
@@ -93,7 +92,7 @@ The headline example: **opening a new window** (`target="_blank"` without warnin
 only clean WCAG home is **3.2.5 Change on Request — which is AAA, absent from the AA
 core** (the dataset jumps 3.2.4 → 3.2.6). So ultra11y does **not** ship a WCAG-core
 detector for it — no static rule flags `target="_blank"` under any standard. It ships as
-RGAA guidance (criterion 13.2 → WCAG 3.2.1): look it up with `criteria --standard rgaa 13.2`,
+RGAA guidance (criterion 13.2 → WCAG 3.2.1): look it up with `criteria 13.2`,
 and it attaches to the relevant `prd`/`report` entry — it is never raised as an audit
 non-conformity, and never force-mapped onto a wrong AA criterion. (`--standard` is a
 `report`/`prd`/`criteria` flag, not an `audit` one.) Judgment- and

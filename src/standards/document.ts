@@ -99,8 +99,18 @@ export function packCriterionLabel(pack: StandardPack, f: Finding): string | nul
  *  existing consumer of that field keeps working, and `criteriaIds` carries the rest: one
  *  missing landmark is RGAA 9.2 AND 12.6, and dropping either would understate the grid. */
 function packFinding(f: Finding, ids: string[]): PackFinding {
-  const { criteriaId: _sc, ...rest } = f;
-  return { ...rest, criteriaId: ids[0] as string, criteriaIds: ids };
+  const { criteriaId: sc, ...rest } = f;
+  return { ...rest, criteriaId: ids[0] as string, criteriaIds: ids, ...(sc && !ids.includes(sc) ? { wcag: sc } : {}) };
+}
+
+/** The one way a finding's criterion is NAMED to a user: the pack criteria first, the WCAG
+ *  success criterion only as the discreet mapping — « RGAA 1.1 (WCAG 1.1.1) ». A finding
+ *  belonging to no criterion of the standard falls back to its bare WCAG id, so it is never
+ *  silently unnamed. */
+export function packRefLabel(pack: StandardPack, f: Finding): string {
+  const ids = packCriteriaOf(pack, f);
+  if (!ids.length) return `WCAG ${f.criteriaId}`;
+  return ids.includes(f.criteriaId) ? `${pack.name} ${ids.join(", ")}` : `${pack.name} ${ids.join(", ")} (WCAG ${f.criteriaId})`;
 }
 
 /**

@@ -7,6 +7,7 @@ import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DynamicResult } from "../src/types.js";
+import { unwrapAudit } from "../src/standards/document.js";
 
 const FIX = new URL("./fixtures/", import.meta.url).pathname;
 
@@ -49,7 +50,7 @@ describe("scan --merge — language resolved from the merged audit BEFORE baking
       const auditPath = join(tmp, "audit-latest.json");
       const code = await main(["scan", "https://exemple.fr", "--merge", auditPath, "--out", tmp]);
       expect(code).toBe(0);
-      const merged = JSON.parse(readFileSync(join(tmp, "audit-latest.json"), "utf8"));
+      const merged = unwrapAudit(JSON.parse(readFileSync(join(tmp, "audit-latest.json"), "utf8")));
       const reflow = merged.findings.find((f: { ruleId: string }) => f.ruleId === "dyn-reflow");
       expect(reflow).toBeTruthy();
       // The mocked runner always returns an English-baked DynamicFinding.message; what THIS
@@ -67,7 +68,7 @@ describe("scan --merge — language resolved from the merged audit BEFORE baking
       const auditPath = join(tmp, "audit-latest.json");
       const code = await main(["scan", "https://exemple.fr", "--merge", auditPath, "--out", tmp, "--lang", "en"]);
       expect(code).toBe(0);
-      const merged = JSON.parse(readFileSync(join(tmp, "audit-latest.json"), "utf8"));
+      const merged = unwrapAudit(JSON.parse(readFileSync(join(tmp, "audit-latest.json"), "utf8")));
       const reflow = merged.findings.find((f: { ruleId: string }) => f.ruleId === "dyn-reflow");
       expect(reflow.remediation).toBe("Verified at render time by axe-core; fix the cited element.");
     } finally {
@@ -75,16 +76,16 @@ describe("scan --merge — language resolved from the merged audit BEFORE baking
     }
   });
 
-  it("no repo-language signal (bad.html has no <html lang>) falls back to English, as before", async () => {
+  it("no repo-language signal (bad.html has no <html lang>) falls back to RGAA's own locale, French", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "u11y-scan-merge-lang-none-"));
     try {
       await main(["audit", `${FIX}non-conforming/bad.html`, "--out", tmp, "--json"]);
       const auditPath = join(tmp, "audit-latest.json");
       const code = await main(["scan", "https://exemple.fr", "--merge", auditPath, "--out", tmp]);
       expect(code).toBe(0);
-      const merged = JSON.parse(readFileSync(join(tmp, "audit-latest.json"), "utf8"));
+      const merged = unwrapAudit(JSON.parse(readFileSync(join(tmp, "audit-latest.json"), "utf8")));
       const reflow = merged.findings.find((f: { ruleId: string }) => f.ruleId === "dyn-reflow");
-      expect(reflow.remediation).toBe("Verified at render time by axe-core; fix the cited element.");
+      expect(reflow.remediation).toBe("Vérifié au rendu par axe-core ; corrigez l'élément cité.");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

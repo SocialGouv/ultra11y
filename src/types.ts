@@ -1288,4 +1288,8 @@ export type PackFinding = Omit<Finding, "criteriaId"> & {
   criteriaId: string;
   /** Every pack criterion this finding fires on; `criteriaId` is the first of them. */
   criteriaIds: string[];
+  /** The WCAG success criterion the engine keyed the finding on — the mapping the pack
+   *  criterion cites, only ever shown beside it (« RGAA 1.1 (WCAG 1.1.1) »). Absent when the
+   *  finding was already keyed on a pack criterion. */
+  wcag?: string;
 };

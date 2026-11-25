@@ -48,7 +48,7 @@ describe("e2e: fix", () => {
 });
 
 describe("e2e: report/prd default output (temp cwd)", () => {
-  it("report with no --out writes audits/wcag-*.md under the working dir", () => {
+  it("report with no --out writes audits/rgaa-*.md under the working dir", () => {
     const dir = mkTmp();
     const auditFile = join(dir, "audit.json");
     writeFileSync(auditFile, runCli(["audit", FIX.bad, "--json"]).stdout);
@@ -56,7 +56,7 @@ describe("e2e: report/prd default output (temp cwd)", () => {
     expect(r.code).toBe(0);
     const audits = join(dir, "audits");
     expect(existsSync(audits)).toBe(true);
-    expect(readdirSync(audits).some((f) => /^wcag-\d{4}-\d{2}-\d{2}\.md$/.test(f))).toBe(true);
+    expect(readdirSync(audits).some((f) => /^rgaa-\d{4}-\d{2}-\d{2}\.md$/.test(f))).toBe(true);
   });
 
   it("prd writes a dated backlog document into --out", () => {

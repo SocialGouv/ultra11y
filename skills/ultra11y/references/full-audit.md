@@ -26,9 +26,9 @@ The completion criterion is a **defensible deliverable**, not merely a clean sta
 
 ## 1. Establish the scope
 
-Read `.ultra11yrc.json` when present. Confirm the standard, language and page sample. For a
-country standard, prefer `sample check` plus `scan --sample`; otherwise crawl without a hidden
-cap (`--max 0`). A source-only country-standard report is partial and must say so. The `sample`
+Read `.ultra11yrc.json` when present. Confirm the language and page sample (the standard is
+always RGAA 4.1.2). Prefer `sample check` plus `scan --sample`; otherwise crawl without a hidden
+cap (`--max 0`). A source-only report is partial and must say so. The `sample`
 block of `.ultra11yrc.json` and the PDF document checks are described in `references/audit.md`.
 
 **Start from the application's routes, not only the sample.** Record the route inventory
@@ -131,8 +131,7 @@ tags, whatever version the project installs. The annex names the version that ra
 « copie du projet audité », ultra11y's own copy could not be resolved; reinstall ultra11y with
 its dependencies before you publish.
 
-What the scan does with a rendering criterion depends on the standard. Under the WCAG core a
-clean scan concludes `C` (`decidedBy: "scan"`). **Under RGAA it does not**: 3.2, 3.3, 10.4,
+**A clean scan never concludes `C` on a rendering criterion**: 3.2, 3.3, 10.4,
 10.11, 10.12, 12.9 and the other rendering criteria carry only *candidate* scan rules, so the
 scan can raise their non-conformities but a clean run leaves them « à évaluer » — they come to
 you in step 3, and `check --require-decided` counts 0 « mesure (scan) » for them. That is

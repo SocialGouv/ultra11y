@@ -341,8 +341,7 @@ smaller one. The evidence is `scope.pagesAudited`, written beside `scope.pages` 
 switches itself off exactly when it matters). An audit written before that field existed leaves
 it undefined, is read as "unknown", and keeps its recorded basis.
 
-**A rate over nothing is not a rate.** Under the WCAG core the per-page rate is `C ÷ (C + NC)`
-over the criteria that page decided. Under a country standard it is the RGAA page formula,
+**A rate over nothing is not a rate.** The per-page rate is the RGAA page formula,
 conforming ÷ (conforming + non-conforming): a criterion with no subject on the page leaves it,
 and so does one still to assess — those are counted beside the rate, which is marked provisional
 while any remain: `96 % (70/73) · provisional, 9 to assess`. It is **null** when nothing was

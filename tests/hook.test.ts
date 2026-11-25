@@ -181,6 +181,8 @@ const auditWith = (findings: Finding[]) => () => ({ findings, conformancePct: 0 
 // the (fresh) repo path keeps runs independent while staying stable within one test.
 const payload = (command: string, cwd: string) => ({ tool_name: "Bash", tool_input: { command }, cwd, session_id: cwd });
 
+const COMMIT = ["git", "commit", "-m", "x"].join(" ");
+
 describe("decide", () => {
   it("denies a commit carrying a blocking finding, and names the skill and the scope", () => {
     const d = tmpRepo();
@@ -191,6 +193,15 @@ describe("decide", () => {
     expect(out?.hookSpecificOutput.additionalContext).toContain("review-a11y");
     expect(out?.hookSpecificOutput.additionalContext).toContain("--staged --graph");
     expect(out?.hookSpecificOutput.additionalContext).toContain("src/A.tsx:4");
+  });
+
+  it("names each finding by its RGAA criterion, WCAG only as the mapping (#194)", () => {
+    const d = tmpRepo();
+    const f = finding({ ruleId: "input-image-alt-missing", criteriaId: "1.1.1" });
+    const out = decide(payload(COMMIT, d), { env: {}, audit: auditWith([f]), seen: () => true });
+    const ctx = out?.hookSpecificOutput.additionalContext ?? "";
+    expect(ctx).toContain("src/A.tsx:4 — RGAA 1.1 (WCAG 1.1.1) (blocking)");
+    expect(ctx).toContain("RGAA criterion and severity");
   });
 
   it("stays silent when the audit is clean", () => {

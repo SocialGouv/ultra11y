@@ -56,11 +56,14 @@ describe("report --json carries the rate the pack report prints (#116)", () => {
     expect(cliReport("--standard", "RGAA").standard).toBe("rgaa");
   });
 
-  it("keeps the WCAG core rate for a core report, without pack operands", () => {
+  it("is the RGAA rate by default: no flag, the same numbers as --standard rgaa (#194)", () => {
     const j = cliReport();
-    expect(j.standard).toBe("wcag");
-    expect(j.conformancePct).toBe(audit.conformancePct);
-    expect(j.conformance).toBeUndefined();
-    expect(j.automatic).toBeUndefined();
+    expect(j.standard).toBe("rgaa");
+    expect(j.conformancePct).toBe(expected.conformance.pct);
+    expect(j.conformance).toEqual(expected.conformance);
+  });
+
+  it("never publishes a WCAG rate: --standard wcag exits 2", () => {
+    expect(() => cliReport("--standard", "wcag")).toThrow();
   });
 });

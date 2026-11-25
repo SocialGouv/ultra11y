@@ -826,7 +826,7 @@ describe("scan downloads the same-origin PDFs a captured page links to", () => {
     ).toBe(false);
 
     const merged = JSON.parse(readFileSync(join(work, "audits", "audit-latest.json"), "utf8"));
-    const audit = merged.audit ?? merged;
+    const audit = merged.core ?? merged.audit ?? merged; // the RGAA document carries the engine result under `core`
     expect(audit.documents).toHaveLength(1);
     expect(audit.documents[0]).toMatchObject({ url: `${siteOrigin}/docs/recepisse.pdf`, tagged: false });
     const ids = new Set((audit.documentFindings ?? []).map((f: { ruleId: string }) => f.ruleId));

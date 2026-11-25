@@ -110,16 +110,9 @@ findings raised on the source code land on their page too; a page list is marked
 only when the defect sits in a source several pages declare, because such a finding is
 attributed to the first one.
 
-## Worldwide: WCAG core, country standards as packs
+## RGAA 4.1.2, with WCAG as its mapping
 
-WCAG 2.2 Level AA is the engine's canonical key — the worldwide standard. A country
-standard (France's RGAA, the US Section 508, the EU's EN 301 549) is a pluggable in-repo
-**pack** that maps its criteria onto WCAG success criteria; `report --standard rgaa` (and
-`criteria`/`check`/`verify`/`prd --standard <pack>`) re-key the deliverable for that
-standard (`rgaa-YYYY-MM-DD.md`). The WCAG report is the canonical, gated one; a pack report
-is a derived view. See `references/standards.md`.
-
-**International equivalence (version-accurate)**: Section 508 incorporates WCAG 2.0 AA;
-EN 301 549 v3.2.1 references WCAG 2.1 and v4 references WCAG 2.2; AODA references WCAG 2.0
-AA. A WCAG 2.2 AA audit therefore covers these standards' web requirements at their
-respective WCAG versions.
+Every deliverable (`report` → `rgaa-YYYY-MM-DD.md`, `pages`, `prd`, `tickets`, `check`,
+`verify`) is RGAA 4.1.2: the default and only standard. WCAG 2.2 Level AA is the engine's
+internal key, and reaches a reader only as the mapping each RGAA criterion cites
+(« RGAA 1.1 (WCAG 1.1.1) »). See `references/standards.md`.

@@ -5,7 +5,7 @@ Two assurance levels before shipping a report, plus the agent-adjudication workl
 ## `check` — structural integrity
 
 ```
-node scripts/ultra11y.mjs check --report audits/wcag-YYYY-MM-DD.md
+node scripts/ultra11y.mjs check --report audits/rgaa-YYYY-MM-DD.md
 ```
 Pass the report itself; the technical annex it links to (`annexe-technique-…md` /
 `technical-annex-…md`, same directory) is read with it, and a missing annex is refused (exit 2).
@@ -18,7 +18,7 @@ id grammar/registry is validated.
 ### Semantic gate — `check --report … --semantic`
 
 ```
-node scripts/ultra11y.mjs check --report audits/wcag-YYYY-MM-DD.md --semantic [--verdicts VERIFY.todo.json]
+node scripts/ultra11y.mjs check --report audits/rgaa-YYYY-MM-DD.md --semantic [--verdicts VERIFY.todo.json]
 ```
 Fails **closed** if there is no adjudicated verdicts artifact (never green-but-inactive),
 re-runs the **uncapped** coverage check, and re-grounds every passing verdict against the cited
@@ -38,7 +38,7 @@ RGAA applicability gate, so a pack report can neither drop nor invent a criterio
 ## `verify` — adversarial verification of non-conformities
 
 ```
-node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --semantic
+node scripts/ultra11y.mjs verify --report audits/rgaa-YYYY-MM-DD.md --semantic
 ```
 Generates a **worklist** `VERIFY.md` + `VERIFY.todo.json`: one entry per non-conformity
 (criterion ↔ `file:line` ↔ cited claim), and — by default — one per agent-claimed conformity or
@@ -71,7 +71,7 @@ so an agent can fill verdicts in-memory). **Prioritise `preliminary` findings** 
 source, see `references/false-positives.md`): refute the ones the rendered DOM disproves.
 Then apply the gate:
 ```
-node scripts/ultra11y.mjs verify --apply VERIFY.todo.json --report audits/wcag-YYYY-MM-DD.md --in audit.json
+node scripts/ultra11y.mjs verify --apply VERIFY.todo.json --report audits/rgaa-YYYY-MM-DD.md --in audit.json
 ```
 The gate fails (non-zero) if any entry is `refuted`, `unsupported`, or unadjudicated. Every
 retained claim is also re-grounded against the cited source. A conformity is grounded the way
@@ -127,7 +127,7 @@ written: it is a report, `check --semantic` stays the gate.
 The **AI agent** decides the `manual` criteria itself, gated. Run from the audit's cwd
 (harvesting re-reads the audited source files):
 ```
-node scripts/ultra11y.mjs verify --report audits/wcag-YYYY-MM-DD.md --in audit.json --manual --out .
+node scripts/ultra11y.mjs verify --report audits/rgaa-YYYY-MM-DD.md --in audit.json --manual --out .
 ```
 This emits an **ADJUDICATION worklist** — `ADJUDICATE.todo.json` + `ADJUDICATE.md`, one item per
 residual criterion, pre-loaded with the engine's harvested evidence (every image's `alt`, every

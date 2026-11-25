@@ -39,14 +39,14 @@ Copier-coller dans une session fraîche, au racine du dépôt. Le moteur tourne 
 >    `--max-files 1` (log de troncature + `scope.truncated`, pas de drop silencieux) ;
 >    `--dedup exact|normalized|off` ; `--include`/`--exclude`/`--ext` ;
 >    **`--fail-on bloquant|majeur|mineur` doit gater l'audit seul (exit≠0)** ; `--lang en`.
-> 2. **report** — `--in audit.json` et `--in -` (stdin) ; `--out` ; défaut = WCAG
->    (`wcag-YYYY-MM-DD.md`) ; `--standard rgaa` (vue dérivée, doit différer,
->    `rgaa-YYYY-MM-DD.md`) ; `--standard nope` → exit 2 ; `--lang fr` ; 5 sections.
-> 3. **criteria** — `criteria 1.4.3` (SC WCAG) ; `--list` (par règle) ; core `--theme 1`
->    → erreur (exit 2) ; `--standard rgaa --theme 1` / `--standard rgaa 8.3` ; `--json` ;
->    `--lang fr` ; `criteria 9.9.9` → erreur propre ; `--standard rgaa --plan` (106 critères
+> 2. **report** — `--in audit.json` et `--in -` (stdin) ; `--out` ; défaut = RGAA
+>    (`rgaa-YYYY-MM-DD.md`, identique avec `--standard rgaa`) ; `--standard wcag` → exit 2
+>    (nomme RGAA) ; `--standard nope` → exit 2 ; `--lang en` ; 5 sections.
+> 3. **criteria** — `criteria 8.3` (critère RGAA) ; `criteria 1.4.3` (cible WCAG de la
+>    correspondance) ; `--list` / `--theme 1` (thématiques RGAA) ; `--json` ;
+>    `--lang en` ; `criteria 9.9.9` → erreur propre ; `--plan` (106 critères
 >    répartis par palier de preuve).
-> 4. **check** — rapport valide → exit 0 ; critère inventé (`9.9.9`) → exit 1 ;
+> 4. **check** — rapport valide → exit 0 ; critère inventé (`9.99`) → exit 1 ;
 >    **taux de conformité hors [0..100] (ex. `999 %`) → exit 1** ; `--quiet` ; `--json`.
 > 5. **verify** — `--report` génère `VERIFY.md` + `VERIFY.todo.json` ; `--max-verify N`
 >    (cap) — **valeur non numérique → exit 2** ; `--semantic` ; `--apply` : verdict

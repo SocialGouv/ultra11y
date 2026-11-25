@@ -121,10 +121,9 @@ import {
 import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
 import { crawlBound, crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
-import { resolveStandard, getPack, isCore, loadPack, findingsForStandard, type StandardId } from "./standards/index.js";
+import { CORE_KEY, derivePackResults, resolveStandard, getPack, isCore, loadPack, findingsForStandard, type StandardId } from "./standards/index.js";
 import { auditDocumentFor, packAuditDocument, unwrapAudit } from "./standards/document.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
-import { runPackCheck, packScaffold } from "./pack.js";
 import { buildManifest, listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
 import { buildTrialSummary, formatTrialSummary } from "./trial-summary.js";
 import { readStdin, readText, today } from "./util.js";
@@ -133,32 +132,32 @@ import { JOURNEY_ENGINE, runJourneys } from "./journey-run.js";
 import type { RenderSignals } from "./types.js";
 
 const HELP = `ultra11y v${VERSION}
-Audit a site against RGAA 4.1.2, the French State's accessibility standard, on a
-WCAG 2.2 AA core, and produce a dated conformance report, or author/review accessible
-markup (native-HTML-first). A deterministic, install-free static engine plus your
-judgment, with check/verify gates against hallucinated non-conformities: nothing is
-declared conforming that was not verified. --standard rgaa selects the RGAA pack;
-WCAG is the worldwide core, other country standards are pluggable packs.
+Audit a site against RGAA 4.1.2, the French State's accessibility standard, and
+produce a dated conformance report, or author/review accessible markup
+(native-HTML-first). A deterministic, install-free static engine plus your judgment,
+with check/verify gates against hallucinated non-conformities: nothing is declared
+conforming that was not verified. Every output speaks RGAA 4.1.2; WCAG appears only
+as the mapping each RGAA criterion cites (« RGAA 1.1 (WCAG 1.1.1) »).
 
 Usage:
   ultra11y audit    <globs… | -> [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
   ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--fail-on blocking|major|minor]
   ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (rendered-DOM captures + .ultra11y/pages snapshots: audit real HTML)
   ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor]   (re-gate an audit already computed — e.g. one carrying adjudicated verdicts — without a second detection pass)
-  ultra11y report   --in <audit.json> [--out <dir>] [--standard <pack>] [--lang auto|en|fr]
+  ultra11y report   --in <audit.json> [--out <dir>] [--standard rgaa] [--lang auto|en|fr]
   ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (the Markdown report, illustrated with annotated crops)
   ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
-  ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--no-technical] [--standard <pack>] [--lang auto|en|fr]
+  ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--no-technical] [--standard rgaa] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
-  ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard <pack>] [--no-technical] [--lang auto|en|fr]
+  ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard rgaa] [--no-technical] [--lang auto|en|fr]
   ultra11y render   [<dir>] [--transpiler esbuild|typescript|sucrase] [--timeout <ms>] [--include <glob>] [--exclude <glob>] [--no-stories] [--json]   (ultra11y's render engine: components, pages, stories → .ultra11y/captures + .ultra11y/render.json)
   ultra11y render   [<dir>] --detect | --coverage | --storybook [--captures <dir>] [--json] [--lang auto|en|fr]
-  ultra11y criteria [<sc>] [--list] [--standard <pack> [--theme <N>]] [--generate] [--json] [--lang auto|en|fr]
-  ultra11y criteria --standard <pack> --glossary [<term>]   (the terms the standard DEFINES — its tests depend on them)
-  ultra11y criteria [--standard <pack>] --plan [--json]   (the work plan: which criteria the engine settles from source, which need a page, a browser, or judgment)
-  ultra11y check    --report <md> [--standard <pack>] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
-  ultra11y check    --in <audit.json> --require-decided [--standard <pack>] [--allow-undecided <file>]   (fail while any criterion is still « to assess »)
-  ultra11y verify   --report <md> [--standard <pack>] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
+  ultra11y criteria [<sc>] [--list] [--standard rgaa] [--theme <N>] [--generate] [--json] [--lang auto|en|fr]
+  ultra11y criteria --glossary [<term>]   (the terms the standard DEFINES — its tests depend on them)
+  ultra11y criteria [--standard rgaa] --plan [--json]   (the work plan: which criteria the engine settles from source, which need a page, a browser, or judgment)
+  ultra11y check    --report <md> [--standard rgaa] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
+  ultra11y check    --in <audit.json> --require-decided [--standard rgaa] [--allow-undecided <file>]   (fail while any criterion is still « to assess »)
+  ultra11y verify   --report <md> [--standard rgaa] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
   ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --no-conformities]   (also put the claimed CONFORMITIES on trial — on by default when a ledger exists)
   ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (adjudicate the manual criteria)
   ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (fold the adjudication into the audit)
@@ -168,16 +167,15 @@ Usage:
   ultra11y orchestrate --run <dir> --manifest [--json]   (the loop as data: each step's command/argv, inputs, outputs, exit contract, next step — for any orchestrator)
   ultra11y fix      <globs… | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
   ultra11y init     [--hook] [--fail-on blocking|major|minor]
-  ultra11y pack     check <pack.json> [--guidance <g.json>] [--json]  |  pack scaffold
   ultra11y scan     <url|file…> [--cwd <dir>] [--browser-path <file>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--all-routes [--max-routes <n>]] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample, then the rest of the route inventory)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
   ultra11y journey  run [<name>… | --all] [--keyboard] [--base-url <url>] [--storage-state <file>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--out <dir>] [--json]   (replay .ultra11y/journeys/<name>.json with axe + keyboard checks)
   ultra11y journey  list [--root <dir>] [--json]
-  ultra11y sample   check [--standard <pack>] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
+  ultra11y sample   check [--standard rgaa] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
   ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (payload on stdin → .ultra11y/pages/<id>/ + audit it)
   ultra11y snapshot list  [--root <dir>] [--json]
-  ultra11y pages    --in <audit.json> [--standard <pack>] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
+  ultra11y pages    --in <audit.json> [--standard rgaa] [--json [--out <dir>]] [--lang auto|en|fr]   (the per-page criterion grid; --json --out also writes <dir>/pages.json)
   ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (the per-page report, with screenshots)
   ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (annotated crops of each non-conformity, and the HTML site)
   ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--propose [--sample-size <n>] [--search-query <q>]] [--write | --routes-only] [--json]   (build the page sample and the route inventory)
@@ -188,21 +186,18 @@ Usage:
 
 Commands:
   audit      Run the static engine over the inputs (files/globs, or '-' for stdin)
-             and emit an AuditResult JSON keyed by WCAG 2.2 success criteria
+             and emit the RGAA 4.1.2 audit JSON, keyed by RGAA criterion
              (consumed by 'report'). Without --json, prints a summary in --lang
              (default auto: repo <html lang> → the active standard's default locale
              → English). The engine decides the machine-detectable criteria; the AI
              agent adjudicates the judgment ones (verify --manual, gated) and the
              scan tier decides the needs-rendering ones.
-  report     Render an AuditResult into a dated WCAG 2.2 AA compliance report
-             (audits/wcag-YYYY-MM-DD.md): metadata, per-guideline synthesis table,
+  report     Render an audit into a dated RGAA 4.1.2 conformance report
+             (audits/rgaa-YYYY-MM-DD.md): metadata, per-theme synthesis table,
              non-conformities by priority, conforming + not-applicable lists.
-             --standard <pack> writes a derived report for a country standard
-             (e.g. --standard rgaa → audits/rgaa-YYYY-MM-DD.md).
   prd        Turn an AuditResult into an AUDITOR conformance backlog
              (audits/prd-YYYY-MM-DD.md), one entry per criterion rendered with the
-             active standard's vocabulary (RGAA "Thématique/Critère/Test", WCAG core
-             "Principle·Guideline/Success criterion/Technique") — theme, criterion +
+             RGAA vocabulary ("Thématique/Critère/Test") — theme, criterion +
              official wording, test(s), WCAG mapping + level, finding, expected state,
              verification. --split criterion writes one file per criterion.
              It writes MARKDOWN only — filing tickets is the 'tickets' command.
@@ -232,10 +227,10 @@ Commands:
              To check a PAGE during an existing Playwright/Cypress run, use the
              ultra11y/playwright or ultra11y/cypress package exports. Then audit, and
              use scan for the needs-rendering criteria.
-  criteria   Look up the reference offline. Core: one WCAG success criterion
-             (criteria 1.4.3) or the full list grouped by guideline (--list).
-             --standard <pack>: a pack criterion, a pack theme (--theme N), or its
-             theme list. Carries the WCAG↔pack cross-refs + automatability class.
+  criteria   Look up the RGAA 4.1.2 reference offline: one criterion (criteria 1.1),
+             a theme (--theme N), or the theme list. Carries the WCAG mapping each
+             criterion cites + automatability class; a WCAG success-criterion id
+             (criteria 1.4.3) prints that mapping target.
              --glossary [<term>] looks up a term the standard DEFINES (RGAA ships
              119). These definitions are normative — what "if necessary" or
              "relevant" mean in a test is decided there — and the adjudication
@@ -278,12 +273,6 @@ Commands:
              index blobs, auto-applies safe fixes (fix --staged --write --safe) and
              re-stages them, blocking only on issues that need judgment. CI is not
              wired here: it runs through iterion's rgaa-audit bot.
-  pack       Author/verify a runtime standards pack. 'pack check <pack.json>
-             [--guidance <g.json>]' runs the validator + guidance gate (every
-             criterion maps to well-formed WCAG SCs, every guidance entry resolves to
-             a real criterion, every code example parses) — the anti-hallucination
-             gate for AI-ingested packs. 'pack scaffold' prints a blank pack to fill.
-             Load packs at audit/report time with --pack (or .ultra11yrc.json).
   scan       OPTIONAL dynamic tier: run axe-core in a headless browser to decide the
              needs-rendering criteria the static engine can't — computed contrast
              (1.4.3), 320px reflow (1.4.10) — over a URL or HTML file. It runs on the
@@ -343,7 +332,7 @@ Commands:
              SKIP_A11Y=1. Called by hooks/pre-tool-use.mjs, not by hand.
   pages      The per-page criterion grid — RGAA is a per-page norm, the engine's
              verdict is scope-wide, and this bridges the two. One row per criterion
-             (the pack's own under --standard), one column per page URL. Rebuilt from a
+             (RGAA's), one column per page URL. Rebuilt from a
              committed audit.json alone: no snapshots on disk, no browser.
              Two honesty rules: a finding is attributed to a page only when something
              SAYS so (the snapshot it was raised on, the scanned URL, the sample page
@@ -372,13 +361,8 @@ Options:
   --staged           audit/fix: only STAGED files, read from the index blob (exact commit snapshot; wins over --changed)
   --max-files <n>    audit: cap canonical files audited (logged truncation, no silent drop)
   --dedup <mode>     audit: collapse identical files — exact|normalized|off  (default: exact)
-  --standard <pack>  report/prd/criteria/check/verify: WCAG core (default) or a pack
-                     key (rgaa, …); contribute a country via a pack (see CONTRIBUTING.md)
-  --pack <paths>     load external standards pack(s) at runtime (no rebuild): a pack JSON
-                     file, or a dir with pack.json (+ glossary.json/guidance.json);
-                     comma-separated, validated before use (see references/packs.md)
-  --override         --pack: allow a runtime pack key to replace a built-in/loaded standard
-  --guidance <file>  pack check: the guidance dataset JSON to gate alongside the pack
+  --standard rgaa    RGAA 4.1.2, the default and only standard (accepted for scripts that
+                     pass it explicitly; --standard wcag was removed and exits 2)
   --format <mode>    prd: 'audit' (default) emits the auditor conformance block (per
                      the active standard's vocabulary) for the backlog AND GitHub issues;
                      'doc' emits a product-requirements document (epics, user stories,
@@ -421,11 +405,11 @@ Options:
   --fail-on <sev>    audit/init/snapshot: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
   --hook             init: write a git pre-commit accessibility gate (staged snapshot + auto-fix by default)
   --report <file>    check/verify: the report markdown to gate
-  --theme <N>        criteria: with --standard <pack>, list the pack's theme N
+  --theme <N>        criteria: list RGAA theme N
   --plan             criteria: the work plan — criteria per evidence tier (source,
                      cross-file, rendered-page, browser, judgment, out-of-scope)
-  --list             criteria: print the WCAG success criteria grouped by guideline
-  --generate         criteria: emit the bundled references/criteria.md (WCAG 2.2 AA)
+  --list             criteria: print the RGAA themes
+  --generate         criteria: emit the bundled references/criteria.md (the WCAG mapping table)
   --apply <file>     verify: reduce a filled verdicts file to a pass/fail gate
                      (requires --report — coverage is re-derived from the report, uncapped)
                      Also accepts an ADJUDICATION (--in <audit.json>), or a VERDICT LEDGER,
@@ -609,7 +593,6 @@ export const COMMANDS = [
   "pages",
   "fix",
   "init",
-  "pack",
   "orchestrate",
   "hook",
   "install",
@@ -674,13 +657,11 @@ const VALUE_FLAGS = new Set([
   "conformities",
   "fail-on",
   "split",
-  "pack",
   "format",
   // Bytes of image data the single-file HTML report may carry inline (src/html-emit.ts).
   "inline-budget",
   // Hard cap on the crops one run writes (src/evidence.ts `DEFAULT_CAPS.total`).
   "evidence-max",
-  "guidance",
   "runtime",
   "cwd",
   // `scan` / `status --browser`: an explicit browser executable (a distribution's Chromium),
@@ -763,7 +744,6 @@ const BOOLEAN_FLAGS = new Set([
   // on is a gate that does not run.
   "no-conformities",
   "no-technical",
-  "override",
   // `scan --local`: alias of `--runtime local`, the only runtime — accepted, changes nothing.
   "local",
   "no-interact",
@@ -1769,7 +1749,7 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
   // was raised on — never stamped on the finding, because a rectangle in pixels is a property
   // of the image and goes silently wrong the moment the audit is re-rendered against another
   // capture. `writeEvidence` reports what it could NOT draw, and that refusal is printed.
-  const manifest = wantEvidence ? writeEvidence(result, { outDir, ...evidenceCapsOf(p) }) : undefined;
+  const manifest = wantEvidence ? writeEvidence(evidenceScope(result, standard), { outDir, ...evidenceCapsOf(p) }) : undefined;
   const cropFor = manifest
     ? (f: Finding) => {
         const c = manifest.crops.get(findingId(f));
@@ -2192,6 +2172,18 @@ function cmdCriteria(p: ParsedArgs): number {
   });
 }
 
+/** The audit narrowed to the findings the standard's deliverable SHOWS, for the evidence tier.
+ *
+ *  Crops used to be drawn for every engine finding. Under RGAA a finding the projection does
+ *  not attach — a *candidate* rule's hit on a judgment criterion, or a rule outside every RGAA
+ *  criterion — appears in no document, so its crop was an image nobody references. */
+function evidenceScope(result: AuditResult, standard: StandardId): AuditResult {
+  if (isCore(standard)) return result;
+  const shown = new Set(derivePackResults(result, standard).flatMap((d) => d.findings.map(findingId)));
+  const keep = (f: Finding) => shown.has(findingId(f));
+  return { ...result, findings: result.findings.filter(keep), ...(result.packFindings ? { packFindings: result.packFindings.filter(keep) } : {}) };
+}
+
 async function cmdReport(p: ParsedArgs): Promise<number> {
   const inFlag = p.flags.in;
   if (typeof inFlag !== "string" || !inFlag) {
@@ -2228,7 +2220,7 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
   // as files and the composite inlines the same bytes as data: URIs, because only the
   // composite has to travel alone. Rendering the Markdown first is what left those files
   // referenced by no document at all while the composite carried a second copy of each.
-  const manifest = p.flags.evidence === true ? writeEvidence(result, { outDir: out, ...evidenceCapsOf(p) }) : undefined;
+  const manifest = p.flags.evidence === true ? writeEvidence(evidenceScope(result, standard), { outDir: out, ...evidenceCapsOf(p) }) : undefined;
   if (manifest) {
     for (const line of evidenceNotice(manifest, null, lang)) console.error(line);
   }
@@ -2326,6 +2318,11 @@ async function cmdPrd(p: ParsedArgs): Promise<number> {
 }
 
 const CI_NOTE = "CI runs through iterion's rgaa-audit bot (https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit)";
+const RGAA_ONLY = "removed: ultra11y audits against RGAA 4.1.2 only — it is built in, there is no pack to load. Drop the flag.";
+/** `--standard wcag` (#194): the WCAG core stays the engine's internal keying, but no WCAG
+ *  report, grid or rate is published any more. */
+const WCAG_REMOVED =
+  "removed: RGAA 4.1.2 is the only standard ultra11y reports against (WCAG appears as the mapping each RGAA criterion cites). Use --standard rgaa, or drop the flag — it is the default.";
 const TICKETS_V3 = "removed in v3 — ticket creation is now its own command. Use:";
 
 /** Flags that USED to exist, mapped to the message that names what replaces them. Checked
@@ -2352,6 +2349,10 @@ export const REMOVED_FLAGS: Record<string, string> = {
   // The render paths that left the rendering to the project, replaced by ultra11y's own engine.
   scaffold:
     "removed: ultra11y renders the components itself. Run `ultra11y render [<dir>]` — it finds the components, pages and stories and renders them with the project's own react-dom/server.",
+  // The country-pack surface (#194): RGAA 4.1.2 is built in and is the only standard.
+  pack: RGAA_ONLY,
+  override: RGAA_ONLY,
+  guidance: RGAA_ONLY,
   setup:
     "removed with the test-render capture harvester: ultra11y no longer reads or runs the project's tests. Run `ultra11y render [<dir>]`, ultra11y's own render engine.",
 };
@@ -2362,6 +2363,7 @@ export const REMOVED_FLAGS: Record<string, string> = {
  *  flag, then value. Checked before dispatch, so a value listed here must be valid on NO
  *  command any more. */
 export const REMOVED_FLAG_VALUES: Record<string, Record<string, string>> = {
+  standard: { wcag: WCAG_REMOVED, core: WCAG_REMOVED, WCAG: WCAG_REMOVED, CORE: WCAG_REMOVED },
   format: {
     sarif: `removed with the CI renderings (audit/report --format sarif|github). ${CI_NOTE}, which reads the JSON — get it with audit --json.`,
     github: `removed with the CI renderings (audit/report --format sarif|github). ${CI_NOTE}, which reads the JSON — get it with audit --json.`,
@@ -2379,6 +2381,7 @@ export const REMOVED_COMMANDS: Record<string, string> = {
     "the headless judge was removed. The agent adjudicates through `verify --manual` / `verify --apply` (fanned out with `orchestrate`); in CI, iterion's rgaa-audit bot does.",
   affected: `the diff-to-pages selector was removed. ${CI_NOTE}.`,
   import: "importing an external audit (and pages --diff) was removed.",
+  pack: "the standards-pack toolbox was removed: ultra11y audits against RGAA 4.1.2 only, built in. Look its criteria up with `ultra11y criteria`.",
   capture:
     "`capture write` was removed with the ultra11y/vitest and ultra11y/jest helpers: ultra11y no longer reads or runs the project's tests. Run `ultra11y render [<dir>]`, ultra11y's own render engine.",
 };
@@ -4558,7 +4561,7 @@ function cmdSample(p: ParsedArgs): number {
   }
   const lang = resolveLang(p.flags, { standard });
   if (action !== "check") {
-    console.error("ultra11y sample: expected `sample check [--standard <pack>]`.");
+    console.error("ultra11y sample: expected `sample check [--standard rgaa]`.");
     return 2;
   }
   let cfg: ReturnType<typeof loadConfig>;
@@ -4699,34 +4702,6 @@ function cmdSample(p: ParsedArgs): number {
 /** standardLabel that never throws for the core (used in an advisory message). */
 function standardLabelSafe(standard: StandardId): string {
   return isCore(standard) ? "WCAG 2.2 AA" : (getPack(standard)?.name ?? standard);
-}
-
-function cmdPack(p: ParsedArgs): number {
-  const action = p.positionals[0];
-  const lang = resolveLang(p.flags, {}); // pack has no --standard (it validates a pack, not runs against one)
-  if (action === "scaffold") {
-    console.log(packScaffold());
-    return 0;
-  }
-  if (action === "check") {
-    const packPath = p.positionals[1];
-    if (!packPath) {
-      console.error("ultra11y pack check: provide a pack JSON file — `pack check <pack.json> [--guidance <g.json>]`.");
-      return 2;
-    }
-    const guidance = typeof p.flags.guidance === "string" && p.flags.guidance ? (p.flags.guidance as string) : undefined;
-    const res = runPackCheck(packPath, guidance);
-    if (p.flags.json) {
-      console.log(JSON.stringify(res, null, 2));
-    } else {
-      for (const w of res.warnings) console.error(`⚠ ${w}`);
-      if (res.ok) console.log(lang === "fr" ? `✓ Pack valide${guidance ? " (+ guidance)" : ""}.` : `✓ Pack valid${guidance ? " (+ guidance)" : ""}.`);
-      else for (const e of res.errors) console.error(`✗ ${e}`);
-    }
-    return res.ok ? 0 : 1;
-  }
-  console.error("ultra11y pack: expected `pack check <pack.json> [--guidance <g.json>]` or `pack scaffold`.");
-  return 2;
 }
 
 function cmdOrchestrate(p: ParsedArgs): number {
@@ -4878,22 +4853,21 @@ export async function main(argv: string[]): Promise<number> {
     if (typeof v === "string" && v && !allowed.includes(v)) console.error(`ultra11y: --${flag} "${v}" is not one of ${allowed.join("|")} — using the default.`);
   }
 
-  // Load any runtime standards packs (--pack / .ultra11yrc.json) BEFORE resolving
-  // --standard, so an external pack is registered when stdOf/loadPack runs. A bad
-  // config or an invalid pack is a hard error (never a silent skip).
-  const packList =
-    typeof p.flags.pack === "string"
-      ? (p.flags.pack as string)
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : [];
-  const loaded = loadRuntimeStandards(process.cwd(), packList, (m) => console.error(m), p.flags.override === true);
+  // Read .ultra11yrc.json (its secondary mappings and guidance) BEFORE resolving the
+  // standard. A bad config is a hard error (never a silent skip).
+  const loaded = loadRuntimeStandards(process.cwd(), [], (m) => console.error(m));
   if (loaded.errors.length) {
     for (const e of loaded.errors) console.error(`ultra11y: ${e}`);
     return 2;
   }
-  if (loaded.defaultStandard && p.flags.standard === undefined) p.flags.standard = loaded.defaultStandard;
+  // RGAA 4.1.2 is the default and only standard (#194). A config still declaring
+  // `"standard": "wcag"` fails like the flag does, naming the replacement.
+  if (p.flags.standard === undefined || p.flags.standard === true || p.flags.standard === "") p.flags.standard = loaded.defaultStandard ?? "rgaa";
+  const stdKey = typeof p.flags.standard === "string" ? p.flags.standard.toLowerCase() : "";
+  if (stdKey === CORE_KEY || stdKey === "core") {
+    console.error(`ultra11y: standard "${p.flags.standard}" was ${WCAG_REMOVED}`);
+    return 2;
+  }
 
   switch (p.command as Command) {
     case "audit":
@@ -4924,8 +4898,6 @@ export async function main(argv: string[]): Promise<number> {
       return cmdFix(p);
     case "init":
       return cmdInit(p);
-    case "pack":
-      return cmdPack(p);
     case "orchestrate":
       return cmdOrchestrate(p);
     case "hook":

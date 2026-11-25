@@ -37,20 +37,20 @@
   <caption class="sr-only">Les commandes d’ultra11y qu’une personne peut lancer elle-même</caption>
   <thead><tr><th scope="col">Commande</th><th scope="col">Rôle</th></tr></thead>
   <tbody>
-    <tr><th scope="row"><code>audit &lt;chemins&gt; --standard rgaa --out audits --json</code></th><td>Passe le moteur statique sur le code et écrit <code>audits/audit-latest.json</code>.</td></tr>
+    <tr><th scope="row"><code>audit &lt;chemins&gt; --out audits --json</code></th><td>Passe le moteur statique sur le code et écrit <code>audits/audit-latest.json</code>.</td></tr>
     <tr><th scope="row"><code>render .</code></th><td>Rend chaque composant, page et story du projet avec son propre <code>react-dom/server</code>, sans lire ses tests, vers <code>.ultra11y/captures/</code>. Ce qui n’a pas pu être rendu est listé avec la raison dans l’annexe du rapport.</td></tr>
     <tr><th scope="row"><code>scan &lt;url&gt; --merge audits/audit-latest.json</code></th><td>Ouvre une page dans un navigateur, la mesure et fusionne le résultat. <code>--sample</code> parcourt l’échantillon déclaré.</td></tr>
     <tr><th scope="row"><code>journey run --all --keyboard --merge audits/audit-latest.json</code></th><td>Rejoue au clavier, dans un navigateur, les parcours que l’agent a écrits dans <code>.ultra11y/journeys/</code> (connexion, formulaire, modale). Chaque étape devient une page auditée ; une étape en échec arrête son parcours, avec la raison.</td></tr>
-    <tr><th scope="row"><code>report --in audits/audit-latest.json --standard rgaa --html</code></th><td>Écrit le rapport RGAA daté, en Markdown et en HTML imprimable.</td></tr>
+    <tr><th scope="row"><code>report --in audits/audit-latest.json --html</code></th><td>Écrit le rapport RGAA daté, en Markdown et en HTML imprimable.</td></tr>
     <tr><th scope="row"><code>pages --in audits/audit-latest.json --format report --split page</code></th><td>Écrit un dossier par page, avec sa capture d’écran.</td></tr>
     <tr><th scope="row"><code>check --report &lt;rapport.md&gt;</code></th><td>Contrôle l’intégrité d’un rapport : aucun critère inventé, aucun NA sans justification.</td></tr>
     <tr><th scope="row"><code>tickets --in audits/audit-latest.json --dry-run</code></th><td>Prépare les tickets GitHub, GitLab ou Jira. Sans <code>--dry-run</code>, les crée.</td></tr>
-    <tr><th scope="row"><code>criteria --standard rgaa 8.3</code></th><td>Affiche le texte officiel d’un critère, ses tests et les définitions du glossaire.</td></tr>
+    <tr><th scope="row"><code>criteria 8.3</code></th><td>Affiche le texte officiel d’un critère, ses tests et les définitions du glossaire.</td></tr>
     <tr><th scope="row"><code>install --all</code> · <code>status</code></th><td>Branche la relecture automatique dans les agents détectés, et dit ce qui est réellement actif.</td></tr>
   </tbody>
 </table>
 </div>
-<p><code>--standard rgaa</code> peut être fixé une fois pour toutes dans <code>.ultra11yrc.json</code> : <code>{ "standard": "rgaa" }</code>. Un audit lancé à la main n’est qu’un premier aperçu : sans arbitrage ni contre-vérification, la plupart des critères restent « à évaluer ». L’audit complet passe par l’agent (voir <a href="audit.html">Audit</a>).</p>
+<p>Toutes les commandes parlent RGAA 4.1.2, par défaut : les WCAG n’apparaissent que comme la correspondance que cite chaque critère, « RGAA 1.1 (WCAG 1.1.1) ». Un audit lancé à la main n’est qu’un premier aperçu : sans arbitrage ni contre-vérification, la plupart des critères restent « à évaluer ». L’audit complet passe par l’agent (voir <a href="audit.html">Audit</a>).</p>
 
 <h2>Documentation détaillée</h2>
 <p>Les fichiers de référence de la skill, sur GitHub (en anglais) :</p>
@@ -66,7 +66,6 @@
   <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/ci.md"><code>ci.md</code></a> : la CI avec le bot <code>rgaa-audit</code> d’iterion</li>
   <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/harnesses.md"><code>harnesses.md</code></a> : les différences entre Claude Code, Codex et OpenCode</li>
   <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/rgaa-automation.md"><code>rgaa-automation.md</code></a> : la matrice des <span data-gen="rgaa.tests.total">258</span> tests RGAA (générée)</li>
-  <li><a href="https://github.com/SocialGouv/ultra11y/blob/main/skills/ultra11y/references/packs.md"><code>packs.md</code></a> : ajouter le référentiel d’un autre pays</li>
 </ul>
 </main>
 <!-- gen:footer -->

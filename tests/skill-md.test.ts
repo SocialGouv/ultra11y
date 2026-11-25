@@ -216,7 +216,6 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
       "naming.md",
       "orchestration.md",
       "orchestrators.md",
-      "packs.md",
       "pages.md",
       "prd.md",
       "rendered.md",
