@@ -815,6 +815,15 @@ export interface PageScope {
   //                    its silence is about content that was not on the page, so nothing may
   //                    be concluded from it either.
   basis: "snapshot" | "attributed" | "not-audited" | "loading";
+  /** What the entry is to the declared sample — stamped by `pagesOf()`, never persisted.
+   *  Absent: a page of the sample (or of a run that declared none). `journey-state`: a state a
+   *  replayed journey recorded (`journey run`), which is a state of a page, not another page.
+   *  `out-of-sample`: a route a snapshot exists for while a declared sample does not list it.
+   *  Both keep their own findings and sheet; neither is counted as an audited page nor enters
+   *  the RGAA mean rate. */
+  kind?: "journey-state" | "out-of-sample";
+  /** For a journey state: the journey and the step that recorded it (step 0 is the start). */
+  journey?: { name: string; step: number };
 }
 
 /** One page's projection of the audit. Derived, never stored on the AuditResult: the full
@@ -825,6 +834,8 @@ export interface PageResult {
   url: string;
   auth?: boolean;
   basis: PageScope["basis"];
+  kind?: PageScope["kind"];
+  journey?: PageScope["journey"];
   criteria: CriterionResult[];
   findings: Finding[];
   // NULL WHEN NOTHING WAS DECIDED. A rate over zero decided criteria is not a rate, and printing

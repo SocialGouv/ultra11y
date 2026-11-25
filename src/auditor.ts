@@ -13,7 +13,8 @@ import { getSC, guidelineTitle, principleTitle, techniques as scTechniques } fro
 import { resolveMessage, resolveRemediation, resolveNote } from "./messages.js";
 import { type StandardId, isCore, loadPack, packTestIdsCited, standardLabel, themeName, vocabularyFor } from "./standards/index.js";
 import { mdLink, mdText } from "./md.js";
-import { occurrencesByPage, type PageResolver } from "./pages.js";
+import { occurrencesByPage, type PageResolver, pageLabel, samplePages } from "./pages.js";
+import { humanNotes } from "./sample-propose.js";
 
 const SEV_ORDER: Severity[] = ["bloquant", "majeur", "mineur"];
 const ICON: Record<Severity, string> = { bloquant: "🔴", majeur: "🟠", mineur: "🟡" };
@@ -72,6 +73,8 @@ const L = {
     allPages: (n: number) => `toutes les pages (${n}/${n})`,
     morePages: (n: number) => `+${n} autre(s)`,
     offPage: (n: number) => `${n} occurrence(s) sans page identifiée`,
+    offPageComponent: (n: number) => `${n} occurrence(s) dans un composant non servi`,
+    offPageDocument: (n: number) => `${n} occurrence(s) dans un document téléchargeable`,
     atLeast: "au moins sur",
   },
   en: {
@@ -120,6 +123,8 @@ const L = {
     allPages: (n: number) => `all pages (${n}/${n})`,
     morePages: (n: number) => `+${n} more`,
     offPage: (n: number) => `${n} occurrence(s) on no page`,
+    offPageComponent: (n: number) => `${n} occurrence(s) in a component no page serves`,
+    offPageDocument: (n: number) => `${n} occurrence(s) in a downloadable document`,
     atLeast: "at least on",
   },
 } as const;
@@ -501,7 +506,10 @@ function renderReproductionContext(normative: Finding[], lang: Lang): string[] {
     const name = meta?.page ? `${meta.page} · ` : "";
     out.push(`- **URL** : \`${f.file}\` — ${name}${s.authRequired} : ${auth}`);
     // Task 5: the sample page's notes ARE the required state / reproduction steps.
-    if (meta?.notes) out.push(`  - ↳ ${meta.notes}`);
+    // The sample proposal's own reasons are an English engine note: a French deliverable keeps
+    // only what a person wrote (#232).
+    const notes = lang === "en" ? meta?.notes : humanNotes(meta?.notes);
+    if (notes) out.push(`  - ↳ ${notes}`);
   }
   out.push(`- _${s.reproSteps}_`, "");
   return out;
@@ -550,16 +558,19 @@ function renderCompactUnit(m: AuditorUnitModel, lang: Lang, opts: AuditorUnitOpt
  *  like `<id> —`, so `check`'s criterion scanner and `verify`'s criterion line both ignore it. */
 function pagesLine(findings: Finding[], resolver: PageResolver, lang: Lang): string | undefined {
   const s = L[lang];
-  const { pages, orphans, approximate } = occurrencesByPage(findings, resolver);
+  const { pages, orphans, offPage, approximate } = occurrencesByPage(findings, resolver);
   const parts: string[] = [];
-  const total = resolver.pages.length;
-  const everywhere = pages.length > 3 && pages.length === total;
+  // Every page OF THE SAMPLE (#232): journey states and stray routes are not pages of it.
+  const total = samplePages(resolver.pages).length;
+  const everywhere = total > 3 && samplePages(pages.map((x) => x.page)).length === total;
   if (everywhere) parts.push(s.allPages(total));
   else {
-    parts.push(...pages.slice(0, PAGES_LISTED_MAX).map(({ page, count }) => `${mdLink(page.name, page.url)} (${count})`));
+    parts.push(...pages.slice(0, PAGES_LISTED_MAX).map(({ page, count }) => `${mdLink(pageLabel(page, lang), page.url)} (${count})`));
     if (pages.length > PAGES_LISTED_MAX) parts.push(s.morePages(pages.length - PAGES_LISTED_MAX));
   }
-  if (orphans) parts.push(s.offPage(orphans));
+  if (offPage.component) parts.push(s.offPageComponent(offPage.component));
+  if (offPage.document) parts.push(s.offPageDocument(offPage.document));
+  if (offPage.unknown) parts.push(s.offPage(offPage.unknown));
   if (!pages.length && !orphans) return undefined;
   return `${approximate && !everywhere && pages.length ? `${s.atLeast} ` : ""}${parts.join(" · ")}`;
 }

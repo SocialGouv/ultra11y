@@ -27475,7 +27475,14 @@ function resolveRemediation(f2, lang) {
   const localized = f2.i18n?.remediation?.[lang];
   if (localized) return localized;
   const entry2 = entryFor(f2.msg?.id);
-  return entry2 ? entry2.remediation[lang](f2.msg?.params ?? {}) : f2.remediation;
+  if (entry2) return entry2.remediation[lang](f2.msg?.params ?? {});
+  return lang === "en" ? f2.remediation : stockRemediation(f2.remediation, lang) ?? f2.remediation;
+}
+function stockRemediation(text, lang) {
+  if (lang !== "fr") return void 0;
+  if (text === "Address the reported non-conformity.") return "Corrigez la non-conformit\xE9 relev\xE9e.";
+  const sc = /^See WCAG (\d+\.\d+\.\d+)\.$/.exec(text)?.[1];
+  return sc ? `Voir le crit\xE8re de succ\xE8s WCAG ${sc}.` : void 0;
 }
 function resolveNote(related, lang) {
   const entry2 = related.noteId ? NOTE_CATALOG[related.noteId] : void 0;
@@ -46883,8 +46890,8 @@ function runAudit(opts) {
 
 // src/hook.ts
 import { execFileSync as execFileSync2 } from "child_process";
-import { createHash as createHash3 } from "crypto";
-import { existsSync as existsSync15, mkdirSync as mkdirSync6, writeFileSync as writeFileSync6 } from "fs";
+import { createHash as createHash4 } from "crypto";
+import { existsSync as existsSync16, mkdirSync as mkdirSync6, writeFileSync as writeFileSync6 } from "fs";
 import { tmpdir } from "os";
 import { join as join15 } from "path";
 
@@ -51238,7 +51245,7 @@ ${g.errors.map((e) => `  \u2717 ${e}`).join("\n")}`);
 }
 
 // src/adjudicate.ts
-import { existsSync as existsSync14, mkdirSync as mkdirSync5, statSync as statSync7, writeFileSync as writeFileSync5 } from "fs";
+import { existsSync as existsSync15, mkdirSync as mkdirSync5, statSync as statSync7, writeFileSync as writeFileSync5 } from "fs";
 import { isAbsolute as isAbsolute3, join as join14, relative as relative6, resolve as resolve6 } from "path";
 
 // src/verapdf.ts
@@ -52848,7 +52855,44 @@ function pagesOf(result) {
   const extra = pageScopesFromSample(result.scope.sample).filter((p2) => !ids2.has(p2.id) && !urls.has(p2.url));
   const cov = result.scope.pageCoverage;
   const stamped = cov ? [...checked, ...extra].map((p2) => cov[p2.id] ? { ...p2, coverage: cov[p2.id] } : p2) : [...checked, ...extra];
-  return stamped.map((p2) => p2.basis === "snapshot" ? p2 : p2.coverage ? { ...p2, coverage: void 0 } : p2);
+  const measured2 = stamped.map((p2) => p2.basis === "snapshot" ? p2 : p2.coverage ? { ...p2, coverage: void 0 } : p2);
+  return classifyPages(result, measured2);
+}
+function classifyPages(result, pages) {
+  const states = /* @__PURE__ */ new Map();
+  const sample = result.scope.sample?.pages;
+  const sampleIds = new Set((sample ?? []).map((p2) => p2.id));
+  for (const j of result.scope.journeys?.journeys ?? [])
+    for (const st of j.steps) {
+      const shaped = st.page?.startsWith(`${j.name}-${String(st.n).padStart(2, "0")}`);
+      if (st.page && shaped && !sampleIds.has(st.page)) states.set(st.page, { name: j.name, step: st.n });
+    }
+  const sampleUrls = new Set((sample ?? []).map((p2) => p2.url));
+  const rank = { page: 0, "out-of-sample": 1, "journey-state": 2 };
+  const classified = pages.map((p2) => {
+    const journey = states.get(p2.id);
+    if (journey) return { ...p2, kind: "journey-state", journey };
+    if (sample?.length && !sampleIds.has(p2.id) && !sampleUrls.has(p2.url)) return { ...p2, kind: "out-of-sample" };
+    return p2;
+  });
+  return classified.map((p2, i) => ({ p: p2, i })).sort((a2, b) => rank[a2.p.kind ?? "page"] - rank[b.p.kind ?? "page"] || a2.i - b.i).map(({ p: p2 }) => p2);
+}
+function samplePages(pages) {
+  return pages.filter((p2) => p2.kind === void 0);
+}
+function offPageLabel(kind, lang) {
+  return L2[lang].offPage[kind];
+}
+function pageLabel(p2, lang) {
+  const named3 = p2.journey !== void 0 && p2.name.startsWith(`${p2.journey.name} \u2014 ${p2.journey.step}.`);
+  const note = named3 ? L2[lang].journeyState : pageKindNote(p2, lang);
+  return note ? `${p2.name} (${note})` : p2.name;
+}
+function pageKindNote(p2, lang) {
+  const s2 = L2[lang];
+  if (p2.kind === "journey-state") return p2.journey ? s2.journeyStateOf(p2.journey.name, p2.journey.step) : s2.journeyState;
+  if (p2.kind === "out-of-sample") return s2.outOfSample;
+  return "";
 }
 function pathMatch2(a2, b) {
   const x2 = a2.split("\\").join("/");
@@ -52891,9 +52935,28 @@ function attributePages(result, pages) {
     }
   }
 }
+var DOCUMENT_FILE = /\.(pdf|docx?|odt|ods|odp|xlsx?|pptx?|rtf|epub)(?:[?#].*)?$/i;
+function offPageKindOf(result) {
+  const documents = /* @__PURE__ */ new Set();
+  for (const d2 of result.documents ?? []) for (const x2 of [d2.file, d2.url, ...d2.copies ?? [], ...d2.urls ?? []]) if (x2) documents.add(x2);
+  const rendered = /* @__PURE__ */ new Set();
+  for (const u2 of result.scope.renders?.units ?? []) {
+    rendered.add(u2.file);
+    if (u2.capture) rendered.add(u2.capture);
+  }
+  return (f2) => {
+    const file = typeof f2.file === "string" ? f2.file : "";
+    if (documents.has(file) || file.startsWith(".ultra11y/documents/") || DOCUMENT_FILE.test(file)) return "document";
+    const capture2 = f2.origin?.capture ?? "";
+    const src = f2.origin?.sourceFile ?? file;
+    if (capture2.startsWith(".ultra11y/captures/") || file.startsWith(".ultra11y/captures/") || f2.origin?.component || rendered.has(src)) return "component";
+    return "unknown";
+  };
+}
 function pageResolver(result) {
   const pages = pagesOf(result);
-  if (!pages.length) return { pages, pageOf: () => void 0, approximate: () => false };
+  const offPageKind = offPageKindOf(result);
+  if (!pages.length) return { pages, pageOf: () => void 0, approximate: () => false, offPageKind };
   attributePages(result, pages);
   const byId2 = new Map(pages.map((p2) => [p2.id, p2]));
   const stamped = /* @__PURE__ */ new Map();
@@ -52907,16 +52970,18 @@ function pageResolver(result) {
     const src = f2.origin?.sourceFile ?? f2.file;
     return pages.filter((p2) => p2.sources?.some((s2) => pathMatch2(src, s2))).length > 1;
   };
-  return { pages, pageOf, approximate: (f2) => pageOf(f2) !== void 0 && !exact(f2) && shared(f2) };
+  return { pages, pageOf, approximate: (f2) => pageOf(f2) !== void 0 && !exact(f2) && shared(f2), offPageKind };
 }
 function occurrencesByPage(findings, resolver) {
   const counts = /* @__PURE__ */ new Map();
   let orphans = 0;
+  const offPage = { component: 0, document: 0, unknown: 0 };
   let approximate = false;
   for (const f2 of findings) {
     const page = resolver.pageOf(f2);
     if (!page) {
       orphans++;
+      offPage[resolver.offPageKind(f2)]++;
       continue;
     }
     if (resolver.approximate(f2)) approximate = true;
@@ -52926,7 +52991,7 @@ function occurrencesByPage(findings, resolver) {
   }
   const order2 = new Map(resolver.pages.map((p2, i) => [p2.id, i]));
   const pages = [...counts.values()].sort((a2, b) => b.count - a2.count || (order2.get(a2.page.id) ?? 0) - (order2.get(b.page.id) ?? 0));
-  return { pages, orphans, approximate };
+  return { pages, orphans, offPage, approximate };
 }
 function unattributedFindings(result) {
   return [...result.findings, ...result.packFindings ?? []].filter((f2) => !f2.page);
@@ -52988,6 +53053,8 @@ function derivePages(result, pages) {
       url: p2.url,
       ...p2.auth !== void 0 ? { auth: p2.auth } : {},
       basis: p2.basis,
+      ...p2.kind ? { kind: p2.kind } : {},
+      ...p2.journey ? { journey: p2.journey } : {},
       criteria,
       findings: own,
       conformancePct: rate,
@@ -53019,7 +53086,12 @@ var L2 = {
     loadingNote: "Une page marqu\xE9e \xAB capture en \xE9tat de chargement \xBB a \xE9t\xE9 enregistr\xE9e alors qu'elle s'annon\xE7ait encore en cours de chargement (`aria-busy`, indicateur de progression, \xAB Chargement\u2026 \xBB) : son contenu n'\xE9tait pas affich\xE9. Ses constats sont r\xE9els, mais l'absence de constat n'y vaut PAS conformit\xE9 \u2014 recapturez-la une fois charg\xE9e.",
     agentMark: "`C*` : conformit\xE9 tranch\xE9e par l'agent IA \xE0 partir des \xE9vidences cit\xE9es (gat\xE9), et non prouv\xE9e par le moteur d\xE9terministe.",
     humanMark: "`C\u2020` : conformit\xE9 tranch\xE9e par un auditeur humain nomm\xE9 \xE0 partir des \xE9vidences cit\xE9es (m\xEAme gate que l'agent), et non prouv\xE9e par le moteur d\xE9terministe.",
-    originNote: (o) => `Les colonnes sont les URL des pages, relatives \xE0 \`${o}\`.`
+    originNote: (o) => `Les colonnes sont les URL des pages, relatives \xE0 \`${o}\`.`,
+    journeyState: "\xE9tat de parcours",
+    journeyStateOf: (name, step) => `\xE9tat de parcours \u2014 ${name}, \xE9tape ${step}`,
+    outOfSample: "hors \xE9chantillon",
+    offPage: { component: "composant non servi", document: "document t\xE9l\xE9chargeable", unknown: "sans page" },
+    kindNote: "Les colonnes marqu\xE9es \xAB \xE9tat de parcours \xBB ou \xAB hors \xE9chantillon \xBB ne sont pas des pages de l'\xE9chantillon : leurs constats comptent pour leur crit\xE8re, mais elles n'entrent ni dans le nombre de pages audit\xE9es ni dans le taux moyen."
   },
   en: {
     title: "Per-page grid",
@@ -53040,7 +53112,12 @@ var L2 = {
     loadingNote: 'A page marked "captured while loading" was recorded while it still declared itself loading (`aria-busy`, a progress indicator, \xAB Loading\u2026 \xBB): its content was not on screen. Its findings are real, but absence of a finding there does NOT mean conforming \u2014 capture it again once it has loaded.',
     agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
     humanMark: "`C\u2020`: conformity ruled by a named human auditor from the evidence they cited (the agent's gate), not proven by the deterministic engine.",
-    originNote: (o) => `Columns are the pages' URLs, relative to \`${o}\`.`
+    originNote: (o) => `Columns are the pages' URLs, relative to \`${o}\`.`,
+    journeyState: "journey state",
+    journeyStateOf: (name, step) => `journey state \u2014 ${name}, step ${step}`,
+    outOfSample: "outside the sample",
+    offPage: { component: "component no page serves", document: "downloadable document", unknown: "on no page" },
+    kindNote: "Columns marked \u201Cjourney state\u201D or \u201Coutside the sample\u201D are not pages of the sample: their findings count against their criterion, but they enter neither the audited page count nor the mean rate."
   }
 };
 function formatRate(rate, decided, total) {
@@ -53078,13 +53155,14 @@ function basisLabel(basis, lang) {
 function unattributedNote(n, lang) {
   return L2[lang].unattributed(n);
 }
-function pageColumnLabel(page, origin) {
+function pageColumnLabel(page, origin, lang) {
   let label = page.url;
   if (origin && page.url.startsWith(origin)) {
     const rest = page.url.slice(origin.length);
     label = rest === "" ? "/" : rest;
   }
-  return `${label}${page.auth ? " \u{1F512}" : ""}`;
+  const kind = lang ? pageKindNote(page, lang) : "";
+  return `${label}${page.auth ? " \u{1F512}" : ""}${kind ? ` (${kind})` : ""}`;
 }
 function commonOrigin(pages) {
   if (!pages.length) return void 0;
@@ -53232,7 +53310,8 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   const origin = commonOrigin(derived);
   const originNote = pageOriginNote(origin, lang);
   if (originNote) out.push(`> ${originNote}`, "");
-  const head = [s2.criterion, ...derived.map((p2) => pageColumnLabel(p2, origin))];
+  if (derived.some((p2) => p2.kind)) out.push(`> ${s2.kindNote}`, "");
+  const head = [s2.criterion, ...derived.map((p2) => pageColumnLabel(p2, origin, lang))];
   out.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
   const { rows, status, human, inapplicable } = pageGridModel(result, derived, standard, lang);
   out.push(
@@ -53261,6 +53340,824 @@ function renderPageGrid(result, pages, standard = CORE2, lang = "en") {
   const orphans = unattributedFindings(result);
   if (orphans.length) out.push(`> ${s2.unattributed(orphans.length)}`, "");
   return out.join("\n");
+}
+
+// src/sample-propose.ts
+import { createHash as createHash3 } from "crypto";
+
+// src/crawl.ts
+function parseSitemapUrls(xml) {
+  const out = [];
+  const re2 = /<loc>\s*([^<]+?)\s*<\/loc>/gi;
+  let m3;
+  while ((m3 = re2.exec(xml)) !== null) out.push(m3[1]);
+  return out;
+}
+var DOWNLOAD_EXT = /\.(?:pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|tar|epub|dmg|exe|pkg|mp3|mp4|m4a|m4v|avi|mov|wmv|webm|ogg|wav|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i;
+function isDownloadUrl(url) {
+  let path = url;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+  }
+  return DOWNLOAD_EXT.test(path);
+}
+function extractLinks(html, baseUrl) {
+  const origin = new URL(baseUrl).origin;
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  const re2 = /<a\b[^>]*\bhref\s*=\s*["']([^"']+)["']/gi;
+  let m3;
+  while ((m3 = re2.exec(html)) !== null) {
+    const href = m3[1].trim();
+    if (!href || href.startsWith("#")) continue;
+    let abs;
+    try {
+      abs = new URL(href, baseUrl);
+    } catch {
+      continue;
+    }
+    if (abs.protocol !== "http:" && abs.protocol !== "https:") continue;
+    if (abs.origin !== origin) continue;
+    if (isDownloadUrl(abs.pathname)) continue;
+    abs.hash = "";
+    const url = abs.href;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+function extractTitle(html) {
+  const m3 = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+  if (!m3) return void 0;
+  const text = m3[1].replace(/&#x([0-9a-f]+);/gi, (_2, hex2) => String.fromCodePoint(Number.parseInt(hex2, 16))).replace(/&#(\d+);/g, (_2, dec) => String.fromCodePoint(Number(dec))).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  return text || void 0;
+}
+function nameFromUrl(url) {
+  let path = url;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+  }
+  const last = path.split("/").filter(Boolean).pop();
+  if (!last) return "Accueil";
+  const words = last.replace(/\.x?html?$/i, "").replace(/[-_]+/g, " ").trim();
+  if (!words) return "Accueil";
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+function canonicalUrl(url) {
+  try {
+    const u2 = new URL(url);
+    u2.hash = "";
+    u2.pathname = u2.pathname.replace(/(^|\/)index\.x?html?$/i, "$1");
+    return u2.href;
+  } catch {
+    return url;
+  }
+}
+function crawlBound(n) {
+  return n === void 0 || !Number.isFinite(n) || n <= 0 ? Number.POSITIVE_INFINITY : n;
+}
+async function crawlUrls(start, opts) {
+  const depth = crawlBound(opts.depth);
+  const max = crawlBound(opts.max);
+  const order2 = [];
+  const first = canonicalUrl(start);
+  const seen = /* @__PURE__ */ new Set([first]);
+  const queue = [{ url: first, d: 0 }];
+  while (queue.length > 0 && order2.length < max) {
+    const { url, d: d2 } = queue.shift();
+    order2.push(url);
+    opts.onPage?.(url, order2.length);
+    if (d2 >= depth) continue;
+    let html = "";
+    let base = url;
+    try {
+      const got = await opts.fetchHtml(url);
+      if (typeof got === "string") html = got;
+      else {
+        html = got.html;
+        if (got.url) base = got.url;
+      }
+    } catch {
+      continue;
+    }
+    for (const link of extractLinks(html, base)) {
+      const canon = canonicalUrl(link);
+      if (seen.has(canon)) continue;
+      seen.add(canon);
+      queue.push({ url: canon, d: d2 + 1 });
+    }
+  }
+  return order2;
+}
+
+// src/sample.ts
+import { existsSync as existsSync14 } from "fs";
+function looksLikeTarget(u2) {
+  return /^https?:\/\//i.test(u2) || /^(\.\.?[/\\]|[/\\])/.test(u2) || /\.x?html?$/i.test(u2);
+}
+function validateSample(raw) {
+  const issues = [];
+  const warnings = [];
+  const err = (path, message) => issues.push({ path, message });
+  const warn = (path, message) => warnings.push({ path, message });
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    err("sample", "sample must be an object { pages: [...], transverse?: [...] }");
+    return { ok: false, issues, warnings };
+  }
+  const s2 = raw;
+  const pages = Array.isArray(s2.pages) ? s2.pages : null;
+  if (!pages || pages.length === 0) err("sample.pages", "sample.pages must be a non-empty array");
+  const ids2 = /* @__PURE__ */ new Set();
+  pages?.forEach((pg, i) => {
+    if (typeof pg !== "object" || pg === null || Array.isArray(pg)) {
+      err(`sample.pages[${i}]`, "each page must be an object { id, name, url, auth?, storageState?, notes?, sources? }");
+      return;
+    }
+    const p2 = pg;
+    const id = p2.id;
+    if (typeof id !== "string" || id.trim() === "") {
+      err(`sample.pages[${i}].id`, "page id must be a non-empty string");
+    } else {
+      if (ids2.has(id)) err(`sample.pages[${i}].id`, `duplicate page id "${id}"`);
+      ids2.add(id);
+    }
+    if (typeof p2.name !== "string" || p2.name.trim() === "") err(`sample.pages[${i}].name`, "page name must be a non-empty string");
+    if (typeof p2.url !== "string" || p2.url.trim() === "") err(`sample.pages[${i}].url`, "page url must be a non-empty string");
+    else if (!looksLikeTarget(p2.url)) err(`sample.pages[${i}].url`, `malformed url "${p2.url}" (expected an http(s):// URL or an HTML file path)`);
+    if (p2.auth !== void 0 && typeof p2.auth !== "boolean") err(`sample.pages[${i}].auth`, "auth must be a boolean");
+    if (p2.storageState !== void 0 && (typeof p2.storageState !== "string" || p2.storageState.trim() === "")) {
+      err(`sample.pages[${i}].storageState`, "storageState must be a non-empty file path string");
+    } else if (typeof p2.storageState === "string" && p2.storageState.trim() !== "" && !existsSync14(p2.storageState)) {
+      warn(
+        `sample.pages[${i}].storageState`,
+        `storageState path not found: "${p2.storageState}" (resolved from the current directory) \u2014 the scan will not be able to load this session`
+      );
+    }
+    if (p2.notes !== void 0 && typeof p2.notes !== "string") err(`sample.pages[${i}].notes`, "notes must be a string");
+    if (p2.sources !== void 0 && (!Array.isArray(p2.sources) || p2.sources.some((s3) => typeof s3 !== "string")))
+      err(`sample.pages[${i}].sources`, "sources must be an array of file paths");
+  });
+  if (s2.transverse !== void 0) {
+    if (!Array.isArray(s2.transverse)) {
+      err("sample.transverse", "transverse must be an array of strings");
+    } else {
+      s2.transverse.forEach((t3, i) => {
+        if (typeof t3 !== "string" || t3.trim() === "") err(`sample.transverse[${i}]`, "transverse entries must be non-empty strings");
+      });
+    }
+  }
+  if (s2.global !== void 0) {
+    if (!Array.isArray(s2.global)) {
+      err("sample.global", "global must be an array of globs");
+    } else {
+      s2.global.forEach((g, i) => {
+        if (typeof g !== "string" || g.trim() === "") err(`sample.global[${i}]`, "global entries must be non-empty glob strings");
+      });
+    }
+  }
+  if (s2.exempt !== void 0) {
+    if (!Array.isArray(s2.exempt)) {
+      err("sample.exempt", "exempt must be an array of { path, reason }");
+    } else {
+      s2.exempt.forEach((e, i) => {
+        const x2 = e;
+        if (typeof x2 !== "object" || x2 === null || Array.isArray(x2)) {
+          err(`sample.exempt[${i}]`, "each exemption must be an object { path, reason }");
+          return;
+        }
+        if (typeof x2.path !== "string" || x2.path.trim() === "") err(`sample.exempt[${i}].path`, "path must be a non-empty glob");
+        if (typeof x2.reason !== "string" || x2.reason.trim() === "")
+          err(`sample.exempt[${i}].reason`, "reason is required \u2014 say why this route is left out of the sample");
+      });
+    }
+  }
+  if (s2.absent !== void 0) {
+    if (!Array.isArray(s2.absent)) {
+      err("sample.absent", "absent must be an array of { kind, reason }");
+    } else {
+      s2.absent.forEach((e, i) => {
+        const x2 = e;
+        if (typeof x2 !== "object" || x2 === null || Array.isArray(x2)) {
+          err(`sample.absent[${i}]`, "each entry must be an object { kind, reason }");
+          return;
+        }
+        if (typeof x2.kind !== "string" || x2.kind.trim() === "") err(`sample.absent[${i}].kind`, "kind must be a required page kind id");
+        if (typeof x2.reason !== "string" || x2.reason.trim() === "")
+          err(`sample.absent[${i}].reason`, "reason is required \u2014 say why the sample holds no page of this kind");
+      });
+    }
+  }
+  const ok = issues.length === 0;
+  return { ok, issues, warnings, sample: ok ? normalizeSample(s2) : void 0 };
+}
+function normalizeSample(s2) {
+  const pages = s2.pages.map((p2) => ({
+    id: String(p2.id),
+    name: String(p2.name),
+    url: String(p2.url),
+    ...typeof p2.auth === "boolean" ? { auth: p2.auth } : {},
+    ...typeof p2.storageState === "string" ? { storageState: p2.storageState } : {},
+    ...typeof p2.notes === "string" ? { notes: p2.notes } : {},
+    ...Array.isArray(p2.sources) ? { sources: p2.sources } : {}
+  }));
+  const transverse = Array.isArray(s2.transverse) ? s2.transverse.map(String) : void 0;
+  const global = Array.isArray(s2.global) ? s2.global.map(String) : void 0;
+  const exempt = Array.isArray(s2.exempt) ? s2.exempt.map((e) => ({ path: String(e.path), reason: String(e.reason) })) : void 0;
+  const absent = Array.isArray(s2.absent) ? s2.absent.map((e) => ({ kind: String(e.kind), reason: String(e.reason) })) : void 0;
+  return {
+    pages,
+    ...transverse?.length ? { transverse } : {},
+    ...global?.length ? { global } : {},
+    ...exempt?.length ? { exempt } : {},
+    ...carryAbsent(absent)
+  };
+}
+function carryAbsent(absent) {
+  return absent?.length ? { absent } : {};
+}
+function sampleScope(sample) {
+  return {
+    pages: sample.pages.map((p2) => ({
+      id: p2.id,
+      name: p2.name,
+      url: p2.url,
+      ...p2.auth !== void 0 ? { auth: p2.auth } : {},
+      ...p2.notes ? { notes: p2.notes } : {}
+    })),
+    ...sample.transverse?.length ? { transverse: sample.transverse } : {}
+  };
+}
+var norm3 = (s2) => s2.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").replace(/['’]/g, " ").toLowerCase();
+var SHORT_KEYWORD = 5;
+var escapeRe = (s2) => s2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function keywordMatches(haystack, keyword) {
+  if (keyword.length > SHORT_KEYWORD) return haystack.includes(keyword);
+  return new RegExp(`(^|[^a-z0-9])${escapeRe(keyword)}($|[^a-z0-9])`).test(haystack);
+}
+var isTransverseKind = (kind) => /transverse/.test(kind.id);
+var isRepresentativeKind = (kind) => /representative|representatif/.test(kind.id);
+function pathOf(url) {
+  try {
+    const u2 = new URL(url);
+    return safeDecode(u2.pathname) + u2.search;
+  } catch {
+    return url;
+  }
+}
+function safeDecode(s2) {
+  try {
+    return decodeURIComponent(s2);
+  } catch {
+    return s2;
+  }
+}
+function lintSample(sample, methodology) {
+  const haystacks = sample.pages.map((p2) => norm3([p2.name, p2.notes ?? "", p2.url, p2.id].join(" ")));
+  const transverseHay = norm3((sample.transverse ?? []).join(" "));
+  const hasTransverse = (sample.transverse ?? []).length > 0;
+  const pageKinds = methodology.requiredKinds.filter((k) => !isTransverseKind(k) && !isRepresentativeKind(k));
+  const beyondKinds = sample.pages.some((p2) => {
+    const h3 = norm3([p2.name, pathOf(p2.url), p2.id].join(" "));
+    return !pageKinds.some((kind) => kind.keywords.map(norm3).some((k) => k && keywordMatches(h3, k)));
+  });
+  const reasons = /* @__PURE__ */ new Map();
+  for (const a2 of sample.absent ?? []) if (!reasons.has(a2.kind)) reasons.set(a2.kind, a2.reason);
+  const missing = [];
+  const waived = [];
+  for (const kind of methodology.requiredKinds) {
+    const kws = kind.keywords.map(norm3).filter(Boolean);
+    const covered = haystacks.some((h3) => kws.some((k) => keywordMatches(h3, k))) || transverseHay !== "" && kws.some((k) => keywordMatches(transverseHay, k)) || hasTransverse && isTransverseKind(kind) || isRepresentativeKind(kind) && beyondKinds;
+    if (covered) continue;
+    const reason = reasons.get(kind.id);
+    if (reason) waived.push({ kind, reason });
+    else missing.push(kind);
+  }
+  return { missing, waived };
+}
+function proposeSamplePages(urls, titles) {
+  const used = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const url of urls) {
+    const base = slugifyPageId(url);
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    used.add(id);
+    out.push({ id, name: titles?.get(url) ?? nameFromUrl(url), url });
+  }
+  return out;
+}
+function mergeSample(existing, proposed) {
+  const pages = [...existing?.pages ?? []];
+  const ids2 = new Set(pages.map((p2) => p2.id));
+  const urls = new Set(pages.map((p2) => p2.url));
+  const added = [];
+  for (const p2 of proposed) {
+    if (urls.has(p2.url)) continue;
+    let id = p2.id;
+    for (let n = 2; ids2.has(id); n++) id = `${p2.id}-${n}`;
+    ids2.add(id);
+    urls.add(p2.url);
+    const page = { ...p2, id };
+    pages.push(page);
+    added.push(page);
+  }
+  return {
+    sample: {
+      pages,
+      ...existing?.transverse?.length ? { transverse: existing.transverse } : {},
+      ...existing?.global?.length ? { global: existing.global } : {},
+      ...existing?.exempt?.length ? { exempt: existing.exempt } : {},
+      ...carryAbsent(existing?.absent)
+    },
+    added,
+    kept: pages.length - added.length
+  };
+}
+function sampleFromSnapshots(snapshots) {
+  return snapshots.map((s2) => ({
+    id: s2.meta.id,
+    name: s2.meta.name,
+    url: s2.meta.url,
+    ...s2.meta.auth !== void 0 ? { auth: s2.meta.auth } : {},
+    ...s2.meta.notes ? { notes: s2.meta.notes } : {}
+  }));
+}
+function unionSample(declared, snapshotted) {
+  const pages = [...declared?.pages ?? []];
+  const declaredIds = new Set(pages.map((p2) => p2.id));
+  const snapIds = new Set(snapshotted.map((p2) => p2.id));
+  const undeclared = snapshotted.filter((p2) => !declaredIds.has(p2.id));
+  const uncaptured = pages.filter((p2) => !snapIds.has(p2.id));
+  return {
+    sample: {
+      pages: [...pages, ...undeclared],
+      ...declared?.transverse?.length ? { transverse: declared.transverse } : {},
+      ...declared?.global?.length ? { global: declared.global } : {},
+      ...declared?.exempt?.length ? { exempt: declared.exempt } : {},
+      ...carryAbsent(declared?.absent)
+    },
+    undeclared,
+    uncaptured
+  };
+}
+function kindLabel(kind, locale = "fr") {
+  return kind.label[locale] ?? Object.values(kind.label)[0] ?? kind.id;
+}
+
+// src/sample-propose.ts
+var DEFAULT_SAMPLE_SIZE = 20;
+var FIXED_SEARCH_QUERY = "information";
+var PROPOSAL_NOTE = "proposal: ";
+var SLUG_SIBLINGS = 3;
+var cmp = (a2, b) => a2 < b ? -1 : a2 > b ? 1 : 0;
+function cmpTuple(a2, b) {
+  for (let i = 0; i < Math.max(a2.length, b.length); i++) {
+    const x2 = a2[i] ?? "";
+    const y = b[i] ?? "";
+    const c = typeof x2 === "number" && typeof y === "number" ? x2 - y : cmp(String(x2), String(y));
+    if (c !== 0) return c;
+  }
+  return 0;
+}
+function parseUrl(url) {
+  try {
+    const u2 = new URL(url);
+    const path = safeDecode(u2.pathname) || "/";
+    return { url, path, segments: path.split("/").filter(Boolean), query: [...u2.searchParams.entries()], origin: u2.origin };
+  } catch {
+    const [p2 = url, q3 = ""] = url.split("?", 2);
+    return { url, path: p2, segments: p2.split(/[/\\]/).filter(Boolean), query: [...new URLSearchParams(q3).entries()] };
+  }
+}
+var DATE = ":date";
+var YEAR = /^(19|20)\d{2}$/;
+var FULL_DATE = /^(19|20)\d{2}[-_.]?(0[1-9]|1[0-2])([-_.]?(0[1-9]|[12]\d|3[01]))?$/;
+var EMBEDDED_DATE = /(19|20)\d{2}[-_.](0[1-9]|1[0-2])[-_.](0[1-9]|[12]\d|3[01])/;
+var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function normalizeSegment(seg, afterDate) {
+  const s2 = seg.replace(/\.x?html?$/i, "");
+  if (YEAR.test(s2) || FULL_DATE.test(s2)) return DATE;
+  if (afterDate && /^\d{1,2}$/.test(s2)) return DATE;
+  if (/^\d+$/.test(s2) || UUID.test(s2) || /^[0-9a-f]{12,}$/i.test(s2) && /\d/.test(s2)) return ":id";
+  if (EMBEDDED_DATE.test(s2) || /[-_]\d+$/.test(s2)) return ":slug";
+  return seg;
+}
+function normalizeQueryValue(v2) {
+  if (YEAR.test(v2) || FULL_DATE.test(v2) || EMBEDDED_DATE.test(v2)) return DATE;
+  if (/^\d+$/.test(v2)) return ":id";
+  return ":v";
+}
+function urlPatterns(urls) {
+  const parsed = [...new Set(urls)].sort(cmp).map(parseUrl);
+  const segs = parsed.map((p2) => {
+    const out2 = [];
+    for (const s2 of p2.segments) {
+      const n = normalizeSegment(s2, out2[out2.length - 1] === DATE);
+      if (n === DATE && out2[out2.length - 1] === DATE) continue;
+      out2.push(n);
+    }
+    return out2;
+  });
+  const depth = Math.max(0, ...segs.map((s2) => s2.length));
+  for (let i = 1; i < depth; i++) {
+    const values = /* @__PURE__ */ new Map();
+    for (const s2 of segs) {
+      const v2 = s2[i];
+      if (v2 === void 0 || v2.startsWith(":")) continue;
+      const prefix2 = s2.slice(0, i).join("/");
+      let set = values.get(prefix2);
+      if (!set) values.set(prefix2, set = /* @__PURE__ */ new Set());
+      set.add(v2);
+    }
+    for (const s2 of segs) {
+      const v2 = s2[i];
+      if (v2 === void 0 || v2.startsWith(":")) continue;
+      if ((values.get(s2.slice(0, i).join("/"))?.size ?? 0) >= SLUG_SIBLINGS) s2[i] = ":slug";
+    }
+  }
+  const out = /* @__PURE__ */ new Map();
+  parsed.forEach((p2, i) => {
+    const keys = [...new Set(p2.query.map(([k, v2]) => `${k}=${normalizeQueryValue(v2)}`))].sort(cmp);
+    out.set(p2.url, `/${segs[i].join("/")}${keys.length ? `?${keys.join("&")}` : ""}`);
+  });
+  return out;
+}
+var STRUCTURAL = /* @__PURE__ */ new Set([
+  "header",
+  "nav",
+  "main",
+  "aside",
+  "footer",
+  "article",
+  "section",
+  "form",
+  "table",
+  "dialog",
+  "iframe",
+  "video",
+  "audio",
+  "search",
+  "fieldset",
+  "details"
+]);
+var ROLE_TAG = {
+  banner: "header",
+  navigation: "nav",
+  main: "main",
+  complementary: "aside",
+  contentinfo: "footer",
+  search: "search",
+  form: "form",
+  dialog: "dialog",
+  table: "table",
+  grid: "table"
+};
+var OPAQUE = /* @__PURE__ */ new Set(["script", "style", "template", "noscript", "svg", "head"]);
+var SKELETON_DEPTH = 5;
+function skeletonOfNodes(nodes, depth) {
+  const out = [];
+  for (const n of nodes) {
+    if (n.type !== "element" || OPAQUE.has(n.tag)) continue;
+    const role = (attr(n, "role") ?? "").trim().toLowerCase();
+    const tag = ROLE_TAG[role] ?? (STRUCTURAL.has(n.tag) ? n.tag : void 0);
+    const parts = tag ? depth < SKELETON_DEPTH ? skeletonOfNodes(n.children, depth + 1) : [] : skeletonOfNodes(n.children, depth);
+    if (!tag) {
+      for (const p2 of parts) if (out[out.length - 1] !== p2) out.push(p2);
+      continue;
+    }
+    const s2 = parts.length ? `${tag}(${parts.join(",")})` : tag;
+    if (out[out.length - 1] !== s2) out.push(s2);
+  }
+  return out;
+}
+function skeletonOf(html) {
+  const doc = parseHtml(html, "skeleton.html");
+  const body = doc.elements.find((e) => e.tag === "body");
+  const shape = skeletonOfNodes(body ? body.children : doc.roots, 0).join(",");
+  return createHash3("sha256").update(shape).digest("hex").slice(0, 12);
+}
+var SEARCH_PARAMS = /* @__PURE__ */ new Set([
+  "q",
+  "s",
+  "query",
+  "search",
+  "recherche",
+  "keys",
+  "keywords",
+  "keyword",
+  "term",
+  "terms",
+  "text",
+  "motcle",
+  "mot-cle",
+  "search_api_fulltext"
+]);
+function readFacts(html, pageUrl) {
+  const doc = parseHtml(html, "page.html");
+  let origin;
+  try {
+    origin = new URL(pageUrl).origin;
+  } catch {
+    origin = void 0;
+  }
+  let documentLinks = 0;
+  if (origin) {
+    for (const a2 of doc.elements) {
+      if (a2.tag !== "a") continue;
+      const href = attr(a2, "href");
+      if (!href) continue;
+      try {
+        const u2 = new URL(href, pageUrl);
+        if (u2.origin === origin && isDownloadUrl(u2.href) && /\.(pdf|docx?|odt|xlsx?|ods|pptx?|odp|rtf|csv|epub)$/i.test(u2.pathname)) documentLinks++;
+      } catch {
+      }
+    }
+  }
+  return { documentLinks, ...origin ? searchFormOf(doc.elements, pageUrl, origin) : {} };
+}
+function searchFormOf(elements, pageUrl, origin) {
+  for (const form of elements) {
+    if (form.tag !== "form") continue;
+    if ((attr(form, "method") ?? "get").trim().toLowerCase() !== "get") continue;
+    const inSearch = attr(form, "role") === "search" || ancestors(form).some((a2) => a2.tag === "search" || attr(a2, "role") === "search");
+    const fields = descendants(form).filter((e) => e.tag === "input" && (attr(e, "name") ?? "").trim() !== "").sort((a2, b) => a2.start - b.start);
+    const typed = (e) => (attr(e, "type") ?? "text").trim().toLowerCase();
+    const field = fields.find((e) => typed(e) === "search") ?? fields.find((e) => (typed(e) === "text" || typed(e) === "search") && SEARCH_PARAMS.has((attr(e, "name") ?? "").toLowerCase()));
+    if (!field) continue;
+    const param = (attr(field, "name") ?? "").trim();
+    if (!inSearch && typed(field) !== "search" && !SEARCH_PARAMS.has(param.toLowerCase())) continue;
+    try {
+      const u2 = new URL(attr(form, "action") || pageUrl, pageUrl);
+      if (u2.origin !== origin || !/^https?:$/.test(u2.protocol)) continue;
+      return { searchForm: { action: `${u2.origin}${u2.pathname}`, param } };
+    } catch {
+    }
+  }
+  return {};
+}
+function searchUrl(action, param, query) {
+  return `${action}?${new URLSearchParams([[param, query]]).toString()}`;
+}
+var TITLE_SEPARATOR = /\s+[-|–—·:»]\s+/;
+function strippedTitles(titles) {
+  const parts = /* @__PURE__ */ new Map();
+  for (const t3 of titles.values()) for (const p2 of new Set(t3.split(TITLE_SEPARATOR).map((x2) => x2.trim()))) parts.set(p2, (parts.get(p2) ?? 0) + 1);
+  const common = titles.size >= 3 ? new Set([...parts].filter(([, n]) => n * 2 >= titles.size).map(([p2]) => p2)) : /* @__PURE__ */ new Set();
+  const out = /* @__PURE__ */ new Map();
+  for (const [url, t3] of titles) {
+    const kept = t3.split(TITLE_SEPARATOR).map((x2) => x2.trim()).filter((x2) => x2 && !common.has(x2));
+    out.set(url, kept.join(" "));
+  }
+  return out;
+}
+function matchKind(kind, pages) {
+  const kws = kind.keywords.map(norm3).filter(Boolean);
+  let best;
+  for (const page of pages) {
+    for (let ki = 0; ki < kws.length; ki++) {
+      const k = kws[ki];
+      const where = keywordMatches(page.urlHay, k) ? "URL" : keywordMatches(page.titleHay, k) ? "title" : void 0;
+      if (!where) continue;
+      const rank = [page.depth, page.hasQuery, where === "URL" ? 0 : 1, ki, page.url.length, page.url, page.key.length, page.key];
+      if (!best || cmpTuple(rank, best.rank) < 0) best = { page, keyword: kind.keywords[ki] ?? k, where, rank };
+    }
+  }
+  return best;
+}
+function proposeSample(inputs, opts) {
+  const size2 = opts.size !== void 0 && Number.isFinite(opts.size) && opts.size > 0 ? Math.floor(opts.size) : DEFAULT_SAMPLE_SIZE;
+  const query = opts.searchQuery?.trim() || FIXED_SEARCH_QUERY;
+  const locale = opts.locale ?? "fr";
+  const keyOf = (i) => i.id ? `id:${i.id}` : `url:${i.url}`;
+  const sorted = inputs.map((i) => ({ ...i, url: i.url.split("#", 1)[0] })).filter((i) => i.url).sort(
+    (a2, b) => cmpTuple(
+      [keyOf(a2), a2.url, a2.title ?? "", a2.skeleton ?? "", a2.html ?? "", a2.auth ? 1 : 0],
+      [keyOf(b), b.url, b.title ?? "", b.skeleton ?? "", b.html ?? "", b.auth ? 1 : 0]
+    )
+  );
+  const unique = [];
+  for (const i of sorted) if (!unique.length || keyOf(unique[unique.length - 1]) !== keyOf(i)) unique.push(i);
+  const documents = unique.filter((i) => isDownloadUrl(i.url));
+  const pageInputs = unique.filter((i) => !isDownloadUrl(i.url));
+  const titles = /* @__PURE__ */ new Map();
+  for (const i of pageInputs) if (i.title?.trim()) titles.set(keyOf(i), i.title.trim());
+  const bare = strippedTitles(titles);
+  const pages = pageInputs.map((i) => {
+    const parsed = parseUrl(i.url);
+    const words = parsed.segments.map((s2) => s2.replace(/\.x?html?$/i, "")).join(" ");
+    const root = parsed.segments.length === 0 || /^index\.x?html?$/i.test(parsed.segments.join("/"));
+    return {
+      key: keyOf(i),
+      ...i.id ? { id: i.id } : {},
+      ...i.auth !== void 0 ? { auth: i.auth } : {},
+      url: i.url,
+      ...i.title?.trim() ? { title: i.title.trim() } : {},
+      ...i.html ? { html: i.html } : {},
+      ...i.skeleton ? { skeleton: i.skeleton } : {},
+      parsed,
+      depth: root ? 0 : parsed.segments.length,
+      hasQuery: parsed.query.length ? 1 : 0,
+      urlHay: norm3(`${words.replace(/[-_.+~]+/g, " ")}${root ? " home index" : ""}`),
+      titleHay: norm3(bare.get(keyOf(i)) ?? ""),
+      ...i.html ? { facts: readFacts(i.html, i.url) } : {}
+    };
+  });
+  const byShallow = [...pages].sort((a2, b) => cmpTuple([a2.depth, a2.hasQuery, a2.url, a2.key], [b.depth, b.hasQuery, b.url, b.key]));
+  const picks = [];
+  const pickOf = /* @__PURE__ */ new Map();
+  const take = (page, reason) => {
+    const key2 = "key" in page ? page.key : `url:${page.url}`;
+    const hit = pickOf.get(key2);
+    if (hit) {
+      if (!hit.reasons.includes(reason)) hit.reasons.push(reason);
+      return;
+    }
+    const from = "key" in page ? page : void 0;
+    const p2 = {
+      key: key2,
+      url: page.url,
+      ...from?.id ? { id: from.id } : {},
+      ...from?.auth !== void 0 ? { auth: from.auth } : {},
+      ...from?.title ? { title: from.title } : {},
+      reasons: [reason]
+    };
+    picks.push(p2);
+    pickOf.set(key2, p2);
+  };
+  const absent = [];
+  const pathOf2 = (p2) => p2.parsed.path + (p2.parsed.query.length ? `?${new URLSearchParams(p2.parsed.query).toString()}` : "");
+  for (const kind of opts.methodology.requiredKinds) {
+    if (isTransverseKind(kind) || isRepresentativeKind(kind)) continue;
+    const label = kindLabel(kind, locale);
+    if (/recherche|search/.test(kind.id)) {
+      const withForm = byShallow.find((p2) => p2.facts?.searchForm);
+      if (withForm?.facts?.searchForm) {
+        const { action, param: param2 } = withForm.facts.searchForm;
+        take({ url: searchUrl(action, param2, query) }, `required kind "${label}", fixed query "${query}" through the search form of ${pathOf2(withForm)}`);
+        continue;
+      }
+      const withParam = byShallow.find(
+        (p2) => p2.parsed.origin && p2.parsed.query.some(([k]) => SEARCH_PARAMS.has(k.toLowerCase())) && kind.keywords.map(norm3).some((k) => keywordMatches(p2.urlHay, k))
+      );
+      const param = withParam?.parsed.query.find(([k]) => SEARCH_PARAMS.has(k.toLowerCase()))?.[0];
+      if (withParam && param) {
+        take(
+          { url: searchUrl(`${withParam.parsed.origin}${new URL(withParam.url).pathname}`, param, query) },
+          `required kind "${label}", fixed query "${query}" on the discovered search URL ${pathOf2(withParam)}`
+        );
+        continue;
+      }
+    }
+    const m3 = matchKind(kind, pages);
+    if (m3) {
+      const extra = /recherche|search/.test(kind.id) ? `; no search parameter known \u2014 search "${query}" by hand on this page` : "";
+      take(m3.page, `required kind "${label}", keyword "${m3.keyword}" in the ${m3.where}${extra}`);
+      continue;
+    }
+    if (/document/.test(kind.id)) {
+      const linking = byShallow.find((p2) => (p2.facts?.documentLinks ?? 0) > 0);
+      if (linking) {
+        take(linking, `required kind "${label}", the shallowest page linking downloadable documents (${linking.facts.documentLinks})`);
+        continue;
+      }
+    }
+    absent.push({
+      kind: kind.id,
+      reason: `${PROPOSAL_NOTE}no discovered URL or title matches ${kind.keywords.map((k) => `"${k}"`).join(", ")}${/document/.test(kind.id) && documents.length ? ` (${documents.length} document URL(s) discovered, no page known to link them)` : ""} \u2014 confirm the site has none`
+    });
+  }
+  const patterns = urlPatterns(pages.map((p2) => p2.url));
+  const groups = /* @__PURE__ */ new Map();
+  for (const p2 of pages) {
+    const key2 = p2.skeleton ? `template:${p2.skeleton}` : `url:${patterns.get(p2.url)}`;
+    let g = groups.get(key2);
+    if (!g) groups.set(key2, g = []);
+    g.push(p2);
+  }
+  const clusters = [...groups].map(([key2, members]) => ({
+    key: key2,
+    members: members.sort((a2, b) => cmpTuple([a2.hasQuery, a2.url, a2.key], [b.hasQuery, b.url, b.key])),
+    pattern: [...new Set(members.map((m3) => patterns.get(m3.url)))].sort(cmp).join(" ")
+  })).sort((a2, b) => cmpTuple([-a2.members.length, a2.pattern, a2.key], [-b.members.length, b.pattern, b.key]));
+  const representativeKind = opts.methodology.requiredKinds.find(isRepresentativeKind);
+  const repLabel = representativeKind ? kindLabel(representativeKind, locale) : "representative pages";
+  const out = [];
+  let leftOut = 0;
+  let represented = 0;
+  for (const c of clusters) {
+    const sampled = c.members.find((m3) => pickOf.has(m3.key));
+    if (sampled) {
+      out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: sampled.url });
+      continue;
+    }
+    if (picks.length >= size2) {
+      out.push({ key: c.key, pattern: c.pattern, size: c.members.length });
+      leftOut++;
+      continue;
+    }
+    const rep = c.members[0];
+    const what = c.key.startsWith("template:") ? `template ${c.key.slice("template:".length)} (${c.pattern})` : `template cluster ${c.pattern}`;
+    take(rep, `${repLabel}: ${what}, ${c.members.length} page(s), first by URL`);
+    represented++;
+    out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: rep.url });
+  }
+  if (representativeKind && represented === 0 && !leftOut)
+    absent.push({
+      kind: representativeKind.id,
+      reason: `${PROPOSAL_NOTE}every discovered page is already sampled for a required kind \u2014 no other template found`
+    });
+  const used = new Set(picks.flatMap((p2) => p2.id ? [p2.id] : []));
+  const samplePages2 = picks.map((p2) => {
+    let id = p2.id;
+    if (!id) {
+      const base = slugifyPageId(p2.url);
+      id = base;
+      for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+      used.add(id);
+    }
+    return {
+      id,
+      name: p2.title ?? nameFromUrl(p2.url),
+      url: p2.url,
+      ...p2.auth !== void 0 ? { auth: p2.auth } : {},
+      notes: `${PROPOSAL_NOTE}${p2.reasons.join("; ")}`
+    };
+  });
+  return {
+    sample: { pages: samplePages2, ...carryAbsent(absent) },
+    clusters: out,
+    considered: pages.length,
+    documents: documents.length,
+    leftOut
+  };
+}
+function humanNotes(notes) {
+  return (notes ?? "").split(" | ").filter((s2) => s2.trim() && !s2.startsWith(PROPOSAL_NOTE)).join(" | ");
+}
+function applyProposal(existing, proposal) {
+  const declared = existing?.pages ?? [];
+  const prior = /* @__PURE__ */ new Map();
+  const claimed = /* @__PURE__ */ new Set();
+  const byId2 = /* @__PURE__ */ new Map();
+  for (const d2 of declared) if (!byId2.has(d2.id)) byId2.set(d2.id, d2);
+  for (const p2 of proposal.pages) {
+    const d2 = byId2.get(p2.id);
+    if (d2 && !claimed.has(d2)) {
+      prior.set(p2, d2);
+      claimed.add(d2);
+    }
+  }
+  for (const p2 of proposal.pages) {
+    if (prior.has(p2)) continue;
+    const d2 = declared.find((x2) => x2.url === p2.url && !claimed.has(x2));
+    if (d2) {
+      prior.set(p2, d2);
+      claimed.add(d2);
+    }
+  }
+  const urlCount = /* @__PURE__ */ new Map();
+  for (const d2 of declared) urlCount.set(d2.url, (urlCount.get(d2.url) ?? 0) + 1);
+  const humanWork = (p2) => p2.auth !== void 0 || !!p2.storageState || !!p2.sources?.length || humanNotes(p2.notes) !== "" || (urlCount.get(p2.url) ?? 0) > 1;
+  const outside = declared.filter((d2) => !claimed.has(d2));
+  const kept = outside.filter(humanWork);
+  const dropped = outside.filter((d2) => !humanWork(d2));
+  const used = /* @__PURE__ */ new Set([...kept.map((p2) => p2.id), ...[...prior.values()].map((d2) => d2.id)]);
+  const pages = proposal.pages.map((p2) => {
+    const d2 = prior.get(p2);
+    let id = d2?.id ?? p2.id;
+    if (!d2) {
+      const base = id;
+      for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+      used.add(id);
+    }
+    const notes = [humanNotes(d2?.notes), p2.notes].filter(Boolean).join(" | ");
+    const auth = d2?.auth ?? p2.auth;
+    return {
+      id,
+      name: d2?.name ?? p2.name,
+      url: p2.url,
+      ...auth !== void 0 ? { auth } : {},
+      ...d2?.storageState ? { storageState: d2.storageState } : {},
+      ...notes ? { notes } : {},
+      ...d2?.sources?.length ? { sources: d2.sources } : {}
+    };
+  });
+  const humanAbsent = (existing?.absent ?? []).filter((a2) => !a2.reason.startsWith(PROPOSAL_NOTE));
+  const absent = [...humanAbsent, ...(proposal.absent ?? []).filter((a2) => !humanAbsent.some((h3) => h3.kind === a2.kind))];
+  return {
+    sample: {
+      pages: [...pages, ...kept],
+      ...existing?.transverse?.length ? { transverse: existing.transverse } : {},
+      ...existing?.global?.length ? { global: existing.global } : {},
+      ...existing?.exempt?.length ? { exempt: existing.exempt } : {},
+      ...carryAbsent(absent)
+    },
+    kept,
+    dropped
+  };
 }
 
 // src/auditor.ts
@@ -53316,6 +54213,8 @@ var L3 = {
     allPages: (n) => `toutes les pages (${n}/${n})`,
     morePages: (n) => `+${n} autre(s)`,
     offPage: (n) => `${n} occurrence(s) sans page identifi\xE9e`,
+    offPageComponent: (n) => `${n} occurrence(s) dans un composant non servi`,
+    offPageDocument: (n) => `${n} occurrence(s) dans un document t\xE9l\xE9chargeable`,
     atLeast: "au moins sur"
   },
   en: {
@@ -53363,6 +54262,8 @@ var L3 = {
     allPages: (n) => `all pages (${n}/${n})`,
     morePages: (n) => `+${n} more`,
     offPage: (n) => `${n} occurrence(s) on no page`,
+    offPageComponent: (n) => `${n} occurrence(s) in a component no page serves`,
+    offPageDocument: (n) => `${n} occurrence(s) in a downloadable document`,
     atLeast: "at least on"
   }
 };
@@ -53544,7 +54445,8 @@ function renderReproductionContext(normative, lang) {
     const auth = meta2 ? meta2.authRequired ? s2.yes : s2.no : s2.unknown;
     const name = meta2?.page ? `${meta2.page} \xB7 ` : "";
     out.push(`- **URL** : \`${f2.file}\` \u2014 ${name}${s2.authRequired} : ${auth}`);
-    if (meta2?.notes) out.push(`  - \u21B3 ${meta2.notes}`);
+    const notes = lang === "en" ? meta2?.notes : humanNotes(meta2?.notes);
+    if (notes) out.push(`  - \u21B3 ${notes}`);
   }
   out.push(`- _${s2.reproSteps}_`, "");
   return out;
@@ -53580,16 +54482,18 @@ function renderCompactUnit(m3, lang, opts) {
 }
 function pagesLine(findings, resolver, lang) {
   const s2 = L3[lang];
-  const { pages, orphans, approximate } = occurrencesByPage(findings, resolver);
+  const { pages, orphans, offPage, approximate } = occurrencesByPage(findings, resolver);
   const parts = [];
-  const total = resolver.pages.length;
-  const everywhere = pages.length > 3 && pages.length === total;
+  const total = samplePages(resolver.pages).length;
+  const everywhere = total > 3 && samplePages(pages.map((x2) => x2.page)).length === total;
   if (everywhere) parts.push(s2.allPages(total));
   else {
-    parts.push(...pages.slice(0, PAGES_LISTED_MAX).map(({ page, count }) => `${mdLink(page.name, page.url)} (${count})`));
+    parts.push(...pages.slice(0, PAGES_LISTED_MAX).map(({ page, count }) => `${mdLink(pageLabel(page, lang), page.url)} (${count})`));
     if (pages.length > PAGES_LISTED_MAX) parts.push(s2.morePages(pages.length - PAGES_LISTED_MAX));
   }
-  if (orphans) parts.push(s2.offPage(orphans));
+  if (offPage.component) parts.push(s2.offPageComponent(offPage.component));
+  if (offPage.document) parts.push(s2.offPageDocument(offPage.document));
+  if (offPage.unknown) parts.push(s2.offPage(offPage.unknown));
   if (!pages.length && !orphans) return void 0;
   return `${approximate && !everywhere && pages.length ? `${s2.atLeast} ` : ""}${parts.join(" \xB7 ")}`;
 }
@@ -55098,7 +56002,7 @@ function captureFilesPresent(files, cwd) {
     const m3 = /^(.*(?:^|\/)\.ultra11y\/pages\/[^/]+)\//.exec(f2.replace(/\\/g, "/"));
     if (m3?.[1]) dirs.add(resolve6(cwd ?? process.cwd(), m3[1]));
   }
-  const present = CAPTURE_FILES.filter((name) => [...dirs].some((d2) => existsSync14(join14(d2, name))));
+  const present = CAPTURE_FILES.filter((name) => [...dirs].some((d2) => existsSync15(join14(d2, name))));
   return present.length ? present : ["dom.html"];
 }
 var VERAPDF_RULES_SHOWN = 6;
@@ -55753,7 +56657,7 @@ function resolveThreshold(cwd, env) {
   return "bloquant";
 }
 function loopKey(sessionId, intent, findings) {
-  const h3 = createHash3("sha256");
+  const h3 = createHash4("sha256");
   h3.update(`${sessionId}\0${intent}\0`);
   for (const id of findings.map(findingId).sort()) h3.update(`${id}\0`);
   return h3.digest("hex").slice(0, 32);
@@ -55763,7 +56667,7 @@ function firstSighting(key2) {
     const dir = join15(tmpdir(), "ultra11y-hook");
     mkdirSync6(dir, { recursive: true });
     const marker = join15(dir, key2);
-    if (existsSync15(marker)) return false;
+    if (existsSync16(marker)) return false;
     writeFileSync6(marker, "");
     return true;
   } catch {
@@ -55850,7 +56754,7 @@ function decide(payload, deps = {}) {
 
 // src/affected.ts
 import { execFileSync as execFileSync3 } from "child_process";
-import { existsSync as existsSync16, readFileSync as readFileSync12, realpathSync as realpathSync3 } from "fs";
+import { existsSync as existsSync17, readFileSync as readFileSync12, realpathSync as realpathSync3 } from "fs";
 import { join as join16, posix as posix3, relative as relative7, resolve as resolve7 } from "path";
 var MARKUP_EXT = /\.(?:html?|xhtml|jsx|tsx|vue|svelte|astro|mdx)$/i;
 var APP_PAGE = /^(?:src\/)?app\/(?:(.+)\/)?page\.(?:tsx|jsx|ts|js|mdx)$/;
@@ -55858,7 +56762,7 @@ var APP_WRAPPER = /^(?:src\/)?app\/(?:(.+)\/)?(?:layout|template)\.(?:tsx|jsx|ts
 var PAGES_FILE = /^(?:src\/)?pages\/(?!api\/)(.+)\.(?:tsx|jsx|ts|js|mdx|md)$/;
 var NEXT_CONFIGS = ["next.config.js", "next.config.mjs", "next.config.cjs", "next.config.ts", "next.config.mts"];
 function isNextProject(root) {
-  if (NEXT_CONFIGS.some((f2) => existsSync16(join16(root, f2)))) return true;
+  if (NEXT_CONFIGS.some((f2) => existsSync17(join16(root, f2)))) return true;
   try {
     const pkg = JSON.parse(readFileSync12(join16(root, "package.json"), "utf8"));
     return ["dependencies", "devDependencies", "peerDependencies"].some((k) => typeof pkg[k]?.next === "string");
@@ -55967,7 +56871,7 @@ function selectAffected(input) {
   const unmapped = [];
   for (const file of changed) {
     const key2 = keyOf.get(file);
-    const reached = key2 ? [...reverseClosure(graph, key2, (k) => routeOf(toRel(k)) !== null)].map(toRel) : existsSync16(join16(root, file)) ? [file] : [];
+    const reached = key2 ? [...reverseClosure(graph, key2, (k) => routeOf(toRel(k)) !== null)].map(toRel) : existsSync17(join16(root, file)) ? [file] : [];
     let hit = false;
     for (const f2 of reached) {
       for (const s2 of sourceOf2.get(f2) ?? []) {
@@ -55980,7 +56884,7 @@ function selectAffected(input) {
       if (route.kind === "page") addPattern(route.pattern, f2, f2, "page", file);
       else for (const pf of pageFiles.filter((p2) => p2.startsWith(`${route.dir}/`))) addPattern(routeOf(pf).pattern, pf, f2, "layout", file);
     }
-    if (!hit && MARKUP_EXT.test(file) && !isTestArtifact(file) && existsSync16(join16(root, file))) unmapped.push(file);
+    if (!hit && MARKUP_EXT.test(file) && !isTestArtifact(file) && existsSync17(join16(root, file))) unmapped.push(file);
   }
   return {
     changed,
@@ -56020,7 +56924,7 @@ function changedSince(ref, root) {
 }
 
 // src/report.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync18, mkdirSync as mkdirSync8, writeFileSync as writeFileSync7 } from "fs";
+import { copyFileSync as copyFileSync2, existsSync as existsSync19, mkdirSync as mkdirSync8, writeFileSync as writeFileSync7 } from "fs";
 import { dirname as dirname11, join as join18, relative as relative9 } from "path";
 
 // src/pages-report.ts
@@ -56039,6 +56943,9 @@ var L5 = {
     date: "Date",
     standard: "R\xE9f\xE9rentiel",
     pagesCount: "Pages",
+    journeyStatesCount: "\xC9tats de parcours",
+    outOfSampleCount: "Routes hors \xE9chantillon",
+    kindsNote: "Les lignes marqu\xE9es \xAB \xE9tat de parcours \xBB ou \xAB hors \xE9chantillon \xBB ne sont pas des pages de l'\xE9chantillon : leurs constats comptent pour leur crit\xE8re, mais elles n'entrent ni dans le nombre de pages ni dans le taux moyen.",
     page: "Page",
     url: "URL",
     basis: "Base",
@@ -56087,6 +56994,9 @@ var L5 = {
     date: "Date",
     standard: "Standard",
     pagesCount: "Pages",
+    journeyStatesCount: "Journey states",
+    outOfSampleCount: "Routes outside the sample",
+    kindsNote: "Rows marked \u201Cjourney state\u201D or \u201Coutside the sample\u201D are not pages of the sample: their findings count against their criterion, but they enter neither the page count nor the mean rate.",
     page: "Page",
     url: "URL",
     basis: "Basis",
@@ -56228,7 +57138,7 @@ function renderPageReport(result, page, opts = {}) {
   const h3 = opts.heading ?? "##";
   const s2 = L5[lang];
   const out = [];
-  out.push(`${h3} ${page.name}${page.auth ? " \u{1F512}" : ""}`, "");
+  out.push(`${h3} ${pageLabel(page, lang)}${page.auth ? " \u{1F512}" : ""}`, "");
   const meta2 = [];
   meta2.push(`- **${s2.url}** : \`${page.url}\``);
   meta2.push(`- **${s2.basis}** : ${basisLabel(page.basis, lang)}`);
@@ -56282,6 +57192,8 @@ function renderPageReport(result, page, opts = {}) {
 }
 function header2(result, pages, standard, lang, title) {
   const s2 = L5[lang];
+  const states = pages.filter((p2) => p2.kind === "journey-state").length;
+  const outOfSample = pages.filter((p2) => p2.kind === "out-of-sample").length;
   return [
     pagesReportMarker(standard),
     "",
@@ -56289,7 +57201,10 @@ function header2(result, pages, standard, lang, title) {
     "",
     `- **${s2.date}** : ${result.date}`,
     `- **${s2.standard}** : ${isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name}`,
-    `- **${s2.pagesCount}** : ${pages.length}`,
+    // The sample's pages counted as pages; journey states and stray routes beside them (#232).
+    `- **${s2.pagesCount}** : ${samplePages(pages).length}`,
+    ...outOfSample ? [`- **${s2.outOfSampleCount}** : ${outOfSample}`] : [],
+    ...states ? [`- **${s2.journeyStatesCount}** : ${states}`] : [],
     ""
   ];
 }
@@ -56300,6 +57215,7 @@ function renderPagesIndex(result, pages, opts = {}) {
   const out = header2(result, pages, standard, lang, s2.indexTitle);
   const pack = !isCore(standard);
   out.push(`> ${pack ? s2.packIndexNote : s2.indexNote}`, "");
+  if (pages.some((p2) => p2.kind)) out.push(`> ${s2.kindsNote}`, "");
   out.push(`| ${s2.page} | ${s2.url} | ${s2.basis} | ${pack ? s2.packRateShort : s2.rateShort} | ${s2.blocking} | ${s2.major} | ${s2.minor} | ${s2.sheet} |`);
   out.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const p2 of pages) {
@@ -56307,7 +57223,7 @@ function renderPagesIndex(result, pages, opts = {}) {
     const nc = [...p2.findings, ...(result.packFindings ?? []).filter((f2) => f2.page === p2.id)].filter((f2) => !f2.advisory);
     const href = opts.hrefs?.get(p2.id);
     out.push(
-      `| ${p2.name}${p2.auth ? " \u{1F512}" : ""} | \`${p2.url}\` | ${basisLabel(p2.basis, lang)} | ${formatPageRate(rows, standard, lang)} | ${nc.filter((f2) => f2.severity === "bloquant").length} | ${nc.filter((f2) => f2.severity === "majeur").length} | ${nc.filter((f2) => f2.severity === "mineur").length} | ${href ? `[${p2.id}](${href})` : p2.id} |`
+      `| ${pageLabel(p2, lang)}${p2.auth ? " \u{1F512}" : ""} | \`${p2.url}\` | ${basisLabel(p2.basis, lang)} | ${formatPageRate(rows, standard, lang)} | ${nc.filter((f2) => f2.severity === "bloquant").length} | ${nc.filter((f2) => f2.severity === "majeur").length} | ${nc.filter((f2) => f2.severity === "mineur").length} | ${href ? `[${p2.id}](${href})` : p2.id} |`
     );
   }
   out.push("");
@@ -56326,7 +57242,7 @@ function renderPageDocument(result, page, opts = {}) {
   const standard = opts.standard ?? CORE2;
   const lang = opts.lang ?? "en";
   const s2 = L5[lang];
-  const out = [pagesReportMarker(standard), "", `# ${s2.docTitle} \u2014 ${page.name}`, "", `- **${s2.date}** : ${result.date}`, ""];
+  const out = [pagesReportMarker(standard), "", `# ${s2.docTitle} \u2014 ${pageLabel(page, lang)}`, "", `- **${s2.date}** : ${result.date}`, ""];
   out.push(renderPageReport(result, page, { ...opts, standard, lang, heading: "##" }));
   return out.join("\n");
 }
@@ -56575,7 +57491,7 @@ function renderAppMap(r2, standard, rows, lang) {
 }
 
 // src/render-snapshot-report.ts
-import { copyFileSync, existsSync as existsSync17, mkdirSync as mkdirSync7 } from "fs";
+import { copyFileSync, existsSync as existsSync18, mkdirSync as mkdirSync7 } from "fs";
 import { join as join17, relative as relative8 } from "path";
 var PER_UNIT_MAX = 8;
 var L6 = {
@@ -56696,7 +57612,7 @@ function renderSnapshotAnnex(idx, lang, outDir) {
       out.push(`_${s2.failed(cell3(u2.error ?? "?"))}_`, "", "</details>", "");
       continue;
     }
-    if (u2.screenshot && existsSync17(u2.screenshot)) {
+    if (u2.screenshot && existsSync18(u2.screenshot)) {
       let href = relative8(outDir ?? ".", u2.screenshot).split("\\").join("/");
       if (outDir) {
         try {
@@ -56775,6 +57691,7 @@ var L7 = {
     averageRateFact: (pct2, n) => `${pct2} % \u2014 ${averageOfFr(n)}`,
     averageRateNone: "non calculable \u2014 aucune page de l'\xE9chantillon n'a de crit\xE8re d\xE9cid\xE9 (conforme ou non conforme)",
     averageRateExcluded: (k) => ` ; ${k} page(s) sans crit\xE8re d\xE9cid\xE9, hors moyenne`,
+    averageRateOutside: (states, routes) => ` ; hors moyenne : ${[states ? `${states} \xE9tat(s) de parcours` : "", routes ? `${routes} route(s) hors \xE9chantillon` : ""].filter(Boolean).join(", ")}`,
     averageRateOpen: (k) => ` ; ${k} crit\xE8re(s) encore \xE0 \xE9valuer sur ces pages, hors des taux`,
     conformanceNone: (na) => `non calculable \u2014 aucun crit\xE8re applicable dans ce p\xE9rim\xE8tre (${na} crit\xE8re(s) conforme(s) faute de sujet, aucun autre d\xE9cid\xE9 ni ouvert). Un d\xE9nominateur vide n'est pas un taux de 100 %.`,
     conformanceFormula: (v2, a2) => `crit\xE8res valid\xE9s \xF7 crit\xE8res applicables (${v2} \xF7 ${a2})`,
@@ -56851,6 +57768,7 @@ var L7 = {
     // Task 5 — « Constats par page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Constats par page",
     perPageNote: "Pour chaque page de l'\xE9chantillon : sa capture d'\xE9cran et les crit\xE8res non conformes relev\xE9s sur cette page.",
+    pageKindsNote: "Les lignes marqu\xE9es \xAB \xE9tat de parcours \xBB (un \xE9tat d'une page, enregistr\xE9 par un parcours rejou\xE9) ou \xAB hors \xE9chantillon \xBB (une route captur\xE9e que l'\xE9chantillon ne d\xE9clare pas) ne sont pas des pages de l'\xE9chantillon : leurs constats comptent pour leur crit\xE8re, mais elles n'entrent ni dans le nombre de pages audit\xE9es ni dans le taux moyen.",
     pageNcCriteria: (n) => `${n} crit\xE8re(s) non conforme(s) sur cette page`,
     transverseNote: (list) => `\xC9l\xE9ments transverses audit\xE9s sur chaque page : ${list}.`,
     authYes: "\u{1F512} authentification requise",
@@ -56908,6 +57826,8 @@ var L7 = {
     allPages: (n) => `toutes les pages (${n}/${n})`,
     morePages: (n) => `+${n} autre(s)`,
     offPage: (n) => `${n} sans page`,
+    offPageComponent: (n) => `${n} dans un composant non servi`,
+    offPageDocument: (n) => `${n} dans un document t\xE9l\xE9chargeable`,
     atLeast: "(au moins)",
     noPagesNote: "Aucune URL : cet audit porte sur le code source, aucune page du site n'a \xE9t\xE9 analys\xE9e. Les anomalies ne peuvent donc pas encore \xEAtre situ\xE9es sur des pages ; l'annexe technique indique comment compl\xE9ter l'analyse.",
     noPagesNoteTech: "Aucune page dans le p\xE9rim\xE8tre : pour situer chaque anomalie sur une URL, lancez `ultra11y scan --sample --merge <audit.json>` (\xE9chantillon d\xE9clar\xE9 dans `.ultra11yrc.json`, avec les `sources` de chaque page) ou capturez les pages dans `.ultra11y/pages/` avant l'audit.",
@@ -56942,6 +57862,8 @@ var L7 = {
     annexTitle: "Annexe \u2014 grille exhaustive des crit\xE8res",
     // THE READER'S REPORT and ITS TECHNICAL ANNEX.
     pagesAudited: "Pages audit\xE9es",
+    journeyStatesAudited: "\xC9tats de parcours",
+    outOfSampleAudited: "Routes hors \xE9chantillon",
     morePagesAudited: (n) => `+${n} autre(s)`,
     sourceOnlyScope: (files) => `code source uniquement (${files} fichier(s)) \u2014 aucune page du site n'a \xE9t\xE9 analys\xE9e`,
     annexPointer: (href) => `\u{1F4CE} Emplacements dans le code, m\xE9thode et commandes : [annexe technique](${href})`,
@@ -56954,6 +57876,8 @@ var L7 = {
     everyPage: (n) => `Toutes les pages audit\xE9es (${n})`,
     morePagesConcerned: (n) => `+${n} autre(s) page(s) \u2014 voir la grille par page`,
     orphanOccurrences: (n) => `${n} occurrence(s) sans page identifi\xE9e (dans le code source)`,
+    orphanComponent: (n) => `${n} occurrence(s) dans un composant non servi (rendu isol\xE9ment, servi par aucune page audit\xE9e)`,
+    orphanDocument: (n) => `${n} occurrence(s) dans un document t\xE9l\xE9chargeable`,
     whereCode: "O\xF9",
     inCodeOnly: (n) => `${n} occurrence(s) dans le code source \u2014 emplacements dans l'annexe technique`,
     expectedFix: "Correction attendue",
@@ -57031,6 +57955,7 @@ var L7 = {
     averageRateFact: (pct2, n) => `${pct2}% \u2014 ${averageOfEn(n)}`,
     averageRateNone: "not computable \u2014 no page of the sample has a decided criterion (conforming or non-conforming)",
     averageRateExcluded: (k) => `; ${k} page(s) with no decided criterion, left out of the mean`,
+    averageRateOutside: (states, routes) => `; left out of the mean: ${[states ? `${states} journey state(s)` : "", routes ? `${routes} route(s) outside the sample` : ""].filter(Boolean).join(", ")}`,
     averageRateOpen: (k) => `; ${k} criteria still to assess across these pages, left out of the rates`,
     conformanceNone: (na) => `not computable \u2014 no applicable criterion in this scope (${na} conforming for want of a subject, none other decided or open). An empty denominator is not a rate of 100%.`,
     conformanceFormula: (v2, a2) => `validated criteria \xF7 applicable criteria (${v2} \xF7 ${a2})`,
@@ -57099,6 +58024,7 @@ var L7 = {
     // Task 5 — « Findings per page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Findings per page",
     perPageNote: "For each sample page: its screenshot and the criteria found non-conforming on that page.",
+    pageKindsNote: "Rows marked \u201Cjourney state\u201D (a state of a page, recorded by a replayed journey) or \u201Coutside the sample\u201D (a captured route the sample does not declare) are not pages of the sample: their findings count against their criterion, but they enter neither the audited page count nor the mean rate.",
     pageNcCriteria: (n) => `${n} non-conforming criterion/criteria on this page`,
     transverseNote: (list) => `Transverse elements audited on every page: ${list}.`,
     authYes: "\u{1F512} authentication required",
@@ -57154,6 +58080,8 @@ var L7 = {
     allPages: (n) => `all pages (${n}/${n})`,
     morePages: (n) => `+${n} more`,
     offPage: (n) => `${n} on no page`,
+    offPageComponent: (n) => `${n} in a component no page serves`,
+    offPageDocument: (n) => `${n} in a downloadable document`,
     atLeast: "(at least)",
     noPagesNote: "No URL: this audit read source code, and no page of the site was analysed. The defects therefore cannot be located on pages yet; the technical annex explains how to complete the analysis.",
     noPagesNoteTech: "No page in scope: to locate each defect on a URL, run `ultra11y scan --sample --merge <audit.json>` (sample declared in `.ultra11yrc.json`, with each page's `sources`) or capture the pages into `.ultra11y/pages/` before the audit.",
@@ -57183,6 +58111,8 @@ var L7 = {
     showCriteria: (n) => `Show the ${n} criterion/criteria`,
     annexTitle: "Appendix \u2014 exhaustive criteria grid",
     pagesAudited: "Pages audited",
+    journeyStatesAudited: "Journey states",
+    outOfSampleAudited: "Routes outside the sample",
     morePagesAudited: (n) => `+${n} more`,
     sourceOnlyScope: (files) => `source code only (${files} file(s)) \u2014 no page of the site was analysed`,
     annexPointer: (href) => `\u{1F4CE} Code locations, method and commands: [technical annex](${href})`,
@@ -57195,6 +58125,8 @@ var L7 = {
     everyPage: (n) => `Every audited page (${n})`,
     morePagesConcerned: (n) => `+${n} more page(s) \u2014 see the per-page grid`,
     orphanOccurrences: (n) => `${n} occurrence(s) on no known page (in the source code)`,
+    orphanComponent: (n) => `${n} occurrence(s) in a component no page serves (rendered on its own, served by no audited page)`,
+    orphanDocument: (n) => `${n} occurrence(s) in a downloadable document`,
     whereCode: "Where",
     inCodeOnly: (n) => `${n} occurrence(s) in the source code \u2014 locations in the technical annex`,
     expectedFix: "Expected fix",
@@ -57329,7 +58261,11 @@ function reportCoverage(groups) {
   return { decided: t3.c + t3.nc, total: t3.c + t3.nc + t3.manual };
 }
 function averageConformanceRate(r2, pages, standard, lang) {
-  const rated = pages.map((p2) => {
+  const outside = {
+    states: pages.filter((p2) => p2.kind === "journey-state").length,
+    routes: pages.filter((p2) => p2.kind === "out-of-sample").length
+  };
+  const rated = samplePages(pages).map((p2) => {
     const rate = packPageRate(pageTally(pageCriterionRows(r2, p2, standard, lang)));
     return { id: p2.id, name: p2.name, url: p2.url, pct: rate.pct ?? 0, validated: rate.validated, applicable: rate.decided, open: rate.open };
   });
@@ -57339,13 +58275,18 @@ function averageConformanceRate(r2, pages, standard, lang) {
     pct: counted.length ? Math.round(mean * 100) : null,
     pages: counted,
     excluded: rated.filter((p2) => p2.applicable === 0).map((p2) => p2.id),
-    open: counted.reduce((n, p2) => n + p2.open, 0)
+    open: counted.reduce((n, p2) => n + p2.open, 0),
+    outside
   };
+}
+function averageOutside(avg, lang) {
+  const { states, routes } = avg.outside;
+  return states || routes ? L7[lang].averageRateOutside(states, routes) : "";
 }
 function averageRateLine(avg, lang) {
   const s2 = L7[lang];
   const title = `${s2.averageRate}${avg.open > 0 ? ` (${s2.conformanceProvisional})` : ""}`;
-  const excluded = avg.excluded.length ? s2.averageRateExcluded(avg.excluded.length) : "";
+  const excluded = (avg.excluded.length ? s2.averageRateExcluded(avg.excluded.length) : "") + averageOutside(avg, lang);
   const open = avg.pct !== null && avg.open > 0 ? s2.averageRateOpen(avg.open) : "";
   return avg.pct === null ? `**${title}** : ${s2.averageRateNone}${excluded}` : `**${title}** : ${avg.pct}% \u2014 ${s2.averageRateOf(avg.pages.length)}${open}${excluded}`;
 }
@@ -57484,7 +58425,7 @@ function summaryModel(lang, std, standard, tot, ncUnits, advisories, resolver, a
   if (!isCore(standard) && average?.pct != null) {
     facts.push({
       label: s2.averageRate,
-      value: `${s2.averageRateFact(average.pct, average.pages.length)}${average.open > 0 ? s2.averageRateOpen(average.open) : ""}${average.excluded.length ? s2.averageRateExcluded(average.excluded.length) : ""}`
+      value: `${s2.averageRateFact(average.pct, average.pages.length)}${average.open > 0 ? s2.averageRateOpen(average.open) : ""}${average.excluded.length ? s2.averageRateExcluded(average.excluded.length) : ""}${averageOutside(average, lang)}`
     });
   }
   facts.push({ label: s2.tallyLabel(rate.total), value: s2.tallyValue(rate.validated, tot.nc, rate.na, rate.open) });
@@ -57496,14 +58437,15 @@ function summaryModel(lang, std, standard, tot, ncUnits, advisories, resolver, a
     const fix = (fixes[0] ?? "") + (fixes.length > 1 ? ` ${s2.moreFixes(fixes.length - 1)}` : "");
     if (!withPages) return { icon: m3.icon, priority: s2.sev[u2.severity], criterion: u2.label, occurrences: m3.occurrences, fix };
     const found = occurrencesByPage(m3.normative, resolver);
-    const total = resolver.pages.length;
-    const all = found.pages.length > SUMMARY_PAGES_MAX && found.pages.length === total ? total : void 0;
-    const listed = all ? [] : found.pages.slice(0, SUMMARY_PAGES_MAX).map(({ page }) => ({ name: page.name, url: page.url }));
+    const total = samplePages(resolver.pages).length;
+    const all = total > SUMMARY_PAGES_MAX && samplePages(found.pages.map((x2) => x2.page)).length === total ? total : void 0;
+    const listed = all ? [] : found.pages.slice(0, SUMMARY_PAGES_MAX).map(({ page }) => ({ name: pageLabel(page, lang), url: page.url }));
     const pages = {
       listed,
       more: all ? 0 : Math.max(0, found.pages.length - SUMMARY_PAGES_MAX),
       ...all ? { all } : {},
       orphans: found.orphans,
+      offPage: found.offPage,
       approximate: found.approximate && !all
     };
     return { icon: m3.icon, priority: s2.sev[u2.severity], criterion: u2.label, occurrences: m3.occurrences, pages, fix };
@@ -57547,7 +58489,12 @@ function summaryPagesText(p2, lang, link) {
   const parts = [];
   if (p2.all) parts.push(s2.allPages(p2.all));
   else if (p2.listed.length) parts.push(p2.listed.map((x2) => link(x2.name, x2.url)).join(", ") + (p2.more ? ` ${s2.morePages(p2.more)}` : ""));
-  if (p2.orphans) parts.push(s2.offPage(p2.orphans));
+  if (p2.orphans) {
+    const by = p2.offPage ?? { component: 0, document: 0, unknown: p2.orphans };
+    if (by.component) parts.push(s2.offPageComponent(by.component));
+    if (by.document) parts.push(s2.offPageDocument(by.document));
+    if (by.unknown) parts.push(s2.offPage(by.unknown));
+  }
   if (!parts.length) return "\u2014";
   return parts.join(" \xB7 ") + (p2.approximate ? ` ${s2.atLeast}` : "");
 }
@@ -57643,15 +58590,17 @@ function renderReaderUnit(u2, standard, lang, resolver, cropFor) {
   const example = cropFor ? m3.normative.map((f2) => cropFor(f2)).find((c) => c !== void 0) : void 0;
   if (example) out.push(`![${example.alt}](${example.href})`, "");
   if (resolver.pages.length) {
-    const { pages, orphans, approximate } = occurrencesByPage(m3.normative, resolver);
-    const total = resolver.pages.length;
+    const { pages, offPage, approximate } = occurrencesByPage(m3.normative, resolver);
+    const total = samplePages(resolver.pages).length;
     const lines = [];
-    if (pages.length > 3 && pages.length === total) lines.push(`- ${s2.everyPage(total)}`);
+    if (total > 3 && samplePages(pages.map((x2) => x2.page)).length === total) lines.push(`- ${s2.everyPage(total)}`);
     else {
-      for (const { page, count } of pages.slice(0, READER_PAGES_MAX)) lines.push(`- ${mdText(page.name)} : ${urlText(page.url)} (${count})`);
+      for (const { page, count } of pages.slice(0, READER_PAGES_MAX)) lines.push(`- ${mdText(pageLabel(page, lang))} : ${urlText(page.url)} (${count})`);
       if (pages.length > READER_PAGES_MAX) lines.push(`- ${s2.morePagesConcerned(pages.length - READER_PAGES_MAX)}`);
     }
-    if (orphans) lines.push(`- ${s2.orphanOccurrences(orphans)}`);
+    if (offPage.component) lines.push(`- ${s2.orphanComponent(offPage.component)}`);
+    if (offPage.document) lines.push(`- ${s2.orphanDocument(offPage.document)}`);
+    if (offPage.unknown) lines.push(`- ${s2.orphanOccurrences(offPage.unknown)}`);
     out.push(`**${approximate ? s2.pagesConcernedAtLeast : s2.pagesConcerned}** :`, "", ...lines, "");
   } else {
     out.push(`**${s2.whereCode}** : ${s2.inCodeOnly(m3.occurrences)}`, "");
@@ -57784,10 +58733,16 @@ function render(r2, lang, opts) {
   out.push(`# ${s2.title(opts.std)}`, "");
   out.push(`- **${s2.date}** : ${r2.date}`);
   if (pageScope.length) {
-    const names = pageScope.slice(0, 8).map((p2) => mdText(p2.name));
-    out.push(
-      `- **${s2.pagesAudited}** : ${pageScope.length} \u2014 ${names.join(", ")}${pageScope.length > 8 ? ` ${s2.morePagesAudited(pageScope.length - 8)}` : ""}`
-    );
+    const listLine = (label, list) => {
+      const names = list.slice(0, 8).map((p2) => mdText(p2.name));
+      return `- **${label}** : ${list.length} \u2014 ${names.join(", ")}${list.length > 8 ? ` ${s2.morePagesAudited(list.length - 8)}` : ""}`;
+    };
+    const sample = samplePages(pageScope);
+    if (sample.length) out.push(listLine(s2.pagesAudited, sample));
+    const routes = pageScope.filter((p2) => p2.kind === "out-of-sample");
+    if (routes.length) out.push(listLine(s2.outOfSampleAudited, routes));
+    const states = pageScope.filter((p2) => p2.kind === "journey-state");
+    if (states.length) out.push(listLine(s2.journeyStatesAudited, states));
   } else {
     out.push(`- **${s2.scope}** : ${s2.sourceOnlyScope(r2.scope.files)}`);
   }
@@ -57847,12 +58802,14 @@ function render(r2, lang, opts) {
   }
   if (derivedPages.length) {
     out.push('<a id="page-rates"></a>', `## \u{1F4CB} ${s2.pageRatesTitle}`, "", `> ${average ? s2.pageRatesNotePack : s2.pageRatesNoteBusiness}`, "");
+    if (derivedPages.some((p2) => p2.kind)) out.push(`> ${s2.pageKindsNote}`, "");
     const conf = average ? new Map(average.pages.map((p2) => [p2.id, p2])) : void 0;
     out.push(`| ${s2.pageCol} | ${s2.urlCol} | ${conf ? s2.conformanceCol : s2.rateCol} |`, "| --- | --- | --- |");
     for (const p2 of derivedPages) {
       const criteria = pageCriterionRows(r2, p2, opts.standard, lang);
-      const cell3 = conf ? pageConformanceCell(conf.get(p2.id), lang) : formatPageRate(criteria, opts.standard, lang);
-      out.push(`| ${mdText(p2.name)}${p2.auth ? " \u{1F512}" : ""} | ${urlText(p2.url)} | ${cell3} |`);
+      const own = conf && p2.kind ? packPageRate(pageTally(criteria)) : void 0;
+      const cell3 = own ? pageConformanceCell({ pct: own.pct ?? 0, validated: own.validated, applicable: own.decided, open: own.open }, lang) : conf ? pageConformanceCell(conf.get(p2.id), lang) : formatPageRate(criteria, opts.standard, lang);
+      out.push(`| ${mdText(pageLabel(p2, lang))}${p2.auth ? " \u{1F512}" : ""} | ${urlText(p2.url)} | ${cell3} |`);
     }
     out.push("");
   }
@@ -57869,13 +58826,14 @@ function render(r2, lang, opts) {
     if (r2.scope.redirected?.length) out.push(...renderRedirected(r2.scope.redirected, lang), "");
     for (const pg of derivedPages) {
       const adv = pg.findings.filter((f2) => f2.advisory);
-      out.push("<details>", `<summary>${pg.name} \u2014 <code>${pg.url}</code> \u2014 ${pg.auth ? s2.authYes : s2.authNo}</summary>`, "");
+      out.push("<details>", `<summary>${pageLabel(pg, lang)} \u2014 <code>${pg.url}</code> \u2014 ${pg.auth ? s2.authYes : s2.authNo}</summary>`, "");
       const failing = pageFailingCriteria(r2, pg, opts.standard, lang);
       out.push(`- ${s2.pageNcCriteria(failing.length)}${adv.length ? ` \xB7 ${adv.length} ${s2.advCount}` : ""}`);
-      const notes = pageScope.find((x2) => x2.id === pg.id)?.notes;
+      const rawNotes = pageScope.find((x2) => x2.id === pg.id)?.notes;
+      const notes = lang === "en" ? rawNotes : humanNotes(rawNotes);
       if (notes) out.push(`- _${notes}_`);
       const shot = pageScreenshot(PAGES_DIR, pg.id) ?? join18(PAGES_DIR, pg.id, "screen.png");
-      if (existsSync18(shot)) {
+      if (existsSync19(shot)) {
         let href = relative9(opts.outDir ?? ".", shot).split("\\").join("/");
         if (opts.outDir) {
           try {
@@ -59090,7 +60048,7 @@ function storyProvenance(story) {
 
 // src/render-engine.ts
 import { spawn } from "child_process";
-import { existsSync as existsSync19, mkdirSync as mkdirSync9, mkdtempSync, readFileSync as readFileSync13, rmSync, unlinkSync, writeFileSync as writeFileSync8 } from "fs";
+import { existsSync as existsSync20, mkdirSync as mkdirSync9, mkdtempSync, readFileSync as readFileSync13, rmSync, unlinkSync, writeFileSync as writeFileSync8 } from "fs";
 import { createRequire as createRequire3 } from "module";
 import { availableParallelism, tmpdir as tmpdir2 } from "os";
 import { dirname as dirname12, join as join19, relative as relative10, resolve as resolve11 } from "path";
@@ -59194,7 +60152,7 @@ function rendererInstallHint(missing, root, lang) {
 }
 function aliasesOf(root) {
   for (const name of ["tsconfig.json", "jsconfig.json"]) {
-    if (!existsSync19(join19(root, name))) continue;
+    if (!existsSync20(join19(root, name))) continue;
     try {
       const found = sn(root, name);
       if (!found) continue;
@@ -59582,7 +60540,7 @@ function componentFallback(rel) {
 function storySource(root, rel) {
   for (const e of [".tsx", ".jsx", ".ts", ".js"]) {
     const sib = rel.replace(STORIES, e);
-    if (sib !== rel && existsSync19(join19(root, sib))) return sib;
+    if (sib !== rel && existsSync20(join19(root, sib))) return sib;
   }
   return rel;
 }
@@ -59717,12 +60675,12 @@ ${r2.html.trim()}
   for (const u2 of previous?.units ?? []) {
     if (!u2.capture || written.has(u2.id)) continue;
     const f2 = join19(root, u2.capture);
-    if (existsSync19(f2)) unlinkSync(f2);
+    if (existsSync20(f2)) unlinkSync(f2);
   }
   if (written.size) mkdirSync9(capDir, { recursive: true });
   for (const [id, content] of written) {
     const f2 = join19(capDir, `${id}.html`);
-    if (!existsSync19(f2) || readFileSync13(f2, "utf8") !== content) writeFileSync8(f2, content);
+    if (!existsSync20(f2) || readFileSync13(f2, "utf8") !== content) writeFileSync8(f2, content);
   }
   units.sort((a2, b) => a2.file.localeCompare(b.file) || a2.export.localeCompare(b.export));
   const manifest = {
@@ -59736,7 +60694,7 @@ ${r2.html.trim()}
   mkdirSync9(dirname12(manifestPath), { recursive: true });
   const text = `${JSON.stringify(manifest, null, 2)}
 `;
-  if (!existsSync19(manifestPath) || readFileSync13(manifestPath, "utf8") !== text) writeFileSync8(manifestPath, text);
+  if (!existsSync20(manifestPath) || readFileSync13(manifestPath, "utf8") !== text) writeFileSync8(manifestPath, text);
   return manifest;
 }
 function readRenderManifest(path) {
@@ -59783,118 +60741,8 @@ import { createRequire as createRequire4 } from "module";
 import { dirname as dirname13, join as join20, resolve as resolve12 } from "path";
 
 // src/scan.ts
-import { existsSync as existsSync20, readFileSync as readFileSync14 } from "fs";
+import { existsSync as existsSync21, readFileSync as readFileSync14 } from "fs";
 import { fileURLToPath as fileURLToPath3 } from "url";
-
-// src/crawl.ts
-function parseSitemapUrls(xml) {
-  const out = [];
-  const re2 = /<loc>\s*([^<]+?)\s*<\/loc>/gi;
-  let m3;
-  while ((m3 = re2.exec(xml)) !== null) out.push(m3[1]);
-  return out;
-}
-var DOWNLOAD_EXT = /\.(?:pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|tar|epub|dmg|exe|pkg|mp3|mp4|m4a|m4v|avi|mov|wmv|webm|ogg|wav|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i;
-function isDownloadUrl(url) {
-  let path = url;
-  try {
-    path = new URL(url).pathname;
-  } catch {
-  }
-  return DOWNLOAD_EXT.test(path);
-}
-function extractLinks(html, baseUrl) {
-  const origin = new URL(baseUrl).origin;
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  const re2 = /<a\b[^>]*\bhref\s*=\s*["']([^"']+)["']/gi;
-  let m3;
-  while ((m3 = re2.exec(html)) !== null) {
-    const href = m3[1].trim();
-    if (!href || href.startsWith("#")) continue;
-    let abs;
-    try {
-      abs = new URL(href, baseUrl);
-    } catch {
-      continue;
-    }
-    if (abs.protocol !== "http:" && abs.protocol !== "https:") continue;
-    if (abs.origin !== origin) continue;
-    if (isDownloadUrl(abs.pathname)) continue;
-    abs.hash = "";
-    const url = abs.href;
-    if (seen.has(url)) continue;
-    seen.add(url);
-    out.push(url);
-  }
-  return out;
-}
-function extractTitle(html) {
-  const m3 = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
-  if (!m3) return void 0;
-  const text = m3[1].replace(/&#x([0-9a-f]+);/gi, (_2, hex2) => String.fromCodePoint(Number.parseInt(hex2, 16))).replace(/&#(\d+);/g, (_2, dec) => String.fromCodePoint(Number(dec))).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
-  return text || void 0;
-}
-function nameFromUrl(url) {
-  let path = url;
-  try {
-    path = new URL(url).pathname;
-  } catch {
-  }
-  const last = path.split("/").filter(Boolean).pop();
-  if (!last) return "Accueil";
-  const words = last.replace(/\.x?html?$/i, "").replace(/[-_]+/g, " ").trim();
-  if (!words) return "Accueil";
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-function canonicalUrl(url) {
-  try {
-    const u2 = new URL(url);
-    u2.hash = "";
-    u2.pathname = u2.pathname.replace(/(^|\/)index\.x?html?$/i, "$1");
-    return u2.href;
-  } catch {
-    return url;
-  }
-}
-function crawlBound(n) {
-  return n === void 0 || !Number.isFinite(n) || n <= 0 ? Number.POSITIVE_INFINITY : n;
-}
-async function crawlUrls(start, opts) {
-  const depth = crawlBound(opts.depth);
-  const max = crawlBound(opts.max);
-  const order2 = [];
-  const first = canonicalUrl(start);
-  const seen = /* @__PURE__ */ new Set([first]);
-  const queue = [{ url: first, d: 0 }];
-  while (queue.length > 0 && order2.length < max) {
-    const { url, d: d2 } = queue.shift();
-    order2.push(url);
-    opts.onPage?.(url, order2.length);
-    if (d2 >= depth) continue;
-    let html = "";
-    let base = url;
-    try {
-      const got = await opts.fetchHtml(url);
-      if (typeof got === "string") html = got;
-      else {
-        html = got.html;
-        if (got.url) base = got.url;
-      }
-    } catch {
-      continue;
-    }
-    for (const link of extractLinks(html, base)) {
-      const canon = canonicalUrl(link);
-      if (seen.has(canon)) continue;
-      seen.add(canon);
-      queue.push({ url: canon, d: d2 + 1 });
-    }
-  }
-  return order2;
-}
-
-// src/scan.ts
 var portableFindingId = (finding) => {
   const posix5 = finding.file.replace(/\\/g, "/");
   const marker = `${PAGES_DIR}/`;
@@ -60136,7 +60984,7 @@ function tagSampleFindings(findings, page) {
 var sevRank = { bloquant: 3, majeur: 2, mineur: 1 };
 function resolveHostAnchor(file, snippet2) {
   const s2 = snippet2?.trim();
-  if (!s2 || !existsSync20(file)) return null;
+  if (!s2 || !existsSync21(file)) return null;
   let source;
   try {
     source = readFileSync14(file, "utf8");
@@ -60399,260 +61247,6 @@ function mergeSnapshotAudit(base, snap) {
   merged.residualRisks = merged.residualRisks.filter((r2) => !nowNc.has(r2.criteriaId));
   recomputeTallies2(merged);
   return merged;
-}
-
-// src/sample.ts
-import { existsSync as existsSync21 } from "fs";
-function looksLikeTarget(u2) {
-  return /^https?:\/\//i.test(u2) || /^(\.\.?[/\\]|[/\\])/.test(u2) || /\.x?html?$/i.test(u2);
-}
-function validateSample(raw) {
-  const issues = [];
-  const warnings = [];
-  const err = (path, message) => issues.push({ path, message });
-  const warn = (path, message) => warnings.push({ path, message });
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    err("sample", "sample must be an object { pages: [...], transverse?: [...] }");
-    return { ok: false, issues, warnings };
-  }
-  const s2 = raw;
-  const pages = Array.isArray(s2.pages) ? s2.pages : null;
-  if (!pages || pages.length === 0) err("sample.pages", "sample.pages must be a non-empty array");
-  const ids2 = /* @__PURE__ */ new Set();
-  pages?.forEach((pg, i) => {
-    if (typeof pg !== "object" || pg === null || Array.isArray(pg)) {
-      err(`sample.pages[${i}]`, "each page must be an object { id, name, url, auth?, storageState?, notes?, sources? }");
-      return;
-    }
-    const p2 = pg;
-    const id = p2.id;
-    if (typeof id !== "string" || id.trim() === "") {
-      err(`sample.pages[${i}].id`, "page id must be a non-empty string");
-    } else {
-      if (ids2.has(id)) err(`sample.pages[${i}].id`, `duplicate page id "${id}"`);
-      ids2.add(id);
-    }
-    if (typeof p2.name !== "string" || p2.name.trim() === "") err(`sample.pages[${i}].name`, "page name must be a non-empty string");
-    if (typeof p2.url !== "string" || p2.url.trim() === "") err(`sample.pages[${i}].url`, "page url must be a non-empty string");
-    else if (!looksLikeTarget(p2.url)) err(`sample.pages[${i}].url`, `malformed url "${p2.url}" (expected an http(s):// URL or an HTML file path)`);
-    if (p2.auth !== void 0 && typeof p2.auth !== "boolean") err(`sample.pages[${i}].auth`, "auth must be a boolean");
-    if (p2.storageState !== void 0 && (typeof p2.storageState !== "string" || p2.storageState.trim() === "")) {
-      err(`sample.pages[${i}].storageState`, "storageState must be a non-empty file path string");
-    } else if (typeof p2.storageState === "string" && p2.storageState.trim() !== "" && !existsSync21(p2.storageState)) {
-      warn(
-        `sample.pages[${i}].storageState`,
-        `storageState path not found: "${p2.storageState}" (resolved from the current directory) \u2014 the scan will not be able to load this session`
-      );
-    }
-    if (p2.notes !== void 0 && typeof p2.notes !== "string") err(`sample.pages[${i}].notes`, "notes must be a string");
-    if (p2.sources !== void 0 && (!Array.isArray(p2.sources) || p2.sources.some((s3) => typeof s3 !== "string")))
-      err(`sample.pages[${i}].sources`, "sources must be an array of file paths");
-  });
-  if (s2.transverse !== void 0) {
-    if (!Array.isArray(s2.transverse)) {
-      err("sample.transverse", "transverse must be an array of strings");
-    } else {
-      s2.transverse.forEach((t3, i) => {
-        if (typeof t3 !== "string" || t3.trim() === "") err(`sample.transverse[${i}]`, "transverse entries must be non-empty strings");
-      });
-    }
-  }
-  if (s2.global !== void 0) {
-    if (!Array.isArray(s2.global)) {
-      err("sample.global", "global must be an array of globs");
-    } else {
-      s2.global.forEach((g, i) => {
-        if (typeof g !== "string" || g.trim() === "") err(`sample.global[${i}]`, "global entries must be non-empty glob strings");
-      });
-    }
-  }
-  if (s2.exempt !== void 0) {
-    if (!Array.isArray(s2.exempt)) {
-      err("sample.exempt", "exempt must be an array of { path, reason }");
-    } else {
-      s2.exempt.forEach((e, i) => {
-        const x2 = e;
-        if (typeof x2 !== "object" || x2 === null || Array.isArray(x2)) {
-          err(`sample.exempt[${i}]`, "each exemption must be an object { path, reason }");
-          return;
-        }
-        if (typeof x2.path !== "string" || x2.path.trim() === "") err(`sample.exempt[${i}].path`, "path must be a non-empty glob");
-        if (typeof x2.reason !== "string" || x2.reason.trim() === "")
-          err(`sample.exempt[${i}].reason`, "reason is required \u2014 say why this route is left out of the sample");
-      });
-    }
-  }
-  if (s2.absent !== void 0) {
-    if (!Array.isArray(s2.absent)) {
-      err("sample.absent", "absent must be an array of { kind, reason }");
-    } else {
-      s2.absent.forEach((e, i) => {
-        const x2 = e;
-        if (typeof x2 !== "object" || x2 === null || Array.isArray(x2)) {
-          err(`sample.absent[${i}]`, "each entry must be an object { kind, reason }");
-          return;
-        }
-        if (typeof x2.kind !== "string" || x2.kind.trim() === "") err(`sample.absent[${i}].kind`, "kind must be a required page kind id");
-        if (typeof x2.reason !== "string" || x2.reason.trim() === "")
-          err(`sample.absent[${i}].reason`, "reason is required \u2014 say why the sample holds no page of this kind");
-      });
-    }
-  }
-  const ok = issues.length === 0;
-  return { ok, issues, warnings, sample: ok ? normalizeSample(s2) : void 0 };
-}
-function normalizeSample(s2) {
-  const pages = s2.pages.map((p2) => ({
-    id: String(p2.id),
-    name: String(p2.name),
-    url: String(p2.url),
-    ...typeof p2.auth === "boolean" ? { auth: p2.auth } : {},
-    ...typeof p2.storageState === "string" ? { storageState: p2.storageState } : {},
-    ...typeof p2.notes === "string" ? { notes: p2.notes } : {},
-    ...Array.isArray(p2.sources) ? { sources: p2.sources } : {}
-  }));
-  const transverse = Array.isArray(s2.transverse) ? s2.transverse.map(String) : void 0;
-  const global = Array.isArray(s2.global) ? s2.global.map(String) : void 0;
-  const exempt = Array.isArray(s2.exempt) ? s2.exempt.map((e) => ({ path: String(e.path), reason: String(e.reason) })) : void 0;
-  const absent = Array.isArray(s2.absent) ? s2.absent.map((e) => ({ kind: String(e.kind), reason: String(e.reason) })) : void 0;
-  return {
-    pages,
-    ...transverse?.length ? { transverse } : {},
-    ...global?.length ? { global } : {},
-    ...exempt?.length ? { exempt } : {},
-    ...carryAbsent(absent)
-  };
-}
-function carryAbsent(absent) {
-  return absent?.length ? { absent } : {};
-}
-function sampleScope(sample) {
-  return {
-    pages: sample.pages.map((p2) => ({
-      id: p2.id,
-      name: p2.name,
-      url: p2.url,
-      ...p2.auth !== void 0 ? { auth: p2.auth } : {},
-      ...p2.notes ? { notes: p2.notes } : {}
-    })),
-    ...sample.transverse?.length ? { transverse: sample.transverse } : {}
-  };
-}
-var norm3 = (s2) => s2.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").replace(/['’]/g, " ").toLowerCase();
-var SHORT_KEYWORD = 5;
-var escapeRe = (s2) => s2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-function keywordMatches(haystack, keyword) {
-  if (keyword.length > SHORT_KEYWORD) return haystack.includes(keyword);
-  return new RegExp(`(^|[^a-z0-9])${escapeRe(keyword)}($|[^a-z0-9])`).test(haystack);
-}
-var isTransverseKind = (kind) => /transverse/.test(kind.id);
-var isRepresentativeKind = (kind) => /representative|representatif/.test(kind.id);
-function pathOf(url) {
-  try {
-    const u2 = new URL(url);
-    return safeDecode(u2.pathname) + u2.search;
-  } catch {
-    return url;
-  }
-}
-function safeDecode(s2) {
-  try {
-    return decodeURIComponent(s2);
-  } catch {
-    return s2;
-  }
-}
-function lintSample(sample, methodology) {
-  const haystacks = sample.pages.map((p2) => norm3([p2.name, p2.notes ?? "", p2.url, p2.id].join(" ")));
-  const transverseHay = norm3((sample.transverse ?? []).join(" "));
-  const hasTransverse = (sample.transverse ?? []).length > 0;
-  const pageKinds = methodology.requiredKinds.filter((k) => !isTransverseKind(k) && !isRepresentativeKind(k));
-  const beyondKinds = sample.pages.some((p2) => {
-    const h3 = norm3([p2.name, pathOf(p2.url), p2.id].join(" "));
-    return !pageKinds.some((kind) => kind.keywords.map(norm3).some((k) => k && keywordMatches(h3, k)));
-  });
-  const reasons = /* @__PURE__ */ new Map();
-  for (const a2 of sample.absent ?? []) if (!reasons.has(a2.kind)) reasons.set(a2.kind, a2.reason);
-  const missing = [];
-  const waived = [];
-  for (const kind of methodology.requiredKinds) {
-    const kws = kind.keywords.map(norm3).filter(Boolean);
-    const covered = haystacks.some((h3) => kws.some((k) => keywordMatches(h3, k))) || transverseHay !== "" && kws.some((k) => keywordMatches(transverseHay, k)) || hasTransverse && isTransverseKind(kind) || isRepresentativeKind(kind) && beyondKinds;
-    if (covered) continue;
-    const reason = reasons.get(kind.id);
-    if (reason) waived.push({ kind, reason });
-    else missing.push(kind);
-  }
-  return { missing, waived };
-}
-function proposeSamplePages(urls, titles) {
-  const used = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const url of urls) {
-    const base = slugifyPageId(url);
-    let id = base;
-    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
-    used.add(id);
-    out.push({ id, name: titles?.get(url) ?? nameFromUrl(url), url });
-  }
-  return out;
-}
-function mergeSample(existing, proposed) {
-  const pages = [...existing?.pages ?? []];
-  const ids2 = new Set(pages.map((p2) => p2.id));
-  const urls = new Set(pages.map((p2) => p2.url));
-  const added = [];
-  for (const p2 of proposed) {
-    if (urls.has(p2.url)) continue;
-    let id = p2.id;
-    for (let n = 2; ids2.has(id); n++) id = `${p2.id}-${n}`;
-    ids2.add(id);
-    urls.add(p2.url);
-    const page = { ...p2, id };
-    pages.push(page);
-    added.push(page);
-  }
-  return {
-    sample: {
-      pages,
-      ...existing?.transverse?.length ? { transverse: existing.transverse } : {},
-      ...existing?.global?.length ? { global: existing.global } : {},
-      ...existing?.exempt?.length ? { exempt: existing.exempt } : {},
-      ...carryAbsent(existing?.absent)
-    },
-    added,
-    kept: pages.length - added.length
-  };
-}
-function sampleFromSnapshots(snapshots) {
-  return snapshots.map((s2) => ({
-    id: s2.meta.id,
-    name: s2.meta.name,
-    url: s2.meta.url,
-    ...s2.meta.auth !== void 0 ? { auth: s2.meta.auth } : {},
-    ...s2.meta.notes ? { notes: s2.meta.notes } : {}
-  }));
-}
-function unionSample(declared, snapshotted) {
-  const pages = [...declared?.pages ?? []];
-  const declaredIds = new Set(pages.map((p2) => p2.id));
-  const snapIds = new Set(snapshotted.map((p2) => p2.id));
-  const undeclared = snapshotted.filter((p2) => !declaredIds.has(p2.id));
-  const uncaptured = pages.filter((p2) => !snapIds.has(p2.id));
-  return {
-    sample: {
-      pages: [...pages, ...undeclared],
-      ...declared?.transverse?.length ? { transverse: declared.transverse } : {},
-      ...declared?.global?.length ? { global: declared.global } : {},
-      ...declared?.exempt?.length ? { exempt: declared.exempt } : {},
-      ...carryAbsent(declared?.absent)
-    },
-    undeclared,
-    uncaptured
-  };
-}
-function kindLabel(kind, locale = "fr") {
-  return kind.label[locale] ?? Object.values(kind.label)[0] ?? kind.id;
 }
 
 // src/reachability.ts
@@ -63127,7 +63721,7 @@ function pruneRefuted(audit, standard, items, lang = "en", untried = []) {
 }
 
 // src/ledger.ts
-import { createHash as createHash4 } from "crypto";
+import { createHash as createHash5 } from "crypto";
 import { existsSync as existsSync26, mkdirSync as mkdirSync12, readFileSync as readFileSync18, writeFileSync as writeFileSync11 } from "fs";
 import { dirname as dirname16, isAbsolute as isAbsolute5, join as join24, resolve as resolve14 } from "path";
 var LEDGER_DIR = ".ultra11y/verdicts";
@@ -63162,7 +63756,7 @@ var anchorKey2 = (e, root) => {
 };
 function evidenceFingerprint(evidence, root) {
   const keys = evidence.map((e) => anchorKey2(e, root)).sort();
-  return `sha256:${createHash4("sha256").update(`${keys.length}
+  return `sha256:${createHash5("sha256").update(`${keys.length}
 ${keys.join("\n")}`).digest("hex").slice(0, 32)}`;
 }
 function evidenceFilesOf(evidence, root) {
@@ -63173,7 +63767,7 @@ function evidenceAnchorsOf(evidence, root) {
   for (const e of evidence) out.add(anchorHash(e, root));
   return [...out].sort().join(",");
 }
-var anchorHash = (e, root) => createHash4("sha256").update(anchorKey2(e, root)).digest("hex").slice(0, 16);
+var anchorHash = (e, root) => createHash5("sha256").update(anchorKey2(e, root)).digest("hex").slice(0, 16);
 function verdictStillHolds(entry2, today2, opts) {
   const stale = (why) => ({ holds: false, why });
   const was = entry2.evidenceCount;
@@ -63487,460 +64081,6 @@ function installInvocationRewrite(invocation) {
     const original = console[name].bind(console);
     console[name] = (...args) => original(...args.map((a2) => typeof a2 === "string" ? rewriteInvocation(a2, invocation) : a2));
   }
-}
-
-// src/sample-propose.ts
-import { createHash as createHash5 } from "crypto";
-var DEFAULT_SAMPLE_SIZE = 20;
-var FIXED_SEARCH_QUERY = "information";
-var PROPOSAL_NOTE = "proposal: ";
-var SLUG_SIBLINGS = 3;
-var cmp = (a2, b) => a2 < b ? -1 : a2 > b ? 1 : 0;
-function cmpTuple(a2, b) {
-  for (let i = 0; i < Math.max(a2.length, b.length); i++) {
-    const x2 = a2[i] ?? "";
-    const y = b[i] ?? "";
-    const c = typeof x2 === "number" && typeof y === "number" ? x2 - y : cmp(String(x2), String(y));
-    if (c !== 0) return c;
-  }
-  return 0;
-}
-function parseUrl(url) {
-  try {
-    const u2 = new URL(url);
-    const path = safeDecode(u2.pathname) || "/";
-    return { url, path, segments: path.split("/").filter(Boolean), query: [...u2.searchParams.entries()], origin: u2.origin };
-  } catch {
-    const [p2 = url, q3 = ""] = url.split("?", 2);
-    return { url, path: p2, segments: p2.split(/[/\\]/).filter(Boolean), query: [...new URLSearchParams(q3).entries()] };
-  }
-}
-var DATE = ":date";
-var YEAR = /^(19|20)\d{2}$/;
-var FULL_DATE = /^(19|20)\d{2}[-_.]?(0[1-9]|1[0-2])([-_.]?(0[1-9]|[12]\d|3[01]))?$/;
-var EMBEDDED_DATE = /(19|20)\d{2}[-_.](0[1-9]|1[0-2])[-_.](0[1-9]|[12]\d|3[01])/;
-var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function normalizeSegment(seg, afterDate) {
-  const s2 = seg.replace(/\.x?html?$/i, "");
-  if (YEAR.test(s2) || FULL_DATE.test(s2)) return DATE;
-  if (afterDate && /^\d{1,2}$/.test(s2)) return DATE;
-  if (/^\d+$/.test(s2) || UUID.test(s2) || /^[0-9a-f]{12,}$/i.test(s2) && /\d/.test(s2)) return ":id";
-  if (EMBEDDED_DATE.test(s2) || /[-_]\d+$/.test(s2)) return ":slug";
-  return seg;
-}
-function normalizeQueryValue(v2) {
-  if (YEAR.test(v2) || FULL_DATE.test(v2) || EMBEDDED_DATE.test(v2)) return DATE;
-  if (/^\d+$/.test(v2)) return ":id";
-  return ":v";
-}
-function urlPatterns(urls) {
-  const parsed = [...new Set(urls)].sort(cmp).map(parseUrl);
-  const segs = parsed.map((p2) => {
-    const out2 = [];
-    for (const s2 of p2.segments) {
-      const n = normalizeSegment(s2, out2[out2.length - 1] === DATE);
-      if (n === DATE && out2[out2.length - 1] === DATE) continue;
-      out2.push(n);
-    }
-    return out2;
-  });
-  const depth = Math.max(0, ...segs.map((s2) => s2.length));
-  for (let i = 1; i < depth; i++) {
-    const values = /* @__PURE__ */ new Map();
-    for (const s2 of segs) {
-      const v2 = s2[i];
-      if (v2 === void 0 || v2.startsWith(":")) continue;
-      const prefix2 = s2.slice(0, i).join("/");
-      let set = values.get(prefix2);
-      if (!set) values.set(prefix2, set = /* @__PURE__ */ new Set());
-      set.add(v2);
-    }
-    for (const s2 of segs) {
-      const v2 = s2[i];
-      if (v2 === void 0 || v2.startsWith(":")) continue;
-      if ((values.get(s2.slice(0, i).join("/"))?.size ?? 0) >= SLUG_SIBLINGS) s2[i] = ":slug";
-    }
-  }
-  const out = /* @__PURE__ */ new Map();
-  parsed.forEach((p2, i) => {
-    const keys = [...new Set(p2.query.map(([k, v2]) => `${k}=${normalizeQueryValue(v2)}`))].sort(cmp);
-    out.set(p2.url, `/${segs[i].join("/")}${keys.length ? `?${keys.join("&")}` : ""}`);
-  });
-  return out;
-}
-var STRUCTURAL = /* @__PURE__ */ new Set([
-  "header",
-  "nav",
-  "main",
-  "aside",
-  "footer",
-  "article",
-  "section",
-  "form",
-  "table",
-  "dialog",
-  "iframe",
-  "video",
-  "audio",
-  "search",
-  "fieldset",
-  "details"
-]);
-var ROLE_TAG = {
-  banner: "header",
-  navigation: "nav",
-  main: "main",
-  complementary: "aside",
-  contentinfo: "footer",
-  search: "search",
-  form: "form",
-  dialog: "dialog",
-  table: "table",
-  grid: "table"
-};
-var OPAQUE = /* @__PURE__ */ new Set(["script", "style", "template", "noscript", "svg", "head"]);
-var SKELETON_DEPTH = 5;
-function skeletonOfNodes(nodes, depth) {
-  const out = [];
-  for (const n of nodes) {
-    if (n.type !== "element" || OPAQUE.has(n.tag)) continue;
-    const role = (attr(n, "role") ?? "").trim().toLowerCase();
-    const tag = ROLE_TAG[role] ?? (STRUCTURAL.has(n.tag) ? n.tag : void 0);
-    const parts = tag ? depth < SKELETON_DEPTH ? skeletonOfNodes(n.children, depth + 1) : [] : skeletonOfNodes(n.children, depth);
-    if (!tag) {
-      for (const p2 of parts) if (out[out.length - 1] !== p2) out.push(p2);
-      continue;
-    }
-    const s2 = parts.length ? `${tag}(${parts.join(",")})` : tag;
-    if (out[out.length - 1] !== s2) out.push(s2);
-  }
-  return out;
-}
-function skeletonOf(html) {
-  const doc = parseHtml(html, "skeleton.html");
-  const body = doc.elements.find((e) => e.tag === "body");
-  const shape = skeletonOfNodes(body ? body.children : doc.roots, 0).join(",");
-  return createHash5("sha256").update(shape).digest("hex").slice(0, 12);
-}
-var SEARCH_PARAMS = /* @__PURE__ */ new Set([
-  "q",
-  "s",
-  "query",
-  "search",
-  "recherche",
-  "keys",
-  "keywords",
-  "keyword",
-  "term",
-  "terms",
-  "text",
-  "motcle",
-  "mot-cle",
-  "search_api_fulltext"
-]);
-function readFacts(html, pageUrl) {
-  const doc = parseHtml(html, "page.html");
-  let origin;
-  try {
-    origin = new URL(pageUrl).origin;
-  } catch {
-    origin = void 0;
-  }
-  let documentLinks = 0;
-  if (origin) {
-    for (const a2 of doc.elements) {
-      if (a2.tag !== "a") continue;
-      const href = attr(a2, "href");
-      if (!href) continue;
-      try {
-        const u2 = new URL(href, pageUrl);
-        if (u2.origin === origin && isDownloadUrl(u2.href) && /\.(pdf|docx?|odt|xlsx?|ods|pptx?|odp|rtf|csv|epub)$/i.test(u2.pathname)) documentLinks++;
-      } catch {
-      }
-    }
-  }
-  return { documentLinks, ...origin ? searchFormOf(doc.elements, pageUrl, origin) : {} };
-}
-function searchFormOf(elements, pageUrl, origin) {
-  for (const form of elements) {
-    if (form.tag !== "form") continue;
-    if ((attr(form, "method") ?? "get").trim().toLowerCase() !== "get") continue;
-    const inSearch = attr(form, "role") === "search" || ancestors(form).some((a2) => a2.tag === "search" || attr(a2, "role") === "search");
-    const fields = descendants(form).filter((e) => e.tag === "input" && (attr(e, "name") ?? "").trim() !== "").sort((a2, b) => a2.start - b.start);
-    const typed = (e) => (attr(e, "type") ?? "text").trim().toLowerCase();
-    const field = fields.find((e) => typed(e) === "search") ?? fields.find((e) => (typed(e) === "text" || typed(e) === "search") && SEARCH_PARAMS.has((attr(e, "name") ?? "").toLowerCase()));
-    if (!field) continue;
-    const param = (attr(field, "name") ?? "").trim();
-    if (!inSearch && typed(field) !== "search" && !SEARCH_PARAMS.has(param.toLowerCase())) continue;
-    try {
-      const u2 = new URL(attr(form, "action") || pageUrl, pageUrl);
-      if (u2.origin !== origin || !/^https?:$/.test(u2.protocol)) continue;
-      return { searchForm: { action: `${u2.origin}${u2.pathname}`, param } };
-    } catch {
-    }
-  }
-  return {};
-}
-function searchUrl(action, param, query) {
-  return `${action}?${new URLSearchParams([[param, query]]).toString()}`;
-}
-var TITLE_SEPARATOR = /\s+[-|–—·:»]\s+/;
-function strippedTitles(titles) {
-  const parts = /* @__PURE__ */ new Map();
-  for (const t3 of titles.values()) for (const p2 of new Set(t3.split(TITLE_SEPARATOR).map((x2) => x2.trim()))) parts.set(p2, (parts.get(p2) ?? 0) + 1);
-  const common = titles.size >= 3 ? new Set([...parts].filter(([, n]) => n * 2 >= titles.size).map(([p2]) => p2)) : /* @__PURE__ */ new Set();
-  const out = /* @__PURE__ */ new Map();
-  for (const [url, t3] of titles) {
-    const kept = t3.split(TITLE_SEPARATOR).map((x2) => x2.trim()).filter((x2) => x2 && !common.has(x2));
-    out.set(url, kept.join(" "));
-  }
-  return out;
-}
-function matchKind(kind, pages) {
-  const kws = kind.keywords.map(norm3).filter(Boolean);
-  let best;
-  for (const page of pages) {
-    for (let ki = 0; ki < kws.length; ki++) {
-      const k = kws[ki];
-      const where = keywordMatches(page.urlHay, k) ? "URL" : keywordMatches(page.titleHay, k) ? "title" : void 0;
-      if (!where) continue;
-      const rank = [page.depth, page.hasQuery, where === "URL" ? 0 : 1, ki, page.url.length, page.url, page.key.length, page.key];
-      if (!best || cmpTuple(rank, best.rank) < 0) best = { page, keyword: kind.keywords[ki] ?? k, where, rank };
-    }
-  }
-  return best;
-}
-function proposeSample(inputs, opts) {
-  const size2 = opts.size !== void 0 && Number.isFinite(opts.size) && opts.size > 0 ? Math.floor(opts.size) : DEFAULT_SAMPLE_SIZE;
-  const query = opts.searchQuery?.trim() || FIXED_SEARCH_QUERY;
-  const locale = opts.locale ?? "fr";
-  const keyOf = (i) => i.id ? `id:${i.id}` : `url:${i.url}`;
-  const sorted = inputs.map((i) => ({ ...i, url: i.url.split("#", 1)[0] })).filter((i) => i.url).sort(
-    (a2, b) => cmpTuple(
-      [keyOf(a2), a2.url, a2.title ?? "", a2.skeleton ?? "", a2.html ?? "", a2.auth ? 1 : 0],
-      [keyOf(b), b.url, b.title ?? "", b.skeleton ?? "", b.html ?? "", b.auth ? 1 : 0]
-    )
-  );
-  const unique = [];
-  for (const i of sorted) if (!unique.length || keyOf(unique[unique.length - 1]) !== keyOf(i)) unique.push(i);
-  const documents = unique.filter((i) => isDownloadUrl(i.url));
-  const pageInputs = unique.filter((i) => !isDownloadUrl(i.url));
-  const titles = /* @__PURE__ */ new Map();
-  for (const i of pageInputs) if (i.title?.trim()) titles.set(keyOf(i), i.title.trim());
-  const bare = strippedTitles(titles);
-  const pages = pageInputs.map((i) => {
-    const parsed = parseUrl(i.url);
-    const words = parsed.segments.map((s2) => s2.replace(/\.x?html?$/i, "")).join(" ");
-    const root = parsed.segments.length === 0 || /^index\.x?html?$/i.test(parsed.segments.join("/"));
-    return {
-      key: keyOf(i),
-      ...i.id ? { id: i.id } : {},
-      ...i.auth !== void 0 ? { auth: i.auth } : {},
-      url: i.url,
-      ...i.title?.trim() ? { title: i.title.trim() } : {},
-      ...i.html ? { html: i.html } : {},
-      ...i.skeleton ? { skeleton: i.skeleton } : {},
-      parsed,
-      depth: root ? 0 : parsed.segments.length,
-      hasQuery: parsed.query.length ? 1 : 0,
-      urlHay: norm3(`${words.replace(/[-_.+~]+/g, " ")}${root ? " home index" : ""}`),
-      titleHay: norm3(bare.get(keyOf(i)) ?? ""),
-      ...i.html ? { facts: readFacts(i.html, i.url) } : {}
-    };
-  });
-  const byShallow = [...pages].sort((a2, b) => cmpTuple([a2.depth, a2.hasQuery, a2.url, a2.key], [b.depth, b.hasQuery, b.url, b.key]));
-  const picks = [];
-  const pickOf = /* @__PURE__ */ new Map();
-  const take = (page, reason) => {
-    const key2 = "key" in page ? page.key : `url:${page.url}`;
-    const hit = pickOf.get(key2);
-    if (hit) {
-      if (!hit.reasons.includes(reason)) hit.reasons.push(reason);
-      return;
-    }
-    const from = "key" in page ? page : void 0;
-    const p2 = {
-      key: key2,
-      url: page.url,
-      ...from?.id ? { id: from.id } : {},
-      ...from?.auth !== void 0 ? { auth: from.auth } : {},
-      ...from?.title ? { title: from.title } : {},
-      reasons: [reason]
-    };
-    picks.push(p2);
-    pickOf.set(key2, p2);
-  };
-  const absent = [];
-  const pathOf2 = (p2) => p2.parsed.path + (p2.parsed.query.length ? `?${new URLSearchParams(p2.parsed.query).toString()}` : "");
-  for (const kind of opts.methodology.requiredKinds) {
-    if (isTransverseKind(kind) || isRepresentativeKind(kind)) continue;
-    const label = kindLabel(kind, locale);
-    if (/recherche|search/.test(kind.id)) {
-      const withForm = byShallow.find((p2) => p2.facts?.searchForm);
-      if (withForm?.facts?.searchForm) {
-        const { action, param: param2 } = withForm.facts.searchForm;
-        take({ url: searchUrl(action, param2, query) }, `required kind "${label}", fixed query "${query}" through the search form of ${pathOf2(withForm)}`);
-        continue;
-      }
-      const withParam = byShallow.find(
-        (p2) => p2.parsed.origin && p2.parsed.query.some(([k]) => SEARCH_PARAMS.has(k.toLowerCase())) && kind.keywords.map(norm3).some((k) => keywordMatches(p2.urlHay, k))
-      );
-      const param = withParam?.parsed.query.find(([k]) => SEARCH_PARAMS.has(k.toLowerCase()))?.[0];
-      if (withParam && param) {
-        take(
-          { url: searchUrl(`${withParam.parsed.origin}${new URL(withParam.url).pathname}`, param, query) },
-          `required kind "${label}", fixed query "${query}" on the discovered search URL ${pathOf2(withParam)}`
-        );
-        continue;
-      }
-    }
-    const m3 = matchKind(kind, pages);
-    if (m3) {
-      const extra = /recherche|search/.test(kind.id) ? `; no search parameter known \u2014 search "${query}" by hand on this page` : "";
-      take(m3.page, `required kind "${label}", keyword "${m3.keyword}" in the ${m3.where}${extra}`);
-      continue;
-    }
-    if (/document/.test(kind.id)) {
-      const linking = byShallow.find((p2) => (p2.facts?.documentLinks ?? 0) > 0);
-      if (linking) {
-        take(linking, `required kind "${label}", the shallowest page linking downloadable documents (${linking.facts.documentLinks})`);
-        continue;
-      }
-    }
-    absent.push({
-      kind: kind.id,
-      reason: `${PROPOSAL_NOTE}no discovered URL or title matches ${kind.keywords.map((k) => `"${k}"`).join(", ")}${/document/.test(kind.id) && documents.length ? ` (${documents.length} document URL(s) discovered, no page known to link them)` : ""} \u2014 confirm the site has none`
-    });
-  }
-  const patterns = urlPatterns(pages.map((p2) => p2.url));
-  const groups = /* @__PURE__ */ new Map();
-  for (const p2 of pages) {
-    const key2 = p2.skeleton ? `template:${p2.skeleton}` : `url:${patterns.get(p2.url)}`;
-    let g = groups.get(key2);
-    if (!g) groups.set(key2, g = []);
-    g.push(p2);
-  }
-  const clusters = [...groups].map(([key2, members]) => ({
-    key: key2,
-    members: members.sort((a2, b) => cmpTuple([a2.hasQuery, a2.url, a2.key], [b.hasQuery, b.url, b.key])),
-    pattern: [...new Set(members.map((m3) => patterns.get(m3.url)))].sort(cmp).join(" ")
-  })).sort((a2, b) => cmpTuple([-a2.members.length, a2.pattern, a2.key], [-b.members.length, b.pattern, b.key]));
-  const representativeKind = opts.methodology.requiredKinds.find(isRepresentativeKind);
-  const repLabel = representativeKind ? kindLabel(representativeKind, locale) : "representative pages";
-  const out = [];
-  let leftOut = 0;
-  let represented = 0;
-  for (const c of clusters) {
-    const sampled = c.members.find((m3) => pickOf.has(m3.key));
-    if (sampled) {
-      out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: sampled.url });
-      continue;
-    }
-    if (picks.length >= size2) {
-      out.push({ key: c.key, pattern: c.pattern, size: c.members.length });
-      leftOut++;
-      continue;
-    }
-    const rep = c.members[0];
-    const what = c.key.startsWith("template:") ? `template ${c.key.slice("template:".length)} (${c.pattern})` : `template cluster ${c.pattern}`;
-    take(rep, `${repLabel}: ${what}, ${c.members.length} page(s), first by URL`);
-    represented++;
-    out.push({ key: c.key, pattern: c.pattern, size: c.members.length, representative: rep.url });
-  }
-  if (representativeKind && represented === 0 && !leftOut)
-    absent.push({
-      kind: representativeKind.id,
-      reason: `${PROPOSAL_NOTE}every discovered page is already sampled for a required kind \u2014 no other template found`
-    });
-  const used = new Set(picks.flatMap((p2) => p2.id ? [p2.id] : []));
-  const samplePages = picks.map((p2) => {
-    let id = p2.id;
-    if (!id) {
-      const base = slugifyPageId(p2.url);
-      id = base;
-      for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
-      used.add(id);
-    }
-    return {
-      id,
-      name: p2.title ?? nameFromUrl(p2.url),
-      url: p2.url,
-      ...p2.auth !== void 0 ? { auth: p2.auth } : {},
-      notes: `${PROPOSAL_NOTE}${p2.reasons.join("; ")}`
-    };
-  });
-  return {
-    sample: { pages: samplePages, ...carryAbsent(absent) },
-    clusters: out,
-    considered: pages.length,
-    documents: documents.length,
-    leftOut
-  };
-}
-function humanNotes(notes) {
-  return (notes ?? "").split(" | ").filter((s2) => s2.trim() && !s2.startsWith(PROPOSAL_NOTE)).join(" | ");
-}
-function applyProposal(existing, proposal) {
-  const declared = existing?.pages ?? [];
-  const prior = /* @__PURE__ */ new Map();
-  const claimed = /* @__PURE__ */ new Set();
-  const byId2 = /* @__PURE__ */ new Map();
-  for (const d2 of declared) if (!byId2.has(d2.id)) byId2.set(d2.id, d2);
-  for (const p2 of proposal.pages) {
-    const d2 = byId2.get(p2.id);
-    if (d2 && !claimed.has(d2)) {
-      prior.set(p2, d2);
-      claimed.add(d2);
-    }
-  }
-  for (const p2 of proposal.pages) {
-    if (prior.has(p2)) continue;
-    const d2 = declared.find((x2) => x2.url === p2.url && !claimed.has(x2));
-    if (d2) {
-      prior.set(p2, d2);
-      claimed.add(d2);
-    }
-  }
-  const urlCount = /* @__PURE__ */ new Map();
-  for (const d2 of declared) urlCount.set(d2.url, (urlCount.get(d2.url) ?? 0) + 1);
-  const humanWork = (p2) => p2.auth !== void 0 || !!p2.storageState || !!p2.sources?.length || humanNotes(p2.notes) !== "" || (urlCount.get(p2.url) ?? 0) > 1;
-  const outside = declared.filter((d2) => !claimed.has(d2));
-  const kept = outside.filter(humanWork);
-  const dropped = outside.filter((d2) => !humanWork(d2));
-  const used = /* @__PURE__ */ new Set([...kept.map((p2) => p2.id), ...[...prior.values()].map((d2) => d2.id)]);
-  const pages = proposal.pages.map((p2) => {
-    const d2 = prior.get(p2);
-    let id = d2?.id ?? p2.id;
-    if (!d2) {
-      const base = id;
-      for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
-      used.add(id);
-    }
-    const notes = [humanNotes(d2?.notes), p2.notes].filter(Boolean).join(" | ");
-    const auth = d2?.auth ?? p2.auth;
-    return {
-      id,
-      name: d2?.name ?? p2.name,
-      url: p2.url,
-      ...auth !== void 0 ? { auth } : {},
-      ...d2?.storageState ? { storageState: d2.storageState } : {},
-      ...notes ? { notes } : {},
-      ...d2?.sources?.length ? { sources: d2.sources } : {}
-    };
-  });
-  const humanAbsent = (existing?.absent ?? []).filter((a2) => !a2.reason.startsWith(PROPOSAL_NOTE));
-  const absent = [...humanAbsent, ...(proposal.absent ?? []).filter((a2) => !humanAbsent.some((h3) => h3.kind === a2.kind))];
-  return {
-    sample: {
-      pages: [...pages, ...kept],
-      ...existing?.transverse?.length ? { transverse: existing.transverse } : {},
-      ...existing?.global?.length ? { global: existing.global } : {},
-      ...existing?.exempt?.length ? { exempt: existing.exempt } : {},
-      ...carryAbsent(absent)
-    },
-    kept,
-    dropped
-  };
 }
 
 // src/fix.ts
@@ -65725,7 +65865,7 @@ var T4 = {
     noScreenshot: "Aucune capture d'\xE9cran pour cette page.",
     screenshotAlt: (n) => `Capture d'\xE9cran de la page ${n}`,
     scopeTitle: "P\xE9rim\xE8tre r\xE9ellement test\xE9",
-    renderedPages: (n) => `${n} page(s) rendue(s) r\xE9ellement test\xE9e(s)`,
+    renderedPages: (n, others) => `${n} page(s) rendue(s) r\xE9ellement test\xE9e(s)${others ? `, plus ${others} \xE9tat(s) de parcours ou route(s) hors \xE9chantillon` : ""}`,
     noRenderedPages: "Aucune page rendue : les tests rendered n'ont pas \xE9t\xE9 ex\xE9cut\xE9s dans ce run.",
     automation: (s2, sc, r2, rc, j, jc) => `Contrat RGAA : ${s2} test(s) static sur ${sc} crit\xE8re(s), ${r2} rendered sur ${rc}, ${j} judgment sur ${jc}.`,
     exhaustive: "Grille exhaustive des crit\xE8res",
@@ -65786,7 +65926,7 @@ var T4 = {
     noScreenshot: "No screenshot for this page.",
     screenshotAlt: (n) => `Screenshot of the ${n} page`,
     scopeTitle: "Actual tested scope",
-    renderedPages: (n) => `${n} rendered page(s) actually tested`,
+    renderedPages: (n, others) => `${n} rendered page(s) actually tested${others ? `, plus ${others} journey state(s) or route(s) outside the sample` : ""}`,
     noRenderedPages: "No rendered page: the rendered tests were not executed in this run.",
     automation: (s2, sc, r2, rc, j, jc) => `RGAA contract: ${s2} static test(s) across ${sc} criterion(ia), ${r2} rendered across ${rc}, ${j} judgment across ${jc}.`,
     exhaustive: "Exhaustive criteria grid",
@@ -65934,7 +66074,9 @@ function criterionBlocks(unit, standard, lang, level, crops, pages) {
     const cells = [
       // Name AND address, as text: the artifact links nothing outside itself (html-emit.ts
       // `externalReferences`), and the URL is what the reader came to this column for.
-      ...withPages ? [page ? { text: `${page.name} (${page.url})` } : { text: "\u2014" }] : [],
+      // No page: what the occurrence was found in instead — a component no page serves, a
+      // downloadable document — rather than a dash that says nothing (#232).
+      ...withPages ? [page ? { text: `${pageLabel(page, lang)} (${page.url})` } : { text: offPageLabel(pages.offPageKind(f2), lang) }] : [],
       { text: `${f2.file}:${f2.line}`, mono: true },
       { text: f2.selectorHint, mono: true },
       { text: resolveOccurrence(f2, lang) }
@@ -65971,8 +66113,10 @@ function findingsBlocks(result, standard, lang, level, crops, refusals) {
 }
 function scopeBlocks(result, standard, lang) {
   const t3 = T4[lang];
-  const pages = result.scope.pagesAudited?.length ?? 0;
-  const items = [[{ text: `${result.scope.files} ${t3.files}` }], [{ text: t3.renderedPages(pages) }]];
+  const read = new Set(result.scope.pagesAudited ?? []);
+  const others = pagesOf(result).filter((p2) => p2.kind && read.has(p2.id)).length;
+  const pages = read.size - others;
+  const items = [[{ text: `${result.scope.files} ${t3.files}` }], [{ text: t3.renderedPages(pages, others) }]];
   const automation = automationOverview(standard);
   if (automation) {
     items.push([
@@ -66031,7 +66175,7 @@ function scoreboardBlocks(result, standard, lang, sheetHref) {
   const rows = derived.map((p2) => {
     const criteria = pageCriterionRows(result, p2, standard, lang);
     return [
-      { text: `${p2.name}${p2.auth ? " \u{1F512}" : ""}`, ...sheetHref ? { href: sheetHref(p2.id) } : {} },
+      { text: `${pageLabel(p2, lang)}${p2.auth ? " \u{1F512}" : ""}`, ...sheetHref ? { href: sheetHref(p2.id) } : {} },
       { text: p2.url, mono: true },
       { text: basisLabel(p2.basis, lang) },
       { text: formatPageRate(criteria, standard, lang), align: "end" }
@@ -66064,7 +66208,7 @@ function crossGridBlocks(result, derived, standard, lang) {
   const table = {
     kind: "table",
     caption: t3.crossGridCaption,
-    columns: [{ text: t3.criterion }, ...derived.map((p2) => ({ text: pageColumnLabel(p2, origin) }))],
+    columns: [{ text: t3.criterion }, ...derived.map((p2) => ({ text: pageColumnLabel(p2, origin, lang) }))],
     rows: []
   };
   let group = "";
@@ -66847,12 +66991,12 @@ var T6 = {
     gridCaption: "Statut de chaque crit\xE8re dans les deux audits.",
     legend: "`C` conforme \xB7 `NC` non conforme \xB7 `\u2014` non applicable \xB7 `?` \xE0 \xE9valuer.",
     previous: "Audit pr\xE9c\xE9dent",
-    averageLine: (pct2, n) => `Taux moyen de conformit\xE9 : ${pct2} % (moyenne des taux de ${n} page(s)).`,
+    averageLine: (pct2, n) => `Taux moyen de conformit\xE9 : ${pct2} % (moyenne des taux des ${n} page(s) de l'\xE9chantillon).`,
     averageNone: "Taux moyen de conformit\xE9 : aucune page n'a de crit\xE8re d\xE9cid\xE9, il n'y a donc pas de moyenne.",
     averageOpen: (n) => `Provisoire : ${n} crit\xE8re(s) restent \xE0 \xE9valuer sur ces pages.`,
     averageExcluded: (n) => `${n} page(s) sans crit\xE8re d\xE9cid\xE9 sont exclues de la moyenne.`,
     journeysTitle: "Parcours",
-    journeysIntro: (n) => `${n} parcours. Chaque \xE9tape r\xE9alis\xE9e enregistre un \xE9tat de page, audit\xE9 comme une page.`,
+    journeysIntro: (n) => `${n} parcours. Chaque \xE9tape r\xE9alis\xE9e enregistre un \xE9tat de page, audit\xE9 comme une page mais compt\xE9 \xE0 part : il n'entre ni dans le nombre de pages ni dans le taux moyen.`,
     noJourneys: "Aucun parcours dans cet audit : `journey run` n'a pas \xE9t\xE9 lanc\xE9, ou ses r\xE9sultats n'ont pas \xE9t\xE9 fusionn\xE9s.",
     journeyFile: "Fichier",
     journeyStatus: "Statut",
@@ -66953,12 +67097,12 @@ var T6 = {
     gridCaption: "Each criterion's status in both audits.",
     legend: "`C` conforming \xB7 `NC` non-conforming \xB7 `\u2014` not applicable \xB7 `?` to assess.",
     previous: "Previous audit",
-    averageLine: (pct2, n) => `Mean conformity rate: ${pct2} % (mean of the rates of ${n} page(s)).`,
+    averageLine: (pct2, n) => `Mean conformity rate: ${pct2} % (mean of the rates of the ${n} sampled page(s)).`,
     averageNone: "Mean conformity rate: no page has a decided criterion, so there is no mean.",
     averageOpen: (n) => `Provisional: ${n} criterion(ia) remain to assess on these pages.`,
     averageExcluded: (n) => `${n} page(s) with no decided criterion are left out of the mean.`,
     journeysTitle: "Journeys",
-    journeysIntro: (n) => `${n} journey(s). Each step done records a page state, audited like a page.`,
+    journeysIntro: (n) => `${n} journey(s). Each step done records a page state, audited like a page but counted apart: it enters neither the page count nor the mean rate.`,
     noJourneys: "No journey in this audit: `journey run` was not run, or its results were not merged.",
     journeyFile: "File",
     journeyStatus: "Status",

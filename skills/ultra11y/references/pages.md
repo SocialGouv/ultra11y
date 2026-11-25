@@ -224,12 +224,18 @@ node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --
 les dossiers et le HTML sont des documents pour une personne ; celui-ci est l’unique fichier
 qu’un job ultérieur, un badge ou un tableau de bord peut lire sans rien re-dériver, et la sortie
 standard seule ne peut pas les servir — en CI, l’appelant est une étape d’orchestrateur, et une
-matrice critère × page ne tient pas dans une sortie d’étape. Sa forme est `{ pages: [{ id, name, url, basis, criteria: [{ id, status, decidedBy }],
-conformancePct, decided, total }], unattributed, averageRate }`.
+matrice critère × page ne tient pas dans une sortie d’étape. Sa forme est `{ pages: [{ id, name, url, basis, kind?, journey?, criteria: [{ id, status, decidedBy }],
+conformancePct, decided, total }], unattributed, averageRate }`. `kind` est absent pour une page
+de l’échantillon, `journey-state` pour un état enregistré par un parcours rejoué (`journey`
+donne alors `{ name, step }`), `out-of-sample` pour une route capturée que l’échantillon déclaré
+ne liste pas. Ces deux dernières gardent leur fiche et leurs constats, qui comptent pour leur
+critère, mais elles ne sont pas comptées comme pages auditées et n’entrent pas dans le taux moyen.
 
 `averageRate` (sous un pack uniquement) est le **« taux moyen de conformité »** du RGAA — le
 second chiffre que la méthode demande pour un échantillon, à côté du taux global : `{ pct, pages: [{ id, name, url,
-pct, validated, applicable, open }], excluded, open }`. Chaque page est notée avec la formule de
+pct, validated, applicable, open }], excluded, open, outside: { states, routes } }`. La moyenne
+porte sur les seules pages de l’échantillon ; `outside` compte les états de parcours et les
+routes hors échantillon laissés de côté, et le rapport le dit. Chaque page est notée avec la formule de
 la page appliquée à cette seule page — conformes ÷ (conformes + non conformes), si bien que
 l’`applicable` d’une page est l’ensemble de ses critères décidés, les non applicables exclus,
 comme la méthode RGAA les compte — `pct` est la moyenne de ces ratios exacts arrondie une seule

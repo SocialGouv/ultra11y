@@ -74,11 +74,14 @@ chef de projet, référent accessibilité). Il dit où en est le site, ce qu’i
 sur quelles pages — jamais de `file:line`, de sélecteurs, de méthode outillée ni de
 commandes :
 
-- **En-tête** — date, les pages auditées (ou « code source uniquement »), le taux principal
+- **En-tête** — date, les pages auditées (les pages de l’échantillon ; les états de parcours et
+  les routes hors échantillon sont listés à part, sur leur propre ligne), ou « code source
+  uniquement », le taux principal
   (pour un rapport de pack : le taux de conformité propre au référentiel, validés ÷
   applicables, et juste en dessous, quand des pages sont dans le périmètre, le « taux moyen de
-  conformité » — la moyenne des taux par page, chacun valant conformes ÷ (conformes + non
-  conformes) sur sa page, les critères encore à évaluer étant comptés à côté), les réserves
+  conformité » — la moyenne des taux des pages de l’échantillon, chacun valant conformes ÷
+  (conformes + non conformes) sur sa page, les critères encore à évaluer étant comptés à côté),
+  les réserves
   qui changent
   ce qu’un lecteur peut conclure, et le lien vers l’annexe.
 - **Synthèse** — le niveau sur l’échelle publiée du référentiel (`conformityLevels` dans le

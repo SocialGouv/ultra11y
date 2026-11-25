@@ -33,7 +33,9 @@ import {
   humanMarkNote,
   packPageRate,
   pageBasisWarning,
+  pageLabel,
   pageView,
+  samplePages,
   ruledMark,
   unattributedFindings,
 } from "./pages.js";
@@ -75,6 +77,10 @@ const L = {
     date: "Date",
     standard: "Référentiel",
     pagesCount: "Pages",
+    journeyStatesCount: "États de parcours",
+    outOfSampleCount: "Routes hors échantillon",
+    kindsNote:
+      "Les lignes marquées « état de parcours » ou « hors échantillon » ne sont pas des pages de l'échantillon : leurs constats comptent pour leur critère, mais elles n'entrent ni dans le nombre de pages ni dans le taux moyen.",
     page: "Page",
     url: "URL",
     basis: "Base",
@@ -130,6 +136,10 @@ const L = {
     date: "Date",
     standard: "Standard",
     pagesCount: "Pages",
+    journeyStatesCount: "Journey states",
+    outOfSampleCount: "Routes outside the sample",
+    kindsNote:
+      "Rows marked “journey state” or “outside the sample” are not pages of the sample: their findings count against their criterion, but they enter neither the page count nor the mean rate.",
     page: "Page",
     url: "URL",
     basis: "Basis",
@@ -372,7 +382,7 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
   const s = L[lang];
   const out: string[] = [];
 
-  out.push(`${h} ${page.name}${page.auth ? " 🔒" : ""}`, "");
+  out.push(`${h} ${pageLabel(page, lang)}${page.auth ? " 🔒" : ""}`, "");
 
   const meta: string[] = [];
   meta.push(`- **${s.url}** : \`${page.url}\``);
@@ -456,6 +466,8 @@ export function renderPageReport(result: AuditResult, page: PageResult, opts: Pa
 
 function header(result: AuditResult, pages: PageResult[], standard: StandardId, lang: Lang, title: string): string[] {
   const s = L[lang];
+  const states = pages.filter((p) => p.kind === "journey-state").length;
+  const outOfSample = pages.filter((p) => p.kind === "out-of-sample").length;
   return [
     pagesReportMarker(standard),
     "",
@@ -463,7 +475,10 @@ function header(result: AuditResult, pages: PageResult[], standard: StandardId, 
     "",
     `- **${s.date}** : ${result.date}`,
     `- **${s.standard}** : ${isCore(standard) ? "WCAG 2.2 AA" : loadPack(standard).name}`,
-    `- **${s.pagesCount}** : ${pages.length}`,
+    // The sample's pages counted as pages; journey states and stray routes beside them (#232).
+    `- **${s.pagesCount}** : ${samplePages(pages).length}`,
+    ...(outOfSample ? [`- **${s.outOfSampleCount}** : ${outOfSample}`] : []),
+    ...(states ? [`- **${s.journeyStatesCount}** : ${states}`] : []),
     "",
   ];
 }
@@ -476,6 +491,7 @@ export function renderPagesIndex(result: AuditResult, pages: PageResult[], opts:
   const out = header(result, pages, standard, lang, s.indexTitle);
   const pack = !isCore(standard);
   out.push(`> ${pack ? s.packIndexNote : s.indexNote}`, "");
+  if (pages.some((p) => p.kind)) out.push(`> ${s.kindsNote}`, "");
   out.push(`| ${s.page} | ${s.url} | ${s.basis} | ${pack ? s.packRateShort : s.rateShort} | ${s.blocking} | ${s.major} | ${s.minor} | ${s.sheet} |`);
   out.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const p of pages) {
@@ -486,7 +502,7 @@ export function renderPagesIndex(result: AuditResult, pages: PageResult[], opts:
     const nc = [...p.findings, ...(result.packFindings ?? []).filter((f) => f.page === p.id)].filter((f) => !f.advisory);
     const href = opts.hrefs?.get(p.id);
     out.push(
-      `| ${p.name}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatPageRate(rows, standard, lang)} | ${
+      `| ${pageLabel(p, lang)}${p.auth ? " 🔒" : ""} | \`${p.url}\` | ${basisLabel(p.basis, lang)} | ${formatPageRate(rows, standard, lang)} | ${
         nc.filter((f) => f.severity === "bloquant").length
       } | ${nc.filter((f) => f.severity === "majeur").length} | ${nc.filter((f) => f.severity === "mineur").length} | ${href ? `[${p.id}](${href})` : p.id} |`,
     );
@@ -511,7 +527,7 @@ export function renderPageDocument(result: AuditResult, page: PageResult, opts: 
   const standard = opts.standard ?? CORE;
   const lang = opts.lang ?? "en";
   const s = L[lang];
-  const out: string[] = [pagesReportMarker(standard), "", `# ${s.docTitle} — ${page.name}`, "", `- **${s.date}** : ${result.date}`, ""];
+  const out: string[] = [pagesReportMarker(standard), "", `# ${s.docTitle} — ${pageLabel(page, lang)}`, "", `- **${s.date}** : ${result.date}`, ""];
   out.push(renderPageReport(result, page, { ...opts, standard, lang, heading: "##" }));
   return out.join("\n");
 }
