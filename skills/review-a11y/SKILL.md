@@ -1,6 +1,6 @@
 ---
 name: review-a11y
-description: "Use to REVIEW changed frontend code for accessibility: staged files, a working diff, branch, or PR; prompts such as 'review a11y', 'is this accessible?', or 'anything to fix before merge?'; and hook or CI findings on a change. Run the bundled install-free engine with cross-file JSX/TSX analysis, then adjudicate candidates and return a severity-ranked RGAA 4.1.2 review (by RGAA criterion, WCAG only as the mapping) with file:line fixes, residual rendering risks, and a verdict. Use `ultra11y` instead for whole-repo audits, dated conformance reports, PRD backlogs, or authoring accessible markup."
+description: "Use to REVIEW changed frontend code for accessibility: staged files, a working diff, branch, or PR; prompts such as 'review a11y', 'is this accessible?', or 'anything to fix before merge?'; and hook or CI findings on a change. Run the bundled install-free engine with cross-file JSX/TSX analysis, render only the pages the diff reaches (Playwright + axe, blocking only on non-conformities new vs the base), then adjudicate candidates and return a severity-ranked RGAA 4.1.2 review (by RGAA criterion, WCAG only as the mapping) with file:line fixes, residual rendering risks, and a verdict. Use `ultra11y` instead for whole-repo audits, dated conformance reports, PRD backlogs, or authoring accessible markup."
 license: MIT
 metadata:
   version: 9.0.2
@@ -16,6 +16,11 @@ deterministic, install-free engine bundled with this skill does the *mechanical*
 `file:line`), and **the AI agent** *adjudicates the judgment* — refute false positives, decide
 alt relevance/link purpose/focus logic statically from the code, and route what needs a rendered
 DOM to `scan`. A human is at most optional oversight.
+
+A review runs in **two passes**: the static engine on the diff (§1), then — when the change has
+a deployment to look at — a Playwright + axe render of **only the pages the diff reaches**,
+compared with the base branch so that only **new** non-conformities block (§1b). That second
+gate is mechanical: no model is involved in deciding what blocks.
 
 **Engine resolution:** every command below is `node scripts/ultra11y.mjs …` where
 `scripts/ultra11y.mjs` lives **next to this SKILL.md** (the engine ships inside the skill;
@@ -68,6 +73,37 @@ node scripts/ultra11y.mjs audit --since origin/main --graph --json     # the who
 - Test/story markup (`*.test.*`, `*.stories.*`, `__tests__/`) is excluded by default; name
   such a file explicitly to include it, or pass `--no-default-excludes`.
 
+## 1b. Render the pages the change touches (branch / PR review)
+
+When the branch has a deployment (a PR preview, a local `next start`) **and** the base branch
+has one too (production, staging, or the same app built from the base), render only the pages
+the diff can reach and gate on what is new:
+
+```
+node scripts/ultra11y.mjs affected --since origin/main --json                       # which pages, and why (read-only)
+node scripts/ultra11y.mjs scan --since origin/main --base-url <base deployment> --no-snapshot --json > base-scan.json
+node scripts/ultra11y.mjs scan --since origin/main --base-url <PR deployment> --baseline base-scan.json --no-snapshot --json
+```
+
+- **Which pages**: `affected` walks the reverse import graph from every file changed since the
+  merge-base (`<base>...HEAD`, plus uncommitted and untracked files) up to the route files —
+  Next.js `app/**/page.*` and `pages/**`; a `layout`/`template` (or `_app`) selects every page
+  below it — and to the files `.ultra11yrc.json` `sample.pages[].sources` declare. Dynamic
+  routes (`[id]`, `[...slug]`) resolve against the route inventory (`.ultra11y/routes.json`,
+  from `pages discover --routes-only`) and the sample. The base URL is the user's to give (ask
+  for it when unknown); both scans render the **same paths**, since the selection depends on
+  the diff, not on the host.
+- **What blocks**: with `--baseline`, `scan` exits 1 only on rendered findings the baseline does
+  not hold (identity = axe rule, criterion, route path, selector — host-free). A page new to
+  the baseline is new, all of it. Advisory (best-practice) findings never block. `--fail-on`
+  narrows the gate (default: any severity). The `gate.new` array of the `--json` output is the
+  blocking list; `gate.known` counts the pre-existing ones (Core rule 2: one line, out of the
+  verdict).
+- **What it cannot see**: a changed file reaching no page is listed as unmapped, a dynamic
+  route no known URL resolves as unresolved — name both in the report as **not rendered**,
+  never as clean. No deployment available → skip §1b and keep the rendering criteria as
+  residual risks (Core rule 3).
+
 ## 2. Judge — the engine's findings are candidates, not verdicts
 
 For each finding (`--json` gives the RGAA `criteriaId` / `criteriaIds`, its `wcag` mapping,
@@ -105,6 +141,11 @@ by its **RGAA criterion** — WCAG only as the discreet mapping in parentheses, 
 
 ### 🟠 Major / 🟡 Minor
 - …same shape…
+
+### 🖥️ Rendered — new on the pages this change reaches (scan --baseline)
+- `/contact` — **RGAA 3.2** (WCAG 1.4.3) — `.btn-primary` contrast 3.1:1 → … (new vs the
+  base deployment)
+- not rendered: `/actualites/[id]` (no known URL), `src/components/Orphan.tsx` (reaches no page)
 
 ### Residual risks (rendering-dependent — resolve in the rendered page via scan)
 - contrast of the new button variants (RGAA 3.2), focus visibility on the custom menu (RGAA 10.7)
@@ -147,5 +188,7 @@ stop. Everything in §4 stays opt-in and belongs to the caller, not to you.
 
 - Invent a non-conformity the engine did not find and you cannot cite.
 - Assert contrast/focus/zoom from source — they are residual risks until rendered (resolve via `scan`).
+- Block on a rendered finding the baseline already holds, or call a page the selection did not
+  render clean.
 - Mix pre-existing repo issues into the verdict on the change.
 - Translate technical tokens in French prose (`aria-live`, never « région live »).

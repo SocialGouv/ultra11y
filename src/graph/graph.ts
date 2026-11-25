@@ -130,7 +130,7 @@ export function htmlLangProvidedFor(graph: DepGraph, file: string): boolean {
 }
 
 /** The files that import (or re-export) `file` directly, over every resolvable specifier. */
-function importersOf(graph: DepGraph, file: string): string[] {
+export function importersOf(graph: DepGraph, file: string): string[] {
   if (!graph.importedBy) {
     const rev = new Map<string, string[]>();
     for (const [from, node] of graph.nodes) {

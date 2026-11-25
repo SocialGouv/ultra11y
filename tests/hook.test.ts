@@ -195,6 +195,16 @@ describe("decide", () => {
     expect(out?.hookSpecificOutput.additionalContext).toContain("src/A.tsx:4");
   });
 
+  it("a push names the rendered step over the pages the branch reaches; a commit does not (#209)", () => {
+    const d = tmpRepo();
+    const push = decide(payload("git push --base main", d), { env: {}, audit: auditWith([finding()]), seen: () => true });
+    const ctx = push?.hookSpecificOutput.additionalContext ?? "";
+    expect(ctx).toMatch(/affected --since \S+/);
+    expect(ctx).toMatch(/scan --since \S+ --base-url <url> --baseline <scan\.json>/);
+    const commit = decide(payload(COMMIT, d), { env: {}, audit: auditWith([finding()]), seen: () => true });
+    expect(commit?.hookSpecificOutput.additionalContext ?? "").not.toContain("affected --since");
+  });
+
   it("names each finding by its RGAA criterion, WCAG only as the mapping (#194)", () => {
     const d = tmpRepo();
     const f = finding({ ruleId: "input-image-alt-missing", criteriaId: "1.1.1" });

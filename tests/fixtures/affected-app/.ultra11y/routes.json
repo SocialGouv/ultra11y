@@ -1,0 +1,35 @@
+{
+  "v": 1,
+  "routes": [
+    {
+      "url": "https://prod.example.fr/",
+      "via": [
+        "sitemap"
+      ]
+    },
+    {
+      "url": "https://prod.example.fr/actualites/101",
+      "via": [
+        "sitemap"
+      ]
+    },
+    {
+      "url": "https://prod.example.fr/actualites/102",
+      "via": [
+        "sitemap"
+      ]
+    },
+    {
+      "url": "https://prod.example.fr/aide",
+      "via": [
+        "sitemap"
+      ]
+    },
+    {
+      "url": "https://prod.example.fr/contact",
+      "via": [
+        "sitemap"
+      ]
+    }
+  ]
+}

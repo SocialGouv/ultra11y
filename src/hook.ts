@@ -200,6 +200,13 @@ const SCOPE_HINT = {
   push: (base: string) => `--since ${base} --graph`,
 } as const;
 
+/** A branch about to be pushed or proposed has pages to render, not only code to read: the
+ *  review's second step renders the pages the diff reaches (src/affected.ts) and fails only on
+ *  non-conformities the base deployment does not already show. The hook names the step; it never
+ *  runs a browser itself (rule 1: it must stay fast and never break a git flow). */
+const RENDERED_HINT = (base: string): string =>
+  `Then the rendered step: \`affected --since ${base}\` lists the pages this change reaches; with a deployment of the branch, \`scan --since ${base} --base-url <url> --baseline <scan.json>\` renders exactly those pages and fails only on NEW non-conformities.`;
+
 export interface DecideDeps {
   env?: NodeJS.ProcessEnv;
   /** Injected so tests can drive the decision without a repo or a real audit. */
@@ -280,6 +287,7 @@ export function decide(payload: PreToolUsePayload, deps: DecideDeps = {}): HookD
         digestOf(findings),
         "",
         "Adjudicate each one against the cited code — refute false positives with evidence, apply the fixes the user agrees to — and report by RGAA criterion and severity.",
+        ...("since" in scope ? [RENDERED_HINT(scope.since)] : []),
         "Then re-run the command: this gate does not fire twice for the same set of findings, so it will go through.",
       ].join("\n"),
     },
