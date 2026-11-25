@@ -169,7 +169,7 @@ describe("the reference page and the contracts carry the same rubric and notes",
   it("references/adjudication.md lists the RGAA notes with their grounds, and the rubric", () => {
     const md = renderAdjudicationReference("fr");
     expect(md).toContain("## Gravité");
-    expect(md).toMatch(/### RGAA 4\.1\.2 9\.4/);
+    expect(md).toMatch(/### RGAA 9\.4 — [^\n]*\n\n(?:[^\n]*\n\n)?\*\*Notes de décision\.\*\*/);
     expect(md).toMatch(/\*\*Fondements\.\*\* « Retrouver dans le document les citations courtes/);
     const en = renderAdjudicationReference("en");
     expect(en).toContain("## Severity");

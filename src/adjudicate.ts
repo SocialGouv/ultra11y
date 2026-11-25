@@ -43,9 +43,9 @@ import {
   subjectsForSc,
 } from "./adjudicate-subjects.js";
 import type { Doc } from "./parse/html.js";
-import { ADJUDICATION, adjudicationForWcagRefs } from "./adjudication-data.js";
+import { ADJUDICATION, adjudicationForWcagRefs, type InheritedProtocol } from "./adjudication-data.js";
 import { PACK_RULINGS, packRulingNotes, SEVERITY_RUBRIC, severityRubricLine } from "./adjudication-rulings.js";
-import { scTitle, getSC, hasSC, techniquesFor, allSC, guidelineTitle, understanding } from "./wcag.js";
+import { scTitle, getSC, hasSC, techniquesFor, understanding } from "./wcag.js";
 import { groundFinding, type GroundingSummary } from "./grounding.js";
 import {
   type StandardId,
@@ -2343,6 +2343,10 @@ const T = {
       "« ⬤ » signale les tests dont le MÉCANISME apparaît dans la source moissonnée (la balise ou l'attribut que le test nomme lui-même). C'est une aide à la lecture, pas un verdict : **l'absence de marque n'affirme rien** — un test non marqué reste à trancher comme les autres, et beaucoup de tests portent sur autre chose que du balisage (un intitulé visible, un bouton adjacent, un comportement).",
     inheritedDecide: (sc: string) =>
       `Règle de décision (héritée du critère de succès WCAG ${sc}, qui pose une question plus large — le texte du référentiel prime)`,
+    protocolSection: "Protocole de décision hérité de WCAG",
+    protocolLead: (name: string, id: string) =>
+      `Les protocoles des critères de succès WCAG auxquels ${name} ${id} est rattaché : un complément pour mener l'examen, qui pose souvent une question plus large. Les tests et la méthodologie ci-dessus priment et fondent seuls le verdict.`,
+    inheritedComplement: (sc: string) => `Critère de succès WCAG ${sc}`,
     officialSource: (name: string, id: string) => `Texte officiel du critère ${name} ${id}`,
     webLookup:
       "Le texte ci-dessus est celui du référentiel : c'est LUI qui tranche. Si une formulation reste ambiguë et que vous disposez d'un outil web, vous POUVEZ consulter la page officielle ci-dessus pour la lever — jamais pour la contredire, jamais pour élargir un test, et une page web n'est jamais un `normativeRef` : seules les références normatives listées ci-dessous en sont.",
@@ -2415,6 +2419,10 @@ const T = {
       "« ⬤ » marks the tests whose MECHANISM appears in the harvested source (the tag or attribute the test itself names). It is a reading aid, not a verdict: **an unmarked test asserts nothing** — it is still yours to rule on, and plenty of tests are about something other than markup (a visible label, an adjacent button, a behaviour).",
     inheritedDecide: (sc: string) =>
       `Decision rule (inherited from WCAG success criterion ${sc}, which asks a broader question — the standard's own text prevails)`,
+    protocolSection: "Decision protocol inherited from WCAG",
+    protocolLead: (name: string, id: string) =>
+      `The protocols of the WCAG success criteria ${name} ${id} maps onto: a complement for running the review, which often asks a broader question. The tests and methodology above prevail and alone ground the verdict.`,
+    inheritedComplement: (sc: string) => `WCAG success criterion ${sc}`,
     officialSource: (name: string, id: string) => `Official text of ${name} criterion ${id}`,
     webLookup:
       "The text above is the standard's own, and it is what decides. If a wording stays ambiguous and you have a web tool, you MAY consult the official page above to settle it — never to contradict it, never to widen a test, and a web page is never a `normativeRef`: only the normative references listed below are.",
@@ -2450,22 +2458,38 @@ const T = {
 const MAX_REFS = 12;
 
 /** Fixed prose of references/adjudication.md, per language. The per-criterion protocol,
- *  the severity rubric and the pack ruling notes carry their own fr/en text. */
+ *  the severity rubric and the pack ruling notes carry their own fr/en text.
+ *
+ *  ORGANISED BY RGAA CRITERION (#230). The page used to walk the 52 WCAG success criteria the
+ *  engine cannot decide, under WCAG guideline headings, while RGAA has been the only standard a
+ *  report shows since 9.0 and every brief is an RGAA criterion. It now follows the referential:
+ *  one section per theme, one entry per criterion, carrying what that criterion's brief carries
+ *  beside its own text — its citable tests, its ruling notes, and the protocols of the WCAG
+ *  success criteria it maps onto. */
 const ADJUDICATION_REF_TEXT = {
   en: {
-    header: "<!-- GENERATED from src/data/adjudication.json and src/adjudication-rulings.ts by `pnpm run build:adjudication` — do not edit by hand. -->",
+    header:
+      "<!-- GENERATED from src/data/adjudication.json, src/adjudication-rulings.ts and the RGAA pack by `pnpm run build:adjudication` — do not edit by hand. -->",
     title: "# Deciding the criteria the engine hands you",
-    intro: [
-      "The static engine decides 3 of the 55 WCAG 2.2 AA success criteria outright. The other 52",
-      "come back as residual risks: 14 need a rendered page (the `scan` tier), 38 are judgment",
-      "calls. This page is the decision rule for each of them — what makes it Conforming, when",
-      "`NA` is legitimate, and the questions that get you there.",
+    intro: (name: string, criteria: number, withProtocol: number, scs: number) => [
+      `${name} has ${criteria} criteria. Each one the engine cannot settle on its own comes back in`,
+      "`ADJUDICATE.md` with a brief of its own: its numbered tests, the standard's official test",
+      "methodology under each test, the glossary terms they cite, and its evidence. That text is the",
+      "rule: a verdict rests on it, and on nothing else.",
+      "",
+      "This page gathers, criterion by criterion, what each brief carries beside it: the citable tests,",
+      `the ruling notes on the recurring cases, and — for the ${withProtocol} criteria that map onto one of the`,
+      `${scs} WCAG success criteria the engine cannot decide — the decision protocol of that success`,
+      "criterion (what makes it conforming, when `NA` is legitimate, the questions that get you there).",
+      "A protocol is printed in full under the first criterion that inherits it, and referred to after.",
+      "It is a complement for running the review: a success criterion often asks a broader question than",
+      "the criterion mapped onto it, and the standard's own text prevails.",
       "",
       "It is the same dataset `verify --manual` loads into `ADJUDICATE.md`, so the worklist and",
-      "this page can never disagree. Three rules govern every verdict below:",
+      "this page can never disagree. Three rules govern every verdict:",
       "",
-      "- **A non-conformity must cite a normative test that resolves.** The worklist proposes the",
-      "  criterion's W3C techniques; `verify --apply` rejects a `normativeRef` that does not exist.",
+      "- **A non-conformity must cite a normative test that resolves** — one of the criterion's",
+      "  numbered tests; `verify --apply` rejects a `normativeRef` that does not exist.",
       "- **A good practice with no failing test is a recommendation**, not a non-conformity — it",
       "  never flips a criterion, never enters the conformance rate.",
       "- **A decided verdict may settle each page of the audit** (#197): an optional `pages` map",
@@ -2474,10 +2498,14 @@ const ADJUDICATION_REF_TEXT = {
       "  it declares. A page `NC` needs a run-wide `NC`. A page left unnamed keeps the run-wide",
       "  verdict; a page whose subject is clean gets its own `C`, a page whose subject fails its own `NC`.",
     ],
+    theme: (n: number, title: string) => `## Theme ${n} — ${title}`,
+    tests: "**Citable tests.**",
+    rulings: "**Ruling notes.**",
+    inherited: (sc: string, title: string) => `**Inherited protocol — WCAG success criterion ${sc} (${title}).**`,
+    seeAbove: (sc: string, title: string, first: string) => `**Inherited protocol — WCAG success criterion ${sc} (${title}):** see ${first}.`,
     decide: "**Decide.**",
     na: "**Not applicable when.**",
     ask: "**Ask.**",
-    refs: "**Citable references.**",
     severityTitle: "## Severity",
     severityLead: "Every NC finding carries a `severity`. The rubric is this tool's — the standards rule conformity, not severity:",
     severityTail: [
@@ -2485,27 +2513,31 @@ const ADJUDICATION_REF_TEXT = {
       "criterion — the fold warns when it is charged twice. A recommendation is never above `mineur`: a",
       "defect that leaves no access fails a test, and is an NC.",
     ],
-    rulingsTitle: (name: string) => `## ${name} — how the standard's own text settles the recurring cases`,
-    rulingsLead: [
-      "Each note rests on the quoted words of the standard (its tests, methodology, particular cases or",
-      "glossary), and the brief of the criterion prints it under the criterion's own text.",
-    ],
     grounds: "**Grounds.**",
   },
   fr: {
-    header: "<!-- GÉNÉRÉ depuis src/data/adjudication.json et src/adjudication-rulings.ts par `pnpm run build:adjudication` — ne pas modifier à la main. -->",
+    header:
+      "<!-- GÉNÉRÉ depuis src/data/adjudication.json, src/adjudication-rulings.ts et le pack RGAA par `pnpm run build:adjudication` — ne pas modifier à la main. -->",
     title: "# Trancher les critères que le moteur vous confie",
-    intro: [
-      "Le moteur statique tranche d’emblée 3 des 55 critères de succès WCAG 2.2 AA. Les 52 autres",
-      "reviennent comme risques résiduels : 14 exigent une page rendue (le niveau `scan`), 38 relèvent",
-      "du jugement. Cette page donne la règle de décision de chacun — ce qui le rend conforme, quand",
-      "`NA` est légitime, et les questions qui y mènent.",
+    intro: (name: string, criteria: number, withProtocol: number, scs: number) => [
+      `Le ${name} compte ${criteria} critères. Chacun de ceux que le moteur ne peut pas trancher seul revient`,
+      "dans `ADJUDICATE.md` avec son propre brief : ses tests numérotés, la méthodologie de test officielle",
+      "du référentiel sous chaque test, les termes du glossaire qu’ils citent, et ses preuves. Ce texte",
+      "est la règle : un verdict repose sur lui, et sur rien d’autre.",
+      "",
+      "Cette page rassemble, critère par critère, ce que chaque brief porte à côté : les tests citables,",
+      `les notes de décision sur les cas récurrents et — pour les ${withProtocol} critères rattachés à l’un des`,
+      `${scs} critères de succès WCAG que le moteur ne peut pas décider — le protocole de décision de ce`,
+      "critère de succès (ce qui le rend conforme, quand `NA` est légitime, les questions qui y mènent).",
+      "Un protocole est donné en entier sous le premier critère qui en hérite, puis renvoyé.",
+      "C’est un complément pour mener l’examen : un critère de succès pose souvent une question plus",
+      "large que le critère qui lui est rattaché, et le texte du référentiel prime.",
       "",
       "C’est le même jeu de données que `verify --manual` charge dans `ADJUDICATE.md` : la liste de",
-      "travail et cette page ne peuvent jamais diverger. Trois règles gouvernent chaque verdict ci-dessous :",
+      "travail et cette page ne peuvent jamais diverger. Trois règles gouvernent chaque verdict :",
       "",
-      "- **Une non-conformité doit citer un test normatif qui se résout.** La liste de travail propose",
-      "  les techniques W3C du critère ; `verify --apply` rejette un `normativeRef` qui n’existe pas.",
+      "- **Une non-conformité doit citer un test normatif qui se résout** — l’un des tests numérotés",
+      "  du critère ; `verify --apply` rejette un `normativeRef` qui n’existe pas.",
       "- **Une bonne pratique sans test en échec est une recommandation**, pas une non-conformité — elle",
       "  ne fait jamais basculer un critère et n’entre jamais dans le taux de conformité.",
       "- **Un verdict tranché peut statuer sur chaque page de l’audit** (#197) : une table `pages`",
@@ -2515,10 +2547,14 @@ const ADJUDICATION_REF_TEXT = {
       "  un `NC` global. Une page non nommée garde le verdict global ; une page dont le sujet est sain",
       "  reçoit son propre `C`, une page dont le sujet échoue son propre `NC`.",
     ],
+    theme: (n: number, title: string) => `## Thématique ${n} — ${title}`,
+    tests: "**Tests citables.**",
+    rulings: "**Notes de décision.**",
+    inherited: (sc: string, title: string) => `**Protocole hérité — critère de succès WCAG ${sc} (${title}).**`,
+    seeAbove: (sc: string, title: string, first: string) => `**Protocole hérité — critère de succès WCAG ${sc} (${title}) :** voir ${first}.`,
     decide: "**Trancher.**",
     na: "**Non applicable quand.**",
     ask: "**Se demander.**",
-    refs: "**Références citables.**",
     severityTitle: "## Gravité",
     severityLead:
       "Chaque constat NC porte une `severity`. Le barème est celui de cet outil — les référentiels statuent sur la conformité, pas sur la gravité :",
@@ -2527,46 +2563,67 @@ const ADJUDICATION_REF_TEXT = {
       "critère — l’agrégation avertit quand il est compté deux fois. Une recommandation n’est jamais au-dessus",
       "de `mineur` : un défaut qui ne laisse aucun accès fait échouer un test, et c’est une NC.",
     ],
-    rulingsTitle: (name: string) => `## ${name} — comment le texte même du référentiel tranche les cas récurrents`,
-    rulingsLead: [
-      "Chaque note repose sur les mots cités du référentiel (ses tests, sa méthodologie, ses cas particuliers",
-      "ou son glossaire), et le brief du critère l’imprime sous le texte propre du critère.",
-    ],
     grounds: "**Fondements.**",
   },
 } as const;
 
-/** Render the per-criterion decision protocol as a standalone reference
- *  (skills/ultra11y/references/adjudication.md). Generated from the same dataset the
- *  worklist uses, so the page an agent reads and the prompt it answers can never drift. */
+/** The pack references/adjudication.md is organised by — RGAA, the only standard a report
+ *  shows since 9.0. */
+const ADJUDICATION_REF_PACK = "rgaa";
+
+/** Render the per-criterion decision reference (skills/ultra11y/references/adjudication.md),
+ *  one entry per RGAA criterion. Generated from the same datasets the briefs use — the pack,
+ *  the SC protocols and the ruling notes — so the page an agent reads and the prompt it
+ *  answers can never drift. */
 export function renderAdjudicationReference(lang: Lang = "en"): string {
   const t = ADJUDICATION_REF_TEXT[lang];
+  const pack = loadPack(ADJUDICATION_REF_PACK);
+  const name = `${pack.name} ${pack.baseVersion}`;
+  const rulingsOf = PACK_RULINGS[pack.key] ?? {};
+  const mapped = new Set(pack.criteria.flatMap((c) => c.wcag.filter((sc) => ADJUDICATION[sc])));
+  const withProtocol = pack.criteria.filter((c) => c.wcag.some((sc) => ADJUDICATION[sc])).length;
   const out: string[] = [];
   out.push(t.header, "");
   out.push(t.title, "");
-  out.push(...t.intro, "");
-  const byGuideline = new Map<string, string[]>();
-  for (const sc of allSC()) {
-    const protocol = ADJUDICATION[sc.sc];
-    if (!protocol) continue;
-    const lines = byGuideline.get(sc.guideline) ?? [];
-    lines.push(`### ${sc.sc} — ${scTitle(sc.sc, lang) ?? sc.title}  ·  ${sc.level}  ·  _${sc.automatability}_`, "", `${t.decide} ${protocol.decide[lang]}`, "");
-    if (protocol.na) lines.push(`${t.na} ${protocol.na[lang]}`, "");
-    if (protocol.questions.length) {
-      lines.push(t.ask, "");
-      for (const q of protocol.questions) lines.push(`- ${q[lang]}`);
-      lines.push("");
+  out.push(...t.intro(name, pack.criteria.length, withProtocol, mapped.size), "");
+  // The first criterion that prints each SC's protocol in full; the others point back to it.
+  const firstAt = new Map<string, string>();
+  for (const theme of pack.themes) {
+    const criteria = pack.criteria.filter((c) => c.theme === theme.number);
+    if (!criteria.length) continue;
+    out.push(t.theme(theme.number, localize(pack, theme.name, lang)), "");
+    for (const c of criteria) {
+      out.push(`### ${pack.name} ${c.id} — ${plainTest(localize(pack, c.titlePlain, lang))}`, "");
+      const tests = Object.keys(c.tests ?? {});
+      if (tests.length) out.push(`${t.tests} ${tests.map((k) => `\`${c.id}.${k}\``).join(", ")}`, "");
+      const ruling = rulingsOf[c.id];
+      if (ruling) {
+        out.push(t.rulings, "");
+        for (const n of ruling.notes) out.push(`- ${n[lang]}`);
+        out.push("", `${t.grounds} ${ruling.grounds.map((g) => `« ${plainTest(g)} »`).join(" · ")}`, "");
+      }
+      for (const sc of c.wcag) {
+        const protocol = ADJUDICATION[sc];
+        if (!protocol) continue;
+        const title = scTitle(sc, lang) ?? getSC(sc)?.title ?? sc;
+        const first = firstAt.get(sc);
+        if (first) {
+          out.push(t.seeAbove(sc, title, `${pack.name} ${first}`), "");
+          continue;
+        }
+        firstAt.set(sc, c.id);
+        out.push(t.inherited(sc, title), "", `${t.decide} ${protocol.decide[lang]}`, "");
+        if (protocol.na) out.push(`${t.na} ${protocol.na[lang]}`, "");
+        if (protocol.questions.length) {
+          out.push(t.ask, "");
+          for (const q of protocol.questions) out.push(`- ${q[lang]}`);
+          out.push("");
+        }
+      }
     }
-    const refs = techniquesFor(sc.sc);
-    if (refs.length) lines.push(`${t.refs} ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${sc.sc}\`)` : ""}`, "");
-    byGuideline.set(sc.guideline, lines);
   }
-  for (const [guideline, lines] of byGuideline) {
-    out.push(`## ${guideline} ${guidelineTitle(guideline, lang) ?? ""}`.trimEnd(), "");
-    out.push(...lines);
-  }
-  // THE SEVERITY RUBRIC and THE PACK RULING NOTES (#183) — the same text the briefs carry, so
-  // this page and the worklist cannot disagree on them either.
+  // THE SEVERITY RUBRIC — the same text the briefs carry, so this page and the worklist cannot
+  // disagree on it either.
   out.push(
     t.severityTitle,
     "",
@@ -2577,17 +2634,6 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
     ...t.severityTail,
     "",
   );
-  for (const [packKey, byCriterion] of Object.entries(PACK_RULINGS)) {
-    const name = packKey === "rgaa" ? "RGAA 4.1.2" : packKey;
-    out.push(t.rulingsTitle(name), "", ...t.rulingsLead, "");
-    const ids = Object.keys(byCriterion).sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
-    for (const id of ids) {
-      const r = byCriterion[id]!;
-      out.push(`### ${name} ${id}`, "");
-      for (const n of r.notes) out.push(`- ${n[lang]}`);
-      out.push("", `${t.grounds} ${r.grounds.map((g) => `« ${plainTest(g)} »`).join(" · ")}`, "");
-    }
-  }
   return out.join("\n");
 }
 
@@ -2609,26 +2655,6 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
 // technical notes and particular cases cite, deduplicated — none of them is optional, so
 // there is no lower-priority term to drop. On RGAA the heaviest criterion (1.3) carries
 // twelve terms and about 12 KB of definitions; that is the price of a correct verdict.
-
-/** Characters of an official test methodology the brief prints. RGAA documents all 258 of
- *  its tests and the procedures run 200-900 characters each, so a criterion with eight tests
- *  can carry several kilobytes — read by a model that pays for its context, and often batched
- *  with other criteria in one pass. Generous enough that a whole procedure normally fits, hard
- *  enough that one long one cannot swamp the evidence it is there to help read. */
-const MAX_METHODOLOGY_CHARS = 900;
-
-/** …and the budget for a test whose MECHANISM the harvest did not find in the source.
- *
- *  The procedure is the expensive half of a test (RGAA documents all 258, at 200-900 characters
- *  each) and the least often needed: on a page that labels every field with `<label>`, four of
- *  RGAA 11.2's six tests are about markup that exists nowhere in scope. Those tests keep their
- *  full WORDING — an unmarked test is never called inapplicable, and the legend says so — but
- *  their step-by-step procedure is cut to an opening. The one that matters is intact: a test the
- *  harvest touches gets all 900 characters.
- *
- *  Deliberately not zero. « No procedure at all » would read as « nothing to do here », which is
- *  exactly the inference the ⬤ legend spends a paragraph forbidding. */
-const MAX_UNTOUCHED_METHODOLOGY_CHARS = 260;
 
 // `glossaryAnchorsOf` now lives in src/standards/pack.ts, next to the glossary it reads —
 // the criteria lookup needs it too, and should not
@@ -2770,6 +2796,9 @@ export function formatAdjudication(
     cwd?: string;
     unrendered?: string[];
     web?: boolean;
+    /** `false` drops the inherited WCAG decision protocols a pack criterion's brief closes on
+     *  (#230). Only the context-budget test sets it, to bill that section apart from the body. */
+    protocols?: boolean;
     pages?: { id: string; name: string; url: string }[];
   } = {},
 ): string {
@@ -2885,13 +2914,29 @@ function runWideNotes(
   return out;
 }
 
+/** The decision protocols of the WCAG success criteria a pack criterion maps onto, each
+ *  headed by `label(sc)` so the brief always says where the rule was borrowed from. */
+function inheritedProtocolLines(protocols: InheritedProtocol[], s: (typeof T)[Lang], label: (sc: string) => string): string[] {
+  const out: string[] = [];
+  for (const p of protocols) {
+    out.push(`> **${label(p.sc)}** — ${p.decide}`, "");
+    if (p.na) out.push(`> **${s.na}** — ${p.na}`, "");
+    if (p.questions.length) {
+      out.push(`> ${s.questions}:`, "");
+      for (const q of p.questions) out.push(`- ${q}`);
+      out.push("");
+    }
+  }
+  return out;
+}
+
 /** The sections of the criteria themselves: one `##` block per item. */
 function criterionSections(
   items: AdjudicationItem[],
   lang: Lang,
   standard: StandardId,
   pack: ReturnType<typeof loadPack> | undefined,
-  opts: { cwd?: string; web?: boolean },
+  opts: { cwd?: string; web?: boolean; protocols?: boolean },
   shown: number,
 ): string[] {
   const s = T[lang];
@@ -2997,18 +3042,16 @@ function criterionSections(
     // criterion mapped onto it (RGAA 8.6 asks whether the page title is *relevant*; WCAG
     // 2.4.2 only that one exists). Same discipline as `resolveGuidance`, which never lets an
     // inherited example pass for the national standard's own doctrine.
+    //
+    // A criterion that DOES carry its methodology still gets the mapped SCs' protocols (#230),
+    // further down: judgment.md promises every ADJUDICATE.md item its decision protocol, and the
+    // questions (« what does the image CONTRIBUTE here? ») are how an auditor reaches a verdict
+    // the methodology only states. Printed AFTER the standard's own text and labelled as a
+    // complement it cannot override, never as the rule.
+    const hasMethodology = !!crit?.methodology && Object.keys(crit.methodology).length > 0;
+    const inherited = pack ? adjudicationForWcagRefs(crit?.wcag ?? [], lang) : [];
     if (pack) {
-      if (!crit?.methodology || Object.keys(crit.methodology).length === 0) {
-        for (const p of adjudicationForWcagRefs(crit?.wcag ?? [], lang)) {
-          out.push(`> **${s.inheritedDecide(p.sc)}** — ${p.decide}`, "");
-          if (p.na) out.push(`> **${s.na}** — ${p.na}`, "");
-          if (p.questions.length) {
-            out.push(`> ${s.questions}:`, "");
-            for (const q of p.questions) out.push(`- ${q}`);
-            out.push("");
-          }
-        }
-      }
+      if (!hasMethodology) out.push(...inheritedProtocolLines(inherited, s, s.inheritedDecide));
     } else {
       const protocol = ADJUDICATION[it.criteriaId];
       if (protocol) {
@@ -3075,14 +3118,12 @@ function criterionSections(
           // of its own: eight procedures listed apart from the eight tests they belong to is
           // a matching exercise nobody should have to do while ruling.
           const method = crit?.methodology?.[k];
-          if (method?.trim()) {
-            const flat = plainTest(method).replace(/\s+/g, " ").trim();
-            // Full procedure for a test the harvest touches; an opening for one it does not.
-            // See MAX_UNTOUCHED_METHODOLOGY_CHARS — the WORDING of every test is unabridged
-            // either way, and an unmarked test is still the adjudicator's to rule on.
-            const cap = !anyTouched || touched.get(k) ? MAX_METHODOLOGY_CHARS : MAX_UNTOUCHED_METHODOLOGY_CHARS;
-            out.push(`  - _${s.methodology}_ : ${flat.length > cap ? `${flat.slice(0, cap)}…` : flat}`);
-          }
+          // ALWAYS WHOLE (#230). The procedure used to be cut at 900 characters, and at 260 for
+          // a test the harvest did not touch — 72 cuts on one fixture, 11 in RGAA 1.1 alone, and
+          // the sentence lost was the test's closing « si c'est le cas, le test est validé ».
+          // A procedure is normative text: printed in part it states a rule the standard does
+          // not, so it is printed in full, like the glossary (#182).
+          if (method?.trim()) out.push(`  - _${s.methodology}_ : ${plainTest(method).replace(/\s+/g, " ").trim()}`);
         }
         out.push("");
       }
@@ -3103,6 +3144,14 @@ function criterionSections(
       // exactly what the pack gate refuses — printing it over a list of RGAA test ids told
       // the adjudicator the ids were something they are not.
       if (keys.length) out.push(`> ${s.packRefs(pack.name)}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
+      // ITS OWN SECTION, LAST (#230): below everything the verdict rests on, under a heading of
+      // its own, so it reads as what it is — a way into the review, never a rule beside the
+      // standard's — and so its cost is tracked apart from the normative body
+      // (tests/adjudicate-context-budget.test.ts).
+      if (hasMethodology && inherited.length && opts.protocols !== false) {
+        out.push(`### ${s.protocolSection}`, "", `> ${s.protocolLead(pack.name, it.criteriaId)}`, "");
+        out.push(...inheritedProtocolLines(inherited, s, s.inheritedComplement));
+      }
     } else {
       out.push(...sourceBlock(s, "WCAG", it.criteriaId, understanding(it.criteriaId), opts.web === true));
       const refs = techniquesFor(it.criteriaId);

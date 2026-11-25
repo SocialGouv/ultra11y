@@ -13,9 +13,12 @@
 //   system prompt is sending it twice. Only `judge` sets the flag, and only because it is the
 //   one caller that provably ships a system prompt.
 //
-//   PAID — the procedure of a test whose mechanism the harvest did not find. It is bounded
-//   rather than removed, and the WORDING of every test stays whole. The glossary is NOT on this
-//   list any more (#182): every term the criterion cites is printed, each definition whole.
+//   NOT CUT AT ALL — normative text. The glossary is printed whole (#182), every term the
+//   criterion cites and each definition in full; so is every test's wording and, since #230,
+//   every official test methodology, which used to be bounded at 900/260 characters.
+//
+// The inherited WCAG decision protocol each pack brief closes on (#230) is billed apart, under
+// its own ceiling: it is guidance, not the standard's text, and its cost should be visible.
 //
 // This file pins both, and the ceiling, so context cost cannot drift without a diff saying so.
 import { describe, it, expect } from "vitest";
@@ -97,8 +100,8 @@ describe("the contract is dropped only where a system prompt already carries it"
   });
 });
 
-describe("the bounded blocks stay bounded", () => {
-  const all = () => items().map((it) => formatAdjudication([it], "fr", "rgaa", { preamble: false, contract: false }));
+describe("normative text is never bounded", () => {
+  const all = () => items().map((it) => formatAdjudication([it], "fr", "rgaa", { preamble: false, contract: false, protocols: false }));
 
   it("never cuts a glossary definition — the glossary is not a bounded block (#182)", () => {
     const pack = loadPack("rgaa");
@@ -132,12 +135,9 @@ describe("the bounded blocks stay bounded", () => {
     for (const n of ["11.2.1", "11.2.2", "11.2.3", "11.2.4", "11.2.5", "11.2.6"]) expect(md).toContain(`\`${n}\``);
   });
 
-  it("never truncates a procedure below the untouched budget", () => {
+  it("never truncates a procedure — a methodology is normative text (#230)", () => {
     for (const md of all()) {
-      for (const m of md.matchAll(/_Méthodologie de test officielle_ : (.*)/g)) {
-        const text = m[1]!;
-        if (text.endsWith("…")) expect(text.length, text.slice(0, 60)).toBeGreaterThanOrEqual(260);
-      }
+      for (const m of md.matchAll(/_Méthodologie de test officielle_ : (.*)/g)) expect(m[1]!.endsWith("…"), m[1]!.slice(0, 60)).toBe(false);
     }
   });
 });
@@ -153,12 +153,34 @@ describe("the bounded blocks stay bounded", () => {
 // 5600 → 6500 (#182): the glossary is printed whole, every cited term and every definition in
 // full. A cut definition was the main cause of disputed non-conformities in a field review;
 // the ~700 characters per criterion it costs were voted for.
+//
+// 6500 → 6600 (#230): every official test methodology is printed whole (it was cut at 900, and
+// at 260 for a test the harvest did not touch — 72 cuts on this fixture). ~200 characters per
+// criterion, and the sentence it buys back is the one that says when the test passes.
+//
+// THE PROTOCOL SECTION (#230) is billed on its own line: the inherited WCAG decision rule, NA
+// rule and questions, ~1 100 characters per criterion. Measured apart so that neither the body
+// nor the protocols can grow behind the other's back.
 describe("the context bill", () => {
-  it("stays under its ceiling for a full RGAA worklist at criterion grain", () => {
-    const rendered = items().map((it) => formatAdjudication([it], "fr", "rgaa", { preamble: false, contract: false }));
+  const bill = (protocols: boolean) => {
+    const rendered = items().map((it) => formatAdjudication([it], "fr", "rgaa", { preamble: false, contract: false, protocols }));
     const total = rendered.reduce((a, md) => a + md.length, 0);
-    const perCriterion = Math.round(total / rendered.length);
-    expect(rendered.length).toBeGreaterThan(50);
-    expect(perCriterion, `${perCriterion} characters per criterion × ${rendered.length} criteria = ${total}`).toBeLessThan(6500);
+    return { n: rendered.length, total, perCriterion: Math.round(total / rendered.length) };
+  };
+
+  it("stays under its ceiling for a full RGAA worklist at criterion grain", () => {
+    const { n, total, perCriterion } = bill(false);
+    expect(n).toBeGreaterThan(50);
+    expect(perCriterion, `${perCriterion} characters per criterion × ${n} criteria = ${total}`).toBeLessThan(6600);
+  });
+
+  it("bills the inherited decision protocols under a ceiling of their own", () => {
+    const body = bill(false);
+    const full = bill(true);
+    const perCriterion = Math.round((full.total - body.total) / full.n);
+    // Non-vacuous: the section is there…
+    expect(perCriterion).toBeGreaterThan(500);
+    // …and bounded.
+    expect(perCriterion, `${perCriterion} protocol characters per criterion × ${full.n} criteria`).toBeLessThan(1300);
   });
 });
