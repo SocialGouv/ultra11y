@@ -18,6 +18,7 @@ import { compositeDoc, indexDoc, pageDoc, pagesIndexDoc, type CropLookup, type R
 import { derivePages, pagesOf } from "./pages.js";
 import type { SnapshotHref } from "./render-snapshot-report.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
+import { NEUTRAL_THEME, type Theme } from "./theme.js";
 import type { AuditResult, Finding, Lang } from "./types.js";
 
 /** 12 MB of inlined image data. Chosen so the composite stays inside what a browser opens
@@ -47,6 +48,9 @@ export interface EmitOpts {
    *  sheets sit beside it — mirroring exactly where that command already writes its Markdown,
    *  so `--out audits/pages` does not produce `audits/pages/pages/`. */
   layout?: "report" | "pages";
+  /** The look (src/theme.ts). Default neutral. A DSFR theme arrives already loaded from the
+   *  audited project's installation; this module only inlines it. */
+  theme?: Theme;
 }
 
 export interface EmitResult {
@@ -158,6 +162,7 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
   const lang = opts.lang ?? "en";
   const t = T[lang];
   const budget = opts.inlineBudget ?? DEFAULT_INLINE_BUDGET;
+  const theme = opts.theme ?? NEUTRAL_THEME;
   const stdKey = isCore(standard) ? "wcag" : loadPack(standard).key;
   mkdirSync(opts.outDir, { recursive: true });
 
@@ -227,7 +232,7 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
     });
     if (notices.length) composite.blocks.unshift({ kind: "note", tone: "warn", runs: noticeRuns(notices) });
     compositePath = join(opts.outDir, compositeName);
-    writeFileSync(compositePath, renderHtmlDocument(composite));
+    writeFileSync(compositePath, renderHtmlDocument(composite, theme));
   }
 
   // Images stay FILES on the sheets, so the same crop is not duplicated into every document
@@ -240,7 +245,7 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
     ? pagesIndexDoc(result, { standard, lang, nav: indexNav, sheetHref: (id) => `./page-${id}.html` })
     : indexDoc(result, { standard, lang, nav: indexNav, links: nav.filter((n) => n.href !== "./index.html") });
   const indexPath = join(opts.outDir, "index.html");
-  writeFileSync(indexPath, renderHtmlDocument(index));
+  writeFileSync(indexPath, renderHtmlDocument(index, theme));
 
   const sheets: string[] = [];
   if (opts.pages) {
@@ -264,6 +269,7 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
             nav: sheetNav.map((n) => ({ ...n, current: n.href === "./index.html" })),
             sheetHref: (id) => `./page-${id}.html`,
           }),
+          theme,
         ),
       );
       sheets.push(join(sheetDir, "index.html"));
@@ -280,7 +286,7 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
         ...(opts.screenshots?.has(p.id) ? { screenshot: `${up}assets/${p.id}.png` } : {}),
       });
       const path = join(sheetDir, `page-${p.id}.html`);
-      writeFileSync(path, renderHtmlDocument(doc));
+      writeFileSync(path, renderHtmlDocument(doc, theme));
       sheets.push(path);
     }
   }

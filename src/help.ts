@@ -20,7 +20,7 @@ Usage:
   ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor]   (re-gate an audit already computed — e.g. one carrying adjudicated verdicts — without a second detection pass)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard rgaa] [--lang auto|en|fr]
   ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (the Markdown report, illustrated with annotated crops)
-  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + a printable single file)
+  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--theme neutral|dsfr [--root <dir>]] [--out <dir>]   (index.html + a printable single file)
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--no-technical] [--standard rgaa] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard rgaa] [--no-technical] [--lang auto|en|fr]
@@ -59,8 +59,8 @@ Usage:
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
   ultra11y status   [--json] [--project] [--browser [--cwd <dir>]]   (doctor: which agents run the review; --browser asks whether the scan tier resolves here)
-  ultra11y serve    [--in <dir>] [--root <dir>] [--port <n>] [--host <addr>] [--lang auto|en|fr]   (local, read-only results site over audits/ and its history)
-  ultra11y serve    [--in <dir>] [--root <dir>] --static <dir> [--lang auto|en|fr]   (the same pages as a static export, relative links only — GitHub Pages, iterion)
+  ultra11y serve    [--in <dir>] [--root <dir>] [--port <n>] [--host <addr>] [--theme neutral|dsfr] [--lang auto|en|fr]   (local, read-only results site over audits/ and its history)
+  ultra11y serve    [--in <dir>] [--root <dir>] --static <dir> [--theme neutral|dsfr] [--lang auto|en|fr]   (the same pages as a static export, relative links only — GitHub Pages, iterion)
 
 Commands:
   audit      Run the static engine over the inputs (files/globs, or '-' for stdin)
@@ -307,7 +307,7 @@ Options:
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
-  --root <dir>       snapshot, scan, serve: project root holding
+  --root <dir>       snapshot, scan, serve, --theme dsfr: project root holding
                      .ultra11y/pages and .ultra11yrc.json (default: . — scan writes the
                      snapshots it collects under it)
   --glossary [<t>]   criteria: look up a term the country standard defines (or list all)
@@ -325,6 +325,10 @@ Options:
   --hook             init: write a git pre-commit accessibility gate (staged snapshot + auto-fix by default)
   --report <file>    check/verify: the report markdown to gate
   --theme <N>        criteria: list RGAA theme N
+  --theme <name>     report --html, pages --html, serve: the HTML look — neutral (default) or
+                     dsfr, read from the PROJECT's own @gouvfr/dsfr (resolved from --root);
+                     ultra11y never ships nor downloads it (its terms reserve it to .gouv.fr
+                     sites). Package missing: exit 2. Also .ultra11yrc.json "html.theme"
   --plan             criteria: the work plan — criteria per evidence tier (source,
                      cross-file, rendered-page, browser, judgment, out-of-scope)
   --list             criteria: print the RGAA themes
@@ -513,7 +517,7 @@ Usage :
   ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor]   (rejouer la barrière sur un audit déjà calculé — par exemple porteur de verdicts arbitrés — sans seconde passe de détection)
   ultra11y report   --in <audit.json> [--out <dir>] [--standard rgaa] [--lang auto|en|fr]
   ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (le rapport Markdown, illustré de recadrages annotés)
-  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + un fichier unique imprimable)
+  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--theme neutral|dsfr [--root <dir>]] [--out <dir>]   (index.html + un fichier unique imprimable)
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--no-technical] [--standard rgaa] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard rgaa] [--no-technical] [--lang auto|en|fr]
@@ -552,8 +556,8 @@ Usage :
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
   ultra11y status   [--json] [--project] [--browser [--cwd <dir>]]   (diagnostic : quels agents lancent la revue ; --browser demande si le palier scan est disponible ici)
-  ultra11y serve    [--in <dir>] [--root <dir>] [--port <n>] [--host <addr>] [--lang auto|en|fr]   (site local, en lecture seule, des résultats de audits/ et de leur historique)
-  ultra11y serve    [--in <dir>] [--root <dir>] --static <dir> [--lang auto|en|fr]   (les mêmes pages en export statique, liens relatifs uniquement — GitHub Pages, iterion)
+  ultra11y serve    [--in <dir>] [--root <dir>] [--port <n>] [--host <addr>] [--theme neutral|dsfr] [--lang auto|en|fr]   (site local, en lecture seule, des résultats de audits/ et de leur historique)
+  ultra11y serve    [--in <dir>] [--root <dir>] --static <dir> [--theme neutral|dsfr] [--lang auto|en|fr]   (les mêmes pages en export statique, liens relatifs uniquement — GitHub Pages, iterion)
 
 Commandes :
   audit      Lance le moteur statique sur les entrées (fichiers/globs, ou '-' pour stdin)
@@ -825,7 +829,7 @@ Options :
   --storybook        render : rattacher le HTML de chaque story (via le index.json de storybook-static) dans .ultra11y/captures (désigner le dossier HTML avec --captures)
   --captures <dir>   audit/render : dossier de captures rendues à intégrer (par défaut : .ultra11y/captures)
   --no-captures      audit : NE PAS détecter/intégrer automatiquement .ultra11y/captures ni .ultra11y/pages
-  --root <dir>       snapshot, scan, serve : racine du projet contenant
+  --root <dir>       snapshot, scan, serve, --theme dsfr : racine du projet contenant
                      .ultra11y/pages et .ultra11yrc.json (par défaut : . — scan y écrit les
                      instantanés qu'il collecte)
   --glossary [<t>]   criteria : chercher un terme que définit le référentiel national (ou tous les lister)
@@ -843,6 +847,10 @@ Options :
   --hook             init : écrire une barrière git pre-commit d'accessibilité (instantané staged + correction automatique par défaut)
   --report <file>    check/verify : le rapport Markdown à contrôler
   --theme <N>        criteria : lister la thématique RGAA N
+  --theme <nom>      report --html, pages --html, serve : l'apparence HTML — neutral (par défaut)
+                     ou dsfr, lu dans le @gouvfr/dsfr DU PROJET (résolu depuis --root) ;
+                     ultra11y ne le fournit ni ne le télécharge (ses conditions le réservent
+                     aux sites en .gouv.fr). Paquet absent : code 2. Aussi « html.theme » dans .ultra11yrc.json
   --plan             criteria : le plan de travail — critères par palier de preuve (source,
                      inter-fichiers, page rendue, navigateur, jugement, hors périmètre)
   --list             criteria : afficher les thématiques RGAA

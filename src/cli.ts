@@ -107,6 +107,7 @@ import { parseOpencodeMajorFlag } from "./install/opencode.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { evidenceNotice, writeEvidence } from "./evidence.js";
 import { writeHtml } from "./html-emit.js";
+import { DsfrUnavailableError, isThemeName, NEUTRAL_THEME, resolveTheme, THEME_NAMES, type Theme } from "./theme.js";
 import { DEFAULT_PORT, exportStatic, isLoopback, startServer } from "./serve.js";
 import { HISTORY_MAX_DEPTH, discoverAudits } from "./serve-history.js";
 import {
@@ -1326,6 +1327,10 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
     return 0;
   }
 
+  // Resolved BEFORE anything is written: a missing DSFR must not leave half an artifact behind.
+  const theme = wantHtml ? themeOf(p, "pages", projectRootOf(p), lang) : NEUTRAL_THEME;
+  if (!theme) return 2;
+
   mkdirSync(outDir, { recursive: true });
 
   // THE EVIDENCE TIER. Annotated crops, derived at render time from the snapshot the finding
@@ -1369,6 +1374,7 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
           screenshots: shotPaths(derived),
           ...(manifest ? { evidence: manifest } : {}),
           inlineBudget: budgetOf(p),
+          theme,
         })
       : undefined;
     console.log(file);
@@ -1397,6 +1403,7 @@ async function cmdPages(p: ParsedArgs): Promise<number> {
         screenshots: shotPaths(derived),
         ...(manifest ? { evidence: manifest } : {}),
         inlineBudget: budgetOf(p),
+        theme,
       })
     : undefined;
   console.log(index);
@@ -1423,6 +1430,50 @@ function positiveIntFlag(p: ParsedArgs, name: string): number | undefined {
 /** `--inline-budget` in bytes, or undefined for the module default. */
 function budgetOf(p: ParsedArgs): number | undefined {
   return positiveIntFlag(p, "inline-budget");
+}
+
+/** The project root the HTML theme is resolved against: `--root`, else the working directory. */
+function projectRootOf(p: ParsedArgs): string {
+  return typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+}
+
+/** The HTML theme of `report --html`, `pages --html` and `serve`: `--theme neutral|dsfr`, else
+ *  `.ultra11yrc.json` → `html.theme` at the project root, else neutral. `dsfr` is read from the
+ *  PROJECT's own `@gouvfr/dsfr` (src/theme.ts) — never shipped, never downloaded. Returns null
+ *  after printing why (an unknown name, or a DSFR the project does not have): the caller exits
+ *  2 rather than render a look nobody asked for. */
+function themeOf(p: ParsedArgs, cmd: string, root: string, lang: Lang): Theme | null {
+  let name: unknown = p.flags.theme;
+  let source = "--theme";
+  if (name === undefined) {
+    let cfg: Ultra11yConfig | null = null;
+    try {
+      cfg = loadConfig(root);
+    } catch (e) {
+      console.error(`ultra11y ${cmd}: ${e instanceof Error ? e.message : String(e)}`);
+      return null;
+    }
+    name = cfg?.html?.theme;
+    source = ".ultra11yrc.json html.theme";
+    if (name === undefined) return NEUTRAL_THEME;
+  }
+  if (!isThemeName(name)) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y ${cmd} : ${source} attend ${THEME_NAMES.join(" ou ")} (reçu "${String(name)}").`
+        : `ultra11y ${cmd}: ${source} expects ${THEME_NAMES.join(" or ")} (got "${String(name)}").`,
+    );
+    return null;
+  }
+  try {
+    return resolveTheme(name, root, lang);
+  } catch (e) {
+    if (e instanceof DsfrUnavailableError) {
+      console.error(e.message);
+      return null;
+    }
+    throw e;
+  }
 }
 
 /** `--evidence-max` as the evidence tier's cap override. Only the RUN-WIDE total is exposed:
@@ -1853,6 +1904,21 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
     return 2;
   }
 
+  // The HTML theme, resolved BEFORE anything is written: a missing DSFR must not leave a
+  // Markdown report behind with no HTML beside it. Without --html the theme has no surface.
+  let theme: Theme = NEUTRAL_THEME;
+  if (p.flags.html === true) {
+    const t = themeOf(p, "report", projectRootOf(p), lang);
+    if (!t) return 2;
+    theme = t;
+  } else if (p.flags.theme !== undefined) {
+    console.error(
+      lang === "fr"
+        ? "ultra11y report : --theme ne s'applique qu'au HTML (--html) ; ignoré pour le Markdown."
+        : "ultra11y report: --theme only applies to HTML (--html); ignored for Markdown.",
+    );
+  }
+
   // THE EVIDENCE TIER, before anything is rendered — because BOTH deliverables read it. The
   // crops are written once into `<out>/assets/<page>/`; the Markdown report references them
   // as files and the composite inlines the same bytes as data: URIs, because only the
@@ -1874,7 +1940,7 @@ async function cmdReport(p: ParsedArgs): Promise<number> {
   // beside the Markdown, in the same `--out`, so the directory stays one self-contained root.
   let html: ReturnType<typeof writeHtml> | undefined;
   if (p.flags.html === true) {
-    html = emitHtml(result, { outDir: out, standard, lang, ...(manifest ? { evidence: manifest } : {}), inlineBudget: budgetOf(p) });
+    html = emitHtml(result, { outDir: out, standard, lang, ...(manifest ? { evidence: manifest } : {}), inlineBudget: budgetOf(p), theme });
   }
   // Partial-audit advisory (owner decision): a pack (RGAA) report whose scan coverage
   // leaves needs-rendering criteria untested — warn prominently on the CLI, naming exactly
@@ -4835,7 +4901,10 @@ async function cmdServe(p: ParsedArgs): Promise<number> {
     return 2;
   }
   const lang = resolveLang(p.flags, { audit: history.at(-1)!.result, standard });
-  const site = { auditsDir, root, lang, standard };
+  // `--root` is the project: where its captures live, and where its own DSFR is resolved from.
+  const theme = themeOf(p, "serve", root, lang);
+  if (!theme) return 2;
+  const site = { auditsDir, root, lang, standard, theme };
 
   if (p.flags.static !== undefined) {
     if (typeof p.flags.static !== "string" || !p.flags.static) {

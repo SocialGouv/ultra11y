@@ -123,6 +123,24 @@ lancer elle-même, avec `npx ultra11y <commande>` (tout le reste : `npx ultra11y
 | `criteria --plan` | le plan de travail : quelle source de preuve tranche chaque critère |
 | `install --all` · `status` | branche le hook dans les agents, dit ce qui est actif |
 
+### Thème DSFR des rapports HTML
+
+`report --html`, `pages --html` et `serve` (y compris `--static`) ont une apparence neutre par
+défaut. Un site en `.gouv.fr` qui utilise déjà le Système de design de l'État peut demander
+`--theme dsfr` (ou `"html": { "theme": "dsfr" }` dans `.ultra11yrc.json`) :
+
+```sh
+npx ultra11y report --in audits/audit-latest.json --html --theme dsfr --root .
+```
+
+ultra11y **ne fournit pas le DSFR** : il lit `@gouvfr/dsfr` installé dans le projet audité
+(résolu depuis `--root`), dont il intègre `dist/dsfr.min.css` et `dist/dsfr.print.min.css`
+tels quels dans chaque page. Ses conditions d'utilisation réservent le DSFR aux sites en
+`.gouv.fr` et le paquet demande de les accepter à l'installation (`.dsfr.yml`). Sans le paquet,
+la commande s'arrête en code 2 et l'explique ; elle ne télécharge rien et ne revient pas au
+thème neutre en silence. Le rapport n'affiche pas de bloc-marque : l'en-tête dit seulement
+qu'il s'agit d'un audit généré par ultra11y. Détail dans `NOTICE`.
+
 ## Pourquoi s’y fier
 
 - **Le silence ne vaut pas conformité.** Un critère que personne n’a vérifié reste « à
