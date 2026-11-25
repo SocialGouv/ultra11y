@@ -9,7 +9,7 @@ import { renderAdjudicationReference } from "../src/adjudicate.js";
 import { allSC } from "../src/wcag.js";
 
 const DOC = new URL("../skills/ultra11y/references/adjudication.md", import.meta.url);
-const rendered = renderAdjudicationReference("en");
+const rendered = renderAdjudicationReference("fr");
 
 if (process.env.UPDATE_ADJUDICATION_MD) writeFileSync(DOC, rendered);
 
@@ -26,7 +26,10 @@ describe("references/adjudication.md is generated, never hand-edited", () => {
   });
 
   it("states the two rules that govern a verdict", () => {
-    expect(rendered).toContain("must cite a normative test that resolves");
-    expect(rendered).toContain("is a recommendation");
+    expect(rendered).toContain("doit citer un test normatif qui se résout");
+    expect(rendered).toContain("est une recommandation");
+    const en = renderAdjudicationReference("en");
+    expect(en).toContain("must cite a normative test that resolves");
+    expect(en).toContain("is a recommendation");
   });
 });

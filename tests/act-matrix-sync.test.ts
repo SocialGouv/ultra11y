@@ -6,7 +6,7 @@
 // Regenerate with: pnpm run build:act
 import { describe, it, expect } from "vitest";
 import { readFileSync, writeFileSync } from "node:fs";
-import { renderActMatrix, type ActTestcase } from "../src/act.js";
+import { ACT_DIVERGENCES_FR, ACT_NOTES_FR, ACT_RULES, renderActMatrix, type ActTestcase } from "../src/act.js";
 
 const MATRIX = new URL("../skills/ultra11y/references/act.md", import.meta.url);
 const snapshot = JSON.parse(readFileSync(new URL("../scripts/vendor/act-testcases.json", import.meta.url), "utf8")) as {
@@ -23,7 +23,18 @@ describe("references/act.md is generated, never hand-edited", () => {
   });
 
   it("states the precision claim and its denominator", () => {
-    expect(rendered).toContain("no unexplained false positive");
-    expect(rendered).toMatch(/Clean examples left alone \| \*\*\d+ \/ \d+\*\*/);
+    expect(rendered).toContain("aucun faux positif inexpliqué");
+    expect(rendered).toMatch(/Exemples sains laissés intacts \| \*\*\d+ \/ \d+\*\*/);
+    const en = renderActMatrix(snapshot.testcases, snapshot.source, "en");
+    expect(en).toContain("no unexplained false positive");
+    expect(en).toMatch(/Clean examples left alone \| \*\*\d+ \/ \d+\*\*/);
+  });
+
+  it("has a French edition of every project-authored note and divergence reason", () => {
+    for (const [id, m] of Object.entries(ACT_RULES)) {
+      if (m.note) expect(ACT_NOTES_FR[id], `ACT rule ${id} has an English note but no French one`).toBeTruthy();
+      for (const tc of Object.keys(m.divergences ?? {}))
+        expect(ACT_DIVERGENCES_FR[tc], `divergence ${id}/${tc} has no French reason`).toBeTruthy();
+    }
   });
 });

@@ -346,31 +346,58 @@ export function runCriteria(opts: CriteriaOpts): number {
   return isCore(opts.standard) ? runWcag(opts) : runPack(opts);
 }
 
-/** Generate the references/criteria.md doc bundled with the skill (WCAG 2.2 AA core). */
-export function renderCriteriaReference(): string {
+const CRITERIA_REF_TEXT = {
+  fr: {
+    header: "<!-- GÉNÉRÉ depuis src/data/wcag.json par `ultra11y criteria --generate` — ne pas modifier à la main. -->",
+    title: "# WCAG 2.2 niveau AA — référence des critères de succès",
+    intro: [
+      "Les 55 critères de succès de niveau A + AA, répartis sur les 4 principes et les 13 règles, avec",
+      "pour chacun son niveau, la classe d’automatisabilité ultra11y (`static` : automatisable par le",
+      "moteur / `needs-rendering` : nécessite un rendu / `judgment` : jugement de l’agent), les règles",
+      "du moteur qui le couvrent et — une colonne par référentiel enregistré — les critères du",
+      "référentiel qui y renvoient. Identifiants et niveaux viennent de la source W3C",
+      "(https://github.com/w3c/wcag) ; les intitulés, de sa traduction française autorisée. WCAG 2.2 © W3C.",
+    ],
+    head: ["Critère", "Intitulé", "Niveau", "Automatisabilité", "Règles"],
+  },
+  en: {
+    header: "<!-- GENERATED from src/data/wcag.json by `ultra11y criteria --generate` — do not edit by hand. -->",
+    title: "# WCAG 2.2 Level AA — success-criteria reference",
+    intro: [
+      "The 55 Level A + AA success criteria across the 4 principles / 13 guidelines, with each",
+      "SC's level, the ultra11y automatability class (automatable / needs rendering / judgment),",
+      "the engine rules that cover it, and — one column per registered standards pack — the pack",
+      "criteria that map to it. SC ids, titles and levels are derived from the W3C source",
+      "(https://github.com/w3c/wcag); WCAG 2.2 © W3C.",
+    ],
+    head: ["SC", "Title", "Level", "Automatability", "Rules"],
+  },
+} as const;
+
+/** Generate the references/criteria.md doc bundled with the skill (WCAG 2.2 AA core).
+ *  French by default (the committed doc); `"en"` renders the English edition. */
+export function renderCriteriaReference(lang: Lang = "fr"): string {
+  const t = CRITERIA_REF_TEXT[lang];
   const out: string[] = [];
-  out.push("<!-- GENERATED from src/data/wcag.json by `ultra11y criteria --generate` — do not edit by hand. -->");
+  out.push(t.header);
   out.push("");
-  out.push("# WCAG 2.2 Level AA — success-criteria reference");
+  out.push(t.title);
   out.push("");
-  out.push("The 55 Level A + AA success criteria across the 4 principles / 13 guidelines, with each");
-  out.push("SC's level, the ultra11y automatability class (automatable / needs rendering / judgment),");
-  out.push("the engine rules that cover it, and — one column per registered standards pack — the pack");
-  out.push("criteria that map to it. SC ids, titles and levels are derived from the W3C source");
-  out.push("(https://github.com/w3c/wcag); WCAG 2.2 © W3C.");
+  out.push(...t.intro);
   out.push("");
   const packs = listPacks();
   const byG = scsByGuideline();
   for (const g of allGuidelines()) {
-    out.push(`## ${g.number} ${g.title}`);
+    out.push(`## ${g.number} ${guidelineTitle(g.number, lang) ?? g.title}`);
     out.push("");
-    const head = ["SC", "Title", "Level", "Automatability", "Rules", ...packs.map((p) => p.name)];
+    const head = [...t.head, ...packs.map((p) => p.name)];
     out.push(`| ${head.join(" | ")} |`);
     out.push(`|${"---|".repeat(head.length)}`);
     for (const c of byG.get(g.number) ?? []) {
       const hits = packsForSc(c.sc);
       const packCols = packs.map((p) => hits.find((h) => h.key === p.key)?.ids.join(", ") ?? "—");
-      const row = [c.sc, c.title.replace(/\|/g, "\\|"), c.level, c.automatability, c.ruleIds.join(", ") || "—", ...packCols];
+      const title = scTitle(c.sc, lang) ?? c.title;
+      const row = [c.sc, title.replace(/\|/g, "\\|"), c.level, c.automatability, c.ruleIds.join(", ") || "—", ...packCols];
       out.push(`| ${row.join(" | ")} |`);
     }
     out.push("");

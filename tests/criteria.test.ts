@@ -56,23 +56,34 @@ describe("runCriteria", () => {
 
 describe("renderCriteriaReference", () => {
   const md = renderCriteriaReference();
-  it("is a generated doc grouped by WCAG guideline", () => {
-    expect(md).toContain("do not edit by hand");
-    expect(md).toContain("GENERATED from src/data/wcag.json");
-    expect(md).toContain("## 1.1 Text Alternatives");
+  const mdEn = renderCriteriaReference("en");
+  it("is a generated doc grouped by WCAG guideline — French by default, English on request", () => {
+    expect(md).toContain("ne pas modifier à la main");
+    expect(md).toContain("GÉNÉRÉ depuis src/data/wcag.json");
+    expect(md).toContain("## 1.1 Équivalents textuels");
     expect(md).toContain("## 4.1 Compatible");
+    expect(mdEn).toContain("do not edit by hand");
+    expect(mdEn).toContain("GENERATED from src/data/wcag.json");
+    expect(mdEn).toContain("## 1.1 Text Alternatives");
+    expect(mdEn).toContain("## 4.1 Compatible");
   });
   it("includes a row for SC 1.1.1 with its rule and RGAA cross-ref", () => {
     expect(md).toMatch(/\| 1\.1\.1 \|.*\| A \|.*\| img-alt-missing/);
+    expect(mdEn).toMatch(/\| 1\.1\.1 \|.*\| A \|.*\| img-alt-missing/);
   });
 
   it("has one table column per registered pack — never hardcoded to RGAA specifically", () => {
-    const header = /\| SC \| Title \| Level \| Automatability \| Rules \|([^\n]*)\|/.exec(md);
-    expect(header).toBeTruthy();
-    const packCols = header![1]!
-      .split("|")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    expect(packCols).toEqual(listPacks().map((p) => p.name));
+    for (const [doc, re] of [
+      [md, /\| Critère \| Intitulé \| Niveau \| Automatisabilité \| Règles \|([^\n]*)\|/],
+      [mdEn, /\| SC \| Title \| Level \| Automatability \| Rules \|([^\n]*)\|/],
+    ] as const) {
+      const header = re.exec(doc);
+      expect(header).toBeTruthy();
+      const packCols = header![1]!
+        .split("|")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      expect(packCols).toEqual(listPacks().map((p) => p.name));
+    }
   });
 });
