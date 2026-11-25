@@ -1,11 +1,13 @@
-# Run the audit during your E2E tests (Playwright / Cypress)
+# Lancer l’audit pendant vos tests E2E (Playwright / Cypress)
 
-`scan` launches its **own** browser after the fact. That is a second run of your app, with
-none of the state your tests just built: no login, no filled form, no opened modal. The E2E
-integration inverts it — the audit runs **inside the run you already have**, on the page as
-your test left it.
+`scan` lance son **propre** navigateur après coup. C’est une seconde exécution de votre
+application, sans rien de l’état que vos tests viennent de construire : pas de connexion, pas de
+formulaire rempli, pas de modale ouverte. L’intégration E2E inverse la logique — l’audit tourne
+**à l’intérieur de l’exécution que vous avez déjà**, sur la page telle que votre test l’a
+laissée.
 
-It ships as **published package entry points** — add `ultra11y` as a devDependency:
+Elle est livrée sous forme de **points d’entrée du package publié** — ajoutez `ultra11y` en
+devDependency :
 
 ```js
 import { test, checkA11y } from "ultra11y/playwright";
@@ -13,20 +15,22 @@ import ultra11y from "ultra11y/cypress/plugin";   // cypress.config.js
 import "ultra11y/cypress";                         // cypress/support/e2e.js
 ```
 
-Versioned, typed, and they resolve the engine that ships inside the very package you
-installed, so a project can never pipe to a different build than the one it depends on.
+Versionnés, typés, et ils résolvent le moteur livré dans le package même que vous avez
+installé : un projet ne peut donc jamais envoyer ses pages à un autre build que celui dont il
+dépend.
 
-These exports record **pages**. Components are rendered by ultra11y's own engine, `render`,
-which never reads or runs your tests (`references/rendered.md`).
+Ces exports enregistrent des **pages**. Les composants sont rendus par le moteur propre
+d’ultra11y, `render`, qui ne lit ni n’exécute jamais vos tests (`references/rendered.md`).
 
-## Sweeping the declared sample (`sweepSample`)
+## Balayer l’échantillon déclaré (`sweepSample`)
 
-The sample in `.ultra11yrc.json` already says what every page is — id, name, URL, whether it
-sits behind a login, the `sources` that render it. A repo that then hand-writes a route table
-to drive its sweep keeps a second copy of that, and the two drift: a page renamed in one place
-keeps its old identity in the report, which is the failure this tier exists to prevent.
+L’échantillon de `.ultra11yrc.json` dit déjà ce qu’est chaque page — id, nom, URL, si elle se
+trouve derrière une connexion, les `sources` qui la rendent. Un dépôt qui écrit ensuite à la
+main une table de routes pour piloter son balayage en garde une seconde copie, et les deux
+finissent par diverger (drift) : une page renommée à un endroit conserve son ancienne identité
+dans le rapport, ce qui est précisément l’échec que ce niveau existe pour empêcher.
 
-So let the sample drive it:
+Laissez donc l’échantillon le piloter :
 
 ```ts
 import { sweepSample } from "ultra11y/playwright";
@@ -40,46 +44,49 @@ sweepSample({
 });
 ```
 
-One test per page, each navigated, checked against `expectPath` and its HTTP status, and
-recorded under its declared identity. A page the browser did not stay on is `test.skip`ped
-with the reason.
+Un test par page, chacune visitée, contrôlée par rapport à `expectPath` et à son statut HTTP,
+et enregistrée sous son identité déclarée. Une page sur laquelle le navigateur n’est pas resté
+est passée en `test.skip`, avec la raison.
 
-`samplePagesFor()` and `sweepTarget()` are the same logic without the runner, for a repo that
-wants to declare its own tests.
+`samplePagesFor()` et `sweepTarget()` sont la même logique sans le runner, pour un dépôt qui
+veut déclarer ses propres tests.
 
-### The sweep probes by default
+### Le balayage lance les sondes par défaut
 
-`checkA11y` leaves the live probes opt-in — it is called from a test that owns its page and may
-be asserting on focus or hover a line later. A sweep is not that: it exists for nothing but
-recording the sample, and the probes are the only thing that can decide zoom (1.4.4), reflow
-(1.4.10), text spacing (1.4.12) and content on hover (1.4.13) on screens a cold scanner never
-reaches. So `sweepSample` turns them on.
+`checkA11y` laisse les sondes en direct optionnelles — il est appelé depuis un test qui possède
+sa page et peut faire une assertion sur le focus ou le survol une ligne plus loin. Un balayage
+n’est pas dans ce cas : il n’existe que pour enregistrer l’échantillon, et les sondes sont la
+seule chose capable de trancher le zoom (1.4.4), la redistribution (1.4.10), l’espacement du
+texte (1.4.12) et le contenu au survol (1.4.13) sur des écrans qu’un scanner à froid n’atteint
+jamais. `sweepSample` les active donc.
 
-This matters more than it looks, because conformity on those criteria is an AND across every
-page in scope. Measured on a real repository: 15 of the 20 recorded pages came from a sweep
-that never probed, so all four criteria stayed « à évaluer » for the whole audit — including on
-the five pages that HAD been probed. One unprobed page closes the door for all of them.
+C’est plus important qu’il n’y paraît, car la conformité sur ces critères est un ET sur toutes
+les pages du périmètre. Mesuré sur un dépôt réel : 15 des 20 pages enregistrées venaient d’un
+balayage qui n’avait jamais sondé, si bien que les quatre critères sont restés « à évaluer »
+pour tout l’audit — y compris sur les cinq pages qui AVAIENT été sondées. Une seule page non
+sondée ferme la porte pour toutes.
 
 ```ts
 sweepSample({ check: { probes: false } });            // opt out entirely
 sweepSample({ check: { probes: { budgetMs: 8_000 } } }); // …or just bound them
 ```
 
-The probes are bounded by construction: every interaction carries its own timeout, the pass
-carries a wall-clock budget, and whatever the budget cuts short is recorded as `skipped` with
-the criterion and the milliseconds spent — never dropped, because a measurement that did not
-happen must not read as one that found nothing. The numbers live in `.ultra11yrc.json` under
-`probes` (`budgetMs`, `actionTimeoutMs`, `maxTriggers`, `maxFocusables`, `maxHits`,
-`reflowWidth`), which is where a judgement about YOUR pages belongs.
+Les sondes sont bornées par construction : chaque interaction porte son propre délai
+d’expiration, la passe porte un budget de temps réel, et tout ce que le budget interrompt est
+enregistré comme `skipped` avec le critère et les millisecondes consommées — jamais abandonné,
+car une mesure qui n’a pas eu lieu ne doit pas se lire comme une mesure qui n’a rien trouvé.
+Les valeurs se trouvent dans `.ultra11yrc.json` sous `probes` (`budgetMs`, `actionTimeoutMs`,
+`maxTriggers`, `maxFocusables`, `maxHits`, `reflowWidth`), là où doit se trouver un jugement
+sur VOS pages.
 
-## A page the browser did not stay on (`expectPath`)
+## Une page sur laquelle le navigateur n’est pas resté (`expectPath`)
 
-`as`/`name` is the identity the report speaks, and the fixture applies it to whatever is on
-screen. So a route your test could not open — a guarded step, an expired session — gets filed
-under the requested page's name, and its sheet, screenshot and rate all describe another
-screen. Nothing about the document looks wrong.
+`as`/`name` est l’identité sous laquelle parle le rapport, et la fixture l’applique à ce qui
+se trouve à l’écran. Ainsi une route que votre test n’a pas pu ouvrir — une étape protégée, une
+session expirée — est classée sous le nom de la page demandée, et sa fiche, sa capture d’écran
+et son taux décrivent tous un autre écran. Rien dans le document n’a l’air faux.
 
-Pass the path you navigated to and the fixture refuses instead:
+Passez le chemin vers lequel vous avez navigué et la fixture refuse à la place :
 
 ```js
 await checkA11y(page, { as: "declaration-etape-4", expectPath: "/declaration/etape/4" });
@@ -87,39 +94,44 @@ await checkA11y(page, { as: "declaration-etape-4", expectPath: "/declaration/eta
 // "declaration-etape-4". The state that opens this route is not the one the test built.
 ```
 
-Opt-in, and path-only: a query or fragment the app appends to its own route is the same page.
-`scan --sample` applies the same rule without being asked, because there the URL *is* the
-instruction. A page reported missing is a bug in your seeding; a page reported under the wrong
-name is a false conformance claim.
+Optionnel, et limité au chemin : une query ou un fragment que l’application ajoute à sa propre
+route désigne la même page. `scan --sample` applique la même règle sans qu’on le lui demande,
+car là l’URL *est* l’instruction. Une page signalée manquante est un bug dans votre
+préparation des données ; une page signalée sous le mauvais nom est une fausse déclaration de
+conformité.
 
-## A page that has not finished loading (`loadingTimeoutMs`)
+## Une page qui n’a pas fini de charger (`loadingTimeoutMs`)
 
-A test that navigates and checks at once can land on the page's placeholder — « Chargement… »
-where the data will be. Before collecting, the fixture waits (10 s by default, bounded) for the
-page to stop declaring itself loading: no rendered `aria-busy="true"`, no indeterminate progress
-bar (`role=progressbar` without `aria-valuenow`, `<progress>` without `value`), no element whose
-whole text is a loading phrase (« Chargement… », « Chargement en cours », « Veuillez
-patienter », « Loading… », « Please wait »).
+Un test qui navigue et contrôle dans la foulée peut tomber sur l’espace réservé de la page —
+« Chargement… » là où viendront les données. Avant la collecte, la fixture attend (10 s par
+défaut, borné) que la page cesse de se déclarer en chargement : aucun `aria-busy="true"` rendu,
+aucune barre de progression indéterminée (`role=progressbar` sans `aria-valuenow`, `<progress>`
+sans `value`), aucun élément dont le texte entier est une formule de chargement
+(« Chargement… », « Chargement en cours », « Veuillez patienter », « Loading… », « Please
+wait »).
 
-A page still loading when the bound runs out is recorded anyway, **marked**: `meta.json`
-carries `loading` (the markers it still showed), a warning is printed, and the page's basis is
-`loading` — « capture en état de chargement » in every report. Its findings count; its silence
-concludes nothing. `loadingTimeoutMs: 0` checks without waiting. `scan` waits the same way; Cypress records the markers but leaves the waiting to the
-test's own `should`.
+Une page encore en chargement quand la borne est atteinte est enregistrée quand même,
+**marquée** : `meta.json` porte `loading` (les marqueurs qu’elle affichait encore), un
+avertissement est affiché, et la base de la page est `loading` — « capture en état de
+chargement » dans chaque rapport. Ses constats comptent ; son silence ne conclut rien.
+`loadingTimeoutMs: 0` contrôle sans attendre. `scan` attend de la même façon ; Cypress
+enregistre les marqueurs mais laisse l’attente au `should` du test lui-même.
 
-## A page captured without cookie consent (`consent`)
+## Une page capturée sans consentement aux cookies (`consent`)
 
-A test browser, like `scan`'s, never accepts cookies. On a page whose video, map or social
-widget sits behind a consent manager, what gets captured is the **placeholder**, such as DSFR's
-`.fr-consent-placeholder` (« … est désactivé »), tarteaucitron's activation box, or a Didomi,
-Axeptio or EU Cookie Compliance (`#sliding-popup`) banner. The collector detects these
-(`src/consent.ts`: those vendors, plus generic `*consent*placeholder*` / `*consent*banner*`
-classes). `meta.json` then carries `consent: "none"` and `consentMarkers`, and every piece of
-evidence harvested inside one is tagged « état sans consentement » in the adjudication briefs, so
-it is not judged as the page's own content (not a 9.1 heading, for example). Accepting or
-refusing consent before the capture (`sample.consent: accept|refuse`) is not implemented yet:
-each consent manager names its buttons differently, and a click that misses would capture the
-wrong state under the right label.
+Un navigateur de test, comme celui de `scan`, n’accepte jamais les cookies. Sur une page dont
+la vidéo, la carte ou le widget social se trouve derrière un gestionnaire de consentement, ce
+qui est capturé est l’**espace réservé**, comme le `.fr-consent-placeholder` du DSFR (« … est
+désactivé »), la boîte d’activation de tarteaucitron, ou un bandeau Didomi, Axeptio ou EU
+Cookie Compliance (`#sliding-popup`). Le collecteur les détecte (`src/consent.ts` : ces
+éditeurs, plus les classes génériques `*consent*placeholder*` / `*consent*banner*`).
+`meta.json` porte alors `consent: "none"` et `consentMarkers`, et chaque preuve récoltée à
+l’intérieur de l’un d’eux est étiquetée « état sans consentement » dans les briefs
+d’arbitrage, afin de ne pas être jugée comme le contenu propre de la page (pas un titre 9.1,
+par exemple). Accepter ou refuser le consentement avant la capture
+(`sample.consent: accept|refuse`) n’est pas encore implémenté : chaque gestionnaire de
+consentement nomme ses boutons différemment, et un clic manqué capturerait le mauvais état
+sous la bonne étiquette.
 
 ## Playwright
 
@@ -135,24 +147,26 @@ test("home page is accessible", async ({ page, ultra11y }) => {
 await checkA11y(page, { as: "contact", failOn: "major" });
 ```
 
-**Wire it first.** When the project has Playwright tests, this is the main rendered tier of a
-full audit (`references/full-audit.md`). Add `checkA11y` to the specs that reach a page in a
-state (logged in, form filled, dialog open), and `sweepSample` for the declared sample. Reuse
-the `.ultra11y/pages` captures the suite already wrote before you fall back on `scan`. Then
-`pages discover --from-snapshots --routes-only` adds the routes the suite reached to the
-inventory, and `scan --all-routes` never rescans them.
+**Branchez-le d’abord.** Quand le projet a des tests Playwright, c’est le principal niveau
+rendu d’un audit complet (`references/full-audit.md`). Ajoutez `checkA11y` aux specs qui
+atteignent une page dans un état donné (connecté, formulaire rempli, dialogue ouvert), et
+`sweepSample` pour l’échantillon déclaré. Réutilisez les captures `.ultra11y/pages` que la
+suite a déjà écrites avant de vous rabattre sur `scan`. Ensuite
+`pages discover --from-snapshots --routes-only` ajoute à l’inventaire les routes atteintes par
+la suite, et `scan --all-routes` ne les rescanne jamais.
 
-**The axe pass is ultra11y's**, not the project's. The pass (`axe`, default `auto`) injects the
-pinned `axe-core` that ships with ultra11y, with the same rule tags as `scan`, so a capture
-and a scan of the same page are measured by the same engine. The version that ran is written to
-the capture's `axe.json` (`engine`) and named in the report annex. The project's own
-`@axe-core/playwright`/`axe-core` is used only when ultra11y's cannot be resolved, and a note
-says so.
+**La passe axe est celle d’ultra11y**, pas celle du projet. La passe (`axe`, `auto` par
+défaut) injecte l’`axe-core` épinglé livré avec ultra11y, avec les mêmes tags de règles que
+`scan`, de sorte qu’une capture et un scan de la même page sont mesurés par le même moteur. La
+version exécutée est écrite dans le `axe.json` de la capture (`engine`) et nommée dans l’annexe
+du rapport. Le `@axe-core/playwright`/`axe-core` du projet n’est utilisé que lorsque celui
+d’ultra11y ne peut pas être résolu, et une note le signale.
 
 ## Cypress
 
-Cypress test code runs in the **browser**, which cannot write to disk, so the collected page
-round-trips through a Node task. Two files, two wiring points:
+Le code de test Cypress s’exécute dans le **navigateur**, qui ne peut pas écrire sur le disque :
+la page collectée fait donc un aller-retour par une tâche Node. Deux fichiers, deux points de
+branchement :
 
 ```js
 // cypress.config.js
@@ -168,112 +182,121 @@ cy.visit("/");
 cy.ultra11y({ as: "accueil" });
 ```
 
-**No axe pass on Cypress.** `cy.ultra11y()` records the page (DOM, styles, boxes, screenshot)
-and the engine's static and rendered rules audit it, but it injects no axe-core and runs no live
-probe. The criteria axe decides (computed contrast above all) therefore stay « à évaluer » on
-Cypress-only pages. Reach them with `ultra11y/playwright` or with `scan` on the same routes.
+**Pas de passe axe sous Cypress.** `cy.ultra11y()` enregistre la page (DOM, styles, boîtes,
+capture d’écran) et les règles statiques et rendues du moteur l’auditent, mais il n’injecte
+aucun axe-core et ne lance aucune sonde en direct. Les critères que tranche axe (le contraste
+calculé avant tout) restent donc « à évaluer » sur les pages vues uniquement par Cypress.
+Atteignez-les avec `ultra11y/playwright` ou avec `scan` sur les mêmes routes.
 
 ## Options
 
-| Option | Effect |
+| Option | Effet |
 |---|---|
-| `as` | the page **id** (directory name). Defaults to the slugified URL path |
-| `name` | human page name for the report. Defaults to the document title |
-| `failOn` | `"blocking"` (default), `"major"`, `"minor"`, or `false` to record without ever failing |
-| `auth` | mark the page as sitting behind authentication |
-| `sources` | source files that rendered it — findings are then reported against **your code** |
-| `notes` | reproduction notes carried into the auditor ticket |
-| `pdf` | Playwright: download the PDF documents the page links to (default `true`; `false` is `scan --no-pdf`) — see below |
-| `maxPdf` | Playwright: most documents downloaded per test worker (default 20, 20 MiB each) — `scan --max-pdf` |
+| `as` | l’**id** de la page (nom du répertoire). Par défaut, le chemin d’URL slugifié |
+| `name` | nom lisible de la page pour le rapport. Par défaut, le titre du document |
+| `failOn` | `"blocking"` (par défaut), `"major"`, `"minor"`, ou `false` pour enregistrer sans jamais échouer |
+| `auth` | marque la page comme se trouvant derrière une authentification |
+| `sources` | fichiers sources qui l’ont rendue — les constats sont alors rapportés sur **votre code** |
+| `notes` | notes de reproduction reportées dans le ticket de l’auditeur |
+| `pdf` | Playwright : télécharge les documents PDF vers lesquels pointe la page (`true` par défaut ; `false` équivaut à `scan --no-pdf`) — voir plus bas |
+| `maxPdf` | Playwright : nombre maximal de documents téléchargés par worker de test (20 par défaut, 20 Mio chacun) — `scan --max-pdf` |
 
-`failOn: false` is the useful one for adoption: record every page first, look at the real
-backlog, then turn the gate on.
+`failOn: false` est l’option utile pour l’adoption : enregistrez d’abord toutes les pages,
+regardez le vrai backlog, puis activez le garde-fou.
 
-## What it does, exactly
+## Ce qu’il fait, exactement
 
-Two steps per checked page, and the fixture owns neither:
+Deux étapes par page contrôlée, et la fixture ne possède aucune des deux :
 
-1. the page is collected **in the browser** with the engine's own collector — DOM,
-   computed-style digest, bounding boxes;
-2. the payload is piped to `ultra11y snapshot write`, which persists
-   `.ultra11y/pages/<id>/` **and** audits it, returning the `AuditResult`.
+1. la page est collectée **dans le navigateur** avec le collecteur propre du moteur — DOM,
+   condensé des styles calculés, boîtes englobantes ;
+2. la charge utile est envoyée à `ultra11y snapshot write`, qui persiste
+   `.ultra11y/pages/<id>/` **et** l’audite, en renvoyant l’`AuditResult`.
 
-So the fixture knows nothing about the snapshot format, the provenance comment or the audit —
-it is a pipe. There is no second implementation to drift out of sync, and any other producer
-can use the same command.
+La fixture ne sait donc rien du format d’instantané, du commentaire de provenance ni de
+l’audit — c’est un tuyau. Il n’y a pas de seconde implémentation susceptible de dériver
+(drift) et de se désynchroniser, et tout autre producteur peut utiliser la même commande.
 
-## Both runners now feed the pixel tier
+## Les deux runners alimentent désormais le niveau pixel
 
-Playwright captures a **viewport screenshot** and sends it with the payload — that is what
-feeds `rendered-contrast-pixel` (contrast over a gradient or a background image, the one case
-computed styles cannot express). When the page is taller than the viewport it also captures
-the **whole page** (height capped at 8000 px) as `screen-full.png`, which is what the reports
-show a reviewer; the pixel tier keeps the viewport shot, whose coordinates match `boxes.json`.
-`screenshot: false` skips both.
+Playwright prend une **capture d’écran du viewport** et l’envoie avec la charge utile — c’est
+ce qui alimente `rendered-contrast-pixel` (contraste sur un dégradé ou une image de fond, le
+seul cas que les styles calculés ne peuvent pas exprimer). Quand la page est plus haute que le
+viewport, il capture aussi la **page entière** (hauteur plafonnée à 8000 px) sous
+`screen-full.png`, ce que les rapports montrent à un relecteur ; le niveau pixel garde la
+capture du viewport, dont les coordonnées correspondent à `boxes.json`. `screenshot: false`
+désactive les deux.
 
-Cypress used to have none: `cy.screenshot()` writes to a path Cypress chooses and names, so
-the browser side never learns where the file went. The **`after:screenshot`** event is the
-missing link — it hands the Node plugin the real path of the file Cypress just wrote, which
-it reads back and attaches. So a Cypress-collected page gets every rule too.
+Cypress n’en avait aucune : `cy.screenshot()` écrit à un chemin que Cypress choisit et nomme,
+si bien que le côté navigateur n’apprend jamais où le fichier est parti. L’événement
+**`after:screenshot`** est le chaînon manquant — il transmet au plugin Node le chemin réel du
+fichier que Cypress vient d’écrire, que celui-ci relit et joint. Une page collectée par Cypress
+obtient donc elle aussi toutes les règles.
 
-The screenshot is taken **before** the collection: `cy.screenshot()` toggles a class on the
-document while it captures, and serializing mid-capture would record that transient state as
-if it were the page. If the event never fires, the page is recorded without a screenshot —
-the criterion stays undecided, exactly as before, and is never guessed.
+La capture d’écran est prise **avant** la collecte : `cy.screenshot()` bascule une classe sur
+le document pendant la capture, et sérialiser en pleine capture enregistrerait cet état
+transitoire comme s’il s’agissait de la page. Si l’événement ne se déclenche jamais, la page
+est enregistrée sans capture d’écran — le critère reste non tranché, exactement comme avant, et
+n’est jamais deviné.
 
-Everything else — the DOM, the computed styles, the boxes and the stylesheets — is identical
-between the two.
+Tout le reste — le DOM, les styles calculés, les boîtes et les feuilles de style — est
+identique entre les deux.
 
-## The documents the page links to (Playwright)
+## Les documents vers lesquels pointe la page (Playwright)
 
-`checkA11y` — and so every `sweepSample` page — downloads the **same-origin PDF documents** the
-recorded page links to, the way `scan` does, but through the page's own request context
-(`page.context().request`): the test's session goes with the request, so a document generated
-behind the login is reached. A link is a **candidate** when its path ends in `.pdf`, it declares
-`type="application/pdf"` or `download`, its text / `aria-label` / `title` names PDF as a word, or
-its path or query names it as a token (`/api/declaration-pdf?year=2026`, `?format=pdf`). The
-links are read in the browser, so `a.href` is already resolved against the page and its `<base>`.
-A candidate is kept only when the response is `Content-Type: application/pdf` or starts with
-`%PDF-`; anything else is printed « not a PDF » with the response type, never audited. Every
-redirect hop is checked before it is followed (same origin, or the http→https upgrade of it; at
-most 5), so no request leaves the audited origin.
+`checkA11y` — et donc chaque page de `sweepSample` — télécharge les **documents PDF de même
+origine** vers lesquels pointe la page enregistrée, comme le fait `scan`, mais via le contexte
+de requêtes de la page elle-même (`page.context().request`) : la session du test accompagne la
+requête, si bien qu’un document généré derrière la connexion est atteint. Un lien est
+**candidat** quand son chemin se termine par `.pdf`, qu’il déclare `type="application/pdf"` ou
+`download`, que son texte / `aria-label` / `title` nomme PDF comme un mot, ou que son chemin ou
+sa query le nomme comme un jeton (`/api/declaration-pdf?year=2026`, `?format=pdf`). Les liens
+sont lus dans le navigateur, donc `a.href` est déjà résolu par rapport à la page et à son
+`<base>`. Un candidat n’est conservé que si la réponse est `Content-Type: application/pdf` ou
+commence par `%PDF-` ; tout le reste est affiché « not a PDF » avec le type de la réponse,
+jamais audité. Chaque saut de redirection est vérifié avant d’être suivi (même origine, ou sa
+montée http→https ; 5 au plus), si bien qu’aucune requête ne quitte l’origine auditée.
 
-They land in `.ultra11y/documents/<sha256>.pdf` with the same sidecar `scan` writes (`kind`,
-`v`, the URL and **every page linking it** — a header link on every page is fetched once per
-worker and its sidecar grows), and `audit` / the `report: true` option re-read them. Bounded
-like `scan`: at most `maxPdf` (default 20) documents per test worker, 20 MiB each. `pdf: false`
-turns it off. A failed download is a `console.warn`, never a failed test. Cypress does not
-download documents.
+Ils arrivent dans `.ultra11y/documents/<sha256>.pdf` avec le même fichier annexe que celui
+qu’écrit `scan` (`kind`, `v`, l’URL et **chaque page qui pointe vers lui** — un lien d’en-tête
+présent sur chaque page est récupéré une fois par worker et son fichier annexe s’enrichit), et
+`audit` / l’option `report: true` les relisent. Borné comme `scan` : au plus `maxPdf` (20 par
+défaut) documents par worker de test, 20 Mio chacun. `pdf: false` le désactive. Un
+téléchargement raté est un `console.warn`, jamais un test en échec. Cypress ne télécharge pas
+de documents.
 
-## A report straight out of the test run
+## Un rapport tout droit sorti de l’exécution des tests
 
-`checkA11y(page, { report: true })` — and `cy.ultra11y({ report: true })` — writes the per-page
-report once the page is recorded — `audits/pages/index.md` plus one sheet per page, screenshots included. Off by
-default: a report per checked page would be wasteful in a suite, so turn it on in a final
-test, or run `pages --format report` yourself afterwards. Cypress test code cannot write
-files, so there the option is declared in the browser and honoured by the Node plugin — same
-option, same behaviour, because a runner that silently ignored it would be worse than one
-that lacked it.
+`checkA11y(page, { report: true })` — et `cy.ultra11y({ report: true })` — écrit le rapport par
+page une fois la page enregistrée — `audits/pages/index.md` plus une fiche par page, captures
+d’écran comprises. Désactivé par défaut : un rapport par page contrôlée serait du gaspillage
+dans une suite, activez-le donc dans un test final, ou lancez `pages --format report`
+vous-même ensuite. Le code de test Cypress ne peut pas écrire de fichiers : l’option y est donc
+déclarée dans le navigateur et honorée par le plugin Node — même option, même comportement, car
+un runner qui l’ignorerait en silence serait pire qu’un runner qui en serait dépourvu.
 
-## Why the artefact matters more than the assertion
+## Pourquoi l’artefact compte plus que l’assertion
 
-A failing assertion tells one developer, once. The **snapshot** is the durable part:
+Une assertion en échec prévient un développeur, une fois. Le **snapshot** est la partie
+durable :
 
-- It records the page as the browser actually built it, so the same page can be re-audited
-  **offline, with no browser** — which is how CI decides rendering criteria without booting
-  the app, and how the report speaks page by page.
-- Because it is a full document (a component capture is a fragment), the page-scoped rules run
-  on it: **RGAA 8.3** (`lang`), **8.5/8.6** (`title`), 12.6 (`main`). Those are not decidable
-  from a component render, nor from source once a framework injects the document shell.
-- Every finding carries `page` **and** `origin.sourceFile`, so a defect found at render time
-  is reported against the code that caused it.
+- Il enregistre la page telle que le navigateur l’a réellement construite, si bien que la même
+  page peut être ré-auditée **hors ligne, sans navigateur** — c’est ainsi que la CI tranche les
+  critères de rendu sans démarrer l’application, et que le rapport parle page par page.
+- Comme c’est un document complet (une capture de composant est un fragment), les règles à
+  l’échelle de la page s’y appliquent : **RGAA 8.3** (`lang`), **8.5/8.6** (`title`), 12.6
+  (`main`). Celles-ci ne sont pas décidables à partir d’un rendu de composant, ni à partir de la
+  source dès qu’un framework injecte la coquille du document.
+- Chaque constat porte `page` **et** `origin.sourceFile`, si bien qu’un défaut trouvé au rendu
+  est rapporté sur le code qui l’a causé.
 
-Commit `.ultra11y/pages/` to gate on it (`audit` ingests the directory automatically). Add
-`sources` to your options and the failure message names your component instead of `dom.html`.
+Commitez `.ultra11y/pages/` pour vous en servir comme garde-fou (`audit` ingère le répertoire
+automatiquement). Ajoutez `sources` à vos options et le message d’échec nomme votre composant
+au lieu de `dom.html`.
 
-## Scoping
+## Périmètre
 
-`snapshot write` audits **only the page it was handed** — never the whole pages tree — so a
-test checking the contact page is never failed by the home page's backlog. Findings are
-filtered to non-advisory ones before the gate: a non-normative recommendation never fails a
-test.
+`snapshot write` n’audite **que la page qu’on lui a passée** — jamais tout l’arbre des pages —
+si bien qu’un test qui contrôle la page de contact n’échoue jamais à cause du backlog de la
+page d’accueil. Les constats sont filtrés pour ne garder que les non-consultatifs avant le
+garde-fou : une recommandation non normative ne fait jamais échouer un test.
