@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [9.6.6](https://github.com/SocialGouv/ultra11y/compare/v9.6.5...v9.6.6) (2026-11-25)
+
+
+### Bug Fixes
+
+* **axe:** axe-core's own French locale under --lang fr ([#239](https://github.com/SocialGouv/ultra11y/issues/239)) ([40013cd](https://github.com/SocialGouv/ultra11y/commit/40013cd08dc1aa0196f114c170dd4d14036f1c81)), closes [#238](https://github.com/SocialGouv/ultra11y/issues/238)
+
 ## [9.6.5](https://github.com/SocialGouv/ultra11y/compare/v9.6.4...v9.6.5) (2026-11-25)
 
 
