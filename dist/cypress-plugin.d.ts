@@ -1,8 +1,10 @@
-import { S as SnapshotPayload, F as FindingLike } from './payload-Dh8zlYiV.js';
+import { S as SnapshotPayload, C as CheckLang, F as FindingLike } from './payload-92OwFKBr.js';
 
 type On = (event: string, handler: any) => void;
 interface TaskPayload extends SnapshotPayload {
     failOn?: string | false;
+    /** Forwarded from `cy.ultra11y({ lang })`: the language of the failure message and the report. */
+    lang?: CheckLang;
     /** The name `cy.screenshot()` was called with, when the browser half took one. */
     screenshotName?: string;
     /** Forwarded from `cy.ultra11y({ report })` — the browser cannot write files, this side can. */

@@ -2413,8 +2413,7 @@ const MAX_REFS = 12;
  *  the severity rubric and the pack ruling notes carry their own fr/en text. */
 const ADJUDICATION_REF_TEXT = {
   en: {
-    header:
-      "<!-- GENERATED from src/data/adjudication.json and src/adjudication-rulings.ts by `pnpm run build:adjudication` — do not edit by hand. -->",
+    header: "<!-- GENERATED from src/data/adjudication.json and src/adjudication-rulings.ts by `pnpm run build:adjudication` — do not edit by hand. -->",
     title: "# Deciding the criteria the engine hands you",
     intro: [
       "The static engine decides 3 of the 55 WCAG 2.2 AA success criteria outright. The other 52",
@@ -2454,8 +2453,7 @@ const ADJUDICATION_REF_TEXT = {
     grounds: "**Grounds.**",
   },
   fr: {
-    header:
-      "<!-- GÉNÉRÉ depuis src/data/adjudication.json et src/adjudication-rulings.ts par `pnpm run build:adjudication` — ne pas modifier à la main. -->",
+    header: "<!-- GÉNÉRÉ depuis src/data/adjudication.json et src/adjudication-rulings.ts par `pnpm run build:adjudication` — ne pas modifier à la main. -->",
     title: "# Trancher les critères que le moteur vous confie",
     intro: [
       "Le moteur statique tranche d’emblée 3 des 55 critères de succès WCAG 2.2 AA. Les 52 autres",
@@ -2520,8 +2518,7 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
       lines.push("");
     }
     const refs = techniquesFor(sc.sc);
-    if (refs.length)
-      lines.push(`${t.refs} ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${sc.sc}\`)` : ""}`, "");
+    if (refs.length) lines.push(`${t.refs} ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${sc.sc}\`)` : ""}`, "");
     byGuideline.set(sc.guideline, lines);
   }
   for (const [guideline, lines] of byGuideline) {

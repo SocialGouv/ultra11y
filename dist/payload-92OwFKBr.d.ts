@@ -10,9 +10,21 @@ interface FindingLike {
         sourceFile?: string;
         sourceLine?: number;
     };
+    /** The catalog key the engine's message was baked from, so a Node half can re-render it in
+     *  the check's language (`message` is the English bake). */
+    msg?: {
+        id: string;
+        params?: Record<string, string | number>;
+    };
+    i18n?: {
+        message: Partial<Record<CheckLang, string>>;
+    };
 }
 interface AuditLike {
     findings?: FindingLike[];
+    scope?: {
+        langs?: string[];
+    };
 }
 interface SnapshotPayload {
     meta: Record<string, unknown>;
@@ -129,7 +141,14 @@ interface CheckOptions {
     behaviour?: boolean | {
         windowMs?: number;
     };
+    /** Language of the failure message the check throws, and of the per-page report when
+     *  `report` sets none of its own. Unset, it follows the CLI's rule: the language the page
+     *  declares (`<html lang>`), else French. */
+    lang?: CheckLang;
 }
+/** The languages a check can speak — the engine's `Lang`, restated here because this module
+ *  must not import the engine. */
+type CheckLang = "fr" | "en";
 /** The bounds a repository may put on the live probes. Stated once, here, because the same
  *  list is read from `.ultra11yrc.json`, accepted at the call site and handed to the engine —
  *  three copies of a field list is three chances for one of them to fall behind.
@@ -146,4 +165,4 @@ interface ProbeTuning {
     budgetMs?: number;
 }
 
-export { type AuditLike as A, type CheckOptions as C, type FindingLike as F, type SnapshotPayload as S, slugify as s };
+export { type AuditLike as A, type CheckLang as C, type FindingLike as F, type SnapshotPayload as S, type CheckOptions as a, slugify as s };

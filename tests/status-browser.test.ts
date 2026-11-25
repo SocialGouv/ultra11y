@@ -79,7 +79,8 @@ describe("status --browser", () => {
 
   it("prints a human line without --json", async () => {
     const { out } = await run(["status", "--browser", "--cwd", bareProject()]);
-    expect(out).toMatch(/browser/i);
+    expect(out).toMatch(/navigateur/i); // French by default (#214)
+    expect((await run(["status", "--browser", "--cwd", bareProject(), "--lang", "en"])).out).toMatch(/browser/i);
   });
 
   // The default `status` is the agent-harness doctor and is consumed by other tooling; adding

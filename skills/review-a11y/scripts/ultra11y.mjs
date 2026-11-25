@@ -5510,8 +5510,8 @@ function knownScStatus(id) {
   return universeById.get(id)?.status;
 }
 function coreGlossary(lang = "en") {
-  const fr = data.glossaryFr;
-  return (lang === "fr" && fr && Object.keys(fr).length ? fr : data.glossary) ?? {};
+  const fr2 = data.glossaryFr;
+  return (lang === "fr" && fr2 && Object.keys(fr2).length ? fr2 : data.glossary) ?? {};
 }
 function allPrinciples() {
   return data.principles;
@@ -42872,7 +42872,7 @@ function Me(e, t3, l = Y.DEFAULT) {
     return b ? d2(F) : (_2(F), s2.push(F)), A2(), true;
   }
   r(P2, "parseString");
-  function M2() {
+  function M3() {
     switch (n.getToken()) {
       case 11:
         const b = n.getTokenValue();
@@ -42893,7 +42893,7 @@ function Me(e, t3, l = Y.DEFAULT) {
     }
     return A2(), true;
   }
-  r(M2, "parseLiteral");
+  r(M3, "parseLiteral");
   function V() {
     return n.getToken() !== 10 ? (k(3, [], [2, 5]), false) : (P2(false), n.getToken() === 6 ? (v2(":"), A2(), U() || k(4, [], [2, 5])) : k(5, [], [2, 5]), s2.pop(), true);
   }
@@ -42931,7 +42931,7 @@ function Me(e, t3, l = Y.DEFAULT) {
       case 10:
         return P2(true);
       default:
-        return M2();
+        return M3();
     }
   }
   return r(U, "parseValue"), A2(), n.getToken() === 17 ? l.allowEmptyContent ? true : (k(4, [], []), false) : U() ? (n.getToken() !== 17 && k(9, [], []), true) : (k(4, [], []), false);
@@ -43120,7 +43120,7 @@ var Z = r((e, t3) => {
 }, "interpolateConfigDir");
 var Xe = ["outDir", "declarationDir", "outFile", "rootDir", "baseUrl", "tsBuildInfoFile"];
 var Ye = r((e) => {
-  var t3, l, n, s2, i, o, f2, u2, c, w2, p2, _2, h3, D, T8, d2, v2, $, g, j, y, A2, k, P2, M2, V, z, G, U, b, F, W, I2;
+  var t3, l, n, s2, i, o, f2, u2, c, w2, p2, _2, h3, D, T8, d2, v2, $, g, j, y, A2, k, P2, M3, V, z, G, U, b, F, W, I2;
   if (e.strict) {
     const a2 = ["noImplicitAny", "noImplicitThis", "strictNullChecks", "strictFunctionTypes", "strictBindCallApply", "strictPropertyInitialization", "strictBuiltinIteratorReturn", "alwaysStrict", "useUnknownInCatchVariables"];
     for (const B of a2) e[B] === void 0 && (e[B] = true);
@@ -43139,7 +43139,7 @@ var Ye = r((e) => {
   }
   if (e.moduleResolution) {
     let a2 = e.moduleResolution.toLowerCase();
-    a2 === "node" && (a2 = "node10"), e.moduleResolution = a2, (a2 === "node16" || a2 === "nodenext" || a2 === "bundler") && ((P2 = e.resolvePackageJsonExports) != null || (e.resolvePackageJsonExports = true), (M2 = e.resolvePackageJsonImports) != null || (e.resolvePackageJsonImports = true)), a2 === "bundler" && ((V = e.allowSyntheticDefaultImports) != null || (e.allowSyntheticDefaultImports = true), (z = e.resolveJsonModule) != null || (e.resolveJsonModule = true));
+    a2 === "node" && (a2 = "node10"), e.moduleResolution = a2, (a2 === "node16" || a2 === "nodenext" || a2 === "bundler") && ((P2 = e.resolvePackageJsonExports) != null || (e.resolvePackageJsonExports = true), (M3 = e.resolvePackageJsonImports) != null || (e.resolvePackageJsonImports = true)), a2 === "bundler" && ((V = e.allowSyntheticDefaultImports) != null || (e.allowSyntheticDefaultImports = true), (z = e.resolveJsonModule) != null || (e.resolveJsonModule = true));
   }
   e.jsx && (e.jsx = e.jsx.toLowerCase()), e.moduleDetection && (e.moduleDetection = e.moduleDetection.toLowerCase()), e.importsNotUsedAsValues && (e.importsNotUsedAsValues = e.importsNotUsedAsValues.toLowerCase()), e.newLine && (e.newLine = e.newLine.toLowerCase()), e.esModuleInterop && ((G = e.allowSyntheticDefaultImports) != null || (e.allowSyntheticDefaultImports = true)), e.verbatimModuleSyntax && ((U = e.isolatedModules) != null || (e.isolatedModules = true), (b = e.preserveConstEnums) != null || (e.preserveConstEnums = true)), e.isolatedModules && ((F = e.preserveConstEnums) != null || (e.preserveConstEnums = true)), e.rewriteRelativeImportExtensions && ((W = e.allowImportingTsExtensions) != null || (e.allowImportingTsExtensions = true)), e.lib && (e.lib = e.lib.map((a2) => a2.toLowerCase())), e.checkJs && ((I2 = e.allowJs) != null || (e.allowJs = true));
 }, "normalizeCompilerOptions");
@@ -52043,7 +52043,7 @@ function adjudicationForWcagRefs(scs, lang) {
 }
 
 // src/adjudication-rulings.ts
-var q2 = (fr, en2) => ({ fr, en: en2 });
+var q2 = (fr2, en2) => ({ fr: fr2, en: en2 });
 var PACK_RULINGS = {
   rgaa: {
     "6.1": {
@@ -53096,15 +53096,15 @@ function pageGridModel(result, derived, standard, lang) {
   return { rows, status, human, inapplicable };
 }
 function renderRedirected(redirected, lang = "en") {
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   const out = [
-    fr ? `> \u26A0\uFE0F **${redirected.length} page(s) n'ont pas \xE9t\xE9 enregistr\xE9es** \u2014 le navigateur n'est pas rest\xE9 sur l'adresse demand\xE9e. Les enregistrer aurait d\xE9crit un autre \xE9cran sous le nom demand\xE9. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.` : `> \u26A0\uFE0F **${redirected.length} page(s) were not recorded** \u2014 the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
+    fr2 ? `> \u26A0\uFE0F **${redirected.length} page(s) n'ont pas \xE9t\xE9 enregistr\xE9es** \u2014 le navigateur n'est pas rest\xE9 sur l'adresse demand\xE9e. Les enregistrer aurait d\xE9crit un autre \xE9cran sous le nom demand\xE9. Elles ne comptent donc ni comme conformes ni comme non conformes : elles manquent.` : `> \u26A0\uFE0F **${redirected.length} page(s) were not recorded** \u2014 the browser did not stay on the address asked for. Recording them would have described another screen under the requested name. They count as neither conforming nor non-conforming: they are missing.`,
     "",
-    fr ? "| Page | Demand\xE9 | Atteint | Motif |" : "| Page | Requested | Landed | Reason |",
+    fr2 ? "| Page | Demand\xE9 | Atteint | Motif |" : "| Page | Requested | Landed | Reason |",
     "| --- | --- | --- | --- |"
   ];
   for (const r2 of redirected) {
-    const why = r2.reason === "http-status" ? fr ? `HTTP ${r2.status ?? "\u2265 400"} \u2014 page d'erreur rendue \xE0 la m\xEAme adresse` : `HTTP ${r2.status ?? "\u2265 400"} \u2014 error page served at the same address` : r2.reason === "error" ? fr ? `le navigateur a \xE9chou\xE9 sur cette page${r2.detail ? ` \u2014 ${r2.detail}` : ""}` : `the browser failed on this page${r2.detail ? ` \u2014 ${r2.detail}` : ""}` : fr ? "redirection" : "redirect";
+    const why = r2.reason === "http-status" ? fr2 ? `HTTP ${r2.status ?? "\u2265 400"} \u2014 page d'erreur rendue \xE0 la m\xEAme adresse` : `HTTP ${r2.status ?? "\u2265 400"} \u2014 error page served at the same address` : r2.reason === "error" ? fr2 ? `le navigateur a \xE9chou\xE9 sur cette page${r2.detail ? ` \u2014 ${r2.detail}` : ""}` : `the browser failed on this page${r2.detail ? ` \u2014 ${r2.detail}` : ""}` : fr2 ? "redirection" : "redirect";
     out.push(`| ${r2.name} (\`${r2.id}\`) | \`${r2.requested}\` | \`${r2.landed}\` | ${why} |`);
   }
   return out;
@@ -54974,26 +54974,26 @@ var VERAPDF_RULES_SHOWN = 6;
 function veraPdfBlock(pdfs, lang, cwd) {
   const report2 = runVeraPdf(pdfs, { cwd });
   if (!report2) return [];
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   const name = `veraPDF${report2.version ? ` ${report2.version}` : ""}`;
   const out = [
-    fr ? `> **Validateur externe \u2014 ${name}, profil PDF/UA-1** \u2014 r\xE9sultat d'un outil EXTERNE install\xE9 sur cette machine, pas un contr\xF4le du moteur : il ne se cite pas (ce n'est pas une \xE9vidence) et ne tranche rien. PDF/UA-1 n'est pas le RGAA 13.3 : une version alternative accessible satisfait le crit\xE8re quel que soit le PDF, et un PDF valide PDF/UA reste \xE0 juger. \xC0 lire \xE0 c\xF4t\xE9 des contr\xF4les du moteur ci-dessus, jamais \xE0 leur place.` : `> **External validator \u2014 ${name}, PDF/UA-1 profile** \u2014 the result of an EXTERNAL tool installed on this machine, not an engine check: it is not citable (it is not evidence) and decides nothing. PDF/UA-1 is not RGAA 13.3: an accessible alternative version satisfies the criterion whatever the PDF is, and a PDF/UA-valid file still has to be judged. Read it beside the engine's checks above, never in their place.`,
+    fr2 ? `> **Validateur externe \u2014 ${name}, profil PDF/UA-1** \u2014 r\xE9sultat d'un outil EXTERNE install\xE9 sur cette machine, pas un contr\xF4le du moteur : il ne se cite pas (ce n'est pas une \xE9vidence) et ne tranche rien. PDF/UA-1 n'est pas le RGAA 13.3 : une version alternative accessible satisfait le crit\xE8re quel que soit le PDF, et un PDF valide PDF/UA reste \xE0 juger. \xC0 lire \xE0 c\xF4t\xE9 des contr\xF4les du moteur ci-dessus, jamais \xE0 leur place.` : `> **External validator \u2014 ${name}, PDF/UA-1 profile** \u2014 the result of an EXTERNAL tool installed on this machine, not an engine check: it is not citable (it is not evidence) and decides nothing. PDF/UA-1 is not RGAA 13.3: an accessible alternative version satisfies the criterion whatever the PDF is, and a PDF/UA-valid file still has to be judged. Read it beside the engine's checks above, never in their place.`,
     ""
   ];
   for (const r2 of report2.results) {
     if (r2.compliant === true)
       out.push(
-        fr ? `- \`${r2.file}\` \u2014 conforme au profil PDF/UA-1 selon veraPDF` : `- \`${r2.file}\` \u2014 compliant with the PDF/UA-1 profile according to veraPDF`
+        fr2 ? `- \`${r2.file}\` \u2014 conforme au profil PDF/UA-1 selon veraPDF` : `- \`${r2.file}\` \u2014 compliant with the PDF/UA-1 profile according to veraPDF`
       );
     else if (r2.compliant === false) {
       const rules = r2.failedRules.slice(0, VERAPDF_RULES_SHOWN).map((x2) => `\`${x2.clause}-${x2.testNumber}\` ${x2.description.replace(/\s+/g, " ").slice(0, 90)}`).join(" ; ");
       const more = r2.failedRules.length > VERAPDF_RULES_SHOWN ? ` ; \u2026 +${r2.failedRules.length - VERAPDF_RULES_SHOWN}` : "";
       out.push(
-        fr ? `- \`${r2.file}\` \u2014 NON conforme au profil PDF/UA-1 selon veraPDF : ${r2.failedRules.length} r\xE8gle(s) en \xE9chec${rules ? ` \u2014 ${rules}${more}` : ""}` : `- \`${r2.file}\` \u2014 NOT compliant with the PDF/UA-1 profile according to veraPDF: ${r2.failedRules.length} failed rule(s)${rules ? ` \u2014 ${rules}${more}` : ""}`
+        fr2 ? `- \`${r2.file}\` \u2014 NON conforme au profil PDF/UA-1 selon veraPDF : ${r2.failedRules.length} r\xE8gle(s) en \xE9chec${rules ? ` \u2014 ${rules}${more}` : ""}` : `- \`${r2.file}\` \u2014 NOT compliant with the PDF/UA-1 profile according to veraPDF: ${r2.failedRules.length} failed rule(s)${rules ? ` \u2014 ${rules}${more}` : ""}`
       );
     } else
       out.push(
-        fr ? `- \`${r2.file}\` \u2014 non valid\xE9 par veraPDF (${r2.error ?? "?"}) : aucun r\xE9sultat externe` : `- \`${r2.file}\` \u2014 not validated by veraPDF (${r2.error ?? "?"}): no external result`
+        fr2 ? `- \`${r2.file}\` \u2014 non valid\xE9 par veraPDF (${r2.error ?? "?"}) : aucun r\xE9sultat externe` : `- \`${r2.file}\` \u2014 not validated by veraPDF (${r2.error ?? "?"}): no external result`
       );
   }
   out.push("");
@@ -57509,9 +57509,9 @@ function renderReaderAdvisory(u2, lang, resolver) {
 function documentsModel(r2, lang) {
   const docs = r2.documents ?? [];
   if (!docs.length) return void 0;
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   const RULES = ["pdf-untagged", "pdf-lang-missing", "pdf-title-missing", "pdf-no-text", "pdf-structure-shallow"];
-  const head = fr ? {
+  const head = fr2 ? {
     "pdf-untagged": "Balis\xE9",
     "pdf-lang-missing": "Langue",
     "pdf-title-missing": "Titre affich\xE9",
@@ -57524,7 +57524,7 @@ function documentsModel(r2, lang) {
     "pdf-no-text": "Text",
     "pdf-structure-shallow": "Structure"
   };
-  const mark = (o) => o === "fail" ? fr ? "\u274C non" : "\u274C no" : o === "not-detected" ? fr ? "\u2014 rien relev\xE9" : "\u2014 none found" : fr ? "\xB7 non v\xE9rifi\xE9" : "\xB7 not checked";
+  const mark = (o) => o === "fail" ? fr2 ? "\u274C non" : "\u274C no" : o === "not-detected" ? fr2 ? "\u2014 rien relev\xE9" : "\u2014 none found" : fr2 ? "\xB7 non v\xE9rifi\xE9" : "\xB7 not checked";
   const rows = docs.map((d2) => {
     const name = d2.url ?? d2.file;
     const label = d2.title ? `${name} \u2014 \xAB ${d2.title.slice(0, 60)} \xBB` : name;
@@ -57535,16 +57535,16 @@ function documentsModel(r2, lang) {
         cells: [
           label,
           linked,
-          fr ? `\u26A0\uFE0F illisible (${d2.unreadable ?? "?"}) \u2014 \xE0 ouvrir et juger \xE0 la main` : `\u26A0\uFE0F unreadable (${d2.unreadable ?? "?"}) \u2014 open and judge it by hand`,
+          fr2 ? `\u26A0\uFE0F illisible (${d2.unreadable ?? "?"}) \u2014 \xE0 ouvrir et juger \xE0 la main` : `\u26A0\uFE0F unreadable (${d2.unreadable ?? "?"}) \u2014 open and judge it by hand`,
           ...RULES.slice(1).map(() => "")
         ]
       };
     return { unreadable: false, cells: [label, linked, ...RULES.map((id) => mark(d2.checks[id]))] };
   });
   return {
-    title: fr ? "Documents t\xE9l\xE9chargeables" : "Downloadable documents",
-    note: fr ? "Chaque document PDF lu, avec chacun de ses contr\xF4les. \xAB rien relev\xE9 \xBB ne veut pas dire conforme : ces contr\xF4les d\xE9tectent les d\xE9fauts grossiers (non balis\xE9, sans langue, sans titre, sans texte), jamais la conformit\xE9 PDF/UA, que seul un validateur (veraPDF, PAC) \xE9tablit. Le crit\xE8re reste \xE0 juger : une version alternative accessible peut exister." : "Every PDF document read, with each of its checks. \xAB none found \xBB does not mean conforming: these checks find the gross failures (untagged, no language, no title, no text), never PDF/UA conformance, which only a validator (veraPDF, PAC) establishes. The criterion remains to be judged: an accessible alternative version may exist.",
-    columns: [fr ? "Document" : "Document", fr ? "Pages qui le lient" : "Linked from", ...RULES.map((id) => head[id])],
+    title: fr2 ? "Documents t\xE9l\xE9chargeables" : "Downloadable documents",
+    note: fr2 ? "Chaque document PDF lu, avec chacun de ses contr\xF4les. \xAB rien relev\xE9 \xBB ne veut pas dire conforme : ces contr\xF4les d\xE9tectent les d\xE9fauts grossiers (non balis\xE9, sans langue, sans titre, sans texte), jamais la conformit\xE9 PDF/UA, que seul un validateur (veraPDF, PAC) \xE9tablit. Le crit\xE8re reste \xE0 juger : une version alternative accessible peut exister." : "Every PDF document read, with each of its checks. \xAB none found \xBB does not mean conforming: these checks find the gross failures (untagged, no language, no title, no text), never PDF/UA conformance, which only a validator (veraPDF, PAC) establishes. The criterion remains to be judged: an accessible alternative version may exist.",
+    columns: [fr2 ? "Document" : "Document", fr2 ? "Pages qui le lient" : "Linked from", ...RULES.map((id) => head[id])],
     rows
   };
 }
@@ -61785,16 +61785,16 @@ function runPlan(opts) {
     console.log(JSON.stringify(plan, null, 2));
     return 0;
   }
-  const fr = opts.lang === "fr";
-  console.log(fr ? `${label} \u2014 plan de travail, ${coverage.size} crit\xE8res` : `${label} \u2014 work plan, ${coverage.size} criteria`);
-  for (const t3 of tiers) console.log(`  ${PLAN_LABEL[t3.tier][fr ? "fr" : "en"].padEnd(38)} ${String(t3.count).padStart(3)}  ${t3.ids.join(" ")}`);
+  const fr2 = opts.lang === "fr";
+  console.log(fr2 ? `${label} \u2014 plan de travail, ${coverage.size} crit\xE8res` : `${label} \u2014 work plan, ${coverage.size} criteria`);
+  for (const t3 of tiers) console.log(`  ${PLAN_LABEL[t3.tier][fr2 ? "fr" : "en"].padEnd(38)} ${String(t3.count).padStart(3)}  ${t3.ids.join(" ")}`);
   console.log(
-    fr ? `${coverage.size - sourceIsEnough} crit\xE8re(s) sur ${coverage.size} exigent plus que le code source pour \xEAtre d\xE9clar\xE9s conformes ; ${canFailFromSource.length} peuvent n\xE9anmoins \xEAtre d\xE9clar\xE9s non conformes depuis le source.` : `${coverage.size - sourceIsEnough} of ${coverage.size} criteria need more than source to be declared conformant; ${canFailFromSource.length} of those can still be failed from source.`
+    fr2 ? `${coverage.size - sourceIsEnough} crit\xE8re(s) sur ${coverage.size} exigent plus que le code source pour \xEAtre d\xE9clar\xE9s conformes ; ${canFailFromSource.length} peuvent n\xE9anmoins \xEAtre d\xE9clar\xE9s non conformes depuis le source.` : `${coverage.size - sourceIsEnough} of ${coverage.size} criteria need more than source to be declared conformant; ${canFailFromSource.length} of those can still be failed from source.`
   );
-  console.log(fr ? "Sources de preuve (crit\xE8res atteints par chacune) :" : "Evidence sources (criteria each one reaches):");
-  for (const s2 of EVIDENCE_SOURCES) console.log(`  ${SOURCE_LABEL[s2][fr ? "fr" : "en"].padEnd(38)} ${String(bySource[s2].length).padStart(3)}`);
+  console.log(fr2 ? "Sources de preuve (crit\xE8res atteints par chacune) :" : "Evidence sources (criteria each one reaches):");
+  for (const s2 of EVIDENCE_SOURCES) console.log(`  ${SOURCE_LABEL[s2][fr2 ? "fr" : "en"].padEnd(38)} ${String(bySource[s2].length).padStart(3)}`);
   console.log(
-    pathless.length ? fr ? `${pathless.length} crit\xE8re(s) sans aucune source de preuve : ${pathless.join(" ")}.` : `${pathless.length} criterion(ia) with no evidence source: ${pathless.join(" ")}.` : fr ? `Chacun des ${matrix.length} crit\xE8res est atteint par au moins une source de preuve (--json : le d\xE9tail par crit\xE8re).` : `Every one of the ${matrix.length} criteria is reached by at least one evidence source (--json: the paths per criterion).`
+    pathless.length ? fr2 ? `${pathless.length} crit\xE8re(s) sans aucune source de preuve : ${pathless.join(" ")}.` : `${pathless.length} criterion(ia) with no evidence source: ${pathless.join(" ")}.` : fr2 ? `Chacun des ${matrix.length} crit\xE8res est atteint par au moins une source de preuve (--json : le d\xE9tail par crit\xE8re).` : `Every one of the ${matrix.length} criteria is reached by at least one evidence source (--json: the paths per criterion).`
   );
   return 0;
 }
@@ -61889,30 +61889,55 @@ function runCriteria(opts) {
   if (opts.glossary !== void 0 && opts.glossary !== false) return runGlossary(opts);
   return isCore(opts.standard) ? runWcag(opts) : runPack(opts);
 }
-function renderCriteriaReference() {
+var CRITERIA_REF_TEXT = {
+  fr: {
+    header: "<!-- G\xC9N\xC9R\xC9 depuis src/data/wcag.json par `ultra11y criteria --generate` \u2014 ne pas modifier \xE0 la main. -->",
+    title: "# WCAG 2.2 niveau AA \u2014 r\xE9f\xE9rence des crit\xE8res de succ\xE8s",
+    intro: [
+      "Les 55 crit\xE8res de succ\xE8s de niveau A + AA, r\xE9partis sur les 4 principes et les 13 r\xE8gles, avec",
+      "pour chacun son niveau, la classe d\u2019automatisabilit\xE9 ultra11y (`static` : automatisable par le",
+      "moteur / `needs-rendering` : n\xE9cessite un rendu / `judgment` : jugement de l\u2019agent), les r\xE8gles",
+      "du moteur qui le couvrent et \u2014 une colonne par r\xE9f\xE9rentiel enregistr\xE9 \u2014 les crit\xE8res du",
+      "r\xE9f\xE9rentiel qui y renvoient. Identifiants et niveaux viennent de la source W3C",
+      "(https://github.com/w3c/wcag) ; les intitul\xE9s, de sa traduction fran\xE7aise autoris\xE9e. WCAG 2.2 \xA9 W3C."
+    ],
+    head: ["Crit\xE8re", "Intitul\xE9", "Niveau", "Automatisabilit\xE9", "R\xE8gles"]
+  },
+  en: {
+    header: "<!-- GENERATED from src/data/wcag.json by `ultra11y criteria --generate` \u2014 do not edit by hand. -->",
+    title: "# WCAG 2.2 Level AA \u2014 success-criteria reference",
+    intro: [
+      "The 55 Level A + AA success criteria across the 4 principles / 13 guidelines, with each",
+      "SC's level, the ultra11y automatability class (automatable / needs rendering / judgment),",
+      "the engine rules that cover it, and \u2014 one column per registered standards pack \u2014 the pack",
+      "criteria that map to it. SC ids, titles and levels are derived from the W3C source",
+      "(https://github.com/w3c/wcag); WCAG 2.2 \xA9 W3C."
+    ],
+    head: ["SC", "Title", "Level", "Automatability", "Rules"]
+  }
+};
+function renderCriteriaReference(lang = "fr") {
+  const t3 = CRITERIA_REF_TEXT[lang];
   const out = [];
-  out.push("<!-- GENERATED from src/data/wcag.json by `ultra11y criteria --generate` \u2014 do not edit by hand. -->");
+  out.push(t3.header);
   out.push("");
-  out.push("# WCAG 2.2 Level AA \u2014 success-criteria reference");
+  out.push(t3.title);
   out.push("");
-  out.push("The 55 Level A + AA success criteria across the 4 principles / 13 guidelines, with each");
-  out.push("SC's level, the ultra11y automatability class (automatable / needs rendering / judgment),");
-  out.push("the engine rules that cover it, and \u2014 one column per registered standards pack \u2014 the pack");
-  out.push("criteria that map to it. SC ids, titles and levels are derived from the W3C source");
-  out.push("(https://github.com/w3c/wcag); WCAG 2.2 \xA9 W3C.");
+  out.push(...t3.intro);
   out.push("");
   const packs = listPacks();
   const byG = scsByGuideline();
   for (const g of allGuidelines()) {
-    out.push(`## ${g.number} ${g.title}`);
+    out.push(`## ${g.number} ${guidelineTitle(g.number, lang) ?? g.title}`);
     out.push("");
-    const head = ["SC", "Title", "Level", "Automatability", "Rules", ...packs.map((p2) => p2.name)];
+    const head = [...t3.head, ...packs.map((p2) => p2.name)];
     out.push(`| ${head.join(" | ")} |`);
     out.push(`|${"---|".repeat(head.length)}`);
     for (const c of byG.get(g.number) ?? []) {
       const hits = packsForSc(c.sc);
       const packCols = packs.map((p2) => hits.find((h3) => h3.key === p2.key)?.ids.join(", ") ?? "\u2014");
-      const row = [c.sc, c.title.replace(/\|/g, "\\|"), c.level, c.automatability, c.ruleIds.join(", ") || "\u2014", ...packCols];
+      const title = scTitle(c.sc, lang) ?? c.title;
+      const row = [c.sc, title.replace(/\|/g, "\\|"), c.level, c.automatability, c.ruleIds.join(", ") || "\u2014", ...packCols];
       out.push(`| ${row.join(" | ")} |`);
     }
     out.push("");
@@ -62498,7 +62523,7 @@ function sectionBody(md, n) {
   return next ? md.slice(from, from + next.index) : md.slice(from);
 }
 function checkSampleCaptured(root = ".", lang = "en") {
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   let declared = [];
   const rc = join23(root, ".ultra11yrc.json");
   let raw;
@@ -62514,7 +62539,7 @@ function checkSampleCaptured(root = ".", lang = "en") {
     return {
       ok: false,
       issues: [
-        fr ? `.ultra11yrc.json est pr\xE9sent mais illisible (${e instanceof Error ? e.message : String(e)}) \u2014 impossible de savoir quelles pages ce run devait couvrir. La porte de couverture ne peut pas r\xE9pondre, et ne r\xE9pondra donc pas \xAB couvert \xBB.` : `.ultra11yrc.json is present but unreadable (${e instanceof Error ? e.message : String(e)}) \u2014 there is no way to know which pages this run was meant to cover. The coverage gate cannot answer, so it does not answer "covered".`
+        fr2 ? `.ultra11yrc.json est pr\xE9sent mais illisible (${e instanceof Error ? e.message : String(e)}) \u2014 impossible de savoir quelles pages ce run devait couvrir. La porte de couverture ne peut pas r\xE9pondre, et ne r\xE9pondra donc pas \xAB couvert \xBB.` : `.ultra11yrc.json is present but unreadable (${e instanceof Error ? e.message : String(e)}) \u2014 there is no way to know which pages this run was meant to cover. The coverage gate cannot answer, so it does not answer "covered".`
       ],
       missing: [],
       declared: 0,
@@ -62534,7 +62559,7 @@ function checkSampleCaptured(root = ".", lang = "en") {
   if (missing.length) {
     const kept = declared.length - missing.length;
     issues.push(
-      fr ? `${kept}/${declared.length} page(s) d\xE9clar\xE9e(s) ont \xE9t\xE9 captur\xE9es. Aucune capture pour : ${missing.map((m3) => `${m3.name} (${m3.id})`).join(", ")}. Une page d\xE9clar\xE9e sans capture n'est pas une page conforme, c'est une page que personne n'a regard\xE9e.` : `${kept}/${declared.length} declared page(s) were captured. No capture for: ${missing.map((m3) => `${m3.name} (${m3.id})`).join(", ")}. A declared page with no capture is not a page that passed \u2014 it is a page nobody looked at.`
+      fr2 ? `${kept}/${declared.length} page(s) d\xE9clar\xE9e(s) ont \xE9t\xE9 captur\xE9es. Aucune capture pour : ${missing.map((m3) => `${m3.name} (${m3.id})`).join(", ")}. Une page d\xE9clar\xE9e sans capture n'est pas une page conforme, c'est une page que personne n'a regard\xE9e.` : `${kept}/${declared.length} declared page(s) were captured. No capture for: ${missing.map((m3) => `${m3.name} (${m3.id})`).join(", ")}. A declared page with no capture is not a page that passed \u2014 it is a page nobody looked at.`
     );
   }
   return { ok: issues.length === 0, issues, missing, declared: declared.length, captured: captured.size };
@@ -62552,7 +62577,7 @@ function isUndecidedFile(v2) {
   return !!v2 && typeof v2 === "object" && Array.isArray(v2.entries);
 }
 function checkDecided(audit, standard = CORE2, lang = "en", opts = {}) {
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   const rows = isCore(standard) ? audit.criteria.map((c) => ({ id: c.id, status: c.status, decidedBy: c.decidedBy })) : (() => {
     const activePack = loadPack(standard);
     return derivePackResults(audit, standard).map((c) => ({
@@ -62570,7 +62595,7 @@ function checkDecided(audit, standard = CORE2, lang = "en", opts = {}) {
     if (!e.criteriaId) continue;
     if (!e.reason?.trim()) {
       issues.push(
-        fr ? `Crit\xE8re ${e.criteriaId} d\xE9clar\xE9 ind\xE9cidable sans motif \u2014 un crit\xE8re laiss\xE9 ouvert doit dire pourquoi, sinon la d\xE9claration ne vaut rien.` : `Criterion ${e.criteriaId} is declared undecidable with no reason \u2014 an open criterion must say why, or the declaration means nothing.`
+        fr2 ? `Crit\xE8re ${e.criteriaId} d\xE9clar\xE9 ind\xE9cidable sans motif \u2014 un crit\xE8re laiss\xE9 ouvert doit dire pourquoi, sinon la d\xE9claration ne vaut rien.` : `Criterion ${e.criteriaId} is declared undecidable with no reason \u2014 an open criterion must say why, or the declaration means nothing.`
       );
       continue;
     }
@@ -62583,7 +62608,7 @@ function checkDecided(audit, standard = CORE2, lang = "en", opts = {}) {
     if (!openAnywhere.has(id)) {
       if (opts.allowStale) continue;
       issues.push(
-        fr ? `Crit\xE8re ${id} d\xE9clar\xE9 ind\xE9cidable, mais il porte d\xE9sormais un verdict \u2014 retirez-le de la liste.` : `Criterion ${id} is declared undecidable but now carries a verdict \u2014 remove it from the list.`
+        fr2 ? `Crit\xE8re ${id} d\xE9clar\xE9 ind\xE9cidable, mais il porte d\xE9sormais un verdict \u2014 retirez-le de la liste.` : `Criterion ${id} is declared undecidable but now carries a verdict \u2014 remove it from the list.`
       );
     }
   }
@@ -62591,7 +62616,7 @@ function checkDecided(audit, standard = CORE2, lang = "en", opts = {}) {
   const allowed = [...open].filter((id) => declared.has(id)).map((id) => declared.get(id));
   if (undecided.length) {
     issues.push(
-      fr ? `${undecided.length}/${rows.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB : ${undecided.join(", ")}.` : `${undecided.length}/${rows.length} criterion(ia) still to assess: ${undecided.join(", ")}.`
+      fr2 ? `${undecided.length}/${rows.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB : ${undecided.join(", ")}.` : `${undecided.length}/${rows.length} criterion(ia) still to assess: ${undecided.join(", ")}.`
     );
   }
   const pages = opts.pages ? perPage.map((p2) => ({ ...p2, undecided: p2.undecided.filter((id) => !declared.has(id)) })).filter((p2) => p2.undecided.length) : void 0;
@@ -62599,14 +62624,14 @@ function checkDecided(audit, standard = CORE2, lang = "en", opts = {}) {
   const everywhere = pageCount && pages ? pages[0].undecided.filter((id) => pages.every((p2) => p2.undecided.includes(id))) : [];
   if (everywhere.length) {
     issues.push(
-      fr ? `Sur les ${pageCount} page(s) concern\xE9e(s) : ${everywhere.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB \u2014 ${everywhere.join(", ")}.` : `On all ${pageCount} affected page(s): ${everywhere.length} criterion(ia) still to assess \u2014 ${everywhere.join(", ")}.`
+      fr2 ? `Sur les ${pageCount} page(s) concern\xE9e(s) : ${everywhere.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB \u2014 ${everywhere.join(", ")}.` : `On all ${pageCount} affected page(s): ${everywhere.length} criterion(ia) still to assess \u2014 ${everywhere.join(", ")}.`
     );
   }
   for (const p2 of pages ?? []) {
     const own = p2.undecided.filter((id) => !everywhere.includes(id));
     if (!own.length) continue;
     issues.push(
-      fr ? `Page \xAB ${p2.name} \xBB : ${own.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB \u2014 ${own.join(", ")}.` : `Page \u201C${p2.name}\u201D: ${own.length} criterion(ia) still to assess \u2014 ${own.join(", ")}.`
+      fr2 ? `Page \xAB ${p2.name} \xBB : ${own.length} crit\xE8re(s) encore \xAB \xE0 \xE9valuer \xBB \u2014 ${own.join(", ")}.` : `Page \u201C${p2.name}\u201D: ${own.length} criterion(ia) still to assess \u2014 ${own.join(", ")}.`
     );
   }
   const settled = rows.filter((r2) => r2.status !== "manual");
@@ -62622,14 +62647,14 @@ function checkDecided(audit, standard = CORE2, lang = "en", opts = {}) {
   return { ok: issues.length === 0, issues, undecided, allowed, total: rows.length, provenance, ...pages ? { pages } : {} };
 }
 function checkRendered(audit, standard = CORE2, lang = "en", opts = {}) {
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   const issues = [];
   const declared = /* @__PURE__ */ new Map();
   for (const e of opts.allow?.entries ?? []) {
     if (!e.criteriaId) continue;
     if (!e.reason?.trim()) {
       issues.push(
-        fr ? `Crit\xE8re ${e.criteriaId} d\xE9clar\xE9 ind\xE9cidable sans motif \u2014 un crit\xE8re laiss\xE9 ouvert doit dire pourquoi.` : `Criterion ${e.criteriaId} is declared undecidable with no reason \u2014 an open criterion must say why.`
+        fr2 ? `Crit\xE8re ${e.criteriaId} d\xE9clar\xE9 ind\xE9cidable sans motif \u2014 un crit\xE8re laiss\xE9 ouvert doit dire pourquoi.` : `Criterion ${e.criteriaId} is declared undecidable with no reason \u2014 an open criterion must say why.`
       );
       continue;
     }
@@ -62646,7 +62671,7 @@ function checkRendered(audit, standard = CORE2, lang = "en", opts = {}) {
   const allowed = rendering.filter((id) => declared.has(id)).map((id) => declared.get(id));
   if (open.length) {
     issues.push(
-      fr ? `${open.length} crit\xE8re(s) exigent une page rendue et aucune page n'a \xE9t\xE9 instantan\xE9e : ${open.join(", ")}. Lancez \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) avant d'adjuger \u2014 la mesure en ferme la plupart sans mod\xE8le.` : `${open.length} criterion(ia) need a rendered page and no page was snapshotted: ${open.join(", ")}. Run \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) before adjudicating \u2014 the measurement closes most of them with no model in the loop.`
+      fr2 ? `${open.length} crit\xE8re(s) exigent une page rendue et aucune page n'a \xE9t\xE9 instantan\xE9e : ${open.join(", ")}. Lancez \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) avant d'adjuger \u2014 la mesure en ferme la plupart sans mod\xE8le.` : `${open.length} criterion(ia) need a rendered page and no page was snapshotted: ${open.join(", ")}. Run \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) before adjudicating \u2014 the measurement closes most of them with no model in the loop.`
     );
   }
   return { ok: issues.length === 0, issues, open, allowed, pagesAudited };
@@ -64660,21 +64685,21 @@ function auditSummary(r2, lang, standard = CORE2) {
   return lines.join("\n");
 }
 function captureCoverageSummary(cov, lang) {
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   const lines = [];
   if (cov.total === 0) {
-    lines.push(fr ? "Couverture captures : aucun composant \xE0 couvrir dans le p\xE9rim\xE8tre." : "Capture coverage: no components to cover in scope.");
+    lines.push(fr2 ? "Couverture captures : aucun composant \xE0 couvrir dans le p\xE9rim\xE8tre." : "Capture coverage: no components to cover in scope.");
   } else {
     lines.push(
-      fr ? `Couverture captures : ${cov.covered.length}/${cov.total} composant(s) couvert(s) par un rendu.` : `Capture coverage: ${cov.covered.length}/${cov.total} component(s) covered by a render.`
+      fr2 ? `Couverture captures : ${cov.covered.length}/${cov.total} composant(s) couvert(s) par un rendu.` : `Capture coverage: ${cov.covered.length}/${cov.total} component(s) covered by a render.`
     );
     if (cov.blindSpots.length) {
-      lines.push(fr ? "Angles morts (audit\xE9s sur source opaque uniquement) :" : "Blind spots (audited from opaque source only):");
+      lines.push(fr2 ? "Angles morts (audit\xE9s sur source opaque uniquement) :" : "Blind spots (audited from opaque source only):");
       for (const k of cov.blindSpots) lines.push(`  \xB7 ${k}`);
     }
   }
   if (cov.unattributed)
-    lines.push(fr ? `${cov.unattributed} capture(s) sans provenance (non rattach\xE9e\xB7s).` : `${cov.unattributed} capture(s) without provenance (unattributed).`);
+    lines.push(fr2 ? `${cov.unattributed} capture(s) sans provenance (non rattach\xE9e\xB7s).` : `${cov.unattributed} capture(s) without provenance (unattributed).`);
   return lines.join("\n");
 }
 
@@ -68850,8 +68875,8 @@ async function perform(page, loc, def, pointer, timeout) {
   } else if (def.action === "select") await loc.selectOption(def.value, { timeout });
 }
 
-// src/cli.ts
-var HELP = `ultra11y v${VERSION}
+// src/help.ts
+var HELP_EN = `ultra11y v${VERSION}
 Audit a site against RGAA 4.1.2, the French State's accessibility standard, and
 produce a dated conformance report, or author/review accessible markup
 (native-HTML-first). A deterministic, install-free static engine plus your judgment,
@@ -68913,7 +68938,7 @@ Commands:
              and emit the RGAA 4.1.2 audit JSON, keyed by RGAA criterion
              (consumed by 'report'). Without --json, prints a summary in --lang
              (default auto: repo <html lang> \u2192 the active standard's default locale
-             \u2192 English). The engine decides the machine-detectable criteria; the AI
+             \u2192 French). The engine decides the machine-detectable criteria; the AI
              agent adjudicates the judgment ones (verify --manual, gated) and the
              scan tier decides the needs-rendering ones.
   report     Render an audit into a dated RGAA 4.1.2 conformance report
@@ -69333,15 +69358,574 @@ Options:
                      Read/Grep/Glob/Edit/Write and offering a web tool only costs turns.
                      The vendored normative text always decides, and no web page is ever
                      an acceptable normativeRef
-  --lang auto|en|fr  output language                (default: auto \u2014 conversation/repo
-                     language: an AI caller should pass --lang explicitly to match the
-                     chat; unset resolves repo <html lang> \u2192 standard's default locale \u2192 en)
+  --lang auto|en|fr  output language                (default: auto \u2014 French; --lang en for
+                     English. Unset: repo <html lang> \u2192 the standard's default locale (fr for
+                     RGAA) \u2192 fr. An AI caller should pass --lang explicitly to match the chat)
   --json             machine-readable output
   --quiet            check: exit code only, no output
-  -h, --help         show this help
+  -h, --help         show this help (in French by default; --help --lang en: in English)
   -v, --version      print version
 
 Data: WCAG 2.2 \xA9 W3C (W3C Document License). RGAA 4.1.2 pack \xA9 DINUM, Licence Ouverte / Etalab 2.0 (see NOTICE).`;
+var HELP_FR = `ultra11y v${VERSION}
+Audite un site au regard du RGAA 4.1.2, le r\xE9f\xE9rentiel d'accessibilit\xE9 de l'\xC9tat
+fran\xE7ais, et produit un rapport de conformit\xE9 dat\xE9, ou r\xE9dige/relit du balisage
+accessible (HTML natif d'abord). Un moteur statique d\xE9terministe, sans installation,
+plus votre jugement, avec des barri\xE8res check/verify contre les non-conformit\xE9s
+invent\xE9es : rien n'est d\xE9clar\xE9 conforme sans avoir \xE9t\xE9 v\xE9rifi\xE9. Toutes les sorties
+parlent RGAA 4.1.2 ; le WCAG n'appara\xEEt que comme la correspondance cit\xE9e par chaque
+crit\xE8re RGAA (\xAB RGAA 1.1 (WCAG 1.1.1) \xBB).
+
+Usage :
+  ultra11y audit    <globs\u2026 | -> [--out <dir>] [--include <glob>] [--exclude <glob>] [--ext <list>] [--jsx] [--graph] [--json] [--lang auto|en|fr] [--no-default-excludes]
+  ultra11y audit    [--changed | --since <ref> | --staged] [--max-files <n>] [--dedup exact|normalized|off] [--fail-on blocking|major|minor]
+  ultra11y audit    [--captures <dir>] [--no-captures] [--require-captures]   (captures du DOM rendu + instantan\xE9s .ultra11y/pages : auditer le vrai HTML)
+  ultra11y audit    --in <audit.json> [--fail-on blocking|major|minor]   (rejouer la barri\xE8re sur un audit d\xE9j\xE0 calcul\xE9 \u2014 par exemple porteur de verdicts arbitr\xE9s \u2014 sans seconde passe de d\xE9tection)
+  ultra11y report   --in <audit.json> [--out <dir>] [--standard rgaa] [--lang auto|en|fr]
+  ultra11y report   --in <audit.json> [--evidence [--evidence-max <n>]] [--out <dir>]   (le rapport Markdown, illustr\xE9 de recadrages annot\xE9s)
+  ultra11y report   --in <audit.json> --html [--evidence] [--inline-budget <bytes>] [--out <dir>]   (index.html + un fichier unique imprimable)
+  ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--no-technical] [--standard rgaa] [--lang auto|en|fr]
+  ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
+  ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard rgaa] [--no-technical] [--lang auto|en|fr]
+  ultra11y render   [<dir>] [--transpiler esbuild|typescript|sucrase] [--timeout <ms>] [--include <glob>] [--exclude <glob>] [--no-stories] [--no-snapshots] [--browser-path <file>] [--json]   (le moteur de rendu d'ultra11y : composants, pages, stories \u2192 .ultra11y/captures + .ultra11y/render.json + .ultra11y/render-snapshots)
+  ultra11y render   [<dir>] --detect | --coverage | --storybook [--captures <dir>] [--json] [--lang auto|en|fr]
+  ultra11y criteria [<sc>] [--list] [--standard rgaa] [--theme <N>] [--generate] [--json] [--lang auto|en|fr]
+  ultra11y criteria --glossary [<term>]   (les termes que le r\xE9f\xE9rentiel D\xC9FINIT \u2014 ses tests en d\xE9pendent)
+  ultra11y criteria [--standard rgaa] --plan [--json]   (le plan de travail : quels crit\xE8res le moteur tranche depuis le source, lesquels demandent une page, un navigateur ou du jugement)
+  ultra11y check    --report <md> [--standard rgaa] [--in <audit.json>] [--semantic [--verdicts <file>]] [--quiet] [--json]
+  ultra11y check    --in <audit.json> --require-decided [--standard rgaa] [--allow-undecided <file>]   (\xE9choue tant qu'un crit\xE8re est encore \xAB \xE0 \xE9valuer \xBB)
+  ultra11y verify   --report <md> [--standard rgaa] [--semantic] [--apply <verdicts.json>] [--max-verify <n>] [--out <dir>] [--json]
+  ultra11y verify   --report <md> [--conformities <ledger|adjudication.json> | --no-conformities]   (met aussi en proc\xE8s les CONFORMIT\xC9S revendiqu\xE9es \u2014 actif par d\xE9faut quand un registre existe)
+  ultra11y verify   --report <md> --in <audit.json> --manual [--out <dir>] [--json]   (arbitrer les crit\xE8res manuels)
+  ultra11y verify   --apply <adjudication.json> --in <audit.json> [--out <dir>]        (int\xE9grer l'arbitrage \xE0 l'audit)
+  ultra11y verify   --apply <VERIFY.todo.json> --report <md> --in <audit.json> --out <dir> --prune   (APPLIQUER le proc\xE8s : supprimer les non-conformit\xE9s r\xE9fut\xE9es, renvoyer les conformit\xE9s r\xE9fut\xE9es \xAB \xE0 \xE9valuer \xBB)
+  ultra11y verify   --summary --verdicts <VERIFY.todo.json> --report <md> --in <audit.json> [--pruned <audit.json>] [--out <dir>] [--json]   (bilan en lecture seule du proc\xE8s \u2192 TRIAL.md : confirm\xE9es, retir\xE9es/appliqu\xE9es, d\xE9cisions du moteur contest\xE9es, couverture, barri\xE8re)
+  ultra11y orchestrate --run <dir> [--phase adjudicate|verify-report] [--eco] [--list] [--lang auto|en|fr]
+  ultra11y orchestrate --run <dir> --manifest [--json]   (la boucle sous forme de donn\xE9es : commande/argv de chaque \xE9tape, entr\xE9es, sorties, contrat de sortie, \xE9tape suivante \u2014 pour tout orchestrateur)
+  ultra11y fix      <globs\u2026 | -> [--write] [--iterate] [--changed | --since <ref> | --staged] [--safe] [--include <glob>] [--exclude <glob>] [--ext <list>] [--only <ids>] [--jsx] [--json] [--lang auto|en|fr]
+  ultra11y init     [--hook] [--fail-on blocking|major|minor]
+  ultra11y scan     <url|file\u2026> [--cwd <dir>] [--browser-path <file>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
+  ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--all-routes [--max-routes <n>]] [--merge <audit.json>] [--json]   (scanner l'\xE9chantillon de pages de .ultra11yrc.json, puis le reste de l'inventaire des routes)
+  ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
+  ultra11y scan     --since <ref> --base-url <url> [--baseline <scan.json>] [--fail-on blocking|major|minor] [--max-routes <n>] [--json]   (ne rendre que les pages atteintes par le diff ; avec --baseline, n'\xE9chouer que sur les NOUVELLES non-conformit\xE9s)
+  ultra11y affected [--since <ref>] [--base-url <url>] [--root <dir>] [--json]   (les pages qu'un diff atteint, via le graphe d'imports et l'inventaire des routes)
+  ultra11y journey  run [<name>\u2026 | --all] [--keyboard] [--base-url <url>] [--storage-state <file>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--out <dir>] [--json]   (rejouer .ultra11y/journeys/<name>.json avec axe + contr\xF4les clavier)
+  ultra11y journey  list [--root <dir>] [--json]
+  ultra11y sample   check [--standard rgaa] [--json]   (v\xE9rifier l'\xE9chantillon de pages de .ultra11yrc.json au regard des types de pages exig\xE9s par le r\xE9f\xE9rentiel)
+  ultra11y snapshot write [--root <dir>] [--fail-on blocking|major|minor] [--json]   (charge utile sur stdin \u2192 .ultra11y/pages/<id>/ + audit)
+  ultra11y snapshot list  [--root <dir>] [--json]
+  ultra11y pages    --in <audit.json> [--standard rgaa] [--json [--out <dir>]] [--lang auto|en|fr]   (la grille des crit\xE8res par page ; --json --out \xE9crit aussi <dir>/pages.json)
+  ultra11y pages    --in <audit.json> --format report [--split page] [--out <dir>]        (le rapport par page, avec captures d'\xE9cran)
+  ultra11y pages    --in <audit.json> --format report --out <dir> [--evidence [--evidence-max <n>]] [--html]   (recadrages annot\xE9s de chaque non-conformit\xE9, et le site HTML)
+  ultra11y pages    discover --sitemap <url> | --crawl <url> | --from-snapshots [--depth <n>] [--max <n>] [--propose [--sample-size <n>] [--search-query <q>]] [--write | --routes-only] [--json]   (construire l'\xE9chantillon de pages et l'inventaire des routes)
+  ultra11y hook     --claude-code|--codex|--opencode   (interne : le hook PreToolUse ; charge utile sur stdin)
+  ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
+  ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
+  ultra11y status   [--json] [--project] [--browser [--cwd <dir>]]   (diagnostic : quels agents lancent la revue ; --browser demande si le palier scan est disponible ici)
+  ultra11y serve    [--in <dir>] [--root <dir>] [--port <n>] [--host <addr>] [--lang auto|en|fr]   (site local, en lecture seule, des r\xE9sultats de audits/ et de leur historique)
+  ultra11y serve    [--in <dir>] [--root <dir>] --static <dir> [--lang auto|en|fr]   (les m\xEAmes pages en export statique, liens relatifs uniquement \u2014 GitHub Pages, iterion)
+
+Commandes :
+  audit      Lance le moteur statique sur les entr\xE9es (fichiers/globs, ou '-' pour stdin)
+             et \xE9met le JSON d'audit RGAA 4.1.2, index\xE9 par crit\xE8re RGAA
+             (consomm\xE9 par 'report'). Sans --json, affiche un r\xE9sum\xE9 dans la langue
+             --lang (par d\xE9faut auto : <html lang> du d\xE9p\xF4t \u2192 locale par d\xE9faut du
+             r\xE9f\xE9rentiel actif \u2192 fran\xE7ais). Le moteur tranche les crit\xE8res d\xE9tectables
+             par la machine ; l'agent IA arbitre ceux qui rel\xE8vent du jugement
+             (verify --manual, sous barri\xE8re) et le palier scan tranche ceux qui
+             demandent un rendu.
+  report     Transforme un audit en rapport de conformit\xE9 RGAA 4.1.2 dat\xE9
+             (audits/rgaa-AAAA-MM-JJ.md) : m\xE9tadonn\xE9es, tableau de synth\xE8se par
+             th\xE9matique, non-conformit\xE9s par priorit\xE9, listes des crit\xE8res conformes
+             et non applicables.
+  prd        Transforme un AuditResult en backlog de conformit\xE9 d'AUDITEUR
+             (audits/prd-AAAA-MM-JJ.md), une entr\xE9e par crit\xE8re r\xE9dig\xE9e avec le
+             vocabulaire RGAA (\xAB Th\xE9matique/Crit\xE8re/Test \xBB) \u2014 th\xE9matique, crit\xE8re +
+             intitul\xE9 officiel, test(s), correspondance WCAG + niveau, constat, \xE9tat
+             attendu, v\xE9rification. --split criterion \xE9crit un fichier par crit\xE8re.
+             Il n'\xE9crit QUE du Markdown \u2014 cr\xE9er les tickets, c'est la commande 'tickets'.
+  tickets    D\xE9pose l'audit sous forme de TICKETS \u2014 GitHub, GitLab ou Jira. Lit un
+             audit.json et pousse ; il n'\xE9crit aucun Markdown, exactement comme
+             prd/report \xE9crivent du Markdown et ne poussent rien. --grain choisit ce
+             qu'est UN ticket : par crit\xE8re (d\xE9faut), par page, par page+crit\xE8re, par
+             fichier, ou un seul consolid\xE9. Le d\xE9doublonnage se fait sur le titre
+             exact : relancer ne cr\xE9e jamais de doublon. --dry-run affiche le plan sans
+             rien cr\xE9er.
+  render     Le moteur de rendu propre \xE0 ultra11y : obtenir le HTML RENDU des
+             composants d'un projet, pour que des biblioth\xE8ques comme le DSFR soient
+             v\xE9rifi\xE9es sur le HTML qu'elles \xE9mettent, pas sur leurs sources JSX. Il
+             trouve les modules .tsx/.jsx (leurs exports de composant par d\xE9faut et en
+             PascalCase), les pages du framework (app/ et pages/ de Next.js) et les
+             stories Storybook (rendues avec leurs args), et rend chacun avec le
+             react-dom/server DU PROJET, sans props, dans un harnais jetable : un
+             processus enfant par fichier, TSX transpil\xE9 en m\xE9moire par
+             l'esbuild/typescript/sucrase du projet, aucun fichier du projet \xE9crit, un
+             --timeout par unit\xE9 (10000 ms par d\xE9faut). Il ne lit ni n'ex\xE9cute jamais
+             les tests ou snapshots du projet. Chaque rendu arrive dans .ultra11y/captures
+             (provenance : source, composant, moteur de rendu, styles="none") ; chaque
+             unit\xE9, rendue, ignor\xE9e avec sa raison, ou non tent\xE9e, est list\xE9e dans
+             .ultra11y/render.json, que 'audit' reprend dans l'annexe du rapport.
+             Puis chaque capture est ouverte dans Chromium (quand Playwright et un
+             navigateur sont disponibles \u2014 sinon il le dit et les captures statiques
+             restent) : une capture d'\xE9cran et une passe axe, avec le CSS global du
+             projet quand il est trouv\xE9 (imports du layout racine/_app/main, feuilles
+             public/ li\xE9es, CSS compil\xE9 d'un build pour des sources Tailwind/Sass).
+             \xC9crit dans .ultra11y/render-snapshots/ (PNG + index.json) et montr\xE9 dans
+             le rapport. Ce sont des rendus de composants ISOL\xC9S : les r\xE8gles axe de
+             niveau page sont \xE9cart\xE9es, celles qui d\xE9pendent du style aussi faute du CSS
+             complet, et aucune observation d'instantan\xE9 ne tranche jamais un crit\xE8re.
+             --no-snapshots saute cette passe.
+             --detect affiche \xE0 la place la recette build\u2192audit du framework.
+             --coverage indique quels composants ont une capture rendue et lesquels
+             restent des angles morts au source opaque. --storybook rattache le HTML de
+             chaque story (via un index storybook-static) \xE0 ses composants sources.
+             Pour v\xE9rifier une PAGE pendant un run Playwright/Cypress existant, utilisez
+             les exports de paquet ultra11y/playwright ou ultra11y/cypress. Ensuite
+             auditez, et utilisez scan pour les crit\xE8res qui demandent un rendu.
+  criteria   Consulte le r\xE9f\xE9rentiel RGAA 4.1.2 hors ligne : un crit\xE8re (criteria 1.1),
+             une th\xE9matique (--theme N), ou la liste des th\xE9matiques. Donne la
+             correspondance WCAG cit\xE9e par chaque crit\xE8re + sa classe d'automatisabilit\xE9 ;
+             un identifiant de crit\xE8re de succ\xE8s WCAG (criteria 1.4.3) affiche cette
+             cible de correspondance.
+             --glossary [<term>] cherche un terme que le r\xE9f\xE9rentiel D\xC9FINIT (le RGAA en
+             compte 119). Ces d\xE9finitions sont normatives \u2014 ce que \xAB si n\xE9cessaire \xBB ou
+             \xAB pertinent \xBB veulent dire dans un test se d\xE9cide l\xE0 \u2014 et la liste de
+             travail d'arbitrage int\xE8gre d\xE9sormais celles que citent les tests de chaque
+             crit\xE8re. Sans terme, les liste toutes. R\xE9sout par ancre ou par titre, sans
+             tenir compte des accents ; un terme inconnu renvoie une erreur avec des
+             suggestions plut\xF4t qu'un quasi-homonyme.
+             --plan affiche le plan de travail : par palier de preuve (source,
+             inter-fichiers, page rendue, navigateur, jugement, hors p\xE9rim\xE8tre), combien
+             de crit\xE8res il tranche \u2014 selon l'applicabilit\xE9 des r\xE8gles du moteur, pas une
+             lecture de l'intitul\xE9. RGAA : 104 sur 106 demandent plus que le source pour
+             obtenir C.
+  check      Barri\xE8re d'int\xE9grit\xE9 sur un rapport produit : chaque crit\xE8re cit\xE9 se
+             r\xE9sout, chaque NA est justifi\xE9, les sections et le calcul des taux sont
+             bien form\xE9s. --standard indique la grammaire d'identifiants/le registre \xE0
+             utiliser pour valider.
+  verify     Liste de travail contradictoire affirmation\u2194crit\xE8re, puis (--apply)
+             barri\xE8re sur les affirmations r\xE9fut\xE9es/non \xE9tay\xE9es. Couvre les DEUX sens :
+             les non-conformit\xE9s du rapport (cet \xE9chec est-il r\xE9el ?) et les conformit\xE9s
+             arbitr\xE9es par l'agent dans le registre (la preuve cit\xE9e \xC9TABLIT-elle le
+             crit\xE8re, ou montre-t-elle seulement que son objet existe ?). Une conformit\xE9
+             r\xE9fut\xE9e renvoie son crit\xE8re \xAB \xE0 \xE9valuer \xBB, jamais en NC.
+  orchestrate  \xC9met l'orchestration multi-agents du run depuis ses listes de travail
+             ACTUELLES : pour chaque phase pr\xEAte (adjudicate sur ADJUDICATE.todo.json,
+             verify-report sur VERIFY.todo.json) un <phase>.batches.json neutre vis-\xE0-vis
+             du harnais, un prompt autonome par lot sous <phase>/ (\xE0 transmettre tel quel
+             \xE0 n'importe quel sous-agent), et le script Workflow Claude Code rendu depuis
+             les m\xEAmes lots ; les contrats de r\xE9partition agents/<role>.md, et un repli
+             s\xE9quentiel RUNBOOK.md \u2014 chemins absolus et vrais identifiants de la liste de
+             travail int\xE9gr\xE9s. Les sous-agents ne font que RENVOYER des fragments de
+             verdict ; vous (l'appelant) restez le seul r\xE9dacteur et les int\xE9grez via
+             verify --apply. --eco n'\xE9met que le RUNBOOK + les contrats (la voie
+             explicite \xE9conome en tokens) ; --list affiche les phases et leur \xE9tat de
+             pr\xE9paration en JSON. Relancez apr\xE8s tout changement d'une liste de travail \u2014
+             l'\xE9mission est d\xE9terministe et idempotente.
+  fix        Met les corrections en place (hybride, HTML natif d'abord) : applique des
+             codemods d\xE9terministes (tabindex, r\xF4le redondant, zoom du viewport), ins\xE8re
+             des espaces r\xE9serv\xE9s \xE0 compl\xE9ter (alt/lang/title TODO) pour l'agent, et liste
+             les propositions qui rel\xE8vent du jugement. --dry-run (d\xE9faut) affiche un
+             diff ; --write applique, mais seulement apr\xE8s qu'un nouvel audit a prouv\xE9
+             l'absence de nouvelle NC ; sur du JSX \xE0 AST r\xE9el, seuls les codemods jsxSafe
+             s'appliquent (jamais de r\xE9\xE9criture de nom). --iterate boucle jusqu'\xE0 un
+             point fixe.
+  init       Branche ultra11y dans le d\xE9p\xF4t (z\xE9ro d\xE9pendance, pas de husky). Par d\xE9faut,
+             --hook est une barri\xE8re git pre-commit sur l'INSTANTAN\xC9 STAGED STRICT : il
+             audite exactement les blobs index\xE9s, applique automatiquement les
+             corrections s\xFBres (fix --staged --write --safe) et les remet en staging, et
+             ne bloque que sur ce qui demande du jugement. La CI n'est pas branch\xE9e ici :
+             elle passe par le bot rgaa-audit d'iterion.
+  scan       Palier dynamique OPTIONNEL : lance axe-core dans un navigateur sans
+             interface pour trancher les crit\xE8res qui demandent un rendu et que le moteur
+             statique ne peut pas trancher \u2014 contraste calcul\xE9 (1.4.3), redistribution \xE0
+             320px (1.4.10) \u2014 sur une URL ou un fichier HTML. Il tourne sur le Playwright
+             local (r\xE9solu depuis --cwd, puis depuis les d\xE9pendances d'ultra11y), et
+             sonde en plus la visibilit\xE9 du focus (2.4.7), le focus non masqu\xE9 (2.4.11 \u2014
+             le composant qui a le focus est-il enti\xE8rement cach\xE9 derri\xE8re un en-t\xEAte
+             collant / un bandeau cookies ? mesur\xE9 pendant le m\xEAme parcours de la
+             tabulation), le zoom \xE0 200% (1.4.4), l'espacement du texte (1.4.12), le
+             contenu au survol (1.4.13) et la taille des cibles (2.5.8), et accepte
+             --storage-state pour les pages authentifi\xE9es.
+             Par d\xE9faut le scan est AVEC \xC9TAT : il saisit de longues valeurs dans les
+             champs et signale ceux qui sont tronqu\xE9s \xE0 320px/200%/espacement du texte
+             (1.4.10/1.4.4/1.4.12 \u2014 surtout les champs dans des cellules de tableau),
+             ouvre les dialogues ferm\xE9s pour rev\xE9rifier le focus, et m\xE8ne des
+             interactions S\xDBRES (saisir / basculer / cliquer type=button \u2014 jamais un
+             lien, une soumission ou une navigation ; les boutons au nom destructeur ne
+             sont jamais cliqu\xE9s) pour rep\xE9rer un contenu mis \xE0 jour hors d'une r\xE9gion
+             live (4.1.3). Sur un scan AUTHENTIFI\xC9 (--storage-state), les clics de bouton
+             sont aussi saut\xE9s, sauf si --interact-clicks les r\xE9active. --no-interact
+             d\xE9sactive tout cela (sondes sur la page vierge uniquement). --merge int\xE8gre
+             les constats dans un AuditResult statique (manuel \u2192 C/NC).
+             --sitemap/--crawl scannent de nombreuses pages (chaque URL du sitemap, ou
+             les liens de m\xEAme origine parcourus en largeur depuis une URL de d\xE9part) et
+             agr\xE8gent les constats.
+             --sample scanne l'\xE9chantillon NORMATIF de pages d\xE9clar\xE9 dans
+             .ultra11yrc.json (pages repr\xE9sentatives + \xE9l\xE9ments transverses) ; le
+             storage-state propre \xE0 chaque page l'emporte sur --storage-state, et le
+             rapport regroupe les constats \xAB Constats par page \xBB.
+  journey    Rejoue les parcours utilisateur \xE9crits par l'agent
+             (.ultra11y/journeys/<name>.json : startUrl + \xE9tapes
+             goto|click|fill|select|check|press|waitFor|expect sur des localisateurs
+             role/label/text) dans le Playwright local. Chaque \xE9tape enregistre un
+             instantan\xE9 de l'\xE9tat de la page (.ultra11y/pages/<journey>-<nn>-<slug>/)
+             mesur\xE9 avec l'axe-core \xE9pingl\xE9 et les sondes en direct, plus ce que seul un
+             parcours voit : --keyboard atteint chaque contr\xF4le avec Tab (un contr\xF4le
+             jamais atteint rel\xE8ve du 2.1.1, une zone que Tab et Maj+Tab ne peuvent pas
+             quitter du 2.1.2), le focus qui entre dans les dialogues et en ressort
+             (2.4.3), les erreurs li\xE9es \xE0 aucun champ (3.3.1), le texte qui appara\xEEt hors
+             d'une r\xE9gion live (4.1.3). Une \xE9tape en \xE9chec arr\xEAte son parcours avec la
+             raison ; l'annexe liste chaque \xE9tape faite / en \xE9chec / non jou\xE9e.
+             Code de sortie 1 quand un parcours a \xE9chou\xE9.
+  sample     Assistant de l'\xE9chantillon de pages normatif. 'sample check' v\xE9rifie le
+             bloc sample de .ultra11yrc.json au regard des types de pages exig\xE9s par le
+             r\xE9f\xE9rentiel actif (RGAA : accueil, contact, mentions l\xE9gales, d\xE9claration
+             d'accessibilit\xE9, plan du site, aide, authentification, pages
+             repr\xE9sentatives + \xE9l\xE9ments transverses) \u2014 indicatif, jamais une barri\xE8re.
+  snapshot   Conserve une PAGE rendue (.ultra11y/pages/<id>/ : DOM du documentElement +
+             condens\xE9 des styles calcul\xE9s + bo\xEEtes + arbre d'accessibilit\xE9) et l'audite.
+             'snapshot write' lit la charge utile collect\xE9e sur stdin, de sorte qu'un
+             producteur c\xF4t\xE9 navigateur (les exports ultra11y/playwright et
+             ultra11y/cypress) n'a rien \xE0 savoir du format sur disque \u2014 un processus par
+             page v\xE9rifi\xE9e. 'snapshot list' montre ce qui a \xE9t\xE9 captur\xE9. Comme un
+             instantan\xE9 est un document COMPLET (une capture de composant est un
+             fragment), les r\xE8gles de niveau page s'y appliquent : c'est l\xE0 que la langue
+             html (RGAA 8.3) et le titre de page (8.5/8.6) deviennent d\xE9cidables.
+  hook       INTERNE \u2014 la moiti\xE9 d\xE9cisionnelle du hook PreToolUse du plugin Claude
+             Code. Lit la charge utile sur stdin ; quand un 'git commit', 'git push' ou
+             'gh pr create' en attente porte des constats >= au seuil, affiche le JSON
+             de hook qui fait invoquer la skill review-a11y, et n'affiche rien sinon.
+             Seuil : ULTRA11Y_HOOK_FAIL_ON, sinon hook.failOn dans .ultra11yrc.json,
+             sinon blocking. D\xE9sactivable avec ULTRA11Y_HOOK=off ou SKIP_A11Y=1. Appel\xE9
+             par hooks/pre-tool-use.mjs, pas \xE0 la main.
+  affected   Les pages qu'un changement peut atteindre : depuis chaque fichier modifi\xE9
+             depuis --since (par d\xE9faut : la branche par d\xE9faut du d\xE9p\xF4t, s\xE9mantique
+             merge-base), remonte le graphe d'imports inverse jusqu'aux fichiers de route
+             (app/ et pages/ de Next.js, les layouts s\xE9lectionnant toutes les pages
+             en dessous) et aux sources que l'\xE9chantillon d\xE9clare, puis nomme leurs URL \u2014
+             routes dynamiques r\xE9solues avec l'inventaire des routes
+             (.ultra11y/routes.json) et l'\xE9chantillon. 'scan --since' rend exactement ces
+             pages.
+  pages      La grille des crit\xE8res par page \u2014 le RGAA est une norme par page, le
+             verdict du moteur porte sur tout le p\xE9rim\xE8tre, et cette commande fait le
+             pont entre les deux. Une ligne par crit\xE8re (ceux du RGAA), une colonne par
+             URL de page. Reconstruite \xE0 partir du seul audit.json commit\xE9 : pas
+             d'instantan\xE9s sur disque, pas de navigateur.
+             Deux r\xE8gles d'honn\xEAtet\xE9 : un constat n'est attribu\xE9 \xE0 une page que lorsque
+             quelque chose le DIT (l'instantan\xE9 sur lequel il a \xE9t\xE9 lev\xE9, l'URL scann\xE9e,
+             le nom de page de l'\xE9chantillon, ou les fichiers sources enregistr\xE9s de la
+             page) \u2014 tout le reste est signal\xE9 NON ATTRIBU\xC9, jamais r\xE9parti entre les
+             pages ; et \xAB aucun constat ici \xBB ne vaut conformit\xE9 que pour une page dont
+             le vrai DOM rendu a \xE9t\xE9 audit\xE9. Une page connue seulement par attribution de
+             source garde ses crit\xE8res non tranch\xE9s \xAB \xE0 \xE9valuer \xBB.
+  serve      Les r\xE9sultats d'audit sous forme d'un petit site local : chaque audit
+             trouv\xE9 dans --in (par d\xE9faut : audits ; tout JSON d'audit courant jusqu'\xE0
+             trois niveaux de profondeur, si bien que des copies dat\xE9es comme
+             audits/2026-09-01/audit-latest.json forment l'HISTORIQUE), chacun avec son
+             tableau de bord et sa grille des 106 crit\xE8res, le taux de conformit\xE9 et le
+             taux moyen par page (les chiffres du rapport lui-m\xEAme), une fiche par page
+             avec sa capture d'\xE9cran, les parcours, les instantan\xE9s de composants et ses
+             fichiers ; et, entre deux audits successifs, l'\xE9volution : chaque crit\xE8re
+             dont le statut a chang\xE9 et l'\xE9cart de taux en points. Lecture seule,
+             node:http uniquement, li\xE9 \xE0 127.0.0.1 (--host pour l'ouvrir), sur --port
+             (4711 par d\xE9faut ; le port libre suivant s'il est occup\xE9). Il ne sert que
+             des fichiers du dossier audits, de .ultra11y/pages et de
+             .ultra11y/render-snapshots, ne liste jamais un dossier, et refuse tout chemin
+             qui en sort, liens compris.
+             --static <dir> \xE9crit les m\xEAmes pages en fichiers simples avec des liens
+             relatifs, pour qu'elles se publient telles quelles sous un sous-chemin
+             (GitHub Pages, iterion).
+
+Options :
+  --out <dir>        dossier de sortie (report/prd/scan, par d\xE9faut : audits) ; pour audit,
+                     y conserver audit-latest.json \u2014 un audit simple n'\xE9crit rien sans lui.
+                     Pour audit, une valeur finissant par .json est un FICHIER cible (\xE9crit
+                     tel quel) ; le chemin r\xE9ellement \xE9crit est rappel\xE9 sur stderr
+  --in <file>        report : le JSON AuditResult \xE0 rendre ('-' pour stdin)
+                     \xB7 serve : le DOSSIER d'audits \xE0 lire (par d\xE9faut : audits)
+  --port <n>         serve : le port d'\xE9coute (4711 par d\xE9faut ; 0 = n'importe quel port libre)
+  --host <addr>      serve : l'adresse d'\xE9coute (127.0.0.1 par d\xE9faut ; toute autre expose les
+                     r\xE9sultats au r\xE9seau \u2014 \xE0 activer en connaissance de cause)
+  --static <dir>     serve : \xE9crire un export statique du site dans <dir> au lieu de le servir
+  --include <glob>   audit/fix : n'inclure que les chemins correspondants (s\xE9par\xE9s par des virgules)
+  --exclude <glob>   audit/fix : ignorer les chemins correspondants (s\xE9par\xE9s par des virgules)
+  --ext <list>       audit/fix : extensions de fichiers suppl\xE9mentaires \xE0 parcourir (ex. .twig,.erb) ;
+                     .html/.htm/.xhtml/.jsx/.tsx/.vue/.svelte/.astro sont int\xE9gr\xE9es
+  --no-default-excludes  audit/fix : auditer aussi le balisage test/spec/story/__tests__
+                     (exclu par d\xE9faut ; journalis\xE9, jamais \xE9cart\xE9 en silence)
+  --jsx              audit/fix : forcer l'analyse JSX/TSX des entr\xE9es, quelle que soit l'extension
+  --graph            audit : r\xE9soudre aussi les imports + lancer les r\xE8gles inter-fichiers (alias --cross-file)
+  --cross-file       audit : alias de --graph
+  --changed          audit/fix : seulement les fichiers modifi\xE9s par rapport \xE0 HEAD (git ; staged+non staged+non suivis, arbre de travail)
+  --since <ref>      audit/fix : seulement les fichiers modifi\xE9s par rapport \xE0 la ref git donn\xE9e
+                     \xB7 scan/affected : les pages qu'atteignent les fichiers modifi\xE9s depuis <ref>
+  --staged           audit/fix : seulement les fichiers STAGED, lus depuis le blob de l'index (instantan\xE9 exact du commit ; l'emporte sur --changed)
+  --max-files <n>    audit : plafonner les fichiers canoniques audit\xE9s (troncature journalis\xE9e, jamais silencieuse)
+  --dedup <mode>     audit : fusionner les fichiers identiques \u2014 exact|normalized|off  (par d\xE9faut : exact)
+  --standard rgaa    RGAA 4.1.2, le r\xE9f\xE9rentiel par d\xE9faut et le seul (accept\xE9 pour les scripts
+                     qui le passent explicitement ; --standard wcag a \xE9t\xE9 retir\xE9 et sort en 2)
+  --format <mode>    prd : 'audit' (d\xE9faut) \xE9met le bloc de conformit\xE9 d'auditeur (selon le
+                     vocabulaire du r\xE9f\xE9rentiel actif) pour le backlog ET les issues GitHub ;
+                     'doc' \xE9met un document d'exigences produit (epics, user stories,
+                     Given/When/Then)
+                     \xB7 pages : 'grid' (d\xE9faut) \xE9met la matrice crit\xE8res \xD7 pages ;
+                     'report' \xE9met le DOSSIER par page \u2014 une section par page avec sa
+                     capture d'\xE9cran, chaque crit\xE8re du r\xE9f\xE9rentiel, et le bloc d'auditeur
+                     de chaque non-conformit\xE9
+  --split <mode>     prd : d\xE9couper le backlog \u2014 pour l'instant seulement 'criterion' (un fichier par crit\xE8re)
+                     \xB7 pages --format report : 'page' \xE9crit <out>/page-<id>.md par page
+                     plus <out>/index.md (recommand\xE9 au-del\xE0 de 3\u20134 pages : le RGAA compte 106 crit\xE8res)
+  --no-technical     prd (format audit) : omettre les sections techniques du ticket (Partie
+                     technique + Contexte de reproduction) pour un bloc d'auditeur pur
+  --provider <id>    tickets : auto|github|gitlab|jira. 'auto' lit ULTRA11Y_TICKET_PROVIDER,
+                     puis .ultra11yrc.json, puis le remote git (Jira n'est jamais d\xE9tect\xE9 automatiquement)
+  --grain <mode>     tickets : ce qu'est un ticket \u2014 criterion (d\xE9faut) | page | page-criterion | single | file
+  --transport <t>    tickets : auto|cli|rest. 'auto' pr\xE9f\xE8re la CLI (gh/glab),
+                     et se rabat sur REST quand seul un jeton est disponible. Jira est en REST uniquement
+  --max-tickets <n>  tickets : refuser de d\xE9poser plus de n tickets en un run (200 par d\xE9faut)
+                     tickets --out <dir> \xE9crit aussi l'ensemble ind\xE9pendant du gestionnaire dans
+                     <dir>/issues-<date>.json, pour qu'un moteur de workflow le d\xE9pose lui-m\xEAme
+  --detect           render : d\xE9tecter le framework et afficher la recette build\u2192audit (ne rend rien)
+  --timeout <ms>     render : budget de rendu par unit\xE9 (10000 par d\xE9faut) ; une unit\xE9 qui le d\xE9passe est enregistr\xE9e en timeout
+  --transpiler <t>   render : esbuild|typescript|sucrase \u2014 le transpileur du projet avec lequel charger le TSX/JSX (par d\xE9faut : le premier r\xE9solu)
+  --no-stories       render : laisser de c\xF4t\xE9 les stories Storybook
+  --no-snapshots     render : sauter la passe visuelle (capture d'\xE9cran + axe de chaque capture dans Chromium). Env : ULTRA11Y_RENDER_SNAPSHOTS=off
+  --coverage         render : rendre compte de la couverture des captures rendues (composants couverts vs angles morts) ; avec --json \xE9met l'objet de couverture
+  --storybook        render : rattacher le HTML de chaque story (via le index.json de storybook-static) dans .ultra11y/captures (d\xE9signer le dossier HTML avec --captures)
+  --captures <dir>   audit/render : dossier de captures rendues \xE0 int\xE9grer (par d\xE9faut : .ultra11y/captures)
+  --no-captures      audit : NE PAS d\xE9tecter/int\xE9grer automatiquement .ultra11y/captures ni .ultra11y/pages
+  --root <dir>       snapshot, scan, serve : racine du projet contenant
+                     .ultra11y/pages et .ultra11yrc.json (par d\xE9faut : . \u2014 scan y \xE9crit les
+                     instantan\xE9s qu'il collecte)
+  --glossary [<t>]   criteria : chercher un terme que d\xE9finit le r\xE9f\xE9rentiel national (ou tous les lister)
+  --require-captures audit : barri\xE8re \u2014 \xE9choue si un composant opaque/de contr\xF4le n'a pas de capture rendue (implique --graph)
+  --write            fix : \xE9crire les corrections sur disque (par d\xE9faut, un diff en dry-run)
+  --iterate          fix : avec --write, r\xE9-auditer + r\xE9appliquer les corrections m\xE9caniques jusqu'\xE0 stabilit\xE9 (born\xE9)
+  --dry-run          fix : aper\xE7u seulement \u2014 n'\xE9crit jamais (c'est le d\xE9faut)
+  --safe             fix : n'appliquer que les codemods vraiment automatiques (sans espaces r\xE9serv\xE9s TODO ni propositions de jugement)
+  --only <ids>       fix : limiter les corrections automatiques \xE0 ces identifiants de r\xE8gle (s\xE9par\xE9s par des virgules)
+  --baseline <file>  scan : un 'scan --json' ant\xE9rieur des m\xEAmes pages (par exemple sur le
+                     d\xE9ploiement de la branche de base) ; sortie en 1 seulement sur les constats qu'il ne contient pas
+  --base-url <url>   scan --since / affected : le d\xE9ploiement sur lequel les pages sont rendues ;
+                     journey run : la base contre laquelle se r\xE9sout un startUrl relatif
+  --fail-on <sev>    audit/init/snapshot/scan --baseline : s\xE9v\xE9rit\xE9 de la barri\xE8re \u2014 blocking|major|minor (alias fran\xE7ais accept\xE9s)  (par d\xE9faut : blocking)
+  --hook             init : \xE9crire une barri\xE8re git pre-commit d'accessibilit\xE9 (instantan\xE9 staged + correction automatique par d\xE9faut)
+  --report <file>    check/verify : le rapport Markdown \xE0 contr\xF4ler
+  --theme <N>        criteria : lister la th\xE9matique RGAA N
+  --plan             criteria : le plan de travail \u2014 crit\xE8res par palier de preuve (source,
+                     inter-fichiers, page rendue, navigateur, jugement, hors p\xE9rim\xE8tre)
+  --list             criteria : afficher les th\xE9matiques RGAA
+  --generate         criteria : \xE9mettre le references/criteria.md embarqu\xE9 (la table de correspondance WCAG)
+  --apply <file>     verify : r\xE9duire un fichier de verdicts rempli \xE0 une barri\xE8re succ\xE8s/\xE9chec
+                     (exige --report \u2014 la couverture est re-d\xE9riv\xE9e du rapport, sans plafond)
+                     Accepte aussi un ARBITRAGE (--in <audit.json>), ou un REGISTRE DE
+                     VERDICTS, qu'il REJOUE sur l'audit sans mod\xE8le dans la boucle
+                     Les conformit\xE9s retenues sont ancr\xE9es comme l'int\xE9gration les a ancr\xE9es :
+                     une citation qui est l'une des ancres r\xE9colt\xE9es de son propre crit\xE8re
+                     (--in <audit.json>) se rabat sur cette ancre, de sorte qu'une ressaisie
+                     accept\xE9e par l'int\xE9gration n'est pas refus\xE9e \xE0 nouveau au proc\xE8s ; sans
+                     l'audit, l'extrait cit\xE9 doit correspondre litt\xE9ralement au source
+  --ledger <file>    verify --apply : enregistrer les verdicts que l'int\xE9gration a ACCEPT\xC9S,
+                     pour qu'un run ult\xE9rieur les rejoue gratuitement (par d\xE9faut :
+                     .ultra11y/verdicts/<standard>.json). Le rejeu re-d\xE9rive les preuves
+                     et relance la m\xEAme barri\xE8re ; un verdict dont la preuve a chang\xE9 est
+                     \xE9cart\xE9 comme p\xE9rim\xE9 et son crit\xE8re le signale. Avec verify --prune,
+                     les affirmations retir\xE9es sont aussi supprim\xE9es du registre
+  --conformities <file>
+                     verify : les CONFORMIT\xC9S REVENDIQU\xC9ES \xE0 mettre en proc\xE8s \u2014 un audit, un
+                     registre de verdicts ou un fichier d'arbitrage. Par d\xE9faut, l'audit
+                     courant de --in, puis le registre du r\xE9f\xE9rentiel
+                     (.ultra11y/verdicts/<standard>.json), pour que la moiti\xE9 conformit\xE9 de la
+                     barri\xE8re tourne sans qu'on la demande : rien ne contestait le verdict C
+                     d'un agent, et un crit\xE8re valid\xE9 parce que son objet \xE9tait PR\xC9SENT plut\xF4t
+                     que JUSTE partait comme une d\xE9claration de conformit\xE9. Chaque ancre cit\xE9e
+                     devient un \xE9l\xE9ment demandant si la preuve \xC9TABLIT le crit\xE8re.
+                     Une conformit\xE9 r\xE9fut\xE9e renvoie son crit\xE8re \xAB \xE0 \xE9valuer \xBB \u2014 jamais en NC
+  --no-conformities  verify : ne pas mettre en proc\xE8s les conformit\xE9s du registre
+  --max-verify <n>   verify : plafonner la taille de la liste de travail ; 0 = sans plafond           (par d\xE9faut : 40, NC seulement)
+                     Les conformit\xE9s revendiqu\xE9es sont sans plafond sauf si ce drapeau est
+                     donn\xE9 ; tout ce qu'un plafond \xE9carte est nomm\xE9 sur stderr et fait \xE9chouer
+                     --apply comme manquant
+  --verdicts <file>  check --semantic : l'artefact des verdicts arbitr\xE9s
+  --require-sample   check : \xE9choue tant qu'une page D\xC9CLAR\xC9E dans .ultra11yrc.json n'a pas de
+                     capture sous .ultra11y/pages/. Couverture, un cran en dessous de
+                     --require-decided : un balayage qui perd des pages produit un rapport
+                     simplement PLUS COURT, et un livrable plus court se lit exactement comme
+                     un livrable complet.
+  --require-rendered check : \xE9choue tant qu'un crit\xE8re qui DEMANDE une page rendue est encore
+                     \xAB \xE0 \xE9valuer \xBB et que ce run n'a pris aucun instantan\xE9 de page. Porte sur
+                     l'INSTRUMENT, pas sur la r\xE9ponse : un run qui a rendu une page et n'a
+                     toujours pas pu trancher un crit\xE8re passe. Exige --in <audit.json> ;
+                     respecte --allow-undecided.
+  --require-decided[=pages]
+                     check : \xE9choue tant qu'UN crit\xE8re du r\xE9f\xE9rentiel est encore \xAB \xE0 \xE9valuer \xBB.
+                     '=pages' tient aussi la grille propre \xE0 CHAQUE page au m\xEAme niveau \u2014 un
+                     crit\xE8re en \xE9chec sur une route est tranch\xE9 pour le run et peut encore \xEAtre
+                     non tranch\xE9 sur les routes o\xF9 il ne s'est jamais d\xE9clench\xE9, et c'est sur
+                     cela qu'un livrable par page est jug\xE9.
+                     Exige --in. Sinon, un job vert ne veut pas dire que la grille est remplie :
+                     --fail-on r\xE9git les non-conformit\xE9s, et un arbitrage qui n'aboutit \xE0 rien
+                     ne fait qu'avertir.
+  --allow-undecided <file>
+                     check --require-decided : les crit\xE8res que ce projet d\xE9clare ne pas pouvoir
+                     trancher, sous la forme {"entries":[{"criteriaId","reason"}]}. Une liste
+                     NOMM\xC9E, jamais une tol\xE9rance : un seuil cacherait justement les crit\xE8res que
+                     personne n'a pu trancher. Une entr\xE9e sans raison fait \xE9chouer la barri\xE8re,
+                     et une entr\xE9e dont le crit\xE8re porte d\xE9sormais un verdict aussi.
+                     (par d\xE9faut : VERIFY.todo.json \xE0 c\xF4t\xE9 du rapport)
+  --allow-stale-undecided
+                     check --require-decided : ignorer les exemptions nomm\xE9es dont les crit\xE8res
+                     ont obtenu un verdict lors de CE rafra\xEEchissement. Pr\xE9vu pour les
+                     rafra\xEEchissements d'arbitrage payants ; le d\xE9faut reste strict pour que les
+                     exceptions p\xE9rim\xE9es soient nettoy\xE9es du d\xE9p\xF4t.
+  --run <dir>        orchestrate : le dossier du run contenant les listes de travail (ADJUDICATE.todo.json,
+                     VERIFY.todo.json) ; les artefacts arrivent sous <dir>/orchestration/
+  --phase <name>     orchestrate : n'\xE9mettre qu'une phase \u2014 adjudicate | verify-report
+                     (sortie en 2 avec la commande productrice si sa liste de travail manque)
+  --eco              orchestrate : n'\xE9mettre que RUNBOOK.md + agents/*.md (ni lots, ni workflow) \u2014 la voie
+                     s\xE9quentielle explicite \xE9conome en tokens (aussi celle que suit un harnais sans sous-agents)
+  --merge <file>     scan : int\xE9grer les constats dynamiques \xE0 ce JSON AuditResult. Avec --json, le
+                     document affich\xE9 commence par un r\xE9sum\xE9 'pages' du run \u2014
+                     {sample, recorded, refused:[{id, reason}]} \u2014 \xE0 c\xF4t\xE9 du document
+  --sitemap <url>    scan : scanner chaque URL list\xE9e dans un sitemap.xml
+  --crawl <url>      scan : parcourir en largeur les liens de m\xEAme origine depuis une URL de d\xE9part (HTML servi)
+  --depth <n>        scan : profondeur de sauts de liens du crawl depuis l'URL de d\xE9part   (par d\xE9faut : sans limite ; 0 = sans limite)
+  --max <n>          scan : plafond de pages scann\xE9es (sitemap/crawl)      (par d\xE9faut : sans limite ; 0 = sans limite)
+  --runtime <mode>   scan : local (l'environnement d'ex\xE9cution par d\xE9faut et le seul : le Playwright
+                     de l'h\xF4te/de la cible ; 'auto' est accept\xE9 comme alias)
+  --local            scan : alias de --runtime local
+  --cwd <dir>        scan : r\xE9sout @playwright/test + @axe-core/playwright (et le
+                     navigateur) d'abord depuis ce dossier (ex. --cwd packages/app)
+  --browser-path <file>  scan / render / status --browser : lancer CET ex\xE9cutable de navigateur (ex. le
+                     /usr/bin/chromium d'une distribution) au lieu de celui que r\xE9sout Playwright.
+                     Explicite : jamais remplac\xE9 par un repli. Env : ULTRA11Y_BROWSER_PATH
+  --storage-state <file>  scan : JSON storageState de Playwright pour les
+                     pages authentifi\xE9es (ex. test-results/.auth/user.json). Ses cookies
+                     qui correspondent \xE0 l'URL d'un document li\xE9 (domaine, chemin, secure,
+                     expiration) sont aussi envoy\xE9s lors de son t\xE9l\xE9chargement \u2014 vers l'origine
+                     audit\xE9e uniquement
+  --no-interact      scan : d\xE9sactiver les sondes AVEC \xC9TAT (saisie dans les champs,
+                     ouverture des dialogues, r\xE9gion live). Actives par d\xE9faut ; les
+                     interactions ne naviguent jamais (saisir dans les champs texte, basculer
+                     case \xE0 cocher/bouton radio, cliquer button[type=button] \u2014 jamais un
+                     lien/une soumission/une navigation, et jamais un bouton dont le nom
+                     accessible correspond \xE0 un verbe destructeur : supprimer, retirer,
+                     effacer, envoyer, valider, confirmer, payer, delete, remove, send,
+                     submit, confirm, pay, \u2026) et restaurent l'\xE9tat de la page, en v\xE9rifiant
+                     que location.href n'a pas chang\xE9 apr\xE8s chaque action
+  --interact-clicks  scan : autoriser les clics button[type=button] de la sonde de r\xE9gion live
+                     sur un scan AUTHENTIFI\xC9 (--storage-state). Saut\xE9s par d\xE9faut dans ce cas :
+                     un clic peut d\xE9clencher une mutation c\xF4t\xE9 serveur (suppression/envoi)
+                     invisible pour la v\xE9rification de location.href. Les scans non
+                     authentifi\xE9s gardent les clics de toute fa\xE7on ; l'exclusion des noms
+                     destructeurs ci-dessus s'applique dans tous les cas
+  --write            pages discover : fusionner les pages d\xE9couvertes dans .ultra11yrc.json
+                     (sample.pages). Sans lui, la proposition est affich\xE9e et rien n'est
+                     \xE9crit. Les pages d\xE9j\xE0 d\xE9clar\xE9es sont gard\xE9es telles quelles \u2014 auth,
+                     storageState et notes sont du travail humain et ne sont jamais \xE9cras\xE9s.
+                     Enregistre aussi chaque route d\xE9couverte dans l'inventaire
+                     .ultra11y/routes.json
+  --routes-only      pages discover : enregistrer l'inventaire des routes (.ultra11y/routes.json) et
+                     laisser l'\xE9chantillon intact \u2014 l'\xE9chantillon RGAA reste celui que vous avez
+                     choisi, et l'annexe du rapport liste chaque autre route avec la fa\xE7on dont
+                     elle a \xE9t\xE9 observ\xE9e
+  --from-snapshots   pages discover : construire l'\xE9chantillon \xE0 partir de .ultra11y/pages au lieu de
+                     crawler \u2014 la seule voie qui voit une page atteinte par un \xE9tat (une modale,
+                     une \xE9tape de tunnel)
+  --propose          pages discover : proposer un \xE9chantillon D\xC9TERMINISTE plut\xF4t que toutes les
+                     pages \u2014 les types exig\xE9s par le r\xE9f\xE9rentiel (--standard, rgaa par d\xE9faut)
+                     rep\xE9r\xE9s par mot-cl\xE9 sur les URL et titres tri\xE9s, la page de recherche avec
+                     une requ\xEAte fixe, puis une page par groupe de gabarit (motif d'URL avec
+                     identifiants, slugs et dates normalis\xE9s ; squelette DOM quand un instantan\xE9
+                     existe), les plus gros d'abord, \xE9galit\xE9s d\xE9partag\xE9es par URL. La raison de
+                     chaque choix va dans \`notes\`, chaque type sans page dans \`sample.absent\`.
+                     Avec --write, il REMPLACE les pages d\xE9clar\xE9es, en gardant celles qui portent
+                     auth, storageState, sources ou notes
+  --sample-size <n>  pages discover --propose : nombre maximal de pages propos\xE9es (par d\xE9faut : ${DEFAULT_SAMPLE_SIZE}) ;
+                     les types exig\xE9s ne sont jamais coup\xE9s
+  --search-query <q> pages discover --propose : la requ\xEAte de recherche (par d\xE9faut : "information")
+  --all-routes      scan : apr\xE8s l'\xE9chantillon (avec --sample), scanner chaque route de l'inventaire
+                     (.ultra11y/routes.json) que l'\xE9chantillon ne contient pas \u2014 sauf les routes
+                     que votre run E2E a d\xE9j\xE0 captur\xE9es, qui l'emportent. Chaque route est ensuite
+                     list\xE9e en annexe : captur\xE9e, scann\xE9e, source seulement, ou non atteinte
+  --max-routes <n>   scan --all-routes : nombre maximal de routes scann\xE9es au-del\xE0 de l'\xE9chantillon
+                     (50 par d\xE9faut) ; les routes laiss\xE9es de c\xF4t\xE9 sont list\xE9es \xAB non atteintes \xBB,
+                     jamais \xE9cart\xE9es
+  --sample           scan : scanner l'\xE9chantillon de pages NORMATIF de .ultra11yrc.json (son
+                     sample.pages), le storage-state de chaque page l'emportant sur
+                     --storage-state, en agr\xE9geant un r\xE9sultat avec la provenance par page pour
+                     le rapport
+  --no-snapshot      scan : NE PAS conserver chaque page scann\xE9e dans .ultra11y/pages/<id>/.
+                     Les instantan\xE9s sont actifs par d\xE9faut : le navigateur est d\xE9j\xE0 sur la page,
+                     et sans instantan\xE9 la page ne peut jamais \xEAtre r\xE9-audit\xE9e hors ligne ni
+                     obtenir de verdict par page (ses crit\xE8res restent \xAB \xE0 \xE9valuer \xBB pour
+                     toujours)
+  --no-pdf           scan : NE PAS t\xE9l\xE9charger les documents PDF de m\xEAme origine vers lesquels
+                     pointent les pages scann\xE9es (dans .ultra11y/documents/<sha256>.pdf, avec un
+                     fichier annexe nommant l'URL et les pages qui y renvoient). Un lien est
+                     candidat quand son chemin finit par .pdf, qu'il d\xE9clare
+                     type=application/pdf ou download, que son texte / aria-label / title nomme
+                     PDF, ou que son chemin ou sa requ\xEAte le fait (/api/x-pdf) ; il n'est gard\xE9
+                     que si la r\xE9ponse est application/pdf ou commence par %PDF-.
+                     Avec --storage-state, les cookies correspondants de la session sont envoy\xE9s.
+                     audit : ne pas int\xE9grer ce dossier. Les entr\xE9es PDF nomm\xE9es explicitement
+                     sont toujours audit\xE9es
+  --max-pdf <n>      scan : nombre maximal de documents PDF t\xE9l\xE9charg\xE9s par run (20 par d\xE9faut ;
+                     chacun plafonn\xE9 \xE0 20 Mio)
+  --strict           verify --apply : int\xE9gration tout ou rien \u2014 un verdict refus\xE9 \xE9carte tout
+                     l'arbitrage. Par d\xE9faut, l'int\xE9gration se fait PAR VERDICT : un refus ne
+                     co\xFBte que son propre crit\xE8re, qui reste \xE0 \xE9valuer en portant le refus, et
+                     chaque verdict qui a fait ses preuves est int\xE9gr\xE9
+  --semantic         verify : int\xE9grer la v\xE9rification d'\xE9tayage en une seule passe
+                     check : activer la barri\xE8re s\xE9mantique \u2014 exige un artefact de verdicts
+                     arbitr\xE9s (\xE9choue s'il est absent) et r\xE9-ancre chaque verdict positif au
+                     niveau du contenu contre le source cit\xE9
+  --manual           verify : avec --in <audit.json>, \xE9mettre une liste de travail d'arbitrage sur
+                     les crit\xE8res r\xE9siduels de l'audit (jugement / rendu n\xE9cessaire) que l'agent
+                     doit trancher
+  --web / --no-web   verify --manual : si chaque brief peut INVITER \xE0 consulter la page
+                     officielle du crit\xE8re (l'URL elle-m\xEAme est toujours affich\xE9e).
+                     Par d\xE9faut : oui, sauf en CI \u2014 o\xF9 l'arbitre dispose de
+                     Read/Grep/Glob/Edit/Write et o\xF9 proposer un outil web ne co\xFBte que des tours.
+                     Le texte normatif embarqu\xE9 d\xE9cide toujours, et aucune page web n'est jamais
+                     un normativeRef acceptable
+  --lang auto|en|fr  langue de sortie                (par d\xE9faut : auto \u2014 fran\xE7ais ; --lang en
+                     pour l'anglais. Sans drapeau : <html lang> du d\xE9p\xF4t \u2192 locale par d\xE9faut du
+                     r\xE9f\xE9rentiel (fr pour le RGAA) \u2192 fr. Un appelant IA doit passer --lang
+                     explicitement pour suivre la langue de la conversation)
+  --json             sortie lisible par une machine
+  --quiet            check : code de sortie seulement, aucune sortie
+  -h, --help         afficher cette aide (--help --lang en : en anglais)
+  -v, --version      afficher la version
+
+Donn\xE9es : WCAG 2.2 \xA9 W3C (W3C Document License). Pack RGAA 4.1.2 \xA9 DINUM, Licence Ouverte / Etalab 2.0 (voir NOTICE).`;
+function helpText(lang) {
+  return lang === "en" ? HELP_EN : HELP_FR;
+}
+
+// src/cli-text.ts
+var fr = (lang) => lang === "fr";
+var M2 = {
+  /** `--in` is missing. `hint` is appended verbatim (already localized by the caller). */
+  inRequired: (cmd, lang, hint = "") => fr(lang) ? `ultra11y ${cmd} : --in <audit.json> est obligatoire ('-' pour stdin).${hint}` : `ultra11y ${cmd}: --in <audit.json> is required ('-' for stdin).${hint}`,
+  /** A `--in`/`--merge` payload that does not parse. */
+  notJsonAudit: (cmd, flag, lang) => fr(lang) ? `ultra11y ${cmd} : ${flag} n'est pas du JSON valide (un AuditResult est attendu).` : `ultra11y ${cmd}: ${flag} is not valid JSON (expected an AuditResult).`,
+  /** A payload that parses but is not a current audit. `what` is "input", "--in" or "--merge input". */
+  notCurrentAudit: (cmd, lang, what = "input") => fr(lang) ? `ultra11y ${cmd} : ${what === "input" ? "l'entr\xE9e" : what === "--in" ? "--in" : "l'entr\xE9e --merge"} n'est pas un AuditResult ultra11y \xE0 jour (index\xE9 WCAG, sch\xE9ma v2). Relancez \`audit\`.` : `ultra11y ${cmd}: ${what === "input" ? "input" : what === "--in" ? "--in" : "--merge input"} is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run \`audit\`.`,
+  /** `--fail-on` with a value that is not a severity. */
+  failOnInvalid: (cmd, raw, lang) => fr(lang) ? `ultra11y ${cmd} : --fail-on doit valoir blocking|major|minor (re\xE7u "${String(raw)}").` : `ultra11y ${cmd}: --fail-on must be blocking|major|minor (got "${String(raw)}").`,
+  /** A file flag whose file is missing or unparsable. */
+  fileNotFoundOrInvalid: (cmd, flag, path, lang) => fr(lang) ? `ultra11y ${cmd} : fichier ${flag} introuvable ou JSON invalide : ${path}.` : `ultra11y ${cmd}: ${flag} file not found or not valid JSON: ${path}.`,
+  fileNotFound: (cmd, flag, path, lang) => fr(lang) ? `ultra11y ${cmd} : fichier ${flag} introuvable : ${path}.` : `ultra11y ${cmd}: ${flag} file not found: ${path}.`,
+  fileUnreadable: (cmd, flag, path, reason, lang) => fr(lang) ? `ultra11y ${cmd} : impossible de lire ${flag} ${path} : ${reason}.` : `ultra11y ${cmd}: cannot read ${flag} ${path}: ${reason}.`,
+  fileNotJson: (cmd, flag, lang) => fr(lang) ? `ultra11y ${cmd} : le fichier ${flag} n'est pas du JSON valide.` : `ultra11y ${cmd}: ${flag} file is not valid JSON.`,
+  /** A count flag that must be a non-negative integer. */
+  nonNegativeInt: (cmd, flag, raw, lang) => fr(lang) ? `ultra11y ${cmd} : ${flag} doit \xEAtre un entier positif ou nul (re\xE7u "${String(raw)}").` : `ultra11y ${cmd}: ${flag} must be a non-negative integer (got "${String(raw)}").`,
+  runDirNotFound: (path, lang) => fr(lang) ? `ultra11y orchestrate : dossier de run introuvable : ${path}.` : `ultra11y orchestrate: run dir not found: ${path}.`
+};
+
+// src/cli.ts
 var COMMANDS = [
   "audit",
   "report",
@@ -69584,24 +70168,31 @@ function resolveLang(flags, ctx = {}) {
   if (top === "fr" || top === "en") return top;
   const locale = ctx.standard ? getPack(ctx.standard)?.defaultLocale : void 0;
   if (locale === "fr" || locale === "en") return locale;
-  return "en";
+  return "fr";
+}
+function argvLang(argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a2 = argv[i];
+    if (a2 === "--lang=en" || a2 === "--lang" && argv[i + 1] === "en") return "en";
+  }
+  return "fr";
 }
 function asList(v2) {
   return typeof v2 === "string" && v2 ? [v2] : void 0;
 }
-function readInputFile(path, cmd, flag) {
+function readInputFile(path, cmd, flag, lang) {
   try {
     return readText(path);
   } catch (e) {
     const code2 = e?.code;
     console.error(
-      code2 === "ENOENT" ? `ultra11y ${cmd}: ${flag} file not found: ${path}.` : `ultra11y ${cmd}: cannot read ${flag} ${path}: ${e instanceof Error ? e.message : String(e)}.`
+      code2 === "ENOENT" ? M2.fileNotFound(cmd, flag, path, lang) : M2.fileUnreadable(cmd, flag, path, e instanceof Error ? e.message : String(e), lang)
     );
     return null;
   }
 }
-function readReportInput(path, cmd) {
-  const md = readInputFile(path, cmd, "--report");
+function readReportInput(path, cmd, lang) {
+  const md = readInputFile(path, cmd, "--report", lang);
   if (md === null) return null;
   try {
     return withReportAnnexes(md, path, readText);
@@ -69655,7 +70246,7 @@ async function cmdAuditFromFile(p2, inPath) {
   if (p2.positionals.length) offenders.unshift("<paths>");
   if (offenders.length) {
     console.error(
-      `ultra11y audit: --in re-gates an audit that already exists, so these have nothing left to change: ${offenders.join(", ")}. Drop them, or run a fresh audit without --in.`
+      resolveLang(p2.flags) === "fr" ? `ultra11y audit : --in rejoue la barri\xE8re sur un audit qui existe d\xE9j\xE0, ces options n'ont donc plus rien \xE0 changer : ${offenders.join(", ")}. Retirez-les, ou lancez un nouvel audit sans --in.` : `ultra11y audit: --in re-gates an audit that already exists, so these have nothing left to change: ${offenders.join(", ")}. Drop them, or run a fresh audit without --in.`
     );
     return 2;
   }
@@ -69663,12 +70254,12 @@ async function cmdAuditFromFile(p2, inPath) {
   try {
     const parsed = unwrapAudit(JSON.parse(inPath === "-" ? await readStdin() : readText(inPath)));
     if (!isCurrentAudit(parsed)) {
-      console.error("ultra11y audit: --in is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+      console.error(M2.notCurrentAudit("audit", resolveLang(p2.flags), "--in"));
       return 2;
     }
     result = parsed;
   } catch {
-    console.error(`ultra11y audit: --in file not found or not valid JSON: ${inPath}.`);
+    console.error(M2.fileNotFoundOrInvalid("audit", "--in", inPath, resolveLang(p2.flags)));
     return 2;
   }
   const standard = stdOf(p2, "audit");
@@ -69677,7 +70268,7 @@ async function cmdAuditFromFile(p2, inPath) {
   const failOnRaw = p2.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
-    console.error(`ultra11y audit: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
+    console.error(M2.failOnInvalid("audit", failOnRaw, lang));
     return 2;
   }
   const failOnSet = failOnRaw !== void 0;
@@ -69696,7 +70287,9 @@ async function cmdAudit(p2) {
   if (typeof inFlag === "string" && inFlag) return cmdAuditFromFile(p2, inFlag);
   const inputs = p2.positionals.length ? p2.positionals : ["."];
   if (inputs.length === 0) {
-    console.error("ultra11y audit: provide files/globs, or '-' to read stdin.");
+    console.error(
+      resolveLang(p2.flags) === "fr" ? "ultra11y audit : indiquez des fichiers/globs, ou '-' pour lire stdin." : "ultra11y audit: provide files/globs, or '-' to read stdin."
+    );
     return 2;
   }
   const stdin = inputs.includes("-") ? await readStdin() : void 0;
@@ -69785,7 +70378,7 @@ async function cmdAudit(p2) {
   const failOnRaw = p2.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
-    console.error(`ultra11y audit: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
+    console.error(M2.failOnInvalid("audit", failOnRaw, lang));
     return 2;
   }
   const failOnSet = failOnRaw !== void 0;
@@ -69936,7 +70529,9 @@ function writeProposedSample(p2, lang, inputs) {
   const sizeFlag = p2.flags["sample-size"];
   const size2 = typeof sizeFlag === "string" ? Number(sizeFlag) : DEFAULT_SAMPLE_SIZE;
   if (!Number.isInteger(size2) || size2 < 1) {
-    console.error(`ultra11y pages discover: --sample-size expects a positive integer, got "${String(sizeFlag)}".`);
+    console.error(
+      resolveLang(p2.flags) === "fr" ? `ultra11y pages discover : --sample-size attend un entier strictement positif, re\xE7u "${String(sizeFlag)}".` : `ultra11y pages discover: --sample-size expects a positive integer, got "${String(sizeFlag)}".`
+    );
     return 2;
   }
   const searchQuery = typeof p2.flags["search-query"] === "string" ? p2.flags["search-query"] : void 0;
@@ -69987,7 +70582,7 @@ ${lang === "fr" ? "Rien n'a \xE9t\xE9 \xE9crit \u2014 relancez avec --write pour
     }
     return 0;
   }
-  const file = persistSample(v2.sample);
+  const file = persistSample(v2.sample, resolveLang(p2.flags));
   if (file === void 0) return 2;
   if (!p2.flags.json)
     console.log(
@@ -70002,14 +70597,16 @@ function proposalSummary(lang, proposal, applied) {
   const absent = (proposal.sample.absent ?? []).map((a2) => a2.kind).join(", ");
   return lang === "fr" ? `${n} page(s) propos\xE9e(s) sur ${proposal.considered} d\xE9couverte(s) \xB7 ${represented}/${proposal.clusters.length} gabarit(s) repr\xE9sent\xE9(s)${proposal.leftOut ? ` (${proposal.leftOut} laiss\xE9(s) par --sample-size)` : ""}${absent ? ` \xB7 sans page : ${absent}` : ""}${applied.kept.length ? ` \xB7 ${applied.kept.length} page(s) d\xE9clar\xE9e(s) conserv\xE9e(s)` : ""}${applied.dropped.length ? ` \xB7 ${applied.dropped.length} retir\xE9e(s)` : ""}` : `${n} page(s) proposed out of ${proposal.considered} discovered \xB7 ${represented}/${proposal.clusters.length} template(s) represented${proposal.leftOut ? ` (${proposal.leftOut} left out by --sample-size)` : ""}${absent ? ` \xB7 no page for: ${absent}` : ""}${applied.kept.length ? ` \xB7 ${applied.kept.length} declared page(s) kept` : ""}${applied.dropped.length ? ` \xB7 ${applied.dropped.length} dropped` : ""}`;
 }
-function persistSample(sample) {
+function persistSample(sample, lang) {
   const file = join39(process.cwd(), ".ultra11yrc.json");
   let doc = {};
   if (existsSync38(file)) {
     try {
       doc = JSON.parse(readText(file));
     } catch {
-      console.error("ultra11y pages discover: .ultra11yrc.json is not valid JSON \u2014 refusing to overwrite it.");
+      console.error(
+        lang === "fr" ? "ultra11y pages discover : .ultra11yrc.json n'est pas du JSON valide \u2014 refus de l'\xE9craser." : "ultra11y pages discover: .ultra11yrc.json is not valid JSON \u2014 refusing to overwrite it."
+      );
       return void 0;
     }
   }
@@ -70076,7 +70673,7 @@ ${found} page(s) discovered, ${merged.added.length} new. Nothing was written \u2
     }
     return 0;
   }
-  const file = persistSample(v2.sample);
+  const file = persistSample(v2.sample, resolveLang(p2.flags));
   if (file === void 0) return 2;
   if (!p2.flags.json)
     console.log(
@@ -70090,22 +70687,22 @@ async function cmdPages(p2) {
   if (p2.positionals[0] === "discover") return cmdPagesDiscover(p2);
   const inFlag = p2.flags.in;
   if (typeof inFlag !== "string" || !inFlag) {
-    console.error("ultra11y pages: --in <audit.json> is required ('-' for stdin), or use `pages discover`.");
+    console.error(M2.inRequired("pages", resolveLang(p2.flags), resolveLang(p2.flags) === "fr" ? " Ou utilisez `pages discover`." : " Or use `pages discover`."));
     return 2;
   }
   const standard = stdOf(p2, "pages");
   if (standard === null) return 2;
-  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "pages", "--in");
+  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "pages", "--in", resolveLang(p2.flags));
   if (raw === null) return 2;
   let result;
   try {
     result = unwrapAudit(JSON.parse(raw));
   } catch {
-    console.error("ultra11y pages: --in is not valid JSON (expected an AuditResult).");
+    console.error(M2.notJsonAudit("pages", "--in", resolveLang(p2.flags)));
     return 2;
   }
   if (!isCurrentAudit(result)) {
-    console.error("ultra11y pages: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+    console.error(M2.notCurrentAudit("pages", resolveLang(p2.flags)));
     return 2;
   }
   const lang = resolveLang(p2.flags, { audit: result, standard });
@@ -70136,7 +70733,9 @@ async function cmdPages(p2) {
   }
   const format = typeof p2.flags.format === "string" ? p2.flags.format : "grid";
   if (!["grid", "report"].includes(format)) {
-    console.error(`ultra11y pages: --format must be grid or report (got "${format}").`);
+    console.error(
+      lang === "fr" ? `ultra11y pages : --format doit valoir grid ou report (re\xE7u "${format}").` : `ultra11y pages: --format must be grid or report (got "${format}").`
+    );
     return 2;
   }
   if (format === "grid") {
@@ -70254,7 +70853,9 @@ function positiveIntFlag(p2, name) {
   if (typeof raw !== "string" || !raw) return void 0;
   const n = Number.parseInt(raw, 10);
   if (Number.isFinite(n) && n > 0) return n;
-  console.error(`ultra11y: --${name} expects a positive integer (got "${raw}"). Ignored \u2014 the default applies.`);
+  console.error(
+    resolveLang(p2.flags) === "fr" ? `ultra11y : --${name} attend un entier strictement positif (re\xE7u "${raw}"). Ignor\xE9 \u2014 la valeur par d\xE9faut s'applique.` : `ultra11y: --${name} expects a positive integer (got "${raw}"). Ignored \u2014 the default applies.`
+  );
   return void 0;
 }
 function budgetOf(p2) {
@@ -70290,19 +70891,23 @@ async function cmdSnapshot(p2) {
     return 0;
   }
   if (sub !== "write") {
-    console.error("ultra11y snapshot: expected `snapshot write` (payload on stdin) or `snapshot list`.");
+    console.error(
+      lang === "fr" ? "ultra11y snapshot : `snapshot write` (charge utile sur stdin) ou `snapshot list` attendu." : "ultra11y snapshot: expected `snapshot write` (payload on stdin) or `snapshot list`."
+    );
     return 2;
   }
   const raw = await readStdin();
   if (!raw.trim()) {
-    console.error("ultra11y snapshot write: no payload on stdin (expected {meta, dom, styles?, boxes?, axtree?}).");
+    console.error(
+      lang === "fr" ? "ultra11y snapshot write : aucune charge utile sur stdin ({meta, dom, styles?, boxes?, axtree?} attendu)." : "ultra11y snapshot write: no payload on stdin (expected {meta, dom, styles?, boxes?, axtree?})."
+    );
     return 2;
   }
   let payload;
   try {
     payload = JSON.parse(raw);
   } catch {
-    console.error("ultra11y snapshot write: stdin is not valid JSON.");
+    console.error(lang === "fr" ? "ultra11y snapshot write : stdin n'est pas du JSON valide." : "ultra11y snapshot write: stdin is not valid JSON.");
     return 2;
   }
   const v2 = validateSnapshotMeta(payload.meta);
@@ -70311,7 +70916,9 @@ async function cmdSnapshot(p2) {
     return 2;
   }
   if (typeof payload.dom !== "string" || !payload.dom.trim()) {
-    console.error("ultra11y snapshot write: `dom` must be the serialized documentElement.outerHTML.");
+    console.error(
+      lang === "fr" ? "ultra11y snapshot write : `dom` doit \xEAtre le documentElement.outerHTML s\xE9rialis\xE9." : "ultra11y snapshot write: `dom` must be the serialized documentElement.outerHTML."
+    );
     return 2;
   }
   const scripts = asScriptsDigest(payload.scripts);
@@ -70342,14 +70949,16 @@ async function cmdSnapshot(p2) {
       ...typeof payload.screenshotFull === "string" && payload.screenshotFull ? { screenshotFullBase64: payload.screenshotFull } : {}
     });
   } catch (e) {
-    console.error(`ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`);
+    console.error(
+      lang === "fr" ? `ultra11y snapshot write : impossible d'\xE9crire l'instantan\xE9 : ${e instanceof Error ? e.message : String(e)}` : `ultra11y snapshot write: could not write the snapshot: ${e instanceof Error ? e.message : String(e)}`
+    );
     return 1;
   }
   const result = runAudit({ inputs: [join39(dir, "dom.html")], onWarn: (m3) => console.error(m3) });
   const failOnRaw = p2.flags["fail-on"];
   const failOnParsed = parseFailOn(failOnRaw);
   if (failOnRaw !== void 0 && failOnParsed === null) {
-    console.error(`ultra11y snapshot write: --fail-on must be blocking|major|minor (got "${String(failOnRaw)}").`);
+    console.error(M2.failOnInvalid("snapshot write", failOnRaw, lang));
     return 2;
   }
   const failing = failOnRaw !== void 0 ? findingsAtOrAbove(result.findings, failOnParsed ?? "bloquant").filter((f2) => !f2.advisory) : [];
@@ -70361,22 +70970,28 @@ async function cmdSnapshot(p2) {
   return failing.length ? 1 : 0;
 }
 function cmdInit(p2) {
+  const lang = resolveLang(p2.flags);
   const root = repoRoot() ?? process.cwd();
   const engineRel = resolveEnginePath(root);
   const failOnParsed = parseFailOn(p2.flags["fail-on"]);
   if (p2.flags["fail-on"] !== void 0 && failOnParsed === null) {
-    console.error(`ultra11y init: --fail-on must be blocking|major|minor (got "${String(p2.flags["fail-on"])}").`);
+    console.error(M2.failOnInvalid("init", p2.flags["fail-on"], lang));
     return 2;
   }
   const failOn = failOnParsed ?? "bloquant";
-  console.log(`ultra11y init: wrote ${writeHook(root, engineRel, failOn)}`);
-  console.log(`ultra11y init: done. The pre-commit gate audits staged changes and auto-applies safe fixes (bypass once with SKIP_A11Y=1).`);
+  const hookPath = writeHook(root, engineRel, failOn);
+  console.log(lang === "fr" ? `ultra11y init : \xE9crit ${hookPath}` : `ultra11y init: wrote ${hookPath}`);
+  console.log(
+    lang === "fr" ? "ultra11y init : termin\xE9. La barri\xE8re pre-commit audite les changements index\xE9s et applique automatiquement les corrections s\xFBres (contournement ponctuel avec SKIP_A11Y=1)." : "ultra11y init: done. The pre-commit gate audits staged changes and auto-applies safe fixes (bypass once with SKIP_A11Y=1)."
+  );
   return 0;
 }
 async function cmdHook(p2) {
   const opencode = p2.flags.opencode === true;
   if (!opencode && p2.flags["claude-code"] !== true && p2.flags.codex !== true) {
-    console.error("ultra11y hook: expected `hook --claude-code`, `--codex` or `--opencode` (the payload is read on stdin).");
+    console.error(
+      resolveLang(p2.flags) === "fr" ? "ultra11y hook : `hook --claude-code`, `--codex` ou `--opencode` attendu (la charge utile est lue sur stdin)." : "ultra11y hook: expected `hook --claude-code`, `--codex` or `--opencode` (the payload is read on stdin)."
+    );
     return 2;
   }
   try {
@@ -70392,10 +71007,15 @@ ${out.additionalContext}` : JSON.stringify(decision));
 }
 var TARGET_FLAGS = "--claude-code | --codex | --opencode | --agents-md | --all";
 function cmdInstall(p2) {
+  const lang = resolveLang(p2.flags);
   const targets = parseTargets(p2.flags);
   if (!targets) {
-    console.error(`ultra11y install: pick at least one target: ${TARGET_FLAGS}`);
-    console.error("  --all covers the agent harnesses; --agents-md is separate because it writes a tracked file into your repository.");
+    console.error(
+      lang === "fr" ? `ultra11y install : choisissez au moins une cible : ${TARGET_FLAGS}` : `ultra11y install: pick at least one target: ${TARGET_FLAGS}`
+    );
+    console.error(
+      lang === "fr" ? "  --all couvre les harnais d'agents ; --agents-md est \xE0 part car il \xE9crit un fichier suivi dans votre d\xE9p\xF4t." : "  --all covers the agent harnesses; --agents-md is separate because it writes a tracked file into your repository."
+    );
     return 2;
   }
   const dryRun = p2.flags["dry-run"] === true;
@@ -70415,17 +71035,20 @@ function cmdInstall(p2) {
     skills: p2.flags["no-skills"] !== true,
     opencodeVersion: oc.major
   });
-  return reportInstall(results, dryRun ? "would wire" : "wired");
+  return reportInstall(results, dryRun ? lang === "fr" ? "serait branch\xE9" : "would wire" : lang === "fr" ? "branch\xE9" : "wired", lang);
 }
 function cmdUninstall(p2) {
+  const lang = resolveLang(p2.flags);
   const targets = parseTargets(p2.flags);
   if (!targets) {
-    console.error(`ultra11y uninstall: pick at least one target: ${TARGET_FLAGS}`);
+    console.error(
+      lang === "fr" ? `ultra11y uninstall : choisissez au moins une cible : ${TARGET_FLAGS}` : `ultra11y uninstall: pick at least one target: ${TARGET_FLAGS}`
+    );
     return 2;
   }
-  return reportInstall(uninstallForTargets({ targets, project: p2.flags.project === true }), "removed");
+  return reportInstall(uninstallForTargets({ targets, project: p2.flags.project === true }), lang === "fr" ? "retir\xE9" : "removed", lang);
 }
-function reportInstall(results, verb) {
+function reportInstall(results, verb, lang) {
   let failed = 0;
   for (const r2 of results) {
     if (r2.error) {
@@ -70434,8 +71057,12 @@ function reportInstall(results, verb) {
       continue;
     }
     const changed = r2.reports.filter((x2) => x2.changed);
-    if (changed.length === 0) console.log(`ultra11y ${r2.target}: already ${verb} (nothing to do)`);
-    for (const x2 of changed) console.log(`ultra11y ${r2.target}: ${verb} ${x2.path}${x2.backup ? ` (backed up to ${x2.backup})` : ""}`);
+    if (changed.length === 0)
+      console.log(lang === "fr" ? `ultra11y ${r2.target} : d\xE9j\xE0 ${verb} (rien \xE0 faire)` : `ultra11y ${r2.target}: already ${verb} (nothing to do)`);
+    for (const x2 of changed)
+      console.log(
+        lang === "fr" ? `ultra11y ${r2.target} : ${verb} ${x2.path}${x2.backup ? ` (sauvegarde : ${x2.backup})` : ""}` : `ultra11y ${r2.target}: ${verb} ${x2.path}${x2.backup ? ` (backed up to ${x2.backup})` : ""}`
+      );
     for (const g of r2.guidance) console.log(`  ${g}`);
   }
   return failed ? 1 : 0;
@@ -70453,17 +71080,22 @@ function cmdStatus(p2) {
     console.log(JSON.stringify({ version: VERSION, targets: rows, ...browser ? { browser } : {}, ...axe ? { axe } : {} }, null, 2));
     return 0;
   }
+  const lang = resolveLang(p2.flags);
   console.log(`ultra11y ${VERSION}`);
   for (const r2 of rows) {
-    console.log(`  ${r2.target.padEnd(12)} ${r2.wired ? "wired    " : "not wired"}  ${r2.path}`);
+    const wired = lang === "fr" ? r2.wired ? "branch\xE9    " : "non branch\xE9" : r2.wired ? "wired    " : "not wired";
+    console.log(`  ${r2.target.padEnd(12)} ${wired}  ${r2.path}`);
     if (r2.note) console.log(`  ${"".padEnd(12)} ${r2.note}`);
   }
   if (browser) {
     console.log(
-      `  ${"browser".padEnd(12)} ${browser.ok ? "available" : "unavailable"}  ${browser.ok ? "@playwright/test + @axe-core/playwright" : browser.reason}`
+      `  ${(lang === "fr" ? "navigateur" : "browser").padEnd(12)} ${browser.ok ? lang === "fr" ? "disponible" : "available" : lang === "fr" ? "indisponible" : "unavailable"}  ${browser.ok ? "@playwright/test + @axe-core/playwright" : browser.reason}`
     );
   }
-  if (axe) console.log(`  ${"axe-core".padEnd(12)} ${axe.ok ? `${axe.version} (${axe.origin})` : "unavailable"}  ${axe.ok ? axe.path : axe.reason}`);
+  if (axe)
+    console.log(
+      `  ${"axe-core".padEnd(12)} ${axe.ok ? `${axe.version} (${axe.origin})` : lang === "fr" ? "indisponible" : "unavailable"}  ${axe.ok ? axe.path : axe.reason}`
+    );
   return 0;
 }
 function axeStatus(cwd) {
@@ -70502,28 +71134,30 @@ function evidenceScope(result, standard) {
 async function cmdReport(p2) {
   const inFlag = p2.flags.in;
   if (typeof inFlag !== "string" || !inFlag) {
-    console.error("ultra11y report: --in <audit.json> is required ('-' for stdin).");
+    console.error(M2.inRequired("report", resolveLang(p2.flags)));
     return 2;
   }
   const standard = stdOf(p2, "report");
   if (standard === null) return 2;
-  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "report", "--in");
+  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "report", "--in", resolveLang(p2.flags));
   if (raw === null) return 2;
   let result;
   try {
     result = unwrapAudit(JSON.parse(raw));
   } catch {
-    console.error("ultra11y report: --in is not valid JSON (expected an AuditResult).");
+    console.error(M2.notJsonAudit("report", "--in", resolveLang(p2.flags)));
     return 2;
   }
   if (!isCurrentAudit(result)) {
-    console.error("ultra11y report: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+    console.error(M2.notCurrentAudit("report", resolveLang(p2.flags)));
     return 2;
   }
   const out = typeof p2.flags.out === "string" ? p2.flags.out : "audits";
   const lang = resolveLang(p2.flags, { audit: result, standard });
   if (p2.flags.format !== void 0) {
-    console.error(`ultra11y report: --format is not supported (got "${String(p2.flags.format)}"); report writes Markdown, or HTML with --html.`);
+    console.error(
+      lang === "fr" ? `ultra11y report : --format n'est pas pris en charge (re\xE7u "${String(p2.flags.format)}") ; report \xE9crit du Markdown, ou du HTML avec --html.` : `ultra11y report: --format is not supported (got "${String(p2.flags.format)}"); report writes Markdown, or HTML with --html.`
+    );
     return 2;
   }
   const manifest = p2.flags.evidence === true ? writeEvidence(evidenceScope(result, standard), { outDir: out, ...evidenceCapsOf(p2) }) : void 0;
@@ -70567,22 +71201,22 @@ async function cmdReport(p2) {
 async function cmdPrd(p2) {
   const inFlag = p2.flags.in;
   if (typeof inFlag !== "string" || !inFlag) {
-    console.error("ultra11y prd: --in <audit.json> is required ('-' for stdin).");
+    console.error(M2.inRequired("prd", resolveLang(p2.flags)));
     return 2;
   }
   const standard = stdOf(p2, "prd");
   if (standard === null) return 2;
-  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "prd", "--in");
+  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "prd", "--in", resolveLang(p2.flags));
   if (raw === null) return 2;
   let result;
   try {
     result = unwrapAudit(JSON.parse(raw));
   } catch {
-    console.error("ultra11y prd: --in is not valid JSON (expected an AuditResult).");
+    console.error(M2.notJsonAudit("prd", "--in", resolveLang(p2.flags)));
     return 2;
   }
   if (!isCurrentAudit(result)) {
-    console.error("ultra11y prd: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+    console.error(M2.notCurrentAudit("prd", resolveLang(p2.flags)));
     return 2;
   }
   const out = typeof p2.flags.out === "string" ? p2.flags.out : "audits";
@@ -70647,24 +71281,26 @@ async function cmdTickets(p2) {
   if (standard === null) return 2;
   const inFlag = p2.flags.in;
   if (typeof inFlag !== "string" || !inFlag) {
-    console.error("ultra11y tickets: --in <audit.json> is required ('-' for stdin). Run `audit --out` first.");
+    console.error(
+      M2.inRequired("tickets", resolveLang(p2.flags), resolveLang(p2.flags) === "fr" ? " Lancez d'abord `audit --out`." : " Run `audit --out` first.")
+    );
     return 2;
   }
-  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "tickets", "--in");
+  const raw = inFlag === "-" ? await readStdin() : readInputFile(inFlag, "tickets", "--in", resolveLang(p2.flags));
   if (raw === null) return 2;
   let result;
   try {
     result = unwrapAudit(JSON.parse(raw));
   } catch {
-    console.error("ultra11y tickets: --in is not valid JSON (expected an AuditResult).");
+    console.error(M2.notJsonAudit("tickets", "--in", resolveLang(p2.flags)));
     return 2;
   }
   if (!isCurrentAudit(result)) {
-    console.error("ultra11y tickets: input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+    console.error(M2.notCurrentAudit("tickets", resolveLang(p2.flags)));
     return 2;
   }
   const lang = resolveLang(p2.flags, { audit: result, standard });
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   const json = p2.flags.json === true;
   const dryRun = p2.flags["dry-run"] === true;
   let config;
@@ -70677,31 +71313,37 @@ async function cmdTickets(p2) {
   for (const key2 of SECRET_CONFIG_KEYS) {
     if (config && key2 in config) {
       console.error(
-        `ultra11y tickets: .ultra11yrc.json must not carry a "${key2}" \u2014 credentials belong in the environment (see references/tickets.md). Remove it and rotate that value.`
+        lang === "fr" ? `ultra11y tickets : .ultra11yrc.json ne doit pas contenir de \xAB ${key2} \xBB \u2014 les identifiants vont dans l'environnement (voir references/tickets.md). Supprimez-le et renouvelez cette valeur.` : `ultra11y tickets: .ultra11yrc.json must not carry a "${key2}" \u2014 credentials belong in the environment (see references/tickets.md). Remove it and rotate that value.`
       );
       return 2;
     }
   }
   const grainFlag = typeof p2.flags.grain === "string" ? p2.flags.grain : config?.grain ?? "criterion";
   if (!ALL_GRAINS.includes(grainFlag)) {
-    console.error(`ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`);
+    console.error(
+      lang === "fr" ? `ultra11y tickets : --grain doit valoir ${ALL_GRAINS.join("|")} (re\xE7u "${grainFlag}").` : `ultra11y tickets: --grain must be one of ${ALL_GRAINS.join("|")} (got "${grainFlag}").`
+    );
     return 2;
   }
   const transportFlag = typeof p2.flags.transport === "string" ? p2.flags.transport : config?.transport ?? "auto";
   if (!["auto", "cli", "rest"].includes(transportFlag)) {
-    console.error(`ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`);
+    console.error(
+      lang === "fr" ? `ultra11y tickets : --transport doit valoir auto, cli ou rest (re\xE7u "${transportFlag}").` : `ultra11y tickets: --transport must be auto, cli or rest (got "${transportFlag}").`
+    );
     return 2;
   }
   const maxTickets = Number.parseInt(String(p2.flags["max-tickets"] ?? config?.maxTickets ?? 200), 10);
   if (!Number.isFinite(maxTickets) || maxTickets < 1) {
-    console.error("ultra11y tickets: --max-tickets must be a positive integer.");
+    console.error(
+      lang === "fr" ? "ultra11y tickets : --max-tickets doit \xEAtre un entier strictement positif." : "ultra11y tickets: --max-tickets must be a positive integer."
+    );
     return 2;
   }
   const providerFlag = typeof p2.flags.provider === "string" ? p2.flags.provider : "auto";
   const providerId = providerFlag === "auto" ? autoProvider(process.env, config?.provider) : isProviderId(providerFlag) ? providerFlag : void 0;
   if (!providerId) {
     console.error(
-      providerFlag === "auto" ? "ultra11y tickets: could not tell which tracker to file into \u2014 pass --provider github|gitlab|jira (Jira is never auto-detected: it owns no git remote)." : `ultra11y tickets: --provider "${providerFlag}" is not one of ${ALL_PROVIDERS.join("|")}.`
+      providerFlag === "auto" ? lang === "fr" ? "ultra11y tickets : impossible de savoir dans quel gestionnaire d\xE9poser \u2014 passez --provider github|gitlab|jira (Jira n'est jamais d\xE9tect\xE9 automatiquement : il n'a pas de remote git)." : "ultra11y tickets: could not tell which tracker to file into \u2014 pass --provider github|gitlab|jira (Jira is never auto-detected: it owns no git remote)." : lang === "fr" ? `ultra11y tickets : --provider \xAB ${providerFlag} \xBB ne fait pas partie de ${ALL_PROVIDERS.join("|")}.` : `ultra11y tickets: --provider "${providerFlag}" is not one of ${ALL_PROVIDERS.join("|")}.`
     );
     return 2;
   }
@@ -70716,13 +71358,13 @@ async function cmdTickets(p2) {
   });
   if (plan.error === "no-pages") {
     console.error(
-      fr ? "ultra11y tickets : aucune page dans le p\xE9rim\xE8tre. Capturez des instantan\xE9s (ultra11y/playwright ou ultra11y/cypress) ou scannez un \xE9chantillon (scan --sample) avant d'utiliser --grain page." : "ultra11y tickets: no page in scope. Capture snapshots (ultra11y/playwright or ultra11y/cypress) or scan a sample (scan --sample) before using --grain page."
+      fr2 ? "ultra11y tickets : aucune page dans le p\xE9rim\xE8tre. Capturez des instantan\xE9s (ultra11y/playwright ou ultra11y/cypress) ou scannez un \xE9chantillon (scan --sample) avant d'utiliser --grain page." : "ultra11y tickets: no page in scope. Capture snapshots (ultra11y/playwright or ultra11y/cypress) or scan a sample (scan --sample) before using --grain page."
     );
     return 1;
   }
   if (plan.tickets.length > maxTickets) {
     console.error(
-      fr ? `ultra11y tickets : ${plan.tickets.length} tickets pour --grain ${grainFlag}, au-del\xE0 de la limite de ${maxTickets}. Relancez avec --max-tickets ${plan.tickets.length}, un grain plus grossier, ou --dry-run pour inspecter.` : `ultra11y tickets: ${plan.tickets.length} tickets for --grain ${grainFlag}, past the limit of ${maxTickets}. Re-run with --max-tickets ${plan.tickets.length}, a coarser grain, or --dry-run to inspect.`
+      fr2 ? `ultra11y tickets : ${plan.tickets.length} tickets pour --grain ${grainFlag}, au-del\xE0 de la limite de ${maxTickets}. Relancez avec --max-tickets ${plan.tickets.length}, un grain plus grossier, ou --dry-run pour inspecter.` : `ultra11y tickets: ${plan.tickets.length} tickets for --grain ${grainFlag}, past the limit of ${maxTickets}. Re-run with --max-tickets ${plan.tickets.length}, a coarser grain, or --dry-run to inspect.`
     );
     return 2;
   }
@@ -70748,7 +71390,7 @@ async function cmdTickets(p2) {
   if (!plan.tickets.length) {
     if (!json)
       console.log(
-        fr ? "ultra11y tickets : rien \xE0 d\xE9poser \u2014 l'audit ne rel\xE8ve aucune non-conformit\xE9." : "ultra11y tickets: nothing to file \u2014 the audit found no non-conformity."
+        fr2 ? "ultra11y tickets : rien \xE0 d\xE9poser \u2014 l'audit ne rel\xE8ve aucune non-conformit\xE9." : "ultra11y tickets: nothing to file \u2014 the audit found no non-conformity."
       );
     if (json)
       console.log(
@@ -70771,7 +71413,9 @@ async function cmdTickets(p2) {
     return 0;
   }
   if (!provider.available() && !dryRun) {
-    console.error(`ultra11y tickets: ${providerId} is not usable here \u2014 ${provider.unavailableReason()}.`);
+    console.error(
+      lang === "fr" ? `ultra11y tickets : ${providerId} n'est pas utilisable ici \u2014 ${provider.unavailableReason()}.` : `ultra11y tickets: ${providerId} is not usable here \u2014 ${provider.unavailableReason()}.`
+    );
     return 1;
   }
   const { plan: planned, result: pushed, dedupeChecked } = await pushTickets(plan.tickets, provider, { dryRun: dryRun || !provider.available() });
@@ -70808,23 +71452,23 @@ async function cmdTickets(p2) {
   } else if (dryRun || !provider.available()) {
     const create = planned.filter((x2) => x2.action === "create").length;
     console.log(
-      fr ? `ultra11y tickets : simulation (${providerId}/${provider.transport}, grain ${grainFlag}) \u2014 ${create} \xE0 cr\xE9er, ${pushed.skipped} d\xE9j\xE0 pr\xE9sent(s).` : `ultra11y tickets: dry run (${providerId}/${provider.transport}, grain ${grainFlag}) \u2014 ${create} to create, ${pushed.skipped} already there.`
+      fr2 ? `ultra11y tickets : simulation (${providerId}/${provider.transport}, grain ${grainFlag}) \u2014 ${create} \xE0 cr\xE9er, ${pushed.skipped} d\xE9j\xE0 pr\xE9sent(s).` : `ultra11y tickets: dry run (${providerId}/${provider.transport}, grain ${grainFlag}) \u2014 ${create} to create, ${pushed.skipped} already there.`
     );
     for (const { ticket, action } of planned) console.log(`  ${action === "create" ? "+" : "="} ${ticket.title}`);
     if (!dedupeChecked)
       console.error(
-        fr ? "ultra11y tickets : l'existant n'a pas pu \xEAtre list\xE9 \u2014 le compte \xAB d\xE9j\xE0 pr\xE9sent \xBB n'est pas v\xE9rifi\xE9." : 'ultra11y tickets: could not list existing tickets \u2014 the "already there" count is unverified.'
+        fr2 ? "ultra11y tickets : l'existant n'a pas pu \xEAtre list\xE9 \u2014 le compte \xAB d\xE9j\xE0 pr\xE9sent \xBB n'est pas v\xE9rifi\xE9." : 'ultra11y tickets: could not list existing tickets \u2014 the "already there" count is unverified.'
       );
     if (!provider.available()) console.error(`ultra11y tickets: ${providerId} \u2014 ${provider.unavailableReason()}.`);
   } else {
     console.log(
-      fr ? `ultra11y tickets : ${providerId} \u2014 ${pushed.created} cr\xE9\xE9(s), ${pushed.skipped} d\xE9j\xE0 pr\xE9sent(s)${pushed.failed ? `, ${pushed.failed} en \xE9chec` : ""}.` : `ultra11y tickets: ${providerId} \u2014 ${pushed.created} created, ${pushed.skipped} already there${pushed.failed ? `, ${pushed.failed} failed` : ""}.`
+      fr2 ? `ultra11y tickets : ${providerId} \u2014 ${pushed.created} cr\xE9\xE9(s), ${pushed.skipped} d\xE9j\xE0 pr\xE9sent(s)${pushed.failed ? `, ${pushed.failed} en \xE9chec` : ""}.` : `ultra11y tickets: ${providerId} \u2014 ${pushed.created} created, ${pushed.skipped} already there${pushed.failed ? `, ${pushed.failed} failed` : ""}.`
     );
     for (const u2 of pushed.createdUrls) console.log(`  ${u2}`);
-    for (const e of pushed.errors) console.error(fr ? `ultra11y tickets : \xE9chec \u2014 ${e}` : `ultra11y tickets: failed \u2014 ${e}`);
+    for (const e of pushed.errors) console.error(fr2 ? `ultra11y tickets : \xE9chec \u2014 ${e}` : `ultra11y tickets: failed \u2014 ${e}`);
     if (plan.unattributed) {
       console.error(
-        fr ? `ultra11y tickets : ${plan.unattributed} constat(s) non rattach\xE9(s) \xE0 une page \u2014 d\xE9pos\xE9s dans leur propre ticket, jamais r\xE9partis d'office.` : `ultra11y tickets: ${plan.unattributed} finding(s) attributed to no page \u2014 filed as their own ticket, never spread.`
+        fr2 ? `ultra11y tickets : ${plan.unattributed} constat(s) non rattach\xE9(s) \xE0 une page \u2014 d\xE9pos\xE9s dans leur propre ticket, jamais r\xE9partis d'office.` : `ultra11y tickets: ${plan.unattributed} finding(s) attributed to no page \u2014 filed as their own ticket, never spread.`
       );
     }
   }
@@ -70918,20 +71562,24 @@ ${raw}${raw.endsWith("\n") ? "" : "\n"}`);
   return 0;
 }
 async function cmdRenderEngine(p2, root, lang) {
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   if (!existsSync38(root)) {
-    console.error(fr ? `ultra11y render : dossier introuvable : ${root}.` : `ultra11y render: no such directory: ${root}.`);
+    console.error(fr2 ? `ultra11y render : dossier introuvable : ${root}.` : `ultra11y render: no such directory: ${root}.`);
     return 2;
   }
   const tFlag = p2.flags.transpiler;
   if (tFlag !== void 0 && !(typeof tFlag === "string" && TRANSPILERS.includes(tFlag))) {
-    console.error(`ultra11y render: --transpiler must be ${TRANSPILERS.join("|")} (got "${String(tFlag)}").`);
+    console.error(
+      resolveLang(p2.flags) === "fr" ? `ultra11y render : --transpiler doit valoir ${TRANSPILERS.join("|")} (re\xE7u "${String(tFlag)}").` : `ultra11y render: --transpiler must be ${TRANSPILERS.join("|")} (got "${String(tFlag)}").`
+    );
     return 2;
   }
   const timeoutRaw = p2.flags.timeout;
   const timeoutMs = typeof timeoutRaw === "string" ? Number(timeoutRaw) : DEFAULT_RENDER_TIMEOUT_MS;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-    console.error(`ultra11y render: --timeout must be a positive number of milliseconds (got "${String(timeoutRaw)}").`);
+    console.error(
+      resolveLang(p2.flags) === "fr" ? `ultra11y render : --timeout doit \xEAtre un nombre positif de millisecondes (re\xE7u "${String(timeoutRaw)}").` : `ultra11y render: --timeout must be a positive number of milliseconds (got "${String(timeoutRaw)}").`
+    );
     return 2;
   }
   const manifest = await runRenderEngine({
@@ -70962,9 +71610,9 @@ async function cmdRenderEngine(p2, root, lang) {
   }
   const out = [];
   out.push(
-    fr ? `ultra11y render : ${n.rendered} rendu(s), ${n.skipped} \xE9chec(s) avec la raison, ${n.notAttempted} non tent\xE9(s) \u2014 ${manifest.renderer ?? "aucun moteur de rendu React"}, ${manifest.transpiler ?? "aucun transpileur"}.` : `ultra11y render: ${n.rendered} rendered, ${n.skipped} failed with the reason, ${n.notAttempted} not attempted \u2014 ${manifest.renderer ?? "no React renderer"}, ${manifest.transpiler ?? "no transpiler"}.`
+    fr2 ? `ultra11y render : ${n.rendered} rendu(s), ${n.skipped} \xE9chec(s) avec la raison, ${n.notAttempted} non tent\xE9(s) \u2014 ${manifest.renderer ?? "aucun moteur de rendu React"}, ${manifest.transpiler ?? "aucun transpileur"}.` : `ultra11y render: ${n.rendered} rendered, ${n.skipped} failed with the reason, ${n.notAttempted} not attempted \u2014 ${manifest.renderer ?? "no React renderer"}, ${manifest.transpiler ?? "no transpiler"}.`
   );
-  const statusWord = fr ? { skipped: "\xE9chec", "not-attempted": "non tent\xE9" } : { skipped: "failed", "not-attempted": "not attempted" };
+  const statusWord = fr2 ? { skipped: "\xE9chec", "not-attempted": "non tent\xE9" } : { skipped: "failed", "not-attempted": "not attempted" };
   for (const u2 of manifest.units) {
     if (u2.status === "rendered") continue;
     out.push(
@@ -70973,29 +71621,29 @@ async function cmdRenderEngine(p2, root, lang) {
   }
   if (manifest.testFilesIgnored)
     out.push(
-      fr ? `  ${manifest.testFilesIgnored} fichier(s) de test, de mock ou d'instantan\xE9 laiss\xE9(s) de c\xF4t\xE9 sans \xEAtre lus.` : `  ${manifest.testFilesIgnored} test, mock or snapshot file(s) left out, unread.`
+      fr2 ? `  ${manifest.testFilesIgnored} fichier(s) de test, de mock ou d'instantan\xE9 laiss\xE9(s) de c\xF4t\xE9 sans \xEAtre lus.` : `  ${manifest.testFilesIgnored} test, mock or snapshot file(s) left out, unread.`
     );
   if (snapshotLine) out.push(snapshotLine);
   out.push(
-    fr ? `\u2192 captures dans ${join39(root, CAPTURES_DIR)}, manifeste ${join39(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).` : `\u2192 captures in ${join39(root, CAPTURES_DIR)}, manifest ${join39(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`
+    fr2 ? `\u2192 captures dans ${join39(root, CAPTURES_DIR)}, manifeste ${join39(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).` : `\u2192 captures in ${join39(root, CAPTURES_DIR)}, manifest ${join39(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`
   );
   console.log(out.join("\n"));
   if (code2)
     console.error(
-      fr ? `ultra11y render : aucune unit\xE9 rendue sur ${manifest.units.length} \u2014 chaque raison est dans ${join39(root, RENDER_MANIFEST)} et dans l'audit.` : `ultra11y render: no unit rendered out of ${manifest.units.length} \u2014 every reason is in ${join39(root, RENDER_MANIFEST)} and in the audit.`
+      fr2 ? `ultra11y render : aucune unit\xE9 rendue sur ${manifest.units.length} \u2014 chaque raison est dans ${join39(root, RENDER_MANIFEST)} et dans l'audit.` : `ultra11y render: no unit rendered out of ${manifest.units.length} \u2014 every reason is in ${join39(root, RENDER_MANIFEST)} and in the audit.`
     );
   return code2;
 }
 function snapshotSummaryLine(index, off, rendered, lang) {
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   if (rendered === 0) return void 0;
   if (off || !index)
-    return fr ? "  Instantan\xE9s visuels d\xE9sactiv\xE9s (--no-snapshots / ULTRA11Y_RENDER_SNAPSHOTS=off) : seules les captures HTML statiques sont \xE9crites." : "  Visual snapshots off (--no-snapshots / ULTRA11Y_RENDER_SNAPSHOTS=off): only the static HTML captures are written.";
+    return fr2 ? "  Instantan\xE9s visuels d\xE9sactiv\xE9s (--no-snapshots / ULTRA11Y_RENDER_SNAPSHOTS=off) : seules les captures HTML statiques sont \xE9crites." : "  Visual snapshots off (--no-snapshots / ULTRA11Y_RENDER_SNAPSHOTS=off): only the static HTML captures are written.";
   if (index.unavailable)
-    return fr ? `  Instantan\xE9s visuels non pris, faute de navigateur (${index.unavailable}). Les captures HTML statiques restent audit\xE9es comme avant.` : `  Visual snapshots not taken, no browser (${index.unavailable}). The static HTML captures are still audited as before.`;
+    return fr2 ? `  Instantan\xE9s visuels non pris, faute de navigateur (${index.unavailable}). Les captures HTML statiques restent audit\xE9es comme avant.` : `  Visual snapshots not taken, no browser (${index.unavailable}). The static HTML captures are still audited as before.`;
   const c = snapshotCounts(index);
-  const styles = index.styles.status === "none" ? fr ? "SANS le CSS du projet (aucune feuille de style globale trouv\xE9e) : styles par d\xE9faut du navigateur, contrastes non retenus" : "WITHOUT the project's CSS (no global stylesheet found): browser default styles, contrast not counted" : index.styles.status === "partial" ? fr ? `avec une partie du CSS du projet (${index.styles.files.length} feuille(s) charg\xE9e(s), ${index.styles.skipped.length} \xE9cart\xE9e(s)) : contrastes non retenus` : `with part of the project's CSS (${index.styles.files.length} stylesheet(s) loaded, ${index.styles.skipped.length} left out): contrast not counted` : fr ? `avec le CSS du projet (${index.styles.files.length} feuille(s))` : `with the project's CSS (${index.styles.files.length} stylesheet(s))`;
-  return fr ? `  Instantan\xE9s visuels : ${c.snapshotted} pris, ${c.failed} en \xE9chec \u2014 ${styles}. axe sur rendu isol\xE9 : ${c.counted} observation(s) \xE0 confirmer sur la page r\xE9elle, ${c.setAside} \xE9cart\xE9e(s) ; aucune ne fonde un verdict. \u2192 ${RENDER_SNAPSHOT_INDEX}` : `  Visual snapshots: ${c.snapshotted} taken, ${c.failed} failed \u2014 ${styles}. axe on isolated renders: ${c.counted} observation(s) to confirm on the real page, ${c.setAside} set aside; none decides a verdict. \u2192 ${RENDER_SNAPSHOT_INDEX}`;
+  const styles = index.styles.status === "none" ? fr2 ? "SANS le CSS du projet (aucune feuille de style globale trouv\xE9e) : styles par d\xE9faut du navigateur, contrastes non retenus" : "WITHOUT the project's CSS (no global stylesheet found): browser default styles, contrast not counted" : index.styles.status === "partial" ? fr2 ? `avec une partie du CSS du projet (${index.styles.files.length} feuille(s) charg\xE9e(s), ${index.styles.skipped.length} \xE9cart\xE9e(s)) : contrastes non retenus` : `with part of the project's CSS (${index.styles.files.length} stylesheet(s) loaded, ${index.styles.skipped.length} left out): contrast not counted` : fr2 ? `avec le CSS du projet (${index.styles.files.length} feuille(s))` : `with the project's CSS (${index.styles.files.length} stylesheet(s))`;
+  return fr2 ? `  Instantan\xE9s visuels : ${c.snapshotted} pris, ${c.failed} en \xE9chec \u2014 ${styles}. axe sur rendu isol\xE9 : ${c.counted} observation(s) \xE0 confirmer sur la page r\xE9elle, ${c.setAside} \xE9cart\xE9e(s) ; aucune ne fonde un verdict. \u2192 ${RENDER_SNAPSHOT_INDEX}` : `  Visual snapshots: ${c.snapshotted} taken, ${c.failed} failed \u2014 ${styles}. axe on isolated renders: ${c.counted} observation(s) to confirm on the real page, ${c.setAside} set aside; none decides a verdict. \u2192 ${RENDER_SNAPSHOT_INDEX}`;
 }
 function cmdCheck(p2) {
   const standard = stdOf(p2, "check");
@@ -71004,7 +71652,9 @@ function cmdCheck(p2) {
   const requireDecided = decidedFlag === true || decidedFlag === "pages" || decidedFlag === "true";
   const requireDecidedPages = decidedFlag === "pages";
   if (typeof decidedFlag === "string" && decidedFlag !== "pages" && decidedFlag !== "true") {
-    console.error(`ultra11y check: --require-decided takes no value, or 'pages' \u2014 got '${decidedFlag}'.`);
+    console.error(
+      resolveLang(p2.flags) === "fr" ? `ultra11y check : --require-decided ne prend aucune valeur, ou 'pages' \u2014 re\xE7u '${decidedFlag}'.` : `ultra11y check: --require-decided takes no value, or 'pages' \u2014 got '${decidedFlag}'.`
+    );
     return 2;
   }
   const requireSample = p2.flags["require-sample"] === true;
@@ -71012,12 +71662,12 @@ function cmdCheck(p2) {
   const rep = p2.flags.report;
   if (typeof rep !== "string" || !rep) {
     if (!requireDecided && !requireSample && !requireRendered) {
-      console.error("ultra11y check: --report <md> is required.");
+      console.error(resolveLang(p2.flags) === "fr" ? "ultra11y check : --report <md> est obligatoire." : "ultra11y check: --report <md> is required.");
       return 2;
     }
   }
   const lang = resolveLang(p2.flags, { standard });
-  const md = typeof rep === "string" && rep ? readReportInput(rep, "check") : "";
+  const md = typeof rep === "string" && rep ? readReportInput(rep, "check", resolveLang(p2.flags)) : "";
   if (md === null) return 2;
   let audit;
   const inFlag = p2.flags.in;
@@ -71026,22 +71676,26 @@ function cmdCheck(p2) {
     try {
       rawAudit = readText(inFlag);
     } catch {
-      console.error(`ultra11y check: --in file not found: ${inFlag}.`);
+      console.error(M2.fileNotFound("check", "--in", inFlag, lang));
       return 2;
     }
     try {
       audit = unwrapAudit(JSON.parse(rawAudit));
     } catch {
-      console.error("ultra11y check: --in file is not valid JSON.");
+      console.error(M2.fileNotJson("check", "--in", lang));
       return 2;
     }
   }
   if (requireDecided && !audit) {
-    console.error("ultra11y check: --require-decided needs --in <audit.json> \u2014 completeness is a property of the audit, not of the report.");
+    console.error(
+      lang === "fr" ? "ultra11y check : --require-decided exige --in <audit.json> \u2014 la compl\xE9tude est une propri\xE9t\xE9 de l'audit, pas du rapport." : "ultra11y check: --require-decided needs --in <audit.json> \u2014 completeness is a property of the audit, not of the report."
+    );
     return 2;
   }
   if (requireRendered && !audit) {
-    console.error("ultra11y check: --require-rendered needs --in <audit.json> \u2014 what a run rendered is a property of the audit, not of the report.");
+    console.error(
+      lang === "fr" ? "ultra11y check : --require-rendered exige --in <audit.json> \u2014 ce qu'un run a rendu est une propri\xE9t\xE9 de l'audit, pas du rapport." : "ultra11y check: --require-rendered needs --in <audit.json> \u2014 what a run rendered is a property of the audit, not of the report."
+    );
     return 2;
   }
   let allow;
@@ -71050,12 +71704,14 @@ function cmdCheck(p2) {
     try {
       const parsed = JSON.parse(readText(allowFlag));
       if (!isUndecidedFile(parsed)) {
-        console.error(`ultra11y check: --allow-undecided file has no "entries" array: ${allowFlag}.`);
+        console.error(
+          lang === "fr" ? `ultra11y check : le fichier --allow-undecided n'a pas de tableau "entries" : ${allowFlag}.` : `ultra11y check: --allow-undecided file has no "entries" array: ${allowFlag}.`
+        );
         return 2;
       }
       allow = parsed;
     } catch {
-      console.error(`ultra11y check: --allow-undecided file not found or not valid JSON: ${allowFlag}.`);
+      console.error(M2.fileNotFoundOrInvalid("check", "--allow-undecided", allowFlag, lang));
       return 2;
     }
   }
@@ -71126,14 +71782,14 @@ function cmdVerify(p2) {
     try {
       raw = readText(apply);
     } catch {
-      console.error(`ultra11y verify: --apply file not found: ${apply}.`);
+      console.error(M2.fileNotFound("verify", "--apply", apply, lang));
       return 2;
     }
     let parsed;
     try {
       parsed = JSON.parse(raw);
     } catch {
-      console.error("ultra11y verify: --apply file is not valid JSON.");
+      console.error(M2.fileNotJson("verify", "--apply", lang));
       return 2;
     }
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.kind === "adjudication") {
@@ -71143,7 +71799,9 @@ function cmdVerify(p2) {
       return replayLedgerFile(p2, parsed, lang);
     }
     if (!Array.isArray(parsed)) {
-      console.error("ultra11y verify: --apply must be a JSON array of verdicts, or an adjudication object.");
+      console.error(
+        lang === "fr" ? "ultra11y verify : --apply doit \xEAtre un tableau JSON de verdicts, ou un objet d'arbitrage." : "ultra11y verify: --apply must be a JSON array of verdicts, or an adjudication object."
+      );
       return 2;
     }
     const items = parsed;
@@ -71156,7 +71814,7 @@ function cmdVerify(p2) {
     }
     const standard = stdOf(p2, "verify");
     if (standard === null) return 2;
-    const repMd = readReportInput(applyReport, "verify");
+    const repMd = readReportInput(applyReport, "verify", resolveLang(p2.flags));
     if (repMd === null) return 2;
     const expectedNc = buildWorklist(repMd, standard, Number.POSITIVE_INFINITY);
     const trial = conformityTrial(p2, standard, lang);
@@ -71241,13 +71899,16 @@ function cmdVerifySummary(p2) {
     try {
       return JSON.parse(readText(path));
     } catch {
-      console.error(`ultra11y verify: --${flag} file not found or not valid JSON: ${path}.`);
+      console.error(M2.fileNotFoundOrInvalid("verify", `--${flag}`, path, lang));
       return void 0;
     }
   };
   const verdicts = readJson3(verdictsPath, "verdicts");
   if (!Array.isArray(verdicts)) {
-    if (verdicts !== void 0) console.error("ultra11y verify: --verdicts must be a JSON array of verdicts (a filled VERIFY.todo.json).");
+    if (verdicts !== void 0)
+      console.error(
+        lang === "fr" ? "ultra11y verify : --verdicts doit \xEAtre un tableau JSON de verdicts (un VERIFY.todo.json rempli)." : "ultra11y verify: --verdicts must be a JSON array of verdicts (a filled VERIFY.todo.json)."
+      );
     return 2;
   }
   const rawAudit = readJson3(auditPath, "in");
@@ -71260,7 +71921,7 @@ function cmdVerifySummary(p2) {
     if (raw === void 0) return 2;
     pruned = { audit: unwrapAudit(raw), path: resolve18(prunedFlag) };
   }
-  const reportMd = readReportInput(reportPath, "verify");
+  const reportMd = readReportInput(reportPath, "verify", resolveLang(p2.flags));
   if (reportMd === null) return 2;
   const gate = checkSemantic(reportMd, { reportPath, verdictsPath, standard, lang });
   const summary = buildTrialSummary({
@@ -71300,7 +71961,7 @@ function applyPrune(p2, standard, items, lang, untried = []) {
   try {
     audit = unwrapAudit(JSON.parse(readText(inFlag)));
   } catch {
-    console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
+    console.error(M2.fileNotFoundOrInvalid("verify", "--in", inFlag, resolveLang(p2.flags)));
     return void 0;
   }
   const pruned = pruneRefuted(audit, standard, items, lang, untried);
@@ -71368,7 +72029,7 @@ function cmdVerifyWorklist(p2, langIn) {
     try {
       audit = unwrapAudit(JSON.parse(readText(inFlag2)));
     } catch {
-      console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag2}.`);
+      console.error(M2.fileNotFoundOrInvalid("verify", "--in", inFlag2, resolveLang(p2.flags)));
       return 2;
     }
     const adjItems = buildAdjudicationWorklist(audit, { standard });
@@ -71406,7 +72067,9 @@ function cmdVerifyWorklist(p2, langIn) {
   }
   const rep = p2.flags.report;
   if (typeof rep !== "string" || !rep) {
-    console.error("ultra11y verify: --report <md> is required (or --apply <verdicts.json>, or --manual --in <audit.json>).");
+    console.error(
+      lang === "fr" ? "ultra11y verify : --report <md> est obligatoire (ou --apply <verdicts.json>, ou --manual --in <audit.json>)." : "ultra11y verify: --report <md> is required (or --apply <verdicts.json>, or --manual --in <audit.json>)."
+    );
     return 2;
   }
   let max = VERIFY_MAX;
@@ -71415,13 +72078,15 @@ function cmdVerifyWorklist(p2, langIn) {
   if (typeof mvFlag === "string" && mvFlag !== "") {
     const n = Number(mvFlag);
     if (!Number.isInteger(n) || n < 0) {
-      console.error("ultra11y verify: --max-verify must be a non-negative integer.");
+      console.error(
+        lang === "fr" ? "ultra11y verify : --max-verify doit \xEAtre un entier positif ou nul." : "ultra11y verify: --max-verify must be a non-negative integer."
+      );
       return 2;
     }
     max = n === 0 ? Number.POSITIVE_INFINITY : n;
     cMax = max;
   }
-  const repMd = readReportInput(rep, "verify");
+  const repMd = readReportInput(rep, "verify", resolveLang(p2.flags));
   if (repMd === null) return 2;
   const ncItems = buildWorklist(repMd, standard, max);
   const ncAll = Number.isFinite(max) ? buildWorklist(repMd, standard, Number.POSITIVE_INFINITY).length : ncItems.length;
@@ -71512,7 +72177,7 @@ function conformityTrial(p2, standard, lang) {
 }
 var sameConformitySource = (a2, b) => a2.source === b.source && ("path" in a2 ? a2.path : "") === ("path" in b ? b.path : "");
 function describeConformitySource(s2, lang) {
-  const fr = lang === "fr";
+  const fr2 = lang === "fr";
   switch (s2.source) {
     case "in":
       return `--in ${s2.path}`;
@@ -71523,7 +72188,7 @@ function describeConformitySource(s2, lang) {
     case "disabled":
       return "--no-conformities";
     default:
-      return fr ? "aucune \u2014 ni --in, ni --conformities, ni ledger" : "none \u2014 no --in, --conformities or ledger";
+      return fr2 ? "aucune \u2014 ni --in, ni --conformities, ni ledger" : "none \u2014 no --in, --conformities or ledger";
   }
 }
 function trialContextFlags(p2, standard, source) {
@@ -71551,7 +72216,7 @@ function replayLedgerFile(p2, ledger, lang) {
   try {
     audit = unwrapAudit(JSON.parse(readText(inFlag)));
   } catch {
-    console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
+    console.error(M2.fileNotFoundOrInvalid("verify", "--in", inFlag, resolveLang(p2.flags)));
     return 2;
   }
   const cwd = typeof p2.flags.cwd === "string" ? p2.flags.cwd : void 0;
@@ -71641,7 +72306,7 @@ function applyAdjudicationFile(p2, adj, lang) {
   try {
     audit = unwrapAudit(JSON.parse(readText(inFlag)));
   } catch {
-    console.error(`ultra11y verify: --in file not found or not valid JSON: ${inFlag}.`);
+    console.error(M2.fileNotFoundOrInvalid("verify", "--in", inFlag, resolveLang(p2.flags)));
     return 2;
   }
   const cwd = typeof p2.flags.cwd === "string" ? p2.flags.cwd : void 0;
@@ -71720,7 +72385,9 @@ async function cmdFix(p2) {
   const write = p2.flags.write === true;
   const onlyFlag = p2.flags.only;
   if (onlyFlag === "" || typeof onlyFlag === "string" && !onlyFlag.trim()) {
-    console.error("ultra11y fix: --only requires one or more rule ids (comma-separated).");
+    console.error(
+      resolveLang(p2.flags) === "fr" ? "ultra11y fix : --only exige un ou plusieurs identifiants de r\xE8gle (s\xE9par\xE9s par des virgules)." : "ultra11y fix: --only requires one or more rule ids (comma-separated)."
+    );
     return 2;
   }
   const fixStandard = stdOf(p2, "fix");
@@ -71785,7 +72452,12 @@ async function cmdJourney(p2) {
       const twins = j ? dupes2.get(j.name)?.filter((x2) => x2 !== f2.file) : void 0;
       const issues = [
         ...f2.validation.issues,
-        ...twins?.length ? [{ path: "name", message: `the journey name "${j.name}" is also declared by ${twins.join(", ")} \u2014 names must be unique` }] : []
+        ...twins?.length ? [
+          {
+            path: "name",
+            message: lang2 === "fr" ? `le nom de parcours \xAB ${j.name} \xBB est aussi d\xE9clar\xE9 par ${twins.join(", ")} \u2014 les noms doivent \xEAtre uniques` : `the journey name "${j.name}" is also declared by ${twins.join(", ")} \u2014 names must be unique`
+          }
+        ] : []
       ];
       return {
         name: j?.name ?? f2.base,
@@ -71808,14 +72480,16 @@ async function cmdJourney(p2) {
     }
     for (const r2 of rows) {
       console.log(
-        `${r2.valid ? "\u2022" : "\u2717"} ${r2.name} \u2014 ${r2.file}, ${r2.steps} step(s)${r2.keyboardOnly ? ", keyboard only" : ""}, last run: ${r2.lastRun}${r2.reason ? ` (${r2.reason})` : ""}`
+        lang2 === "fr" ? `${r2.valid ? "\u2022" : "\u2717"} ${r2.name} \u2014 ${r2.file}, ${r2.steps} \xE9tape(s)${r2.keyboardOnly ? ", clavier uniquement" : ""}, dernier run : ${r2.lastRun}${r2.reason ? ` (${r2.reason})` : ""}` : `${r2.valid ? "\u2022" : "\u2717"} ${r2.name} \u2014 ${r2.file}, ${r2.steps} step(s)${r2.keyboardOnly ? ", keyboard only" : ""}, last run: ${r2.lastRun}${r2.reason ? ` (${r2.reason})` : ""}`
       );
       for (const i of r2.issues ?? []) console.log(`    \u2717 ${i.path ? `${i.path}: ` : ""}${i.message}`);
     }
     return rows.every((r2) => r2.valid) ? 0 : 1;
   }
   if (sub !== "run") {
-    console.error("ultra11y journey: use `journey run [<name>\u2026 | --all]` or `journey list`.");
+    console.error(
+      resolveLang(p2.flags) === "fr" ? "ultra11y journey : utilisez `journey run [<name>\u2026 | --all]` ou `journey list`." : "ultra11y journey: use `journey run [<name>\u2026 | --all]` or `journey list`."
+    );
     return 2;
   }
   const standard = stdOf(p2, "journey");
@@ -71892,11 +72566,11 @@ async function cmdJourney(p2) {
       try {
         parsed = unwrapAudit(JSON.parse(readText(mergeIn)));
       } catch {
-        console.error("ultra11y journey run: --merge is not valid JSON (expected an AuditResult).");
+        console.error(M2.notJsonAudit("journey run", "--merge", lang));
         return 2;
       }
       if (!isCurrentAudit(parsed)) {
-        console.error("ultra11y journey run: --merge input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+        console.error(M2.notCurrentAudit("journey run", lang, "--merge"));
         return 2;
       }
       audit = parsed;
@@ -72033,7 +72707,9 @@ async function cmdScan(p2) {
   const browserPath = browserPathOf(p2.flags);
   const runtimeFlag = typeof p2.flags.runtime === "string" && p2.flags.runtime ? p2.flags.runtime : "local";
   if (runtimeFlag !== "local" && runtimeFlag !== "auto") {
-    console.error(`ultra11y scan: --runtime must be local (got "${runtimeFlag}"). The Docker runtime was removed; the scan runs on the local Playwright.`);
+    console.error(
+      lang === "fr" ? `ultra11y scan : --runtime doit valoir local (re\xE7u "${runtimeFlag}"). L'environnement Docker a \xE9t\xE9 retir\xE9 ; le scan tourne sur le Playwright local.` : `ultra11y scan: --runtime must be local (got "${runtimeFlag}"). The Docker runtime was removed; the scan runs on the local Playwright.`
+    );
     return 2;
   }
   const interact = p2.flags["no-interact"] !== true;
@@ -72081,7 +72757,7 @@ async function cmdScan(p2) {
     if (typeof p2.flags["max-routes"] === "string") {
       const n = Number(p2.flags["max-routes"]);
       if (!Number.isInteger(n) || n < 0) {
-        console.error(`ultra11y scan: --max-routes must be a non-negative integer (got "${p2.flags["max-routes"]}").`);
+        console.error(M2.nonNegativeInt("scan", "--max-routes", p2.flags["max-routes"], lang));
         return 2;
       }
       maxRoutes = n;
@@ -72095,14 +72771,16 @@ async function cmdScan(p2) {
   const sinceRef = typeof p2.flags.since === "string" && p2.flags.since ? p2.flags.since : void 0;
   const baselinePath = typeof p2.flags.baseline === "string" && p2.flags.baseline ? p2.flags.baseline : void 0;
   if (p2.flags.baseline !== void 0 && !baselinePath) {
-    console.error("ultra11y scan: --baseline needs a file (the output of a previous `scan --json`).");
+    console.error(
+      lang === "fr" ? "ultra11y scan : --baseline exige un fichier (la sortie d'un `scan --json` ant\xE9rieur)." : "ultra11y scan: --baseline needs a file (the output of a previous `scan --json`)."
+    );
     return 2;
   }
   const baseline = baselinePath ? readScanBaseline(baselinePath, lang) : void 0;
   if (baseline === null) return 2;
   const gateOn = p2.flags["fail-on"] === void 0 ? "mineur" : parseFailOn(p2.flags["fail-on"]);
   if (gateOn === null) {
-    console.error(`ultra11y scan: --fail-on must be blocking|major|minor (got "${String(p2.flags["fail-on"])}").`);
+    console.error(M2.failOnInvalid("scan", p2.flags["fail-on"], lang));
     return 2;
   }
   let affectedUrls;
@@ -72118,7 +72796,7 @@ async function cmdScan(p2) {
     if (typeof p2.flags["max-routes"] === "string") {
       const n = Number(p2.flags["max-routes"]);
       if (!Number.isInteger(n) || n < 0) {
-        console.error(`ultra11y scan: --max-routes must be a non-negative integer (got "${p2.flags["max-routes"]}").`);
+        console.error(M2.nonNegativeInt("scan", "--max-routes", p2.flags["max-routes"], lang));
         return 2;
       }
       maxRoutes = n;
@@ -72175,7 +72853,9 @@ async function cmdScan(p2) {
     } else {
       const targets = p2.positionals.filter((a2) => a2 !== "-");
       if (targets.length === 0) {
-        console.error("ultra11y scan: provide one or more URLs/HTML files, --sitemap <url>, --crawl <url>, or --sample.");
+        console.error(
+          lang === "fr" ? "ultra11y scan : indiquez une ou plusieurs URL/fichiers HTML, --sitemap <url>, --crawl <url>, ou --sample." : "ultra11y scan: provide one or more URLs/HTML files, --sitemap <url>, --crawl <url>, or --sample."
+        );
         return 2;
       }
       dynamic = targets.length === 1 ? await runScanLocal({ target: targets[0], cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath }) : await runScanManyLocal(targets, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
@@ -72300,11 +72980,11 @@ async function cmdScan(p2) {
       try {
         parsed = unwrapAudit(JSON.parse(readText(mergeIn)));
       } catch {
-        console.error("ultra11y scan: --merge is not valid JSON (expected an AuditResult).");
+        console.error(M2.notJsonAudit("scan", "--merge", lang));
         return 2;
       }
       if (!isCurrentAudit(parsed)) {
-        console.error("ultra11y scan: --merge input is not a current ultra11y AuditResult (WCAG-keyed, schema v2). Re-run `audit`.");
+        console.error(M2.notCurrentAudit("scan", lang, "--merge"));
         return 2;
       }
       audit = parsed;
@@ -72383,7 +73063,9 @@ function cmdSample(p2) {
   }
   const lang = resolveLang(p2.flags, { standard });
   if (action !== "check") {
-    console.error("ultra11y sample: expected `sample check [--standard rgaa]`.");
+    console.error(
+      lang === "fr" ? "ultra11y sample : `sample check [--standard rgaa]` attendu." : "ultra11y sample: expected `sample check [--standard rgaa]`."
+    );
     return 2;
   }
   let cfg;
@@ -72500,7 +73182,7 @@ function cmdOrchestrate(p2) {
   const engineAbs = realpathSync9(fileURLToPath4(import.meta.url));
   if (p2.flags.list === true) {
     if (!existsSync38(runFlag)) {
-      console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
+      console.error(M2.runDirNotFound(runFlag, lang));
       return 2;
     }
     console.log(JSON.stringify({ phases: listPhases(runFlag, engineAbs) }, null, 2));
@@ -72508,7 +73190,7 @@ function cmdOrchestrate(p2) {
   }
   if (p2.flags.manifest === true) {
     if (!existsSync38(runFlag)) {
-      console.error(`ultra11y orchestrate: run dir not found: ${runFlag}.`);
+      console.error(M2.runDirNotFound(runFlag, lang));
       return 2;
     }
     console.log(JSON.stringify(buildManifest(runFlag, engineAbs), null, 2));
@@ -72545,7 +73227,7 @@ function cmdOrchestrate(p2) {
   if (p2.flags.phase === void 0 && workflows.length === 0 && p2.flags.eco !== true) {
     const anyReady = res.phases.some((ph) => ph.ready);
     console.error(
-      anyReady ? "ultra11y orchestrate: every ready phase has an empty worklist \u2014 nothing to fan out (see --list)." : `ultra11y orchestrate: no ready phase \u2014 phases are ${PHASES.join(", ")} (see --list).`
+      anyReady ? lang === "fr" ? "ultra11y orchestrate : chaque phase pr\xEAte a une liste de travail vide \u2014 rien \xE0 r\xE9partir (voir --list)." : "ultra11y orchestrate: every ready phase has an empty worklist \u2014 nothing to fan out (see --list)." : lang === "fr" ? `ultra11y orchestrate : aucune phase pr\xEAte \u2014 les phases sont ${PHASES.join(", ")} (voir --list).` : `ultra11y orchestrate: no ready phase \u2014 phases are ${PHASES.join(", ")} (see --list).`
     );
   }
   return 0;
@@ -72554,25 +73236,33 @@ async function cmdServe(p2) {
   const standard = stdOf(p2, "serve");
   if (standard === null) return 2;
   if (p2.positionals.length) {
-    console.error(`ultra11y serve: unexpected argument "${p2.positionals[0]}" \u2014 pass the audits directory with --in <dir>.`);
+    console.error(
+      resolveLang(p2.flags) === "fr" ? `ultra11y serve : argument inattendu \xAB ${p2.positionals[0]} \xBB \u2014 passez le dossier d'audits avec --in <dir>.` : `ultra11y serve: unexpected argument "${p2.positionals[0]}" \u2014 pass the audits directory with --in <dir>.`
+    );
     return 2;
   }
   const auditsDir = typeof p2.flags.in === "string" && p2.flags.in ? p2.flags.in : "audits";
   const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
   if (!existsSync38(auditsDir)) {
-    console.error(`ultra11y serve: audits directory not found: ${auditsDir} (run \`audit \u2026 --out ${auditsDir}\` first, or pass --in <dir>).`);
+    console.error(
+      resolveLang(p2.flags) === "fr" ? `ultra11y serve : dossier d'audits introuvable : ${auditsDir} (lancez d'abord \`audit \u2026 --out ${auditsDir}\`, ou passez --in <dir>).` : `ultra11y serve: audits directory not found: ${auditsDir} (run \`audit \u2026 --out ${auditsDir}\` first, or pass --in <dir>).`
+    );
     return 2;
   }
   const history = discoverAudits(resolve18(auditsDir));
   if (!history.length) {
-    console.error(`ultra11y serve: no ultra11y audit JSON found in ${auditsDir} (looked ${HISTORY_MAX_DEPTH} levels deep).`);
+    console.error(
+      resolveLang(p2.flags) === "fr" ? `ultra11y serve : aucun JSON d'audit ultra11y trouv\xE9 dans ${auditsDir} (recherche sur ${HISTORY_MAX_DEPTH} niveaux de profondeur).` : `ultra11y serve: no ultra11y audit JSON found in ${auditsDir} (looked ${HISTORY_MAX_DEPTH} levels deep).`
+    );
     return 2;
   }
   const lang = resolveLang(p2.flags, { audit: history.at(-1).result, standard });
   const site = { auditsDir, root, lang, standard };
   if (p2.flags.static !== void 0) {
     if (typeof p2.flags.static !== "string" || !p2.flags.static) {
-      console.error("ultra11y serve: --static needs a target directory (--static <dir>).");
+      console.error(
+        lang === "fr" ? "ultra11y serve : --static exige un dossier cible (--static <dir>)." : "ultra11y serve: --static needs a target directory (--static <dir>)."
+      );
       return 2;
     }
     try {
@@ -72590,7 +73280,9 @@ async function cmdServe(p2) {
   if (p2.flags.port !== void 0) {
     const n = typeof p2.flags.port === "string" && /^\d+$/.test(p2.flags.port) ? Number(p2.flags.port) : Number.NaN;
     if (!Number.isInteger(n) || n < 0 || n > 65535) {
-      console.error(`ultra11y serve: --port must be an integer between 0 and 65535 (got "${String(p2.flags.port)}").`);
+      console.error(
+        lang === "fr" ? `ultra11y serve : --port doit \xEAtre un entier entre 0 et 65535 (re\xE7u "${String(p2.flags.port)}").` : `ultra11y serve: --port must be an integer between 0 and 65535 (got "${String(p2.flags.port)}").`
+      );
       return 2;
     }
     port = n;
@@ -72600,7 +73292,9 @@ async function cmdServe(p2) {
   try {
     running = await startServer({ ...site, host, port });
   } catch (e) {
-    console.error(`ultra11y serve: cannot listen on ${host}:${port}: ${e instanceof Error ? e.message : String(e)}`);
+    console.error(
+      lang === "fr" ? `ultra11y serve : impossible d'\xE9couter sur ${host}:${port} : ${e instanceof Error ? e.message : String(e)}` : `ultra11y serve: cannot listen on ${host}:${port}: ${e instanceof Error ? e.message : String(e)}`
+    );
     return 1;
   }
   if (running.port !== port && port !== 0)
@@ -72624,8 +73318,9 @@ async function cmdServe(p2) {
 }
 async function main(argv) {
   const first = argv[0];
+  const lang0 = argvLang(argv);
   if (!first || first === "-h" || first === "--help") {
-    console.log(HELP);
+    console.log(helpText(lang0));
     return 0;
   }
   if (first === "-v" || first === "--version") {
@@ -72638,12 +73333,14 @@ async function main(argv) {
     return 2;
   }
   if (!isCommand(first)) {
-    console.error(`ultra11y: unknown command "${first}". Run \`ultra11y --help\`.`);
+    console.error(
+      lang0 === "fr" ? `ultra11y : commande inconnue \xAB ${first} \xBB. Lancez \`ultra11y --help\`.` : `ultra11y: unknown command "${first}". Run \`ultra11y --help\`.`
+    );
     return 2;
   }
   const p2 = parseArgs(argv);
   if (p2.flags.help === true || p2.flags.h === true) {
-    console.log(HELP);
+    console.log(helpText(lang0));
     return 0;
   }
   for (const f2 of p2.unknown) {
@@ -72667,7 +73364,10 @@ async function main(argv) {
       return 2;
     }
   }
-  for (const f2 of p2.unknown) console.error(`ultra11y: unknown flag --${f2} (ignored). Run \`ultra11y --help\`.`);
+  for (const f2 of p2.unknown)
+    console.error(
+      lang0 === "fr" ? `ultra11y : drapeau inconnu --${f2} (ignor\xE9). Lancez \`ultra11y --help\`.` : `ultra11y: unknown flag --${f2} (ignored). Run \`ultra11y --help\`.`
+    );
   const ENUM_FLAGS = {
     lang: ["auto", "en", "fr"],
     dedup: ["exact", "normalized", "off"],
@@ -72680,7 +73380,10 @@ async function main(argv) {
   };
   for (const [flag, allowed] of Object.entries(ENUM_FLAGS)) {
     const v2 = p2.flags[flag];
-    if (typeof v2 === "string" && v2 && !allowed.includes(v2)) console.error(`ultra11y: --${flag} "${v2}" is not one of ${allowed.join("|")} \u2014 using the default.`);
+    if (typeof v2 === "string" && v2 && !allowed.includes(v2))
+      console.error(
+        lang0 === "fr" ? `ultra11y : --${flag} \xAB ${v2} \xBB ne fait pas partie de ${allowed.join("|")} \u2014 valeur par d\xE9faut utilis\xE9e.` : `ultra11y: --${flag} "${v2}" is not one of ${allowed.join("|")} \u2014 using the default.`
+      );
   }
   let configPacks;
   try {
@@ -72690,7 +73393,7 @@ async function main(argv) {
   }
   if (Array.isArray(configPacks) && configPacks.length) {
     console.error(
-      'ultra11y: .ultra11yrc.json "packs" was removed: ultra11y audits against RGAA 4.1.2 only \u2014 it is built in, there is no pack to load. Remove the "packs" entry.'
+      lang0 === "fr" ? "ultra11y : l'entr\xE9e \xAB packs \xBB de .ultra11yrc.json a \xE9t\xE9 retir\xE9e : ultra11y audite au regard du seul RGAA 4.1.2 \u2014 il est int\xE9gr\xE9, il n'y a aucun pack \xE0 charger. Supprimez l'entr\xE9e \xAB packs \xBB." : 'ultra11y: .ultra11yrc.json "packs" was removed: ultra11y audits against RGAA 4.1.2 only \u2014 it is built in, there is no pack to load. Remove the "packs" entry.'
     );
     return 2;
   }
@@ -72707,7 +73410,7 @@ async function main(argv) {
   }
   if (stdKey !== "rgaa") {
     console.error(
-      `ultra11y: unknown standard "${String(p2.flags.standard)}" \u2014 ultra11y audits against RGAA 4.1.2 only. Use --standard rgaa, or drop the flag \u2014 it is the default.`
+      lang0 === "fr" ? `ultra11y : r\xE9f\xE9rentiel inconnu \xAB ${String(p2.flags.standard)} \xBB \u2014 ultra11y audite au regard du seul RGAA 4.1.2. Utilisez --standard rgaa, ou retirez le drapeau \u2014 c'est la valeur par d\xE9faut.` : `ultra11y: unknown standard "${String(p2.flags.standard)}" \u2014 ultra11y audits against RGAA 4.1.2 only. Use --standard rgaa, or drop the flag \u2014 it is the default.`
     );
     return 2;
   }
@@ -72757,7 +73460,7 @@ async function main(argv) {
     case "serve":
       return cmdServe(p2);
     default:
-      console.error(`ultra11y: "${p2.command}" is not implemented yet`);
+      console.error(lang0 === "fr" ? `ultra11y : \xAB ${p2.command} \xBB n'est pas encore impl\xE9ment\xE9` : `ultra11y: "${p2.command}" is not implemented yet`);
       return 1;
   }
 }

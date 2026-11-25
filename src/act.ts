@@ -276,12 +276,10 @@ export const ACT_NOTES_FR: Record<string, string> = {
     "`placeholder-as-label` n’est volontairement PAS rattachée : un placeholder contribue bien au nom accessible, donc ACT valide le cas — ultra11y le signale quand même, en règle maison plus stricte sous 3.3.2.",
   bf051a:
     "au-delà de la syntaxe, la sous-étiquette principale est vérifiée contre le registre fermé des codes à deux lettres et les graphies ISO 639-2 des langues qui en ont une (`eng`, `fre`) ; les étiquettes héritées dépréciées `i-*` (`i-lux`) sont acceptées en connaissance de cause",
-  de46e4:
-    "même vérification de registre que pour la langue de la page ; les étiquettes héritées dépréciées `i-*` sont acceptées en connaissance de cause",
+  de46e4: "même vérification de registre que pour la langue de la page ; les étiquettes héritées dépréciées `i-*` sont acceptées en connaissance de cause",
   b40fd1:
     "tranché seulement quand un <nav> marque le bloc répété et qu’aucune région, aucun titre ni aucun lien d’évitement n’existe ; sinon, savoir quel bloc se répète relève d’un jugement inter-pages. `missing-main-landmark` n’est PAS rattachée : elle exige un <main>, exigence plus stricte que « une région quelconque » chez ACT",
-  bisz58:
-    "cette variante supprime l’exception des plus de 20 h que le moteur respecte : les longs délais ne sont donc pas signalés, en connaissance de cause",
+  bisz58: "cette variante supprime l’exception des plus de 20 h que le moteur respecte : les longs délais ne sont donc pas signalés, en connaissance de cause",
   f51b46:
     "`media-no-track` est consultative par conception — les sous-titres peuvent être incrustés dans le fichier média et sa piste audio peut être muette, deux faits invisibles dans le source — elle ne compte donc jamais comme une détection ici ; l’existence et l’exactitude des sous-titres sont tranchées par l’agent face au média",
   "5c01ea":
@@ -321,16 +319,14 @@ export const ACT_DIVERGENCES_FR: Record<string, string> = {
   "394132219ba385a90dda40efe822ab8db0cc9483":
     "une iframe en tabindex=-1 reste exposée aux technologies d’assistance et doit toujours avoir un titre (le RGAA 2.1 l’exige sans condition)",
   "949f41987201e52f8404c1246d1229eec06dea08":
-    "lang=\"\" sur un élément qui porte du texte ne déclare aucune langue pour ce texte ; ACT juge la règle non applicable, ce moteur le signale sous 3.1.2",
+    'lang="" sur un élément qui porte du texte ne déclare aucune langue pour ce texte ; ACT juge la règle non applicable, ce moteur le signale sous 3.1.2',
   "4cfb71fcbfb617bb32540826847a8d6af7890fd4":
     "un lien sentinelle de focus dans un conteneur aria-hidden : il EST atteignable au Tab, et seul un gestionnaire de focus à l’exécution le renvoie — le même choix qu’axe-core",
   "6a0fc31d6bea6ceced58d1ef97713935e4fd2717": "le source ne peut pas savoir que le fichier média référencé est muet",
   cc5c2900c8d128d3ca25d8443f1f3e0a0e5f58e6: "un fragment média #t= qui ramène la lecture sous 3 s ne se résout pas depuis le source",
-  "85c01775d802057e6f43c2248b8a5eb916c50c74":
-    "le mécanisme de pause est un bouton personnalisé câblé en JavaScript, pas un attribut natif `controls`",
+  "85c01775d802057e6f43c2248b8a5eb916c50c74": "le mécanisme de pause est un bouton personnalisé câblé en JavaScript, pas un attribut natif `controls`",
   b13d65523ad27d9c763caca8bcc0fcce4b5ca5fb: "le source ne peut pas savoir que le média référencé n’a pas de piste audio",
-  cf4bc23e70caa9b42a6f82739a8492cb51393dbc:
-    "le mécanisme de pause est un bouton personnalisé câblé en JavaScript, pas un attribut natif `controls`",
+  cf4bc23e70caa9b42a6f82739a8492cb51393dbc: "le mécanisme de pause est un bouton personnalisé câblé en JavaScript, pas un attribut natif `controls`",
   "65be0004543e57d44dd4a53d9f582c482503727c":
     "une POLICE d’icônes affiche le texte « search » sous forme de glyphe : l’étiquette visible n’est donc pas le texte du DOM — un fait que seule la page rendue porte",
 };

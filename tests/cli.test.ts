@@ -423,10 +423,10 @@ describe("subcommand --help is intercepted (no side effects)", () => {
   it("check --help prints help and exits 0 (instead of erroring on missing --report)", async () => {
     const r = await run(["check", "--help"]);
     expect(r.code).toBe(0);
-    expect(r.out).toContain("Usage:");
+    expect(r.out).toContain("Usage :"); // French help by default (#214)
   });
   it("verify -h prints help and exits 0", async () => {
-    const r = await run(["verify", "-h"]);
+    const r = await run(["verify", "-h", "--lang", "en"]);
     expect(r.code).toBe(0);
     expect(r.out).toContain("Usage:");
   });
@@ -478,13 +478,13 @@ describe("audit --in re-gates an audit that already exists", () => {
   ])("refuses %s, which cannot change an audit that is already computed", async (flag, value) => {
     const r = await run(["audit", "--in", AUDIT, flag, value]);
     expect(r.code).toBe(2);
-    expect(r.err).toContain("already exists");
+    expect(r.err).toContain("existe déjà");
   });
 
   it("refuses positional paths too — they name a scope it will not honour", async () => {
     const r = await run(["audit", "--in", AUDIT, "src"]);
     expect(r.code).toBe(2);
-    expect(r.err).toContain("already exists");
+    expect(r.err).toContain("existe déjà");
   });
 
   it("refuses a file that is not a current AuditResult", async () => {
@@ -492,7 +492,7 @@ describe("audit --in re-gates an audit that already exists", () => {
     writeFileSync(bogus, JSON.stringify({ hello: "world" }));
     const r = await run(["audit", "--in", bogus]);
     expect(r.code).toBe(2);
-    expect(r.err).toMatch(/not a current ultra11y AuditResult/);
+    expect(r.err).toMatch(/n'est pas un AuditResult ultra11y à jour/);
   });
 
   it("refuses a missing file rather than gating an empty audit green", async () => {
@@ -562,7 +562,7 @@ describe("verify — input validation hardening", () => {
   it("--apply on a missing file reports not-found and exits 2", async () => {
     const r = await run(["verify", "--apply", join(tmpdir(), "u11y-nope.json")]);
     expect(r.code).toBe(2);
-    expect(r.err.toLowerCase()).toContain("not found");
+    expect(r.err.toLowerCase()).toContain("introuvable");
   });
   it("--apply on non-array JSON exits 2 cleanly (no TypeError)", async () => {
     const f = join(tmpdir(), "u11y-apply-obj.json");
@@ -581,7 +581,7 @@ describe("scan runtime selection", () => {
   it("--runtime docker exits 2: the Docker runtime is gone, and the scan never silently runs another way", async () => {
     const r = await run(["scan", "http://example.com", "--runtime", "docker"]);
     expect(r.code).toBe(2);
-    expect(r.err.toLowerCase()).toContain("docker runtime was removed");
+    expect(r.err.toLowerCase()).toContain("l'environnement docker a été retiré");
   });
 
   // Where no browser starts this fails fast (exit 1); where one does — the launcher now falls
@@ -611,14 +611,17 @@ describe("CLI gate & input hardening", () => {
   it("report --in on a missing file surfaces a clean 'file not found', not a raw ENOENT", async () => {
     const r = await run(["report", "--in", join(tmpdir(), "nope-4821.json")]);
     expect(r.code).toBe(2);
-    expect(r.err.toLowerCase()).toContain("not found");
+    expect(r.err.toLowerCase()).toContain("introuvable");
     expect(r.err).not.toContain("ENOENT");
   });
 
   it("check --report on a missing file surfaces a clean 'file not found'", async () => {
     const r = await run(["check", "--report", join(tmpdir(), "nope-9931.md")]);
     expect(r.code).toBe(2);
-    expect(r.err.toLowerCase()).toContain("not found");
+    expect(r.err.toLowerCase()).toContain("introuvable");
+    // The English wording stays one flag away.
+    const en = await run(["check", "--report", join(tmpdir(), "nope-9931.md"), "--lang", "en"]);
+    expect(en.err.toLowerCase()).toContain("not found");
   });
 
   it("an unsupported --lang value warns (and falls back), never silently coerces", async () => {
@@ -628,7 +631,7 @@ describe("CLI gate & input hardening", () => {
 
   it("a single-dash flag typo (-grph) is surfaced as unknown", async () => {
     const r = await run(["audit", `${FIX}conforming/good.html`, "-grph"]);
-    expect(r.err.toLowerCase()).toContain("unknown flag");
+    expect(r.err.toLowerCase()).toContain("drapeau inconnu");
   });
 });
 

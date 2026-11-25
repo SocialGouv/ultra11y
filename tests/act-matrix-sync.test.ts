@@ -33,8 +33,7 @@ describe("references/act.md is generated, never hand-edited", () => {
   it("has a French edition of every project-authored note and divergence reason", () => {
     for (const [id, m] of Object.entries(ACT_RULES)) {
       if (m.note) expect(ACT_NOTES_FR[id], `ACT rule ${id} has an English note but no French one`).toBeTruthy();
-      for (const tc of Object.keys(m.divergences ?? {}))
-        expect(ACT_DIVERGENCES_FR[tc], `divergence ${id}/${tc} has no French reason`).toBeTruthy();
+      for (const tc of Object.keys(m.divergences ?? {})) expect(ACT_DIVERGENCES_FR[tc], `divergence ${id}/${tc} has no French reason`).toBeTruthy();
     }
   });
 });

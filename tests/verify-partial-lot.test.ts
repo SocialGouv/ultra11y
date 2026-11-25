@@ -82,7 +82,8 @@ describe("verify --apply on a partial worklist (#132)", () => {
     const { path, inLot, open } = writeLot("lot2.json", 3);
     const gaps = open.length - inLot.length;
 
-    const r = await run(["verify", "--apply", path, "--in", join(out, "audit-latest.json"), "--out", out]);
+    // French is the default (#214); this half pins the English wording.
+    const r = await run(["verify", "--apply", path, "--in", join(out, "audit-latest.json"), "--out", out, "--lang", "en"]);
     expect(r.code, r.err).toBe(0);
     expect(r.err).not.toMatch(/refused by the gate/);
     expect(r.err).toContain(`${gaps} criterion(ia) not in this worklist`);
@@ -107,7 +108,7 @@ describe("verify --apply on a partial worklist (#132)", () => {
     expect(j.issues.join("\n")).not.toMatch(/coverage gap/);
     expect(j.notInWorklist).toEqual(open.filter((id) => !inLot.includes(id)));
 
-    const human = await run(["verify", "--apply", path, "--in", join(out, "audit-latest.json"), "--out", join(dir, "R3h")]);
+    const human = await run(["verify", "--apply", path, "--in", join(out, "audit-latest.json"), "--out", join(dir, "R3h"), "--lang", "en"]);
     expect(human.err).toMatch(/1 criterion\(ia\) refused by the gate/);
   });
 });
