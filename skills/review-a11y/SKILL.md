@@ -73,7 +73,8 @@ node scripts/ultra11y.mjs audit --since origin/main --graph --json     # the who
   catégorie de faux positifs propres à l’analyse fichier par fichier.
 - Passez `--lang` correspondant à la conversation pour que les messages et les textes de
   remédiation du moteur soient dans la langue de la revue (sans lui, la CLI détecte
-  automatiquement — un repli, pas un substitut).
+  automatiquement : `<html lang>` du dépôt → la locale par défaut du référentiel actif →
+  français — un repli, pas un substitut).
 - La revue du dépôt entier est un **audit**, pas une revue — proposez plutôt la skill `ultra11y`.
 - Le balisage de tests/stories (`*.test.*`, `*.stories.*`, `__tests__/`) est exclu par défaut ;
   nommez explicitement un tel fichier pour l’inclure, ou passez `--no-default-excludes`.

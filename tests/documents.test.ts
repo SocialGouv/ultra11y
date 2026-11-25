@@ -170,4 +170,55 @@ describe("from snapshot to audit: a document's findings land on the pages that l
     // …idempotently.
     expect(mergeSnapshotAudit(merged, snap).documentFindings?.length).toBe(snap.documentFindings?.length);
   });
+
+  // Issue #225: the same PDF named in the audit glob (`public/documents/formulaire.pdf`) and
+  // downloaded by `scan` (`.ultra11y/documents/<sha256>.pdf`) was two documents, its defects
+  // counted once page-less and once per linking page.
+  describe("a PDF named in the glob AND downloaded by scan is ONE document", () => {
+    const source = join(dir, "public", "documents", "formulaire.pdf");
+    const stored = (): string[] =>
+      readdirSync(join(dir, DOCUMENTS_DIR))
+        .filter((f) => f.endsWith(".pdf"))
+        .map((f) => join(dir, DOCUMENTS_DIR, f));
+    beforeAll(() => {
+      mkdirSync(join(dir, "public", "documents"), { recursive: true });
+      writeFileSync(source, UNTAGGED);
+    });
+
+    it("one audit run: one entry with both origins, each finding once per linking page", () => {
+      const alone = runAudit({ inputs: [source] });
+      const defects = alone.documentFindings!.length;
+      expect(defects).toBeGreaterThan(0);
+
+      const audit = runAudit({ inputs: [source, join(dir, PAGES_DIR, "declaration", "dom.html"), ...stored()] });
+      expect(audit.documents).toHaveLength(1);
+      expect(audit.documents![0]).toMatchObject({ file: source, copies: stored(), url: `${origin}/docs/recu.pdf`, pages: ["declaration"] });
+      expect(audit.documents![0]!.sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(audit.documentFindings).toHaveLength(defects);
+      expect(audit.documentFindings!.every((f) => f.page === "declaration" && f.file === source)).toBe(true);
+      expect(audit.scope.pageSubjects?.declaration).toContain("downloadDocs");
+    });
+
+    it("scan --merge: the downloaded copy folds into the glob's entry; RGAA 13.3 still lands on the linking page", () => {
+      const base = runAudit({ inputs: [source, join(dir, PAGES_DIR, "accueil", "dom.html")] });
+      const defects = base.documentFindings!.length;
+      expect(base.documentFindings!.every((f) => !f.page)).toBe(true);
+      const snap = runAudit({ inputs: [join(dir, PAGES_DIR, "declaration", "dom.html"), ...stored()] });
+      const merged = mergeSnapshotAudit(base, snap);
+      expect(merged.documents).toHaveLength(1);
+      expect(merged.documents![0]).toMatchObject({ file: source, copies: stored(), url: `${origin}/docs/recu.pdf`, pages: ["declaration"] });
+      expect(merged.documentFindings).toHaveLength(defects);
+      expect(merged.documentFindings!.every((f) => f.page === "declaration" && f.file === source)).toBe(true);
+      // The base audit is not mutated, and the merge is idempotent.
+      expect(base.documents![0]!.copies).toBeUndefined();
+      const again = mergeSnapshotAudit(merged, snap);
+      expect(again.documents).toEqual(merged.documents);
+      expect(again.documentFindings).toEqual(merged.documentFindings);
+
+      const view = (id: string) => pageView(merged, { id, name: id, url: "", criteria: merged.criteria, findings: [] } as never);
+      const on = (id: string) => derivePackResults(view(id), "rgaa").find((r) => r.id === "13.3")!;
+      expect((on("declaration").candidateFindings ?? []).map((f) => f.ruleId)).toContain("pdf-untagged");
+      expect(on("accueil").candidateFindings ?? []).toEqual([]);
+    });
+  });
 });

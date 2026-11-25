@@ -29,6 +29,7 @@ import {
   DOCUMENT_TIMEOUT_MS,
   type DocFetcher,
   documentCandidate,
+  documentDigest,
   fetchDocument,
   hasPdfHeader,
   readDocumentOrigin,
@@ -37,9 +38,36 @@ import {
 import { attr, elementsByTag, hasAttr, parseHtml, visibleText, type Doc } from "./parse/html.js";
 import { PDF_MAX_BYTES, readPdf } from "./parse/pdf.js";
 import { PAGES_DIR } from "./snapshot.js";
-import type { DocumentOrigin } from "./types.js";
+import type { DocumentAudit, DocumentOrigin } from "./types.js";
 
-export { DOCUMENTS_DIR, readDocumentOrigin } from "./document-store.js";
+export { DOCUMENTS_DIR, documentDigest, readDocumentOrigin } from "./document-store.js";
+
+/** A copy `scan` stored (`.ultra11y/documents/<sha256>.pdf`), as opposed to a file of the project. */
+export function isStoredDocument(file: string): boolean {
+  return /(?:^|[\\/])\.ultra11y[\\/]documents[\\/][0-9a-f]{64}\.pdf$/i.test(file);
+}
+
+/** Fold another sighting of the SAME document (same bytes) into its entry, in place. The entry
+ *  keeps one file for its findings to cite — the project's own file over the copy `scan` stored,
+ *  since that is the one to fix — and every other path the bytes were read from goes to `copies`;
+ *  the linking pages are unioned (RGAA 13.3 asks the question on each of them), and every URL it
+ *  was downloaded from is kept. A PDF named as an audit input and the same file `scan`
+ *  downloaded are one document with two origins — not two documents (issue #225). Callers
+ *  re-cite on `into.file` the findings of any path now in `copies`. */
+export function mergeDocumentAudit(into: DocumentAudit, other: DocumentAudit): void {
+  if (isStoredDocument(into.file) && !isStoredDocument(other.file)) {
+    into.copies = [...(into.copies ?? []), into.file];
+    into.file = other.file;
+  }
+  const copies = [...new Set([...(into.copies ?? []), other.file, ...(other.copies ?? [])])].filter((f) => f !== into.file).sort();
+  if (copies.length) into.copies = copies;
+  const pages = [...new Set([...(into.pages ?? []), ...(other.pages ?? [])])].sort();
+  if (pages.length) into.pages = pages;
+  const urls = [...new Set([into.url, ...(into.urls ?? []), other.url, ...(other.urls ?? [])].filter((u): u is string => !!u))];
+  if (!into.url && urls.length) into.url = urls[0];
+  if (urls.length > 1) into.urls = urls.sort();
+  if (!into.sha256 && other.sha256) into.sha256 = other.sha256;
+}
 
 /** The engine reads a PDF from its extension; content sniffing would mean reading every file. */
 export function isPdfPath(file: string): boolean {
@@ -57,6 +85,7 @@ export function pdfDocFromBytes(bytes: Buffer, file: string, origin?: DocumentOr
     lossy: false,
     kind: "pdf",
     pdf: facts,
+    ...(bytes.length ? { digest: documentDigest(bytes) } : {}),
     ...(origin && (origin.url || origin.pages?.length) ? { document: origin } : {}),
     roots: [],
     elements: [],

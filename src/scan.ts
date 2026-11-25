@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import type {
   AuditResult,
   AxeEngineInfo,
+  DocumentAudit,
   DynamicEngine,
   DynamicFinding,
   DynamicResult,
@@ -14,6 +15,7 @@ import type {
   Severity,
 } from "./types.js";
 import { isAdjudicated } from "./types.js";
+import { mergeDocumentAudit } from "./documents.js";
 import { lineStartsOf, lineColAt } from "./parse/html.js";
 import { allGuidelines } from "./wcag.js";
 import { PROBE_SEVERITY, PROBE_WCAG, axeNodeTreatment, scForAxe } from "./axe-map.js";
@@ -774,26 +776,58 @@ export function mergeSnapshotAudit(base: AuditResult, snap: AuditResult): AuditR
   // Downloadable documents the snapshot run read (the PDFs `scan` fetched from these pages):
   // outside the WCAG verdict like the pack findings, carried over so the report lists them and a
   // pack projection routes their findings.
+  //
+  // ONE ENTRY PER CONTENT (issue #225): the base audit read `public/documents/formulaire.pdf`
+  // from the glob, the snapshot run read the same bytes as `.ultra11y/documents/<sha256>.pdf` —
+  // one document, two origins. The snapshot's copy is folded into the base entry (its path goes
+  // to `copies`, its URL and linking pages are kept) and every finding is cited on the entry's
+  // file, so each defect is reported once per linking page and not once more page-less.
+  let folded = false;
   if (snap.documents?.length) {
-    const docs = [...(merged.documents ?? [])];
-    const known = new Set(docs.map((d) => d.file));
-    for (const d of snap.documents) if (!known.has(d.file)) docs.push(d);
+    const docs = (merged.documents ?? []).map((d) => ({ ...d }));
+    const key = (d: DocumentAudit): string => (d.sha256 ? `sha256:${d.sha256}` : `file:${d.file}`);
+    const byKey = new Map(docs.map((d) => [key(d), d]));
+    for (const d of snap.documents) {
+      const into = byKey.get(key(d)) ?? docs.find((x) => x.file === d.file || x.copies?.includes(d.file));
+      if (into) {
+        mergeDocumentAudit(into, d);
+        folded = true;
+      } else {
+        const copy = { ...d };
+        docs.push(copy);
+        byKey.set(key(copy), copy);
+      }
+    }
     merged.documents = docs;
   }
-  if (snap.documentFindings?.length) {
+  if (snap.documentFindings?.length || folded) {
+    // Any path now a copy of an entry → the file that entry's findings cite.
+    const citeOn = new Map<string, string>();
+    for (const d of merged.documents ?? []) for (const c of d.copies ?? []) citeOn.set(c, d.file);
+    const cite = (f: Finding): Finding => {
+      const file = citeOn.get(f.file);
+      return file ? { ...f, file } : f;
+    };
     // One document raises several findings at the same anchor (its header), once per linking
     // page — so the identity carries the page and the message variant too.
     const docId = (f: Finding): string => `${portableFindingId(f)}|${f.page ?? ""}|${f.msg?.id ?? ""}|${JSON.stringify(f.msg?.params ?? {})}`;
-    const list = [...(merged.documentFindings ?? [])];
-    const seenDoc = new Set(list.map(docId));
-    for (const finding of snap.documentFindings) {
+    const list: Finding[] = [];
+    const seenDoc = new Set<string>();
+    for (const raw of [...(merged.documentFindings ?? []), ...(snap.documentFindings ?? [])]) {
+      const finding = cite(raw);
       const id = docId(finding);
       if (!seenDoc.has(id)) {
         seenDoc.add(id);
         list.push(finding);
       }
     }
-    merged.documentFindings = list;
+    // A document now known to be linked from pages has its findings on those pages: the
+    // page-less copies the base raised (before anyone knew who links it) would count each defect
+    // once more.
+    const linked = new Set((merged.documents ?? []).filter((d) => d.pages?.length).map((d) => d.file));
+    const kept = list.filter((f) => f.page || !linked.has(f.file));
+    if (kept.length) merged.documentFindings = kept;
+    else delete merged.documentFindings;
   }
 
   // A criterion the static pass closed for want of a subject, which the snapshot then MEASURED.

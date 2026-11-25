@@ -245,13 +245,13 @@ export function localAvailable(cwd: string, choice: BrowserChoice = {}): boolean
  *  their `Page` objects. axe does NOT: the axe-core build is ultra11y's own, pinned, so `scan`
  *  and `ultra11y/playwright` measure with the same engine whatever the project installed (see
  *  src/axe-engine.ts). The project's copy is a fallback, and a visible one. */
-export function resolveLocalDeps(cwd: string): LocalDeps {
+export function resolveLocalDeps(cwd: string, lang?: Lang): LocalDeps {
   let chromium: Any;
   let axe: AxeEngine;
   try {
     const pw = requireRuntime(cwd, PW_SPEC);
     chromium = pw.chromium;
-    axe = resolveAxeEngine({ cwd });
+    axe = resolveAxeEngine({ cwd, ...(lang ? { lang } : {}) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(
@@ -1019,7 +1019,7 @@ export async function runScanLocal(opts: LocalScanOpts): Promise<DynamicResult> 
   const isFile = !isUrl && statSync(opts.target).isFile();
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, axe } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd, lang);
   const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   try {
     const out = await runOnPage(browser, axe, opts.target, isFile, {
@@ -1057,7 +1057,7 @@ export interface LocalManyOpts {
 export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Promise<DynamicResult> {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, axe } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd, lang);
   const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];
@@ -1158,7 +1158,7 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
 export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpts): Promise<DynamicResult> {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, axe } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd, lang);
   const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   const findings: DynamicFinding[] = [];
   const snapshots: string[] = [];

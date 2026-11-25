@@ -916,6 +916,14 @@ export type DocumentCheckOutcome = "fail" | "not-detected" | "not-checked";
 export interface DocumentAudit extends DocumentOrigin {
   /** The audited file, exactly as its findings cite it. */
   file: string;
+  /** SHA-256 of the file's bytes — the document's identity: copies of it are one entry. Absent
+   *  when the bytes were not read (a file too large) and in audits that predate it. */
+  sha256?: string;
+  /** Other paths the same bytes were read from (a PDF named as an input AND downloaded by `scan`
+   *  into `.ultra11y/documents/<sha256>.pdf`). Its findings cite `file` only. */
+  copies?: string[];
+  /** Every URL it was downloaded from, when more than one (`url` is the first). */
+  urls?: string[];
   format: "pdf";
   readable: boolean;
   /** Why the file could not be read — encrypted, malformed, truncated, too large, not a PDF. */
