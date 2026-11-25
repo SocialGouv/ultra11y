@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [9.5.0](https://github.com/SocialGouv/ultra11y/compare/v9.4.0...v9.5.0) (2026-11-25)
+
+
+### Features
+
+* French by default for everything user-facing (CLI, reports, README, site, skills) ([#220](https://github.com/SocialGouv/ultra11y/issues/220)) ([393e5e5](https://github.com/SocialGouv/ultra11y/commit/393e5e52c6bcbc3da669fc8b6f2e1326a0e5f9db))
+
 # [9.4.0](https://github.com/SocialGouv/ultra11y/compare/v9.3.0...v9.4.0) (2026-11-25)
 
 
