@@ -100,10 +100,19 @@ interface DynResult {
 }
 const runLocal = hasLocalPlaywright(REPO_ROOT);
 
-describe("e2e: stateful scan — a FILLED input inside a table cell clips at 320px/200%/text-spacing", () => {
+// EACH CASE LAUNCHES A REAL CHROMIUM (#206). Under vitest's 5s unit-test default these failed
+// whenever the suite loaded the machine: the scan itself was right every time (16 concurrent runs
+// all found the clipping field), only the wall clock ran out — a browser launch, a bounded
+// networkidle, the DOM settle and the behaviour window. The budget is the browser tier's, and
+// `runCli` kills a hung scan before it, so that failure names itself.
+const SCAN_KILL_MS = 90_000;
+const scanLocal = (target: string, ...extra: string[]) =>
+  runCli(["scan", target, "--runtime", "local", "--cwd", REPO_ROOT, ...extra, "--json"], { cwd: mkTmp(), timeoutMs: SCAN_KILL_MS });
+
+describe("e2e: stateful scan — a FILLED input inside a table cell clips at 320px/200%/text-spacing", { timeout: 120_000 }, () => {
   it.skipIf(!runLocal)("flags the clipping input (input-overflow → 1.4.10/1.4.4/1.4.12, with the table-cell note)", () => {
-    const r = runCli(["scan", FIX.inputInCellClip, "--runtime", "local", "--cwd", REPO_ROOT, "--json"], { cwd: mkTmp() });
-    expect(r.code).toBe(0);
+    const r = scanLocal(FIX.inputInCellClip);
+    expect(r.code, r.stderr).toBe(0);
     const dyn = JSON.parse(r.stdout) as DynResult;
     const overflow = dyn.findings.filter((f) => (f.engine ?? "").startsWith("input-overflow"));
     expect(overflow.length).toBeGreaterThan(0);
@@ -115,15 +124,15 @@ describe("e2e: stateful scan — a FILLED input inside a table cell clips at 320
   });
 
   it.skipIf(!runLocal)("the clean counterpart (growing field) fires NO input-overflow finding", () => {
-    const r = runCli(["scan", FIX.inputInCellClean, "--runtime", "local", "--cwd", REPO_ROOT, "--json"], { cwd: mkTmp() });
-    expect(r.code).toBe(0);
+    const r = scanLocal(FIX.inputInCellClean);
+    expect(r.code, r.stderr).toBe(0);
     const dyn = JSON.parse(r.stdout) as DynResult;
     expect(dyn.findings.some((f) => (f.engine ?? "").startsWith("input-overflow"))).toBe(false);
   });
 
   it.skipIf(!runLocal)("--no-interact turns the stateful probes off (no input-overflow, no live-region)", () => {
-    const r = runCli(["scan", FIX.inputInCellClip, "--runtime", "local", "--cwd", REPO_ROOT, "--no-interact", "--json"], { cwd: mkTmp() });
-    expect(r.code).toBe(0);
+    const r = scanLocal(FIX.inputInCellClip, "--no-interact");
+    expect(r.code, r.stderr).toBe(0);
     const dyn = JSON.parse(r.stdout) as DynResult;
     expect(dyn.findings.some((f) => (f.engine ?? "").startsWith("input-overflow"))).toBe(false);
     expect(dyn.findings.some((f) => f.engine === "live-region")).toBe(false);
