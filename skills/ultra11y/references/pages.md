@@ -468,6 +468,41 @@ the same upload, so `pages --html` deliberately writes none.
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --html --evidence --out audits
 ```
 
+### Browsing the results and their history (`serve`)
+
+`serve` turns the audits directory into a small local site, read-only:
+
+```sh
+node scripts/ultra11y.mjs serve                              # http://127.0.0.1:4711/ (next free port when busy)
+node scripts/ultra11y.mjs serve --in audits --port 8080      # another directory, another port
+node scripts/ultra11y.mjs serve --static site                # the same pages as plain files, relative links only
+```
+
+- **The history is the directory.** Every current audit JSON under `--in` (default `audits`,
+  up to three levels deep) is one audit: keep dated copies — `audits/2026-09-01/audit-latest.json`
+  beside the run's `audits/audit-latest.json` — and they line up by their `date`. Identical
+  copies count once; other JSON (pages.json, worklists, ticket sets) is ignored.
+- **Per audit:** its dashboard (summary, synthesis, the grid of the 106 criteria, the per-page
+  scoreboard), the page index with the RGAA **mean rate**, one sheet per page with its
+  screenshot, the journeys, the component snapshots (`.ultra11y/render-snapshots/index.json`)
+  and its files — the report, the annex (with Annex I, the application map, when the annex has
+  one), the JSON.
+- **Between two successive audits:** the conformity-rate and mean-rate change in points, the
+  criteria per status before and after, every criterion whose status changed (fixed,
+  regression, decided, reopened, requalified) and each page's rate change.
+- **Nothing is recomputed.** The rates are the report's own (`conformanceRate`,
+  `averageConformanceRate`, the page sheet's rate); the pages are the HTML report's builders.
+- **Captures belong to the latest audit only.** `.ultra11y/pages` and `.ultra11y/render-snapshots`
+  hold the current state; an older audit shows a screenshot only when one was copied beside it
+  (`assets/<page>.png`, as `pages --format report` does).
+- **Security:** `node:http` only, bound to `127.0.0.1` unless `--host` says otherwise, `GET`/`HEAD`
+  only, a loopback `Host` required. Raw files are served from the audits directory,
+  `.ultra11y/pages` and `.ultra11y/render-snapshots` alone, with their content type; a path that
+  climbs out of them, a link that points out of them, a dot-file or a directory is refused.
+- **`--static <dir>`** writes every page and copies exactly the files they show. All links are
+  relative, so the export works from any sub-path (GitHub Pages, an iterion publication). The
+  target must not overlap the audits directory.
+
 ## Producing snapshots
 
 Anything that drives a browser can write one — the format is the contract, not the producer.

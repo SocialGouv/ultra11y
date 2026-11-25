@@ -49,6 +49,27 @@ export function unwrapAudit<T>(v: T | PackAuditResult): T | AuditResult {
   return isPackAudit(v) ? v.core : (v as T);
 }
 
+/** Current ultra11y AuditResult: WCAG-keyed, schema v2+. Rejects stale (pre-v2,
+ *  RGAA-keyed) JSON so it is never silently mis-processed against the WCAG engine. */
+export function isCurrentAudit(r: unknown): r is AuditResult {
+  const a = r as Partial<AuditResult> | null;
+  return (
+    !!a &&
+    a.tool === "ultra11y" &&
+    a.standard === "wcag" &&
+    typeof a.schemaVersion === "number" &&
+    a.schemaVersion >= 2 &&
+    Array.isArray(a.criteria) &&
+    // Require the fields the renderers dereference, so a shallow-fabricated object is
+    // rejected cleanly here instead of crashing report/prd with a raw TypeError.
+    typeof a.scope === "object" &&
+    a.scope !== null &&
+    Array.isArray(a.findings) &&
+    Array.isArray(a.residualRisks) &&
+    Array.isArray(a.guidelines)
+  );
+}
+
 /**
  * The document a command should WRITE BACK, in the active standard's shape.
  *
