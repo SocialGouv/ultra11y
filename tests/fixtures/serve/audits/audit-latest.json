@@ -1,0 +1,4979 @@
+{
+  "tool": "ultra11y",
+  "kind": "pack-audit",
+  "standard": "rgaa",
+  "standardLabel": "RGAA 4.1.2",
+  "version": "9.2.0",
+  "schemaVersion": 2,
+  "date": "2026-10-15",
+  "scope": {
+    "inputs": [
+      "accueil.html",
+      "contact.html"
+    ],
+    "files": 2,
+    "langs": [
+      "fr"
+    ],
+    "subjectsSeen": [
+      "autocomplete",
+      "buttons",
+      "controls",
+      "declaredLang",
+      "images",
+      "links",
+      "pointerActions",
+      "tables"
+    ],
+    "pagesAudited": [
+      "accueil",
+      "contact"
+    ],
+    "pages": [
+      {
+        "id": "accueil",
+        "name": "Accueil",
+        "url": "https://exemple.fr/",
+        "basis": "snapshot",
+        "sources": [
+          "accueil.html"
+        ]
+      },
+      {
+        "id": "contact",
+        "name": "Contact",
+        "url": "https://exemple.fr/contact",
+        "basis": "snapshot",
+        "sources": [
+          "contact.html"
+        ]
+      }
+    ],
+    "journeys": {
+      "manifest": ".ultra11y/journey-runs.json",
+      "journeys": [
+        {
+          "name": "contact",
+          "file": ".ultra11y/journeys/contact.json",
+          "keyboard": true,
+          "status": "failed",
+          "reason": "Le bouton « Envoyer » n'a pas été atteint au clavier.",
+          "steps": [
+            {
+              "n": 0,
+              "action": "goto",
+              "label": "goto https://exemple.fr/contact",
+              "status": "done",
+              "page": "contact"
+            },
+            {
+              "n": 1,
+              "action": "fill",
+              "label": "fill textbox \"Nom\"",
+              "status": "done",
+              "keyboard": "focus"
+            },
+            {
+              "n": 2,
+              "action": "click",
+              "label": "click button \"Envoyer\"",
+              "status": "failed",
+              "reason": "unreachable",
+              "keyboard": "unreachable"
+            },
+            {
+              "n": 3,
+              "action": "expect",
+              "label": "expect text \"Merci\"",
+              "status": "not-run"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "themes": [
+    {
+      "number": 1,
+      "title": "Images",
+      "c": 0,
+      "nc": 1,
+      "na": 0,
+      "manual": 8
+    },
+    {
+      "number": 2,
+      "title": "Cadres",
+      "c": 1,
+      "nc": 0,
+      "na": 1,
+      "manual": 1
+    },
+    {
+      "number": 3,
+      "title": "Couleurs",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 3
+    },
+    {
+      "number": 4,
+      "title": "Multimédia",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 13
+    },
+    {
+      "number": 5,
+      "title": "Tableaux",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 8
+    },
+    {
+      "number": 6,
+      "title": "Liens",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 2
+    },
+    {
+      "number": 7,
+      "title": "Scripts",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 5
+    },
+    {
+      "number": 8,
+      "title": "Éléments obligatoires",
+      "c": 2,
+      "nc": 0,
+      "na": 0,
+      "manual": 8
+    },
+    {
+      "number": 9,
+      "title": "Structuration de l’information",
+      "c": 1,
+      "nc": 0,
+      "na": 1,
+      "manual": 3
+    },
+    {
+      "number": 10,
+      "title": "Présentation de l’information",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 14
+    },
+    {
+      "number": 11,
+      "title": "Formulaires",
+      "c": 0,
+      "nc": 1,
+      "na": 0,
+      "manual": 12
+    },
+    {
+      "number": 12,
+      "title": "Navigation",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 11
+    },
+    {
+      "number": 13,
+      "title": "Consultation",
+      "c": 0,
+      "nc": 0,
+      "na": 0,
+      "manual": 12
+    }
+  ],
+  "criteria": [
+    {
+      "id": "1.1",
+      "theme": 1,
+      "title": "Chaque image porteuse d’information a-t-elle une alternative textuelle ?",
+      "status": "NC",
+      "findings": [
+        {
+          "ruleId": "img-alt-missing",
+          "file": "contact.html",
+          "line": 1,
+          "col": 95,
+          "selectorHint": "img",
+          "severity": "bloquant",
+          "message": "<img> has no alt attribute or accessible name — missing text alternative.",
+          "remediation": "Add alt=\"…\" (a description if the image conveys information, alt=\"\" if it is decorative).",
+          "msg": {
+            "id": "img-alt-missing",
+            "params": {
+              "tag": "img"
+            }
+          },
+          "snippet": "<img src=\"photo.jpg\"><form><input type=\"text\" name=\"nom\"><button>Envoyer</button></form></main></body></html>",
+          "sourceStart": 94,
+          "sourceEnd": 114,
+          "criteriaId": "1.1",
+          "criteriaIds": [
+            "1.1"
+          ],
+          "wcag": "1.1.1"
+        }
+      ],
+      "automation": {
+        "tests": {
+          "1": "static",
+          "2": "rendered",
+          "3": "static",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment",
+          "8": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:area-alt",
+            "tests": [
+              "2"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:image-alt",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:input-image-alt",
+            "tests": [
+              "3"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:object-alt",
+            "tests": [
+              "6"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:role-img-alt",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:svg-img-alt",
+            "tests": [
+              "5"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "canvas-fallback-missing",
+            "tests": [
+              "8"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "chart-no-accessible-name",
+            "tests": [
+              "1",
+              "5",
+              "8"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "img-alt-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "An <img> with no alt attribute and no other text alternative fails either way: 1.1.1 if it carries information, 1.2.1 if it is decorative (alt=\"\" was required). Informative by default; 1.2 if decorative — a decorative context the engine can see is routed to 1.2 by img-alt-missing-decorative."
+          },
+          {
+            "id": "input-image-alt-missing",
+            "tests": [
+              "3"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "object-embed-no-name",
+            "tests": [
+              "6",
+              "7"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "1.2",
+      "theme": 1,
+      "title": "Chaque image de décoration est-elle correctement ignorée par les technologies d’assistance ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:image-redundant-alt",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "decorative-alt-misuse",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "decorative-marked-exposed",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "img-alt-missing-decorative",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "An <img> with no alt attribute inside a link or button whose visible text already names it repeats that text: it is decorative and fails 1.2.1 (neither alt=\"\" nor aria-hidden/role=presentation). Had it carried information, it would fail 1.1.1 instead — never a conformity."
+          }
+        ]
+      }
+    },
+    {
+      "id": "1.3",
+      "theme": 1,
+      "title": "Pour chaque image porteuse d’information ayant une alternative textuelle, cette alternative est-elle pertinente (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment",
+          "8": "judgment",
+          "9": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "1.4",
+      "theme": 1,
+      "title": "Pour chaque image utilisée comme CAPTCHA ou comme image-test, ayant une alternative textuelle, cette alternative permet-elle d’identifier la nature et la fonction de l’image ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "1.5",
+      "theme": 1,
+      "title": "Pour chaque image utilisée comme CAPTCHA, une solution d’accès alternatif au contenu ou à la fonction du CAPTCHA est-elle présente ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "1.6",
+      "theme": 1,
+      "title": "Chaque image porteuse d’information a-t-elle, si nécessaire, une description détaillée ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment",
+          "8": "judgment",
+          "9": "judgment",
+          "10": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "1.7",
+      "theme": 1,
+      "title": "Pour chaque image porteuse d’information ayant une description détaillée, cette description est-elle pertinente ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "1.8",
+      "theme": 1,
+      "title": "Chaque image texte porteuse d’information, en l’absence d’un mécanisme de remplacement, doit si possible être remplacée par du texte stylé. Cette règle est-elle respectée (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "1.9",
+      "theme": 1,
+      "title": "Chaque légende d’image est-elle, si nécessaire, correctement reliée à l’image correspondante ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment"
+        },
+        "rules": [
+          {
+            "id": "figure-caption-unassociated",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "2.1",
+      "theme": 2,
+      "title": "Chaque cadre a-t-il un titre de cadre ?",
+      "status": "C",
+      "findings": [],
+      "inapplicable": true,
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "axe:frame-title",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:frame-title-unique",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "iframe-title-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "2.2",
+      "theme": 2,
+      "title": "Pour chaque cadre ayant un titre de cadre, ce titre de cadre est-il pertinent ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "3.1",
+      "theme": 3,
+      "title": "Dans chaque page web, l’information ne doit pas être donnée uniquement par la couleur. Cette règle est-elle respectée ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "3.2",
+      "theme": 3,
+      "title": "Dans chaque page web, le contraste entre la couleur du texte et la couleur de son arrière-plan est-il suffisamment élevé (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:color-contrast",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:color-contrast-enhanced",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "contrast-literal",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "rendered-contrast",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "rendered-contrast-pixel",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "3.3",
+      "theme": 3,
+      "title": "Dans chaque page web, les couleurs utilisées dans les composants d’interface ou les éléments graphiques porteurs d’informations sont-elles suffisamment contrastées (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        "rules": [
+          {
+            "id": "rendered-nontext-contrast",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "4.1",
+      "theme": 4,
+      "title": "Chaque média temporel pré-enregistré a-t-il, si nécessaire, une transcription textuelle ou une audiodescription (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.2",
+      "theme": 4,
+      "title": "Pour chaque média temporel pré-enregistré ayant une transcription textuelle ou une audiodescription synchronisée, celles-ci sont-elles pertinentes (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.3",
+      "theme": 4,
+      "title": "Chaque média temporel synchronisé pré-enregistré a-t-il, si nécessaire, des sous-titres synchronisés (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:audio-caption",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:video-caption",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "media-no-track",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "4.4",
+      "theme": 4,
+      "title": "Pour chaque média temporel synchronisé pré-enregistré ayant des sous-titres synchronisés, ces sous-titres sont-ils pertinents ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.5",
+      "theme": 4,
+      "title": "Chaque média temporel pré-enregistré a-t-il, si nécessaire, une audiodescription synchronisée (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.6",
+      "theme": 4,
+      "title": "Pour chaque média temporel pré-enregistré ayant une audiodescription synchronisée, celle-ci est-elle pertinente ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.7",
+      "theme": 4,
+      "title": "Chaque média temporel est-il clairement identifiable (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.8",
+      "theme": 4,
+      "title": "Chaque média non temporel a-t-il, si nécessaire, une alternative (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.9",
+      "theme": 4,
+      "title": "Pour chaque média non temporel ayant une alternative, cette alternative est-elle pertinente ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.10",
+      "theme": 4,
+      "title": "Chaque son déclenché automatiquement est-il contrôlable par l’utilisateur ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "autoplay-media",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:no-autoplay-audio",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "4.11",
+      "theme": 4,
+      "title": "La consultation de chaque média temporel est-elle, si nécessaire, contrôlable par le clavier et tout dispositif de pointage ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.12",
+      "theme": 4,
+      "title": "La consultation de chaque média non temporel est-elle contrôlable par le clavier et tout dispositif de pointage ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "4.13",
+      "theme": 4,
+      "title": "Chaque média temporel et non temporel est-il compatible avec les technologies d’assistance (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "5.1",
+      "theme": 5,
+      "title": "Chaque tableau de données complexe a-t-il un résumé ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "5.2",
+      "theme": 5,
+      "title": "Pour chaque tableau de données complexe ayant un résumé, celui-ci est-il pertinent ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "5.3",
+      "theme": 5,
+      "title": "Pour chaque tableau de mise en forme, le contenu linéarisé reste-t-il compréhensible ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "5.4",
+      "theme": 5,
+      "title": "Pour chaque tableau de données ayant un titre, le titre est-il correctement associé au tableau de données ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "table-caption-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "5.5",
+      "theme": 5,
+      "title": "Pour chaque tableau de données ayant un titre, celui-ci est-il pertinent ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "5.6",
+      "theme": 5,
+      "title": "Pour chaque tableau de données, chaque en-tête de colonne et chaque en-tête de ligne sont-ils correctement déclarés ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:td-has-header",
+            "tests": [
+              "1",
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:th-has-data-cells",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "data-table-no-headers",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "th-no-data-cells",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "5.7",
+      "theme": 5,
+      "title": "Pour chaque tableau de données, la technique appropriée permettant d’associer chaque cellule avec ses en-têtes est-elle utilisée (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "static",
+          "3": "static",
+          "4": "static",
+          "5": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:scope-attr-valid",
+            "tests": [
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:td-headers-attr",
+            "tests": [
+              "4"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "data-table-no-headers",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "headers-attr-dangling",
+            "tests": [
+              "4"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "table-scope-invalid",
+            "tests": [
+              "2",
+              "3"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "5.8",
+      "theme": 5,
+      "title": "Chaque tableau de mise en forme ne doit pas utiliser d’éléments propres aux  tableaux de données. Cette règle est-elle respectée ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "axe:table-fake-caption",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "layout-table-data-markup",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "6.1",
+      "theme": 6,
+      "title": "Chaque lien est-il explicite (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "static"
+        },
+        "rules": [
+          {
+            "id": "link-label-in-name-mismatch",
+            "tests": [
+              "5"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "pack:rgaa:download-link-format",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ],
+            "effect": "advisory",
+            "rationale": "Non-normative recommendation; it cannot affect the criterion verdict."
+          }
+        ]
+      }
+    },
+    {
+      "id": "6.2",
+      "theme": 6,
+      "title": "Dans chaque page web, chaque lien a-t-il un intitulé ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "axe:link-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "icon-only-control-unnamed",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "link-empty-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "7.1",
+      "theme": 7,
+      "title": "Chaque script est-il, si nécessaire, compatible avec les technologies d’assistance ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static",
+          "2": "judgment",
+          "3": "static"
+        },
+        "rules": [
+          {
+            "id": "aria-hidden-focusable",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "aria-prohibited-attr",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "aria-ref-missing-id",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "aria-required-attr",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "aria-required-children",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-allowed-attr",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-allowed-role",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-command-name",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-dialog-name",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-hidden-focus",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-meter-name",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-progressbar-name",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-required-attr",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-required-children",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-required-parent",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-roles",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-tooltip-name",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-valid-attr",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:aria-valid-attr-value",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:button-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:input-button-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:nested-interactive",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:presentation-role-conflict",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "button-empty-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "cross-prop-drilled-name-lost",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "disabled-context-content",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "invalid-aria-attr",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "invalid-aria-role",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "invalid-aria-value",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "label-in-name-mismatch",
+            "tests": [
+              "3"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "menuitem-empty-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "nested-interactive",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "presentational-children-focusable",
+            "tests": [
+              "1",
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "redundant-aria",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "7.2",
+      "theme": 7,
+      "title": "Pour chaque script ayant une alternative, cette alternative est-elle pertinente ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "7.3",
+      "theme": 7,
+      "title": "Chaque script est-il contrôlable par le clavier et par tout dispositif de pointage (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": [
+          {
+            "id": "clickable-noninteractive",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-keyboard-unreachable",
+            "tests": [
+              "1",
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "7.4",
+      "theme": 7,
+      "title": "Pour chaque script qui initie un changement de contexte, l’utilisateur est-il averti ou en a-t-il le contrôle ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "on-input-context-change",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "7.5",
+      "theme": 7,
+      "title": "Dans chaque page web, les messages de statut sont-ils correctement restitués par les technologies d’assistance ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": [
+          {
+            "id": "dyn-live-region",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "live-region-conflict",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "status-message-not-assertive",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "8.1",
+      "theme": 8,
+      "title": "Chaque page web est-elle définie par un type de document ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "rendered",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": [
+          {
+            "id": "pack:rgaa:doctype-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "8.2",
+      "theme": 8,
+      "title": "Pour chaque page web, le code source généré est-il valide selon le type de document spécifié ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "axe:duplicate-id",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:duplicate-id-active",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:duplicate-id-aria",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "duplicate-attribute",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "duplicate-id",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "invalid-aria-attr",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "invalid-aria-value",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "8.3",
+      "theme": 8,
+      "title": "Dans chaque page web, la langue par défaut est-elle présente ?",
+      "status": "C",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "axe:html-has-lang",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "document-language-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "html-lang-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ],
+        "completeBySilence": true
+      }
+    },
+    {
+      "id": "8.4",
+      "theme": 8,
+      "title": "Pour chaque page web ayant une langue par défaut, le code de langue est-il pertinent ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "axe:html-lang-valid",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:html-xml-lang-mismatch",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "html-lang-xml-lang-mismatch",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "lang-invalid",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "8.5",
+      "theme": 8,
+      "title": "Chaque page web a-t-elle un titre de page ?",
+      "status": "C",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "axe:document-title",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "title-missing-empty",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ],
+        "completeBySilence": true
+      }
+    },
+    {
+      "id": "8.6",
+      "theme": 8,
+      "title": "Pour chaque page web ayant un titre de page, ce titre est-il pertinent ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "8.7",
+      "theme": 8,
+      "title": "Dans chaque page web, chaque changement de langue est-il indiqué dans le code source (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "inline-lang-change-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "8.8",
+      "theme": 8,
+      "title": "Dans chaque page web, le code de langue de chaque changement de langue est-il valide et pertinent ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:valid-lang",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "lang-invalid",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "8.9",
+      "theme": 8,
+      "title": "Dans chaque page web, les balises ne doivent pas être utilisées uniquement à des fins de présentation. Cette règle est-elle respectée ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "8.10",
+      "theme": 8,
+      "title": "Dans chaque page web, les changements du sens de lecture sont-ils signalés ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "static"
+        },
+        "rules": [
+          {
+            "id": "pack:rgaa:dir-value-invalid",
+            "tests": [
+              "2"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "9.1",
+      "theme": 9,
+      "title": "Dans chaque page web, l’information est-elle structurée par l’utilisation appropriée de titres ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:empty-heading",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:heading-order",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:page-has-heading-one",
+            "tests": [
+              "1",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "empty-heading",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "h1-missing",
+            "tests": [
+              "1",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "h1-multiple",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "heading-order-skip",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "9.2",
+      "theme": 9,
+      "title": "Dans chaque page web, la structure du document est-elle cohérente (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "missing-main-landmark",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "multiple-main-landmark",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "nav-landmark-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "9.3",
+      "theme": 9,
+      "title": "Dans chaque page web, chaque liste est-elle correctement structurée ?",
+      "status": "C",
+      "findings": [],
+      "inapplicable": true,
+      "automation": {
+        "tests": {
+          "1": "static",
+          "2": "static",
+          "3": "static"
+        },
+        "rules": [
+          {
+            "id": "axe:definition-list",
+            "tests": [
+              "3"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:dlitem",
+            "tests": [
+              "3"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:list",
+            "tests": [
+              "1",
+              "2"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:listitem",
+            "tests": [
+              "1",
+              "2"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "dl-structure",
+            "tests": [
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "list-structure",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "9.4",
+      "theme": 9,
+      "title": "Dans chaque page web, chaque citation est-elle correctement indiquée ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "10.1",
+      "theme": 10,
+      "title": "Dans le site web, des feuilles de styles sont-elles utilisées pour contrôler la présentation de l’information ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static",
+          "2": "static",
+          "3": "static"
+        },
+        "rules": [
+          {
+            "id": "presentational-attribute",
+            "tests": [
+              "2"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "presentational-element",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "presentational-spacing",
+            "tests": [
+              "3"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "10.2",
+      "theme": 10,
+      "title": "Dans chaque page web, le contenu visible porteur d’information reste-t-il présent lorsque les feuilles de styles sont désactivées ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "css-generated-content-informative",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "10.3",
+      "theme": 10,
+      "title": "Dans chaque page web, l’information reste-t-elle compréhensible lorsque les feuilles de styles sont désactivées ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "10.4",
+      "theme": 10,
+      "title": "Dans chaque page web, le texte reste-t-il lisible lorsque la taille des caractères est augmentée jusqu’à 200 %, au moins (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:meta-viewport",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:meta-viewport-large",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-input-overflow-zoom",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-reflow-zoom",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "meta-viewport-zoom-block",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "10.5",
+      "theme": 10,
+      "title": "Dans chaque page web, les déclarations CSS de couleurs de fond d’élément et de police sont-elles correctement utilisées ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "10.6",
+      "theme": 10,
+      "title": "Dans chaque page web, chaque lien dont la nature n’est pas évidente est-il visible par rapport au texte environnant ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:link-in-text-block",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "rendered-link-colour-only",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "10.7",
+      "theme": 10,
+      "title": "Dans chaque page web, pour chaque élément recevant le focus, la prise de focus est-elle visible ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "rendered"
+        },
+        "rules": [
+          {
+            "id": "dyn-focus-visible",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "rendered-focus-not-visible",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "10.8",
+      "theme": 10,
+      "title": "Pour chaque page web, les contenus cachés ont-ils vocation à être ignorés par les technologies d’assistance ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "disabled-context-content",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "10.9",
+      "theme": 10,
+      "title": "Dans chaque page web, l’information ne doit pas être donnée uniquement par la forme, taille ou position. Cette règle est-elle respectée ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "10.10",
+      "theme": 10,
+      "title": "Dans chaque page web, l’information ne doit pas être donnée par la forme, taille ou position uniquement. Cette règle est-elle implémentée de façon pertinente ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "10.11",
+      "theme": 10,
+      "title": "Pour chaque page web, les contenus peuvent-ils être présentés sans perte d’information ou de fonctionnalité et sans avoir recours soit à un défilement vertical pour une fenêtre ayant une hauteur de 256 px, soit à un défilement horizontal pour une fenêtre ayant une largeur de 320 px (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": [
+          {
+            "id": "dyn-input-overflow-reflow",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-reflow",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "10.12",
+      "theme": 10,
+      "title": "Dans chaque page web, les propriétés d’espacement du texte peuvent-elles être redéfinies par l’utilisateur sans perte de contenu ou de fonctionnalité (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "dyn-input-overflow-spacing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-text-spacing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "letter-spacing-important",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "line-height-important",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "word-spacing-important",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "10.13",
+      "theme": 10,
+      "title": "Dans chaque page web, les contenus additionnels apparaissant à la prise de focus ou au survol d’un composant d’interface sont-ils contrôlables par l’utilisateur (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": [
+          {
+            "id": "dyn-hover",
+            "tests": [
+              "1",
+              "2",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "10.14",
+      "theme": 10,
+      "title": "Dans chaque page web, les contenus additionnels apparaissant via les styles CSS uniquement peuvent-ils être rendus visibles au clavier et par tout dispositif de pointage ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "11.1",
+      "theme": 11,
+      "title": "Chaque champ de formulaire a-t-il une étiquette ?",
+      "status": "NC",
+      "findings": [
+        {
+          "ruleId": "control-label-missing",
+          "file": "contact.html",
+          "line": 1,
+          "col": 122,
+          "selectorHint": "input[type=text]",
+          "severity": "bloquant",
+          "message": "Form field <input> has no label — no associated label.",
+          "remediation": "Associate a <label for=\"…\"> (or wrap the field in a <label>, or use aria-label/aria-labelledby).",
+          "msg": {
+            "id": "control-label-missing",
+            "params": {
+              "tag": "input"
+            }
+          },
+          "snippet": "<input type=\"text\" name=\"nom\"><button>Envoyer</button></form></main></body></html>",
+          "sourceStart": 121,
+          "sourceEnd": 150,
+          "criteriaId": "11.1",
+          "criteriaIds": [
+            "11.1"
+          ],
+          "wcag": "4.1.2"
+        }
+      ],
+      "automation": {
+        "tests": {
+          "1": "static",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:aria-input-field-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:aria-toggle-field-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:form-field-multiple-labels",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:label",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "axe:label-title-only",
+            "tests": [
+              "1",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:select-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "control-label-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "control-name-title-only",
+            "tests": [
+              "1",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "field-purpose-incomplete",
+            "tests": [
+              "1",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "form-field-multiple-labels",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "label-for-dangling",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "placeholder-as-label",
+            "tests": [
+              "1",
+              "3"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "select-has-option",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "11.2",
+      "theme": 11,
+      "title": "Chaque étiquette associée à un champ de formulaire est-elle pertinente (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "static",
+          "6": "judgment"
+        },
+        "rules": [
+          {
+            "id": "field-label-in-name-mismatch",
+            "tests": [
+              "5"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "11.3",
+      "theme": 11,
+      "title": "Dans chaque formulaire, chaque étiquette associée à un champ de formulaire ayant la même fonction et répétée plusieurs fois dans une même page ou dans un ensemble de pages est-elle cohérente ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "11.4",
+      "theme": 11,
+      "title": "Dans chaque formulaire, chaque étiquette de champ et son champ associé sont-ils accolés (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "11.5",
+      "theme": 11,
+      "title": "Dans chaque formulaire, les champs de même nature sont-ils regroupés, si nécessaire ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "date-fields-ungrouped",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "radio-checkbox-group-ungrouped",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "11.6",
+      "theme": 11,
+      "title": "Dans chaque formulaire, chaque regroupement de champs de même nature a-t-il une légende ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static"
+        },
+        "rules": [
+          {
+            "id": "fieldset-legend-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "11.7",
+      "theme": 11,
+      "title": "Dans chaque formulaire, chaque légende associée à un regroupement de champs de même nature est-elle pertinente ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "11.8",
+      "theme": 11,
+      "title": "Dans chaque formulaire, les items de même nature d’une liste de choix sont-ils regroupés de manière pertinente ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "static",
+          "3": "judgment"
+        },
+        "rules": [
+          {
+            "id": "pack:rgaa:optgroup-without-label",
+            "tests": [
+              "2"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "11.9",
+      "theme": 11,
+      "title": "Dans chaque formulaire, l’intitulé de chaque bouton est-il pertinent (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "static",
+          "2": "static"
+        },
+        "rules": [
+          {
+            "id": "cross-icon-only-unnamed",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "form-button-empty-name",
+            "tests": [
+              "1"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "form-label-in-name-mismatch",
+            "tests": [
+              "2"
+            ],
+            "effect": "decisive-nc",
+            "rationale": "The observed failure exhausts the cited RGAA test."
+          },
+          {
+            "id": "icon-only-control-unnamed",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "11.10",
+      "theme": 11,
+      "title": "Dans chaque formulaire, le contrôle de saisie est-il utilisé de manière pertinente (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment",
+          "5": "judgment",
+          "6": "judgment",
+          "7": "judgment"
+        },
+        "rules": [
+          {
+            "id": "aria-invalid-no-description",
+            "tests": [
+              "3",
+              "4",
+              "6",
+              "7"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-error-unassociated",
+            "tests": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "error-not-associated",
+            "tests": [
+              "3",
+              "4",
+              "6",
+              "7"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "11.11",
+      "theme": 11,
+      "title": "Dans chaque formulaire, le contrôle de saisie est-il accompagné, si nécessaire, de suggestions facilitant la correction des erreurs de saisie ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "11.12",
+      "theme": 11,
+      "title": "Pour chaque formulaire qui modifie ou supprime des données, ou qui transmet des réponses à un test ou à un examen, ou dont la validation a des conséquences financières ou juridiques, les données saisies peuvent-elles être modifiées, mises à jour ou récupérées par l’utilisateur ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "11.13",
+      "theme": 11,
+      "title": "La finalité d’un champ de saisie peut-elle être déduite pour faciliter le remplissage automatique des champs avec les données de l’utilisateur ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "autocomplete-token-invalid",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:autocomplete-valid",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "field-purpose-incomplete",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "12.1",
+      "theme": 12,
+      "title": "Chaque ensemble de pages dispose-t-il de deux systèmes de navigation différents, au moins (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "12.2",
+      "theme": 12,
+      "title": "Dans chaque ensemble de pages, le menu et les barres de navigation sont-ils toujours à la même place (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "12.3",
+      "theme": 12,
+      "title": "La page « plan du site » est-elle pertinente ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "12.4",
+      "theme": 12,
+      "title": "Dans chaque ensemble de pages, la page « plan du site » est-elle accessible à partir d’une fonctionnalité identique ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "12.5",
+      "theme": 12,
+      "title": "Dans chaque ensemble de pages, le moteur de recherche est-il atteignable de manière identique ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "12.6",
+      "theme": 12,
+      "title": "Les zones de regroupement de contenus présentes dans plusieurs pages web (zones d’en-tête, de navigation principale, de contenu principal, de pied de page et de moteur de recherche) peuvent-elles être atteintes ou évitées ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:landmark-one-main",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "bypass-blocks-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "missing-main-landmark",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "multiple-main-landmark",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "nav-landmark-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "nav-landmark-unnamed",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "12.7",
+      "theme": 12,
+      "title": "Dans chaque page web, un lien d’évitement ou d’accès rapide à la zone de contenu principal est-il présent (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:bypass",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:skip-link",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "bypass-blocks-missing",
+            "tests": [
+              "1",
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "skip-link-target-missing",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "12.8",
+      "theme": 12,
+      "title": "Dans chaque page web, l’ordre de tabulation est-il cohérent ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:tabindex",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "dyn-dialog-focus",
+            "tests": [
+              "1",
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "positive-tabindex",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "12.9",
+      "theme": 12,
+      "title": "Dans chaque page web, la navigation ne doit pas contenir de piège au clavier. Cette règle est-elle respectée ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "dyn-keyboard-trap",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "12.10",
+      "theme": 12,
+      "title": "Dans chaque page web, les raccourcis clavier n’utilisant qu’une seule touche (lettre minuscule ou majuscule, ponctuation, chiffre ou symbole) sont-ils contrôlables par l’utilisateur ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "12.11",
+      "theme": 12,
+      "title": "Dans chaque page web, les contenus additionnels apparaissant au survol, à la prise de focus ou à l’activation d’un composant d’interface sont-ils si nécessaire atteignables au clavier ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "13.1",
+      "theme": 13,
+      "title": "Pour chaque page web, l’utilisateur a-t-il le contrôle de chaque limite de temps modifiant le contenu (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment",
+          "4": "judgment"
+        },
+        "rules": [
+          {
+            "id": "meta-refresh-redirect",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "13.2",
+      "theme": 13,
+      "title": "Dans chaque page web, l’ouverture d’une nouvelle fenêtre ne doit pas être déclenchée sans action de l’utilisateur. Cette règle est-elle respectée ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "13.3",
+      "theme": 13,
+      "title": "Dans chaque page web, chaque document bureautique en téléchargement possède-t-il, si nécessaire, une version accessible (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "pdf-lang-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "pdf-no-text",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "pdf-structure-shallow",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "pdf-title-missing",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "pdf-untagged",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "13.4",
+      "theme": 13,
+      "title": "Pour chaque document bureautique ayant une version accessible, cette version offre-t-elle la même information ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "13.5",
+      "theme": 13,
+      "title": "Dans chaque page web, chaque contenu cryptique (art ASCII, émoticône, syntaxe cryptique) a-t-il une alternative ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "13.6",
+      "theme": 13,
+      "title": "Dans chaque page web, pour chaque contenu cryptique (art ASCII, émoticône, syntaxe cryptique) ayant une alternative, cette alternative est-elle pertinente ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "13.7",
+      "theme": 13,
+      "title": "Dans chaque page web, les changements brusques de luminosité ou les effets de flash sont-ils correctement utilisés ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "13.8",
+      "theme": 13,
+      "title": "Dans chaque page web, chaque contenu en mouvement ou clignotant est-il contrôlable par l’utilisateur ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": [
+          {
+            "id": "axe:blink",
+            "tests": [
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "axe:marquee",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "blink-marquee",
+            "tests": [
+              "1",
+              "2"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "13.9",
+      "theme": 13,
+      "title": "Dans chaque page web, le contenu proposé est-il consultable quelle que soit l’orientation de l’écran (portrait ou paysage) (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": [
+          {
+            "id": "rendered-orientation-lock",
+            "tests": [
+              "1"
+            ],
+            "effect": "candidate",
+            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          }
+        ]
+      }
+    },
+    {
+      "id": "13.10",
+      "theme": 13,
+      "title": "Dans chaque page web, les fonctionnalités utilisables ou disponibles au moyen d’un geste complexe peuvent-elles être également disponibles au moyen d’un geste simple (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "13.11",
+      "theme": 13,
+      "title": "Dans chaque page web, les actions déclenchées au moyen d’un dispositif de pointage sur un point unique de l’écran peuvent-elles faire l’objet d’une annulation (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "automation": {
+        "tests": {
+          "1": "judgment"
+        },
+        "rules": []
+      }
+    },
+    {
+      "id": "13.12",
+      "theme": 13,
+      "title": "Dans chaque page web, les fonctionnalités qui impliquent un mouvement de l’appareil ou vers l’appareil peuvent-elles être satisfaites de manière alternative (hors cas particuliers) ?",
+      "status": "manual",
+      "findings": [],
+      "justification": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automation": {
+        "tests": {
+          "1": "judgment",
+          "2": "judgment",
+          "3": "judgment"
+        },
+        "rules": []
+      }
+    }
+  ],
+  "findings": [
+    {
+      "ruleId": "img-alt-missing",
+      "file": "contact.html",
+      "line": 1,
+      "col": 95,
+      "selectorHint": "img",
+      "severity": "bloquant",
+      "message": "<img> has no alt attribute or accessible name — missing text alternative.",
+      "remediation": "Add alt=\"…\" (a description if the image conveys information, alt=\"\" if it is decorative).",
+      "msg": {
+        "id": "img-alt-missing",
+        "params": {
+          "tag": "img"
+        }
+      },
+      "snippet": "<img src=\"photo.jpg\"><form><input type=\"text\" name=\"nom\"><button>Envoyer</button></form></main></body></html>",
+      "sourceStart": 94,
+      "sourceEnd": 114,
+      "criteriaId": "1.1",
+      "criteriaIds": [
+        "1.1"
+      ],
+      "wcag": "1.1.1",
+      "page": "contact"
+    },
+    {
+      "ruleId": "control-label-missing",
+      "file": "contact.html",
+      "line": 1,
+      "col": 122,
+      "selectorHint": "input[type=text]",
+      "severity": "bloquant",
+      "message": "Form field <input> has no label — no associated label.",
+      "remediation": "Associate a <label for=\"…\"> (or wrap the field in a <label>, or use aria-label/aria-labelledby).",
+      "msg": {
+        "id": "control-label-missing",
+        "params": {
+          "tag": "input"
+        }
+      },
+      "snippet": "<input type=\"text\" name=\"nom\"><button>Envoyer</button></form></main></body></html>",
+      "sourceStart": 121,
+      "sourceEnd": 150,
+      "criteriaId": "11.1",
+      "criteriaIds": [
+        "11.1"
+      ],
+      "wcag": "4.1.2",
+      "page": "contact"
+    }
+  ],
+  "residualRisks": [
+    {
+      "criteriaId": "1.2",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.3",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.4",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.5",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.6",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.7",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.8",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "1.9",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "2.2",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.1",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.2",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "3.3",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.1",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.2",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.3",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.4",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.5",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.6",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.7",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.8",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.9",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.10",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.11",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.12",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "4.13",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "5.1",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "5.2",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "5.3",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "5.4",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "5.5",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "5.6",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "5.7",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "5.8",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "6.1",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "6.2",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "7.1",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "7.2",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "7.3",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "7.4",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "7.5",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "8.1",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "8.2",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "8.4",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "8.6",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "8.7",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "8.8",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "8.9",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "8.10",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "9.1",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "9.2",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "9.4",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.1",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.2",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.3",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.4",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.5",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.6",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.7",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.8",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.9",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.10",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.11",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.12",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.13",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "10.14",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.2",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.3",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.4",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.5",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.6",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.7",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.8",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.9",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.10",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.11",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.12",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "11.13",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.1",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.2",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.3",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.4",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.5",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.6",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.7",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.8",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.9",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.10",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "12.11",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.1",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.2",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.3",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.4",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.5",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.6",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.7",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.8",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.9",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.10",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.11",
+      "reason": "",
+      "automatability": "judgment"
+    },
+    {
+      "criteriaId": "13.12",
+      "reason": "Aucun sujet détecté par le moteur ; l'IA doit confirmer la non-applicabilité de ce critère de jugement.",
+      "automatability": "judgment"
+    }
+  ],
+  "conformancePct": 67,
+  "core": {
+    "tool": "ultra11y",
+    "standard": "wcag",
+    "version": "9.2.0",
+    "schemaVersion": 2,
+    "date": "2026-10-15",
+    "scope": {
+      "inputs": [
+        "accueil.html",
+        "contact.html"
+      ],
+      "files": 2,
+      "langs": [
+        "fr"
+      ],
+      "subjectsSeen": [
+        "autocomplete",
+        "buttons",
+        "controls",
+        "declaredLang",
+        "images",
+        "links",
+        "pointerActions",
+        "tables"
+      ],
+      "pagesAudited": [
+        "accueil",
+        "contact"
+      ],
+      "pages": [
+        {
+          "id": "accueil",
+          "name": "Accueil",
+          "url": "https://exemple.fr/",
+          "basis": "snapshot",
+          "sources": [
+            "accueil.html"
+          ]
+        },
+        {
+          "id": "contact",
+          "name": "Contact",
+          "url": "https://exemple.fr/contact",
+          "basis": "snapshot",
+          "sources": [
+            "contact.html"
+          ]
+        }
+      ],
+      "journeys": {
+        "manifest": ".ultra11y/journey-runs.json",
+        "journeys": [
+          {
+            "name": "contact",
+            "file": ".ultra11y/journeys/contact.json",
+            "keyboard": true,
+            "status": "failed",
+            "reason": "Le bouton « Envoyer » n'a pas été atteint au clavier.",
+            "steps": [
+              {
+                "n": 0,
+                "action": "goto",
+                "label": "goto https://exemple.fr/contact",
+                "status": "done",
+                "page": "contact"
+              },
+              {
+                "n": 1,
+                "action": "fill",
+                "label": "fill textbox \"Nom\"",
+                "status": "done",
+                "keyboard": "focus"
+              },
+              {
+                "n": 2,
+                "action": "click",
+                "label": "click button \"Envoyer\"",
+                "status": "failed",
+                "reason": "unreachable",
+                "keyboard": "unreachable"
+              },
+              {
+                "n": 3,
+                "action": "expect",
+                "label": "expect text \"Merci\"",
+                "status": "not-run"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "guidelines": [
+      {
+        "key": "1.1",
+        "title": "Text Alternatives",
+        "c": 0,
+        "nc": 1,
+        "na": 0,
+        "manual": 0
+      },
+      {
+        "key": "1.2",
+        "title": "Time-based Media",
+        "c": 5,
+        "nc": 0,
+        "na": 0,
+        "manual": 0
+      },
+      {
+        "key": "1.3",
+        "title": "Adaptable",
+        "c": 0,
+        "nc": 0,
+        "na": 0,
+        "manual": 5
+      },
+      {
+        "key": "1.4",
+        "title": "Distinguishable",
+        "c": 1,
+        "nc": 0,
+        "na": 0,
+        "manual": 8
+      },
+      {
+        "key": "2.1",
+        "title": "Keyboard Accessible",
+        "c": 1,
+        "nc": 0,
+        "na": 0,
+        "manual": 2
+      },
+      {
+        "key": "2.2",
+        "title": "Enough Time",
+        "c": 2,
+        "nc": 0,
+        "na": 0,
+        "manual": 0
+      },
+      {
+        "key": "2.3",
+        "title": "Seizures and Physical Reactions",
+        "c": 0,
+        "nc": 0,
+        "na": 0,
+        "manual": 1
+      },
+      {
+        "key": "2.4",
+        "title": "Navigable",
+        "c": 1,
+        "nc": 0,
+        "na": 0,
+        "manual": 7
+      },
+      {
+        "key": "2.5",
+        "title": "Input Modalities",
+        "c": 4,
+        "nc": 0,
+        "na": 0,
+        "manual": 2
+      },
+      {
+        "key": "3.1",
+        "title": "Readable",
+        "c": 1,
+        "nc": 0,
+        "na": 0,
+        "manual": 1
+      },
+      {
+        "key": "3.2",
+        "title": "Predictable",
+        "c": 2,
+        "nc": 0,
+        "na": 0,
+        "manual": 3
+      },
+      {
+        "key": "3.3",
+        "title": "Input Assistance",
+        "c": 0,
+        "nc": 0,
+        "na": 0,
+        "manual": 6
+      },
+      {
+        "key": "4.1",
+        "title": "Compatible",
+        "c": 0,
+        "nc": 1,
+        "na": 0,
+        "manual": 1
+      }
+    ],
+    "criteria": [
+      {
+        "id": "1.1.1",
+        "guideline": "1.1",
+        "status": "NC",
+        "findings": [
+          {
+            "ruleId": "img-alt-missing",
+            "criteriaId": "1.1.1",
+            "file": "contact.html",
+            "line": 1,
+            "col": 95,
+            "selectorHint": "img",
+            "severity": "bloquant",
+            "message": "<img> has no alt attribute or accessible name — missing text alternative.",
+            "remediation": "Add alt=\"…\" (a description if the image conveys information, alt=\"\" if it is decorative).",
+            "msg": {
+              "id": "img-alt-missing",
+              "params": {
+                "tag": "img"
+              }
+            },
+            "snippet": "<img src=\"photo.jpg\"><form><input type=\"text\" name=\"nom\"><button>Envoyer</button></form></main></body></html>",
+            "sourceStart": 94,
+            "sourceEnd": 114
+          }
+        ]
+      },
+      {
+        "id": "1.2.1",
+        "guideline": "1.2",
+        "status": "C",
+        "findings": [],
+        "justification": "No time-based media in scope: nothing in the 2 file(s) audited is concerned — no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.",
+        "inapplicable": true
+      },
+      {
+        "id": "1.2.2",
+        "guideline": "1.2",
+        "status": "C",
+        "findings": [],
+        "justification": "No time-based media in scope: nothing in the 2 file(s) audited is concerned — no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.",
+        "inapplicable": true
+      },
+      {
+        "id": "1.2.3",
+        "guideline": "1.2",
+        "status": "C",
+        "findings": [],
+        "justification": "No time-based media in scope: nothing in the 2 file(s) audited is concerned — no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.",
+        "inapplicable": true
+      },
+      {
+        "id": "1.2.4",
+        "guideline": "1.2",
+        "status": "C",
+        "findings": [],
+        "justification": "No time-based media in scope: nothing in the 2 file(s) audited is concerned — no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.",
+        "inapplicable": true
+      },
+      {
+        "id": "1.2.5",
+        "guideline": "1.2",
+        "status": "C",
+        "findings": [],
+        "justification": "No time-based media in scope: nothing in the 2 file(s) audited is concerned — no <audio>, <video>, <track> or <source> element, no <object>/<embed>, and no <iframe> pointing at media.",
+        "inapplicable": true
+      },
+      {
+        "id": "1.3.1",
+        "guideline": "1.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.3.2",
+        "guideline": "1.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.3.3",
+        "guideline": "1.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.3.4",
+        "guideline": "1.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.3.5",
+        "guideline": "1.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.4.1",
+        "guideline": "1.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.4.2",
+        "guideline": "1.4",
+        "status": "C",
+        "findings": [],
+        "justification": "No element in scope is concerned by this success criterion — nothing contradicts it, and nothing of that kind exists here.",
+        "inapplicable": true
+      },
+      {
+        "id": "1.4.3",
+        "guideline": "1.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.4.4",
+        "guideline": "1.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.4.5",
+        "guideline": "1.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.4.10",
+        "guideline": "1.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.4.11",
+        "guideline": "1.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.4.12",
+        "guideline": "1.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "1.4.13",
+        "guideline": "1.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.1.1",
+        "guideline": "2.1",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.1.2",
+        "guideline": "2.1",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.1.4",
+        "guideline": "2.1",
+        "status": "C",
+        "findings": [],
+        "justification": "No single-character keyboard shortcut in scope: nothing in the 2 file(s) audited is concerned — no single-printable-character key comparison and no accesskey attribute was found.",
+        "inapplicable": true
+      },
+      {
+        "id": "2.2.1",
+        "guideline": "2.2",
+        "status": "C",
+        "findings": [],
+        "justification": "No time limit in scope: nothing in the 2 file(s) audited is concerned — no timer, no <meta http-equiv=\"refresh\">, and no session-expiry configuration was found.",
+        "inapplicable": true
+      },
+      {
+        "id": "2.2.2",
+        "guideline": "2.2",
+        "status": "C",
+        "findings": [],
+        "justification": "No moving, blinking or auto-updating content in scope: nothing in the 2 file(s) audited is concerned — no <marquee>/<blink>, no media element, no CSS animation (inline or in a captured stylesheet), and no carousel/autoplay/rAF signal was found.",
+        "inapplicable": true
+      },
+      {
+        "id": "2.3.1",
+        "guideline": "2.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.4.1",
+        "guideline": "2.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.4.2",
+        "guideline": "2.4",
+        "status": "C",
+        "findings": []
+      },
+      {
+        "id": "2.4.3",
+        "guideline": "2.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.4.4",
+        "guideline": "2.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.4.5",
+        "guideline": "2.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.4.6",
+        "guideline": "2.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.4.7",
+        "guideline": "2.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.4.11",
+        "guideline": "2.4",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.5.1",
+        "guideline": "2.5",
+        "status": "C",
+        "findings": [],
+        "justification": "No path-based or multipoint gesture in scope: nothing in the 2 file(s) audited is concerned — no touch-move, pinch, swipe or gesture handler was found.",
+        "inapplicable": true
+      },
+      {
+        "id": "2.5.2",
+        "guideline": "2.5",
+        "status": "C",
+        "findings": [],
+        "justification": "No down-event action in scope: nothing in the 2 file(s) audited is concerned — no mousedown/pointerdown/touchstart handler was found.",
+        "inapplicable": true
+      },
+      {
+        "id": "2.5.3",
+        "guideline": "2.5",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "2.5.4",
+        "guideline": "2.5",
+        "status": "C",
+        "findings": [],
+        "justification": "No motion actuation in scope: nothing in the 2 file(s) audited is concerned — no device-motion or device-orientation API is used.",
+        "inapplicable": true
+      },
+      {
+        "id": "2.5.7",
+        "guideline": "2.5",
+        "status": "C",
+        "findings": [],
+        "justification": "No dragging interaction in scope: nothing in the 2 file(s) audited is concerned — no draggable attribute and no drag-and-drop library or handler was found.",
+        "inapplicable": true
+      },
+      {
+        "id": "2.5.8",
+        "guideline": "2.5",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.1.1",
+        "guideline": "3.1",
+        "status": "C",
+        "findings": []
+      },
+      {
+        "id": "3.1.2",
+        "guideline": "3.1",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.2.1",
+        "guideline": "3.2",
+        "status": "C",
+        "findings": [],
+        "justification": "Nothing in scope is concerned by 3.2.1: across the 2 file(s) audited there is no control that changes context on its own. « Not applicable » is a verdict about the SUBJECT of the criterion — it never says the criterion is met, and one element of this kind anywhere in scope reopens it.",
+        "inapplicable": true
+      },
+      {
+        "id": "3.2.2",
+        "guideline": "3.2",
+        "status": "C",
+        "findings": [],
+        "justification": "Nothing in scope is concerned by 3.2.2: across the 2 file(s) audited there is no control that changes context on its own. « Not applicable » is a verdict about the SUBJECT of the criterion — it never says the criterion is met, and one element of this kind anywhere in scope reopens it.",
+        "inapplicable": true
+      },
+      {
+        "id": "3.2.3",
+        "guideline": "3.2",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.2.4",
+        "guideline": "3.2",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.2.6",
+        "guideline": "3.2",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.3.1",
+        "guideline": "3.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.3.2",
+        "guideline": "3.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.3.3",
+        "guideline": "3.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.3.4",
+        "guideline": "3.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.3.7",
+        "guideline": "3.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "3.3.8",
+        "guideline": "3.3",
+        "status": "manual",
+        "findings": []
+      },
+      {
+        "id": "4.1.2",
+        "guideline": "4.1",
+        "status": "NC",
+        "findings": [
+          {
+            "ruleId": "control-label-missing",
+            "criteriaId": "4.1.2",
+            "file": "contact.html",
+            "line": 1,
+            "col": 122,
+            "selectorHint": "input[type=text]",
+            "severity": "bloquant",
+            "message": "Form field <input> has no label — no associated label.",
+            "remediation": "Associate a <label for=\"…\"> (or wrap the field in a <label>, or use aria-label/aria-labelledby).",
+            "msg": {
+              "id": "control-label-missing",
+              "params": {
+                "tag": "input"
+              }
+            },
+            "snippet": "<input type=\"text\" name=\"nom\"><button>Envoyer</button></form></main></body></html>",
+            "sourceStart": 121,
+            "sourceEnd": 150
+          }
+        ]
+      },
+      {
+        "id": "4.1.3",
+        "guideline": "4.1",
+        "status": "manual",
+        "findings": []
+      }
+    ],
+    "findings": [
+      {
+        "ruleId": "img-alt-missing",
+        "criteriaId": "1.1.1",
+        "file": "contact.html",
+        "line": 1,
+        "col": 95,
+        "selectorHint": "img",
+        "severity": "bloquant",
+        "message": "<img> has no alt attribute or accessible name — missing text alternative.",
+        "remediation": "Add alt=\"…\" (a description if the image conveys information, alt=\"\" if it is decorative).",
+        "msg": {
+          "id": "img-alt-missing",
+          "params": {
+            "tag": "img"
+          }
+        },
+        "snippet": "<img src=\"photo.jpg\"><form><input type=\"text\" name=\"nom\"><button>Envoyer</button></form></main></body></html>",
+        "sourceStart": 94,
+        "sourceEnd": 114,
+        "page": "contact"
+      },
+      {
+        "ruleId": "control-label-missing",
+        "criteriaId": "4.1.2",
+        "file": "contact.html",
+        "line": 1,
+        "col": 122,
+        "selectorHint": "input[type=text]",
+        "severity": "bloquant",
+        "message": "Form field <input> has no label — no associated label.",
+        "remediation": "Associate a <label for=\"…\"> (or wrap the field in a <label>, or use aria-label/aria-labelledby).",
+        "msg": {
+          "id": "control-label-missing",
+          "params": {
+            "tag": "input"
+          }
+        },
+        "snippet": "<input type=\"text\" name=\"nom\"><button>Envoyer</button></form></main></body></html>",
+        "sourceStart": 121,
+        "sourceEnd": 150,
+        "page": "contact"
+      }
+    ],
+    "residualRisks": [
+      {
+        "criteriaId": "1.3.1",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "1.3.2",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "1.3.3",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "1.3.4",
+        "reason": "Decided on a page's own stylesheets (an orientation media query that rotates the document) — record a snapshot with `scan --sample` (or an E2E capture), then re-audit.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "1.3.5",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "1.4.1",
+        "reason": "Decided on computed colours (a link distinguished by colour alone) — record a snapshot with `scan --sample`, then re-audit.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "1.4.3",
+        "reason": "Decided on computed text/background colours, with a screenshot fallback where the backdrop is an image — record a snapshot with `scan --sample`, then re-audit.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "1.4.4",
+        "reason": "Needs a live browser: the page is re-measured at 200% zoom — `scan <url> --runtime local --merge <audit.json>`.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "1.4.5",
+        "reason": "No automated tier decides this: whether text is presented as an image is a reading of each image's content. Adjudicate it (`verify --manual`) against the images the audit lists.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "1.4.10",
+        "reason": "Needs a live browser: the page is re-measured in a 320px viewport (reflow) — `scan <url> --merge <audit.json>`.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "1.4.11",
+        "reason": "Decided on computed colours of UI components and graphics — record a snapshot with `scan --sample`, then re-audit.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "1.4.12",
+        "reason": "Needs a live browser: text spacing overrides are injected and the layout re-measured — `scan <url> --runtime local --merge <audit.json>`.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "1.4.13",
+        "reason": "Needs a live browser: hover/focus-triggered content is opened and probed for dismiss/hover/persist — `scan <url> --runtime local --merge <audit.json>`.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "2.1.1",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "2.1.2",
+        "reason": "Needs a live browser: the tab ring is walked and every focusable is checked for one Tab cannot move off — `scan <url> --runtime local --merge <audit.json>`. A region only a pointer can open (a custom widget behind a click) still has to be attempted by hand.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "2.3.1",
+        "reason": "No automated tier decides this: flashing has to be observed over time on the rendered page.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "2.4.1",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "2.4.3",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "2.4.4",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "2.4.5",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "2.4.6",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "2.4.7",
+        "reason": "Decided on the page's own stylesheets (a `:focus` rule that removes the indicator without restoring one), or by the live focus probe — record a snapshot with `scan --sample`, then re-audit.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "2.4.11",
+        "reason": "Needs a rendered DOM (contrast, focus visibility, zoom/reflow, target size) — decide via `scan`.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "2.5.3",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "2.5.8",
+        "reason": "A live scan can fail this (axe `target-size`) but never certify it — `scan <url> --runtime local --merge <audit.json>`, then adjudicate what is left.",
+        "automatability": "needs-rendering"
+      },
+      {
+        "criteriaId": "3.1.2",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "3.2.3",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "3.2.4",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "3.2.6",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "3.3.1",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "3.3.2",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "3.3.3",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "3.3.4",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "3.3.7",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "3.3.8",
+        "reason": "Judgement criterion — adjudicated by the agent from source/context (`verify --manual`, gated).",
+        "automatability": "judgment"
+      },
+      {
+        "criteriaId": "4.1.3",
+        "reason": "Needs a live browser WITH interaction: a status message is triggered and the live region observed — `scan <url> --runtime local --merge <audit.json>` (interactions are on by default).",
+        "automatability": "judgment"
+      }
+    ],
+    "conformancePct": 89
+  }
+}

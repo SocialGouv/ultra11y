@@ -18,6 +18,7 @@
 //      from the document, and status NEVER encoded by colour alone — every mark carries its
 //      letter. tests/html.test.ts audits the output with the engine rather than asserting
 //      that it looks right.
+import { NEUTRAL_THEME, type Theme } from "./theme.js";
 import type { Lang, Status } from "./types.js";
 
 /** The status marks, identical to the Markdown grids — `C` conforming, `NC` non-conforming,
@@ -82,6 +83,9 @@ export interface Doc {
   /** Sibling documents. Rendered as a NAMED `<nav>` — two unnamed navigation regions on one
    *  page is RGAA 12.6, which this engine reports. */
   nav?: NavLink[];
+  /** The nav's accessible name. Defaults to « Documents du rapport »: the results server
+   *  (src/serve.ts) names its own navigation, which is not a list of report documents. */
+  navLabel?: string;
   blocks: Block[];
 }
 
@@ -107,67 +111,6 @@ const T = {
 export function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-
-/** The single stylesheet. Light and dark, and a print sheet that turns the document into
- *  something an auditor can hand to a client on paper.
- *
- *  The dark status colours are NOT the light ones: `#0a7d33`, `#b3261e` and `#b06000` measure
- *  3.50, 2.81 and 3.96 against `#141416`, all below AA. Measured with src/color.ts's own
- *  `contrastRatio` — an accessibility report whose own palette fails 1.4.3 has no standing. */
-const STYLE = `
- :root { color-scheme: light dark; --bg:#fff; --fg:#111; --line:#e3e3e6; --mut:#666; --soft:#f6f6f8;
-         --c:#0a7d33; --nc:#b3261e; --m:#b06000; --accent:#0b5fa5; }
- @media (prefers-color-scheme: dark) { :root { --bg:#141416; --fg:#f2f2f7; --line:#2c2c2e; --mut:#a1a1a6; --soft:#1c1c1f;
-         --c:#3fbf6f; --nc:#ff6b5e; --m:#d99a2b; --accent:#6cb6ff; } }
- * { box-sizing:border-box; }
- body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.6 ui-sans-serif,system-ui,-apple-system,sans-serif; }
- .skip { position:absolute; left:-9999px; top:0; padding:8px 14px; background:var(--bg); color:var(--fg); border:2px solid var(--accent); z-index:9; }
- .skip:focus { left:8px; top:8px; }
- .wrap { max-width:78ch; margin:0 auto; padding:32px 20px 64px; }
- header.top { border-bottom:1px solid var(--line); }
- h1 { font-size:26px; line-height:1.25; margin:0 0 6px; }
- h2 { font-size:20px; margin:36px 0 10px; padding-top:8px; border-top:1px solid var(--line); }
- h3 { font-size:17px; margin:26px 0 8px; }
- h4 { font-size:15px; margin:20px 0 6px; }
- p { margin:0 0 12px; } p.sub { color:var(--mut); margin:0 0 4px; }
- a { color:var(--accent); }
- a:focus-visible, summary:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
- nav.docs ul { list-style:none; display:flex; flex-wrap:wrap; gap:6px 16px; margin:12px 0 0; padding:0; }
- nav.docs [aria-current="page"] { font-weight:700; }
- code, .mono { font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
- ul.body { margin:0 0 12px; padding-left:22px; }
- .note { margin:0 0 14px; padding:10px 14px; border-left:4px solid var(--mut); background:var(--soft); }
- .note.warn { border-left-color:var(--m); }
- .tw { overflow-x:auto; margin:0 0 18px; }
- table { border-collapse:collapse; width:100%; font-size:14px; }
- caption { text-align:left; font-weight:600; padding:0 0 8px; }
- th, td { padding:6px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
- thead th { border-bottom:2px solid var(--line); background:var(--soft); }
- td.end, th.end { text-align:right; }
- tr.group th { background:var(--soft); font-weight:700; }
- .st { font-weight:700; }
- .st-c{color:var(--c)} .st-nc{color:var(--nc)} .st-na{color:var(--mut)} .st-m{color:var(--m)}
- figure { margin:0 0 18px; }
- figure img { max-width:100%; height:auto; border:1px solid var(--line); }
- figcaption { color:var(--mut); font-size:13px; margin-top:6px; }
- details { margin:0 0 14px; border:1px solid var(--line); padding:8px 12px; }
- summary { cursor:pointer; font-weight:600; }
- footer.bot { margin-top:48px; padding-top:12px; border-top:1px solid var(--line); color:var(--mut); font-size:13px; }
- @media print {
-   :root { --bg:#fff; --fg:#000; --line:#bbb; --mut:#444; --soft:#f2f2f2; --c:#0a7d33; --nc:#b3261e; --m:#8a4b00; --accent:#00449e; }
-   .skip, nav.docs { display:none; }
-   .wrap { max-width:none; padding:0; }
-   body { font-size:11pt; }
-   /* One criterion per block, never split across a page break — the whole point of a
-      printable deliverable is that a finding and its evidence stay on the same sheet. */
-   h2, h3 { break-after:avoid-page; page-break-after:avoid; }
-   figure, table, .note, details { break-inside:avoid-page; page-break-inside:avoid; }
-   details { border:0; padding:0; } details > summary { list-style:none; }
-   /* A collapsed section would print as a title with nothing under it. */
-   details[open], details:not([open]) > *:not(summary) { display:revert; }
-   figure img { max-width:16cm; }
-   a { color:inherit; text-decoration:underline; }
- }`;
 
 function runHtml(r: Run): string {
   let inner = esc(r.text);
@@ -206,7 +149,12 @@ function blockHtml(b: Block): string[] {
     case "list":
       return [`<ul class="body">${b.items.map((i) => `<li>${runsHtml(i)}</li>`).join("")}</ul>`];
     case "figure":
-      return [`<figure><img src="${esc(b.src)}" alt="${esc(b.alt)}">${b.caption ? `<figcaption>${esc(b.caption)}</figcaption>` : ""}</figure>`];
+      // A captioned image is tied to its caption the way RGAA 1.9.1 asks: `role="figure"` and
+      // an `aria-label` repeating the caption. Without them the engine's own rule flags every
+      // illustrated crop and component snapshot this renderer draws.
+      return [
+        `<figure${b.caption ? ` role="figure" aria-label="${esc(b.caption)}"` : ""}><img src="${esc(b.src)}" alt="${esc(b.alt)}">${b.caption ? `<figcaption>${esc(b.caption)}</figcaption>` : ""}</figure>`,
+      ];
     case "details":
       return [`<details open><summary>${esc(b.summary)}</summary>`, ...b.blocks.flatMap(blockHtml), "</details>"];
     case "table": {
@@ -233,21 +181,22 @@ function blockHtml(b: Block): string[] {
 
 /** The whole page. Self-contained by construction: the stylesheet is inline, there is no
  *  script, and every `src`/`href` a caller passes in is its own responsibility to keep
- *  inside the artifact (src/html-emit.ts enforces that). */
-export function renderHtmlDocument(doc: Doc): string {
+ *  inside the artifact (src/html-emit.ts enforces that). The look comes from `theme`
+ *  (src/theme.ts) and nothing else: swapping it changes no markup. */
+export function renderHtmlDocument(doc: Doc, theme: Theme = NEUTRAL_THEME): string {
   const t = T[doc.lang];
   const out: string[] = [];
   out.push(`<!doctype html>`, `<html lang="${doc.lang}">`, "<head>");
   out.push('<meta charset="utf-8">', '<meta name="viewport" content="width=device-width, initial-scale=1">');
   out.push(`<title>${esc(doc.title)}</title>`);
-  out.push(`<style>${STYLE}</style>`);
+  out.push(`<style>${theme.css}</style>`);
   out.push("</head>", "<body>");
   out.push(`<a class="skip" href="#content">${esc(t.skip)}</a>`);
   out.push('<header class="top"><div class="wrap">');
   out.push(`<h1>${esc(doc.title)}</h1>`);
   if (doc.subtitle?.length) out.push(`<p class="sub">${runsHtml(doc.subtitle)}</p>`);
   if (doc.nav?.length) {
-    out.push(`<nav class="docs" aria-label="${esc(t.nav)}"><ul>`);
+    out.push(`<nav class="docs" aria-label="${esc(doc.navLabel ?? t.nav)}"><ul>`);
     for (const l of doc.nav) out.push(`<li><a href="${esc(l.href)}"${l.current ? ' aria-current="page"' : ""}>${esc(l.text)}</a></li>`);
     out.push("</ul></nav>");
   }

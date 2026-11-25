@@ -149,7 +149,7 @@ Domain knowledge first, then the tooling. Read the one that matches the question
 | `references/harnesses.md` | Where this runs: Claude Code, Codex CLI, OpenCode 1.x and 2.x, and the AGENTS.md fallback |
 | `references/orchestrators.md` | Driving the engine from a workflow engine / non-GitHub CI: pinning, the six-step pipeline, exit codes, the ticket set as JSON for any tracker |
 | `references/ci.md` | CI: run iterion's `rgaa-audit` bot; the CLI contract it relies on |
-| `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), and its honesty rules |
+| `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), its honesty rules, and `serve` (the results site, its history, its static export) |
 | `references/e2e.md` | `ultra11y/playwright` Â· `ultra11y/cypress`: auditing a page during your E2E run |
 | `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
 | `references/journeys.md` | Journeys you write (`.ultra11y/journeys/`), replayed by `journey run` with axe and keyboard checks |
@@ -350,6 +350,7 @@ node scripts/ultra11y.mjs report --in audits/audit-latest.json --out audits  # â
 node scripts/ultra11y.mjs prd     --in audits/audit-latest.json              # the same auditor block as a backlog
 node scripts/ultra11y.mjs tickets --in audits/audit-latest.json --dry-run    # file it: GitHub/GitLab/Jira
 node scripts/ultra11y.mjs check  --report audits/rgaa-YYYY-MM-DD.md          # integrity gate
+node scripts/ultra11y.mjs serve                                              # browse audits/ and its history on http://127.0.0.1:4711/ (--static <dir> to export)
 node scripts/ultra11y.mjs criteria 8.3                                       # one RGAA criterion (--theme N, or the theme list)
 node scripts/ultra11y.mjs criteria --plan                                    # the work plan: what each evidence tier settles
 node scripts/ultra11y.mjs fix "src/**/*.html" --write --iterate               # apply the safe codemods to a fixpoint

@@ -624,7 +624,10 @@ export function documentsBlocks(result: AuditResult, lang: Lang): Block[] {
 
 /** THE ENTRY POINT. Dashboard only: identity, rate, synthesis, scoreboard, and the links out.
  *  It carries no image, so an artifact viewer opens it instantly however heavy the evidence. */
-export function indexDoc(result: AuditResult, opts: HtmlReportOpts & { links?: { href: string; text: string }[] } = {}): Doc {
+export function indexDoc(
+  result: AuditResult,
+  opts: HtmlReportOpts & { links?: { href: string; text: string }[]; sheetHref?: (id: string) => string } = {},
+): Doc {
   const standard = opts.standard ?? CORE;
   const lang = opts.lang ?? "en";
   const t = T[lang];
@@ -638,7 +641,7 @@ export function indexDoc(result: AuditResult, opts: HtmlReportOpts & { links?: {
   blocks.push(...synthesisBlocks(result, standard, lang));
   blocks.push(...criteriaGridBlocks(result, standard, lang));
   if (h.agentRuled) blocks.push({ kind: "note", tone: "warn", runs: ticks(agentMarkNote(lang)) });
-  blocks.push(...scoreboardBlocks(result, standard, lang));
+  blocks.push(...scoreboardBlocks(result, standard, lang, opts.sheetHref));
   blocks.push(...documentsBlocks(result, lang));
   return { lang, title: `${t.indexTitle} — ${stdName(standard)}`, subtitle: h.runs, ...(opts.nav ? { nav: opts.nav } : {}), blocks };
 }

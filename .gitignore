@@ -28,3 +28,6 @@ coverage/
 
 # Local artefacts of the impeccable skill (review captures, reports).
 /.impeccable/
+
+# The audit history fixtures of `serve` (tests/serve.test.ts) are an audits/ directory on purpose.
+!tests/fixtures/serve/audits/

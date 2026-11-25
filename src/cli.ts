@@ -107,6 +107,8 @@ import { parseOpencodeMajorFlag } from "./install/opencode.js";
 import { auditSummary, captureCoverageSummary } from "./output.js";
 import { evidenceNotice, writeEvidence } from "./evidence.js";
 import { writeHtml } from "./html-emit.js";
+import { DEFAULT_PORT, exportStatic, isLoopback, startServer } from "./serve.js";
+import { HISTORY_MAX_DEPTH, discoverAudits } from "./serve-history.js";
 import {
   PAGES_DIR,
   asScriptsDigest,
@@ -124,7 +126,7 @@ import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, u
 import { pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
 import { crawlBound, crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
 import { CORE_KEY, derivePackResults, resolveStandard, getPack, isCore, loadPack, findingsForStandard, type StandardId } from "./standards/index.js";
-import { auditDocumentFor, packAuditDocument, unwrapAudit } from "./standards/document.js";
+import { auditDocumentFor, isCurrentAudit, packAuditDocument, unwrapAudit } from "./standards/document.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
 import { buildManifest, listPhases, orchestrateRun, PHASES } from "./orchestrate.js";
 import { buildTrialSummary, formatTrialSummary } from "./trial-summary.js";
@@ -187,6 +189,8 @@ Usage:
   ultra11y install   --claude-code | --codex | --opencode | --agents-md | --all  [--project] [--dry-run] [--no-skills] [--opencode-version 1|2]
   ultra11y uninstall --claude-code | --codex | --opencode | --agents-md | --all  [--project]
   ultra11y status   [--json] [--project] [--browser [--cwd <dir>]]   (doctor: which agents run the review; --browser asks whether the scan tier resolves here)
+  ultra11y serve    [--in <dir>] [--root <dir>] [--port <n>] [--host <addr>] [--lang auto|en|fr]   (local, read-only results site over audits/ and its history)
+  ultra11y serve    [--in <dir>] [--root <dir>] --static <dir> [--lang auto|en|fr]   (the same pages as a static export, relative links only — GitHub Pages, iterion)
 
 Commands:
   audit      Run the static engine over the inputs (files/globs, or '-' for stdin)
@@ -360,6 +364,20 @@ Commands:
              UNATTRIBUTED, never spread across pages; and "no finding here" means
              conforming only for a page whose real rendered DOM was audited. A page
              known only by source attribution keeps its undecided criteria "to assess".
+  serve      The audit results as a small local site: every audit found in --in
+             (default: audits; any current audit JSON up to three levels deep, so
+             dated copies like audits/2026-09-01/audit-latest.json form the HISTORY),
+             each with its dashboard and grid of the 106 criteria, the conformity
+             rate and the mean page rate (the report's own figures), one sheet per
+             page with its screenshot, the journeys, the component snapshots and its
+             files; and, between two successive audits, the evolution: each criterion
+             whose status changed and the rate change in points. Read-only, node:http
+             only, bound to 127.0.0.1 (--host to open it), on --port (default 4711;
+             the next free port when busy). It serves files from the audits dir,
+             .ultra11y/pages and .ultra11y/render-snapshots only, never lists a
+             directory, and refuses any path that escapes them, links included.
+             --static <dir> writes the same pages as plain files with relative links,
+             so they publish as they are under a sub-path (GitHub Pages, iterion).
 
 Options:
   --out <dir>        output dir (report/prd/scan default: audits); for audit, persist
@@ -367,6 +385,11 @@ Options:
                      For audit, a value ending in .json is a FILE target (written exactly);
                      the path actually written is echoed on stderr
   --in <file>        report: the AuditResult JSON to render ('-' for stdin)
+                     · serve: the audits DIRECTORY to read (default: audits)
+  --port <n>         serve: the port to listen on (default 4711; 0 = any free port)
+  --host <addr>      serve: the address to bind (default 127.0.0.1; anything else exposes the
+                     results to the network — opt in knowingly)
+  --static <dir>     serve: write a static export of the site to <dir> instead of serving
   --include <glob>   audit/fix: only include paths matching (comma-separated)
   --exclude <glob>   audit/fix: skip paths matching (comma-separated)
   --ext <list>       audit/fix: extra file extensions to walk (e.g. .twig,.erb);
@@ -414,7 +437,7 @@ Options:
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
   --no-captures      audit: do NOT auto-detect/ingest .ultra11y/captures nor .ultra11y/pages
-  --root <dir>       snapshot, scan: project root holding
+  --root <dir>       snapshot, scan, serve: project root holding
                      .ultra11y/pages and .ultra11yrc.json (default: . — scan writes the
                      snapshots it collects under it)
   --glossary [<t>]   criteria: look up a term the country standard defines (or list all)
@@ -626,6 +649,7 @@ export const COMMANDS = [
   "status",
   "journey",
   "affected",
+  "serve",
 ] as const;
 type Command = (typeof COMMANDS)[number];
 
@@ -707,6 +731,10 @@ const VALUE_FLAGS = new Set([
   "glossary",
   // `tickets --transport auto|cli|rest`.
   "transport",
+  // `serve`: the port and bind address of the results server, and the static export target.
+  "port",
+  "host",
+  "static",
 ]);
 // Boolean flags documented in HELP (every valid flag that is NOT a value flag).
 // Paired with VALUE_FLAGS this is the full set of recognised long flags, used to
@@ -946,27 +974,6 @@ function stdOf(p: ParsedArgs, cmd: string): StandardId | null {
     console.error(`ultra11y ${cmd}: ${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
-}
-
-/** Current ultra11y AuditResult: WCAG-keyed, schema v2+. Rejects stale (pre-v2,
- *  RGAA-keyed) JSON so it is never silently mis-processed against the WCAG engine. */
-function isCurrentAudit(r: unknown): r is AuditResult {
-  const a = r as Partial<AuditResult> | null;
-  return (
-    !!a &&
-    a.tool === "ultra11y" &&
-    a.standard === "wcag" &&
-    typeof a.schemaVersion === "number" &&
-    a.schemaVersion >= 2 &&
-    Array.isArray(a.criteria) &&
-    // Require the fields the renderers dereference, so a shallow-fabricated object is
-    // rejected cleanly here instead of crashing report/prd with a raw TypeError.
-    typeof a.scope === "object" &&
-    a.scope !== null &&
-    Array.isArray(a.findings) &&
-    Array.isArray(a.residualRisks) &&
-    Array.isArray(a.guidelines)
-  );
 }
 
 /** Best-effort load of a `scan --merge <file>` AuditResult, used ONLY to inform
@@ -5101,6 +5108,88 @@ function cmdOrchestrate(p: ParsedArgs): number {
   return 0;
 }
 
+/** `serve` — the results site over the audits directory, or (`--static <dir>`) its export. */
+async function cmdServe(p: ParsedArgs): Promise<number> {
+  const standard = stdOf(p, "serve");
+  if (standard === null) return 2;
+  if (p.positionals.length) {
+    console.error(`ultra11y serve: unexpected argument "${p.positionals[0]}" — pass the audits directory with --in <dir>.`);
+    return 2;
+  }
+  const auditsDir = typeof p.flags.in === "string" && p.flags.in ? p.flags.in : "audits";
+  const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
+  if (!existsSync(auditsDir)) {
+    console.error(`ultra11y serve: audits directory not found: ${auditsDir} (run \`audit … --out ${auditsDir}\` first, or pass --in <dir>).`);
+    return 2;
+  }
+  const history = discoverAudits(resolve(auditsDir));
+  if (!history.length) {
+    console.error(`ultra11y serve: no ultra11y audit JSON found in ${auditsDir} (looked ${HISTORY_MAX_DEPTH} levels deep).`);
+    return 2;
+  }
+  const lang = resolveLang(p.flags, { audit: history.at(-1)!.result, standard });
+  const site = { auditsDir, root, lang, standard };
+
+  if (p.flags.static !== undefined) {
+    if (typeof p.flags.static !== "string" || !p.flags.static) {
+      console.error("ultra11y serve: --static needs a target directory (--static <dir>).");
+      return 2;
+    }
+    try {
+      const r = exportStatic({ ...site, outDir: p.flags.static });
+      console.log(
+        lang === "fr"
+          ? `Export statique → ${r.outDir} (${r.pages} page(s), ${r.files} fichier(s) copié(s), ${history.length} audit(s)).`
+          : `Static export → ${r.outDir} (${r.pages} page(s), ${r.files} file(s) copied, ${history.length} audit(s)).`,
+      );
+      return 0;
+    } catch (e) {
+      console.error(`ultra11y serve: ${e instanceof Error ? e.message : String(e)}`);
+      return 2;
+    }
+  }
+
+  let port = DEFAULT_PORT;
+  if (p.flags.port !== undefined) {
+    const n = typeof p.flags.port === "string" && /^\d+$/.test(p.flags.port) ? Number(p.flags.port) : Number.NaN;
+    if (!Number.isInteger(n) || n < 0 || n > 65535) {
+      console.error(`ultra11y serve: --port must be an integer between 0 and 65535 (got "${String(p.flags.port)}").`);
+      return 2;
+    }
+    port = n;
+  }
+  const host = typeof p.flags.host === "string" && p.flags.host ? p.flags.host : "127.0.0.1";
+  let running: Awaited<ReturnType<typeof startServer>>;
+  try {
+    running = await startServer({ ...site, host, port });
+  } catch (e) {
+    console.error(`ultra11y serve: cannot listen on ${host}:${port}: ${e instanceof Error ? e.message : String(e)}`);
+    return 1;
+  }
+  if (running.port !== port && port !== 0)
+    console.error(lang === "fr" ? `Port ${port} occupé : ${running.port} utilisé à la place.` : `Port ${port} busy: using ${running.port} instead.`);
+  if (!isLoopback(host))
+    console.error(
+      lang === "fr"
+        ? `Attention : lié à ${host}, les résultats sont visibles depuis le réseau.`
+        : `Warning: bound to ${host}, the results are reachable from the network.`,
+    );
+  console.log(
+    lang === "fr"
+      ? `Résultats d'accessibilité sur ${running.url} (${history.length} audit(s), lecture seule). Ctrl+C pour arrêter.`
+      : `Accessibility results on ${running.url} (${history.length} audit(s), read-only). Ctrl+C to stop.`,
+  );
+  return new Promise<number>((done) => {
+    const stop = (): void => {
+      process.off("SIGINT", stop);
+      process.off("SIGTERM", stop);
+      void running.close().then(() => done(0));
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
+}
+
 export async function main(argv: string[]): Promise<number> {
   const first = argv[0];
 
@@ -5263,6 +5352,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdJourney(p);
     case "affected":
       return cmdAffected(p);
+    case "serve":
+      return cmdServe(p);
     default:
       console.error(`ultra11y: "${p.command}" is not implemented yet`);
       return 1;

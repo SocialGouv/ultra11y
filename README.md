@@ -94,6 +94,7 @@ lancer elle-même, avec `npx ultra11y <commande>` (tout le reste : `npx ultra11y
 | `journey run --all --keyboard --merge audits/audit-latest.json` | rejoue au clavier les parcours écrits par l’agent ([`journeys.md`](skills/ultra11y/references/journeys.md)) |
 | `report --in audits/audit-latest.json --html` | écrit le rapport daté |
 | `pages --in audits/audit-latest.json --format report --split page` | un dossier par page |
+| `serve` · `serve --static site` | consulte les résultats et leur historique en local, ou les exporte en pages statiques |
 | `check --report <rapport.md>` | contrôle l’intégrité d’un rapport |
 | `tickets --in audits/audit-latest.json --dry-run` | prépare les tickets GitHub, GitLab ou Jira |
 | `criteria 8.3` | texte officiel d’un critère, ses tests, le glossaire |

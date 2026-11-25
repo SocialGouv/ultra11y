@@ -1,0 +1,42 @@
+{
+  "v": 1,
+  "context": "isolated-component",
+  "date": "2026-10-15",
+  "browser": "chromium 140",
+  "styles": {
+    "status": "project",
+    "files": [
+      {
+        "file": "src/styles.css",
+        "via": "import"
+      }
+    ],
+    "skipped": []
+  },
+  "units": [
+    {
+      "id": "src-button-Button",
+      "file": "src/button.tsx",
+      "export": "Button",
+      "component": "Button",
+      "kind": "component",
+      "capture": ".ultra11y/captures/src-button-Button.html",
+      "status": "snapshotted",
+      "screenshot": ".ultra11y/render-snapshots/src-button-Button.png",
+      "width": 120,
+      "height": 40,
+      "violations": [
+        {
+          "rule": "button-name",
+          "criteriaId": "4.1.2",
+          "impact": "critical",
+          "help": "Buttons must have discernible text",
+          "nodes": 1,
+          "target": "button",
+          "html": "<button></button>",
+          "counted": true
+        }
+      ]
+    }
+  ]
+}
