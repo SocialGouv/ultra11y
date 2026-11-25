@@ -71,6 +71,59 @@ verdict défendable et enregistré, jamais inventé, jamais « conforme » en si
    sont rendus à nouveau avec les statuts arbitrés ; le §5 se réduit aux seuls items encore
    `manual`.
 
+### Statuer page par page (`pages`)
+
+Un verdict peut porter une table `pages`, indexée par identifiant de page auditée, dont chaque
+entrée `{ verdict: "C" | "NC" | "NA", justification, citations?, findings?, notShownHere? }`
+passe le même garde-fou que le verdict global, restreint à CETTE page : chaque citation et
+chaque constat nomme la capture de la page (`.ultra11y/pages/<id>/dom.html`) ou une source
+qu’elle déclare. Une page qu’on ne sait pas trancher reste hors de la table et garde le verdict
+global. Trois cas que le garde-fou accepte, sans jamais déclarer conforme ce qui n’a pas été
+vérifié :
+
+- **Sous un verdict global `manual`.** Un critère qui reste « à évaluer » pour l’ensemble peut
+  quand même trancher les pages qu’on sait trancher : la ligne du rapport reste « à évaluer »,
+  chaque page nommée reçoit son `C` ou son `NA`. Un `NC` de page y est refusé : un critère en
+  échec sur une page est `NC` pour tout le run — rendez alors un `NC` global.
+- **Un `NA` de page sur une page sans le sujet.** Une page sans image ne porte aucune preuve de
+  1.6 ou 1.8, donc rien de récolté à citer. Elle prouve son absence autrement : citez la capture
+  de CETTE page à l’endroit où vous avez cherché le sujet (`file` = `.ultra11y/pages/<id>/dom.html`,
+  avec `line` et `snippet` de l’élément inspecté, son `<main>` par exemple) ; la citation est
+  relue dans le fichier comme n’importe quelle autre. La citation est inutile quand le recensement
+  par page du moteur (`scope.pageSubjects`) prouve déjà que le sujet en est absent. Un `NA` de
+  page sans l’un ni l’autre est refusé.
+- **Un constat global ancré sur la page, mais pas affiché sur cette page.** Un `NC` global dont
+  le constat est ancré dans le DOM d’une page interdit en principe un `C`/`NA` sur cette page.
+  Quand le défaut n’y est PAS montré (11.11 sur l’état de départ d’un parcours, où le message
+  d’erreur ne s’affiche pas encore), nommez ce constat dans `notShownHere: ["<file>:<line>"]`,
+  écrit exactement comme dans `findings`, et fondez le verdict de page sur les preuves propres à
+  la page. Le `NC` global reste entier. Un constat qui siège sur la page sans être nommé refuse
+  toujours la page, et une entrée de `notShownHere` qui ne nomme aucun constat global de cette
+  page est refusée.
+
+### Les critères qu’on ne peut pas trancher : `--allow-undecided`
+
+`check --require-decided[=pages]` échoue tant qu’un critère reste « à évaluer ». Un critère qui
+ne PEUT pas être tranché (indécidable depuis les captures, qui demande un humain) se déclare
+dans un fichier JSON passé à `--allow-undecided <file>`, par convention
+`.ultra11y/undecidable-<standard>.json` :
+
+```json
+{
+  "standard": "rgaa",
+  "entries": [
+    { "criteriaId": "4.1", "reason": "Les transcriptions des vidéos sont hébergées hors du périmètre audité.", "recordedBy": "Équipe accessibilité", "date": "2026-11-25" }
+  ]
+}
+```
+
+Seul `entries` est exigé ; chaque entrée exige `criteriaId` (l’identifiant du référentiel actif)
+et une `reason` non vide — `recordedBy` et `date` sont facultatifs, comme `standard` (informatif). C’est une liste NOMMÉE, jamais une tolérance : une entrée sans raison fait échouer
+le contrôle, et une entrée dont le critère a désormais un verdict aussi (exemption périmée — à
+retirer du fichier, ou à ignorer pour un rafraîchissement avec `--allow-stale-undecided`). Sous
+`=pages`, une déclaration couvre le critère sur chaque page. Le même fichier sert à
+`check --require-rendered`.
+
 ### Le protocole de décision
 
 Chaque critère résiduel de `ADJUDICATE.md` est pré-chargé, à côté des preuves récoltées, avec

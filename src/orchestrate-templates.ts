@@ -99,10 +99,16 @@ const ADJUDICATE_SCHEMA = {
                   items: CITATION_ITEMS,
                 },
                 findings: { type: "array", description: "REQUIRED (>=1, groundable) for a per-page NC", items: FINDING_ITEMS },
+                notShownHere: {
+                  type: "array",
+                  description:
+                    'OPTIONAL on a per-page C/NA: the run-wide NC findings ("file:line") anchored on this page whose defect is NOT shown here (a journey state where the error is not displayed)',
+                  items: { type: "string" },
+                },
               },
             },
             description:
-              "OPTIONAL on a decided C/NC/NA verdict: per-page outcomes keyed by AUDITED PAGE id (the worklist header lists them). Each page verdict passes the same gate as the run-level verdict, scoped to that page: every citation and finding names the page's own capture (.ultra11y/pages/<id>/dom.html) or a source it declares. A page NC needs a run-wide NC; no page C/NA where a run-wide NC finding sits. A page left unnamed keeps the run-wide verdict — there is no per-page manual. A page whose subject is clean gets its own C; a page whose subject fails gets its own NC.",
+              "OPTIONAL on any verdict, a still-manual one included: per-page outcomes keyed by AUDITED PAGE id (the worklist header lists them). Each page verdict passes the same gate as the run-level verdict, scoped to that page: every citation and finding names the page's own capture (.ultra11y/pages/<id>/dom.html) or a source it declares. A page NC needs a run-wide NC; no page C/NA where a run-wide NC finding sits, unless its defect is not shown on that page and notShownHere names it. A page NA on a page without the criterion's evidence cites the page's own capture where the absence was observed. A page left unnamed keeps the run-wide verdict — there is no per-page manual. A page whose subject is clean gets its own C; a page whose subject fails gets its own NC.",
           },
         },
       },

@@ -679,8 +679,9 @@ function adjudicationOnPage(
     // run-wide handling below, unchanged.
     const outcome = c.pages?.[page.id];
     if (outcome) {
-      // The run-wide citations are other pages' evidence: the page shows only its own.
-      const { pages: _perPage, citations: _runCitations, ...rest } = c;
+      // The run-wide citations are other pages' evidence: the page shows only its own. A
+      // still-manual run-wide entry (#231) also loses its `reason`: this page is decided.
+      const { pages: _perPage, citations: _runCitations, reason: _runReason, ...rest } = c;
       return [
         {
           ...rest,

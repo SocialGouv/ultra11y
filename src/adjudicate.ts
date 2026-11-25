@@ -39,6 +39,7 @@ import {
   harvestSubjects,
   isSnapshotFile,
   pageOfDoc,
+  subjectsAbsent,
   subjectsForPackCriterion,
   subjectsForSc,
 } from "./adjudicate-subjects.js";
@@ -163,6 +164,11 @@ export interface PageVerdict {
   justification: string;
   citations?: (Evidence | string)[];
   findings?: AgentFinding[];
+  /** #231 — run-wide NC findings (`file:line`, as written in the verdict's `findings`) whose
+   *  anchor sits in this page's capture or sources while the defect is NOT shown on this page
+   *  (a journey state where the error is not displayed). Only on a page C or NA, which is then
+   *  gated on this page's own evidence like any other. */
+  notShownHere?: string[];
 }
 
 /** A page outcome's findings as the fold gates them (#197): object entries naming a file. Read
@@ -179,6 +185,14 @@ export function gatedPageFindings(raw: unknown): AgentFinding[] {
 /** A page outcome's justification, trimmed, or "" when it is not a string. */
 export function pageJustification(raw: unknown): string {
   return typeof raw === "string" ? raw.trim() : "";
+}
+
+/** A page outcome's `notShownHere` (#231) as the fold gates it: trimmed `file:line` strings,
+ *  anything else dropped (the fold refuses a malformed list by name). */
+export function pageNotShown(pv: unknown): string[] {
+  const raw = (pv as { notShownHere?: unknown } | null)?.notShownHere;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim());
 }
 
 export interface AdjudicationItem {
@@ -295,7 +309,7 @@ export function adjudicationContract(): AdjudicationContract {
       NA: "a non-empty justification, and citations[] whenever evidence was presented — a criterion whose subject exists NOWHERE in the audited scope is NA, never NC",
       NC: "at least one groundable finding, each naming the `file` it was observed in (an NC with no location is refused as flatly as an uncited C — and a non-conformity that rests on an ABSENCE is still observed on an element of a page, so cite that element) and each citing a normativeRef that resolves against the active standard",
       manual: `a reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`,
-      pages: `optional on a decided verdict (C, NC or NA): PER-PAGE OUTCOMES (#197), keyed by AUDITED PAGE id — { "<page id>": { verdict: "C" | "NC" | "NA", justification, citations?, findings? } }. Each page verdict passes the SAME gate as the run-level one (justification and citations for a C/NA, groundable findings each citing a test of this criterion for an NC), scoped to THAT page: every citation and finding names the page's own capture (.ultra11y/pages/<id>/dom.html) or a source the page declares — a verdict settled on another page's evidence covers only that other page. It must agree with the run-wide verdict: a page NC only under a run-wide NC, a page C never under a run-wide NA, and no page C/NA where a run-wide NC finding sits. A page left unnamed keeps the run-wide verdict; there is no per-page "manual" — a page you cannot decide stays out of the map, and a still-manual criterion carries no pages. Pack standards only: the WCAG core has no page grid of its own`,
+      pages: `optional on any verdict, a still-manual one included (#231: the run-wide row stays open, the pages it could settle are settled): PER-PAGE OUTCOMES (#197), keyed by AUDITED PAGE id — { "<page id>": { verdict: "C" | "NC" | "NA", justification, citations?, findings?, notShownHere? } }. Each page verdict passes the SAME gate as the run-level one (justification and citations for a C/NA, groundable findings each citing a test of this criterion for an NC), scoped to THAT page: every citation and finding names the page's own capture (.ultra11y/pages/<id>/dom.html) or a source the page declares — a verdict settled on another page's evidence covers only that other page. It must agree with the run-wide verdict: a page NC only under a run-wide NC, a page C never under a run-wide NA, and no page C/NA where a run-wide NC finding sits unless its defect is NOT shown on that page (a journey state where the error is not displayed) and the page names it in notShownHere: ["file:line"], and no page NC under a still-manual verdict. A page NA on a page carrying none of the criterion's evidence still grounds the absence: it cites the page's own capture at the element searched (its <main>), unless the engine's per-page census already proves the subject absent there. A page left unnamed keeps the run-wide verdict; there is no per-page "manual" — a page you cannot decide stays out of the map. Pack standards only: the WCAG core has no page grid of its own`,
       human: `decidedBy "human" (a human auditor's verdict, instead of the default "agent") requires auditor: { name, organisation? } — the same evidence gate applies, and the verdict is reported under the auditor's name`,
       recommendations: RECOMMENDATION_SHAPE,
       severity: `on every NC finding: ${(Object.entries(SEVERITY_RUBRIC) as [string, { en: string }][]).map(([k, v]) => `${k} = ${v.en}`).join("; ")}. One defect at one anchor keeps ONE severity, the highest, even when two criteria cite it; a recommendation is always mineur`,
@@ -1415,6 +1429,17 @@ export function applyAdjudication(
   // only an item carrying a `pages` map ever asks for it.
   let auditPageCache: Map<string, PageScope> | undefined;
   const auditPageScopes = (): Map<string, PageScope> => (auditPageCache ??= new Map(pagesOf(audit).map((p) => [p.id, p])));
+  /** Did the engine's own per-page census (`scope.pageSubjects`, read from the page's capture)
+   *  find none of this criterion's subjects on that page? The same test the page grid uses to
+   *  close a criterion for absence on one page (src/pages.ts adjudicationOnPage): only
+   *  existence subjects conclude, and an audit without the census reads « unknown », never
+   *  « nothing ». */
+  const subjectAbsentOnPage = (criteriaId: string, pageId: string): boolean => {
+    const seen = audit.scope.pageSubjects?.[pageId];
+    if (!seen || !packMode) return false;
+    const wcag = getCriterion(loadPack(adj.standard), criteriaId)?.wcag ?? [];
+    return subjectsAbsent(subjectsForPackCriterion(adj.standard, criteriaId, wcag), new Set(seen));
+  };
   for (const it of adj.items) {
     // A surplus verdict is already blamed above (« not open for adjudication ») and the fold
     // below records nothing for it. Gating it further would read `it.evidence` — which
@@ -1547,14 +1572,16 @@ export function applyAdjudication(
           it.criteriaId,
           `criterion ${it.criteriaId}: "pages" must be an object keyed by audited page id (got ${Array.isArray(rawPages) ? "an array" : typeof rawPages})`,
         );
-      } else if (v !== "C" && v !== "NC" && v !== "NA") {
-        // A page outcome REFINES a decided verdict. Under a run-wide `manual` the report row
-        // would stay « à évaluer » while the grid claimed decisions the run never stood behind.
-        blame(
-          it.criteriaId,
-          `criterion ${it.criteriaId}: per-page outcomes ("pages") refine a decided run-wide verdict (C, NC or NA) — a still-manual criterion carries none`,
-        );
+      } else if (v !== "C" && v !== "NC" && v !== "NA" && v !== "manual") {
+        // A null or unknown run-wide verdict is already refused above: there is nothing to refine.
       } else {
+        // #231 — A STILL-MANUAL CRITERION MAY SETTLE SOME OF ITS PAGES. The run-wide row stays
+        // « à évaluer », as the verdict says, but a page the adjudicator could decide on its own
+        // evidence no longer waits for the whole run: measured on a full audit, the 29 pages
+        // carrying no image at all stayed « à évaluer » for RGAA 1.6 and 1.8 because the one
+        // page with an image could not be settled. Every page gate below still applies; only a
+        // page NC is refused under it (the consistency check), since a criterion failing on one
+        // page is NC run-wide and an open row would understate that failure.
         const auditPages = auditPageScopes();
         const runFindings = v === "NC" ? (it.findings ?? []).filter((f) => typeof f?.file === "string") : [];
         for (const [pageId, rawPv] of Object.entries(rawPages as Record<string, unknown>)) {
@@ -1606,12 +1633,40 @@ export function applyAdjudication(
             blame(it.criteriaId, `${subject}: a page C under a run-wide NA contradicts it — the run-wide NA says no page carries the criterion's subject`);
             continue;
           }
+          // #231 — A RUN-WIDE FINDING ANCHORED ON THIS PAGE BUT NOT SHOWN HERE. A run-wide NC
+          // finding whose anchor sits in this page's DOM forbade any page C/NA, even where the
+          // defect is not displayed: RGAA 11.11 on a journey's start state, where the form is
+          // rendered but the error message the finding is about only appears on a later state.
+          // The adjudicator may name such a finding in `notShownHere`; the page verdict is then
+          // gated like any other — a justification, and citations of THIS page's own evidence —
+          // so it rests on what this page shows, never on silence. The run-wide NC stands.
+          // Fail-closed both ways: a clashing finding left unnamed still refuses the page, and an
+          // entry naming no run-wide finding on this page is refused as junk.
+          const rawNotShown = (pv as { notShownHere?: unknown }).notShownHere;
+          if (rawNotShown !== undefined && (!Array.isArray(rawNotShown) || rawNotShown.some((x) => typeof x !== "string"))) {
+            blame(it.criteriaId, `${subject}: "notShownHere" must be an array of "file:line" strings naming run-wide NC findings`);
+            continue;
+          }
+          const notShown = new Set(pageNotShown(pv));
+          if (notShown.size && pageV === "NC") {
+            blame(it.criteriaId, `${subject}: "notShownHere" releases run-wide findings from a page C or NA — a page NC rests on its own findings`);
+            continue;
+          }
           if (pageV !== "NC") {
-            const clash = runFindings.find((f) => fileOnPage(f.file, page));
+            const clashes = runFindings.filter((f) => fileOnPage(f.file, page));
+            const clash = clashes.find((f) => !notShown.has(`${f.file}:${f.line}`));
             if (clash) {
               blame(
                 it.criteriaId,
-                `${subject}: a page ${pageV} contradicts the run-wide NC finding ${clash.file}:${clash.line}, which sits on this page — rule the page NC on that finding, or leave it out of the map`,
+                `${subject}: a page ${pageV} contradicts the run-wide NC finding ${clash.file}:${clash.line}, which sits on this page — rule the page NC on that finding, leave it out of the map, or, when that defect is not shown on this page (a journey state where the error is not displayed), name it in notShownHere: ["${clash.file}:${clash.line}"] and cite this page's own evidence`,
+              );
+              continue;
+            }
+            const stray = [...notShown].find((k) => !clashes.some((f) => `${f.file}:${f.line}` === k));
+            if (stray) {
+              blame(
+                it.criteriaId,
+                `${subject}: notShownHere names ${stray}, which is not a run-wide NC finding sitting on this page — list only the verdict's own findings ("file:line", as written in "findings") anchored in this page's capture or sources`,
               );
               continue;
             }
@@ -1652,6 +1707,18 @@ export function applyAdjudication(
               blame(
                 it.criteriaId,
                 `${subject}: applies to every page with content — « non applicable » is refused. Rule C or NC on the page's own evidence, or leave the page out of the map`,
+              );
+            // #231 — A PAGE NA WITHOUT THE SUBJECT IS STILL GROUNDED. Such a page carries none of
+            // the criterion's evidence by construction, so it has nothing harvested to cite; what
+            // it can show is WHERE the absence was observed — the page's own capture, at the
+            // element that was searched (its <main>, its <form>), cited and grounded like any
+            // citation (on-page, then literally re-read from the file). Or the engine proved it
+            // already: its per-page subject census (`scope.pageSubjects`, read from that capture)
+            // holds none of the criterion's subjects. An NA with neither rests on nothing.
+            if (pageV === "NA" && pageEvidence.length === 0 && pageCites.length === 0 && !subjectAbsentOnPage(it.criteriaId, pageId))
+              blame(
+                it.criteriaId,
+                `${subject}: a NA verdict on a page that carries none of this criterion's evidence must still ground the absence — cite this page's own capture where you searched for the subject (file ".ultra11y/pages/${pageId}/dom.html", with the line and snippet of the element you inspected, e.g. its <main>), or leave the page out of the map`,
               );
             if (pageEvidence.length > 0 && pageCites.length === 0)
               blame(
@@ -1806,6 +1873,8 @@ export function applyAdjudication(
           justification: it.reason === "needs-rendered-dom" ? residualScanReason() : residualUndecidableReason(),
           findings: [],
           ...ruledBy(it),
+          // #231: the pages it could settle, each re-gated above; the run-wide row stays open.
+          ...recordedPages(it),
         });
         continue;
       }
@@ -2066,8 +2135,8 @@ function ruledBy(it: AdjudicationItem): { decidedBy: "agent" | "human"; auditor?
 
 /** The per-page outcomes (#197) a verdict carries, converted exactly like the run-level one:
  *  each page's citations through the `citationsOf` mapping, each page's NC findings through
- *  `agentFinding`. Only a decided verdict carries them (the fold refuses pages on a `manual`),
- *  and a refused item never reaches here.
+ *  `agentFinding`. A still-`manual` verdict may carry them too (#231: the pages it could settle,
+ *  never a page NC), and a refused item never reaches here.
  *
  *  Returns a SPREADABLE object, like `citationsOf`: a verdict without per-page outcomes writes
  *  no `pages` key at all, so the recorded shape of every pre-existing verdict is unchanged. */
@@ -2087,10 +2156,12 @@ function recordedPages(it: AdjudicationItem): { pages?: Record<string, PackPageA
     // Only what the gate checked: object findings naming a file, a string justification.
     const fs = status === "NC" ? gatedPageFindings(pv.findings).map((f) => agentFinding(it.criteriaId, f)) : [];
     const justification = pageJustification(pv.justification);
+    const notShownHere = status === "NC" ? [] : pageNotShown(pv);
     out[pageId] = {
       status,
       ...(justification ? { justification } : {}),
       ...(status === "NC" ? (fs.length ? { findings: fs } : {}) : { ...citesRecord(Array.isArray(pv.citations) ? pv.citations : []) }),
+      ...(notShownHere.length ? { notShownHere } : {}),
     };
   }
   return Object.keys(out).length ? { pages: out } : {};
@@ -2540,12 +2611,15 @@ const ADJUDICATION_REF_TEXT = {
       "  du critère ; `verify --apply` rejette un `normativeRef` qui n’existe pas.",
       "- **Une bonne pratique sans test en échec est une recommandation**, pas une non-conformité — elle",
       "  ne fait jamais basculer un critère et n’entre jamais dans le taux de conformité.",
-      "- **Un verdict tranché peut statuer sur chaque page de l’audit** (#197) : une table `pages`",
+      "- **Un verdict peut statuer sur chaque page de l’audit** (#197) : une table `pages`",
       "  facultative, indexée par identifiant de page auditée, porte des résultats par page, chacun",
       "  passant le même contrôle fermé par défaut, restreint à cette page — chaque citation et chaque",
       "  constat nomme la capture propre de la page ou une source qu’elle déclare. Un `NC` de page exige",
-      "  un `NC` global. Une page non nommée garde le verdict global ; une page dont le sujet est sain",
-      "  reçoit son propre `C`, une page dont le sujet échoue son propre `NC`.",
+      "  un `NC` global ; un verdict global `manual` peut trancher ses pages en `C` ou `NA` (#231). Un",
+      "  `NA` de page sans preuve du critère cite la capture de la page là où l’absence a été constatée,",
+      "  et `notShownHere` nomme un constat global ancré sur la page mais qui n’y est pas affiché",
+      "  (`references/judgment.md`). Une page non nommée garde le verdict global ; une page dont le",
+      "  sujet est sain reçoit son propre `C`, une page dont le sujet échoue son propre `NC`.",
     ],
     theme: (n: number, title: string) => `## Thématique ${n} — ${title}`,
     tests: "**Tests citables.**",

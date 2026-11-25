@@ -251,15 +251,36 @@ describe("a verdict may settle each audited page (#197)", () => {
     expect(derivePackResults(result, "rgaa").find((c) => c.id === "1.1")?.status).toBe("NC");
   });
 
-  it("refuses per-page outcomes on a still-manual verdict: a page refines a decided verdict", () => {
+  it("settles the pages it can under a still-manual verdict, and the run-wide row stays open (#231)", () => {
     const r = fold112(
       { good: { verdict: "C", justification: "Étiquette pertinente sur cette page.", citations: [{ ...GOOD_CAPTURE_ANCHOR }] } },
       { verdict: "manual", reason: "undecidable" },
       true,
     );
+    expect(r.rejectedCriteria, r.issues.join("\n")).toEqual([]);
+    const entry = r.audit.packAdjudication?.criteria.find((c) => c.id === "11.2");
+    expect(entry?.status).toBe("manual");
+    expect(entry?.pages?.good).toMatchObject({ status: "C" });
+    expect(derivePackResults(r.audit, "rgaa").find((c) => c.id === "11.2")?.status).toBe("manual");
+    expect(rowOn(r.audit, 1, "11.2")).toMatchObject({ status: "C" });
+    expect(rowOn(r.audit, 0, "11.2")?.status, "an unnamed page keeps the run-wide abstention").toBe("manual");
+  });
+
+  it("refuses a page NC under a still-manual verdict: a criterion failing on one page is NC run-wide", () => {
+    const r = fold112(
+      { bad: { verdict: "NC", justification: "Étiquette non pertinente.", findings: [{ ...CAPTURE_FINDING }] } },
+      { verdict: "manual", reason: "undecidable", findings: [] },
+      true,
+    );
     expect(r.rejectedCriteria).toContain("11.2");
-    expect(r.issues.join("\n")).toMatch(/refine a decided run-wide verdict/);
+    expect(r.issues.join("\n")).toMatch(/a page NC under a run-wide manual contradicts it/);
     expect(r.audit.packAdjudication?.criteria.find((c) => c.id === "11.2")?.pages).toBeUndefined();
+  });
+
+  it("still gates every page outcome under a still-manual verdict: an uncited page C is refused", () => {
+    const r = fold112({ good: { verdict: "C", justification: "Étiquette pertinente." } }, { verdict: "manual", reason: "undecidable" }, true);
+    expect(r.rejectedCriteria).toContain("11.2");
+    expect(r.issues.join("\n")).toMatch(/must cite at least one of/);
   });
 
   it("records no pages key for a verdict that carries none, so every earlier shape is unchanged", () => {
@@ -418,6 +439,134 @@ describe("the gate refuses a page outcome that fails its own gate (#197)", () =>
   it("refuses junk in a page outcome instead of crashing on it", () => {
     const r = fold112({ good: { verdict: "C", justification: "x", citations: "good.html:3" as unknown as Evidence[] } }, {}, true);
     expectRefused(r, /"citations" must be an array/, "good");
+  });
+});
+
+describe("a page NA on a page without the subject is grounded in an absence proof (#231)", () => {
+  // 11.2's label class is harvested on both sources: keep bad's representative alone, so page
+  // `good` carries none of the criterion's evidence — the shape of the 29 image-less pages.
+  const foldBadOnly = (good: RawPageVerdict, prepare?: (audit: AuditResult) => void): ApplyAdjudicationResult => {
+    const audit = auditOf();
+    prepare?.(audit);
+    const item = plainItem(audit);
+    const ruled = {
+      ...item,
+      evidence: item.evidence.filter((e) => e.file === bad).map(({ alsoAt: _also, occurrences: _n, ...e }) => e),
+      verdict: "manual",
+      reason: "undecidable",
+      pages: { good },
+    } as unknown as AdjudicationItem;
+    return applyAdjudication(audit, file([ruled]), { cwd: dir });
+  };
+  /** Where the absence was observed: page good's own `<main>`, in a source the page declares. */
+  const MAIN_OF_GOOD: Evidence = { file: good, line: 2, selector: "main", snippet: "<main>" };
+
+  it("refuses an uncited page NA with no census: an NA with nothing under it", () => {
+    const r = foldBadOnly({ verdict: "NA", justification: "Aucun champ sur cette page." });
+    expect(r.rejectedCriteria).toContain("11.2");
+    expect(r.issues.join("\n")).toMatch(
+      /criterion 11\.2, page good: a NA verdict on a page that carries none of this criterion's evidence must still ground the absence/,
+    );
+  });
+
+  it("accepts a page NA citing the page's own markup where the absence was observed", () => {
+    const r = foldBadOnly({ verdict: "NA", justification: "Le <main> de cette page ne porte aucun champ.", citations: [{ ...MAIN_OF_GOOD }] });
+    expect(r.rejectedCriteria, r.issues.join("\n")).toEqual([]);
+    expect(r.audit.packAdjudication?.criteria.find((c) => c.id === "11.2")?.pages?.good).toMatchObject({ status: "NA" });
+    expect(rowOn(r.audit, 1, "11.2")).toMatchObject({ status: "C", inapplicable: true });
+  });
+
+  it("refuses an absence citation the page does not hold — grounding still re-reads the file", () => {
+    const r = foldBadOnly({ verdict: "NA", justification: "Rien ici.", citations: [{ ...MAIN_OF_GOOD, snippet: "<aside>nothing</aside>" }] });
+    expect(r.rejectedCriteria).toContain("11.2");
+    expect(r.issues.join("\n")).toMatch(/page good: cited snippet not found/);
+  });
+
+  it("refuses an absence citation of ANOTHER page's markup", () => {
+    const r = foldBadOnly({ verdict: "NA", justification: "Rien ici.", citations: [{ ...MAIN_OF_GOOD, file: bad }] });
+    expect(r.rejectedCriteria).toContain("11.2");
+    expect(r.issues.join("\n")).toMatch(/is not this page's evidence/);
+  });
+
+  it("accepts an uncited page NA when the engine's per-page census proves the subject absent there", () => {
+    const r = foldBadOnly({ verdict: "NA", justification: "Aucun champ sur cette page." }, (audit) => {
+      // The census read page good's capture and found none of the criterion's subjects.
+      audit.scope.pageSubjects = { bad: [...(audit.scope.subjectsSeen ?? [])], good: [] };
+    });
+    expect(r.rejectedCriteria, r.issues.join("\n")).toEqual([]);
+  });
+});
+
+describe("a run-wide finding anchored on a page but not shown there (#231)", () => {
+  // The run-wide NC rests on bad's CAPTURE (a journey state's DOM), and page bad is ruled C on
+  // its own evidence while naming that finding as not shown on this page.
+  const FINDING_REF = `${badCapture}:${CAPTURE_LINE}`;
+  const badC = (extra: Partial<RawPageVerdict> & { notShownHere?: unknown } = {}): Record<string, RawPageVerdict> => ({
+    bad: {
+      verdict: "C",
+      justification: "L'erreur n'est pas affichée dans cet état ; l'étiquette est pertinente.",
+      citations: [{ ...BAD_CAPTURE_ANCHOR }],
+      ...extra,
+    },
+  });
+  const ncOnCapture = { findings: [{ ...CAPTURE_FINDING }] };
+
+  it("still refuses the page C when the finding is not named", () => {
+    const r = fold112(badC(), ncOnCapture, true);
+    expect(r.rejectedCriteria).toContain("11.2");
+    expect(r.issues.join("\n")).toMatch(/contradicts the run-wide NC finding .*notShownHere/);
+  });
+
+  it("accepts a grounded page C that names the finding in notShownHere, keeps the run-wide NC, and records it", () => {
+    const r = fold112(badC({ notShownHere: [FINDING_REF] } as Partial<RawPageVerdict>), ncOnCapture, true);
+    expect(r.rejectedCriteria, r.issues.join("\n")).toEqual([]);
+    const entry = r.audit.packAdjudication?.criteria.find((c) => c.id === "11.2");
+    expect(entry?.status).toBe("NC");
+    expect(entry?.pages?.bad).toMatchObject({ status: "C", notShownHere: [FINDING_REF] });
+    expect(derivePackResults(r.audit, "rgaa").find((c) => c.id === "11.2")?.status).toBe("NC");
+    expect(rowOn(r.audit, 0, "11.2")).toMatchObject({ status: "C" });
+  });
+
+  it("refuses the override when the page C cites nothing of its own", () => {
+    const r = fold112(badC({ citations: [], notShownHere: [FINDING_REF] } as Partial<RawPageVerdict>), ncOnCapture, true);
+    expect(r.rejectedCriteria).toContain("11.2");
+    expect(r.issues.join("\n")).toMatch(/must cite at least one of/);
+  });
+
+  it("refuses a notShownHere entry naming no run-wide finding on this page", () => {
+    const r = fold112(badC({ notShownHere: [FINDING_REF, `${badCapture}:99`] } as Partial<RawPageVerdict>), ncOnCapture, true);
+    expect(r.rejectedCriteria).toContain("11.2");
+    expect(r.issues.join("\n")).toMatch(/notShownHere names .*:99, which is not a run-wide NC finding sitting on this page/);
+  });
+
+  it("refuses notShownHere on a page NC, and a malformed notShownHere", () => {
+    const onNc = fold112(
+      { bad: { verdict: "NC", justification: "x", findings: [{ ...CAPTURE_FINDING }], notShownHere: [FINDING_REF] } as RawPageVerdict },
+      ncOnCapture,
+      true,
+    );
+    expect(onNc.issues.join("\n")).toMatch(/a page NC rests on its own findings/);
+    const junk = fold112(badC({ notShownHere: FINDING_REF } as unknown as Partial<RawPageVerdict>), ncOnCapture, true);
+    expect(junk.issues.join("\n")).toMatch(/"notShownHere" must be an array/);
+  });
+
+  it("round-trips notShownHere through the ledger, and the replay re-folds", () => {
+    const audit = auditOf();
+    const adj = file([
+      {
+        ...itemWithCaptureAnchors(audit),
+        verdict: "NC",
+        justification: "",
+        ...ncOnCapture,
+        pages: badC({ notShownHere: [FINDING_REF] } as Partial<RawPageVerdict>),
+      } as unknown as AdjudicationItem,
+    ]);
+    expect(applyAdjudication(audit, adj, { cwd: dir }).rejectedCriteria).toEqual([]);
+    const entries = entriesFrom(adj, new Set(["11.2"]), audit.date, dir);
+    expect(entries.find((e) => e.criteriaId === "11.2")?.pages?.bad?.notShownHere).toEqual([FINDING_REF]);
+    const replay = replayLedger(audit, mergeLedger(undefined, "rgaa", entries), { cwd: dir, standard: "rgaa" });
+    const replayed = replay.adj.items.find((i) => i.criteriaId === "11.2");
+    expect(replayed?.pages?.bad?.notShownHere).toEqual([FINDING_REF]);
   });
 });
 
