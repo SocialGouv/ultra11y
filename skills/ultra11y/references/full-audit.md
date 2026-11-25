@@ -148,7 +148,13 @@ thème 4 et de 13.7. L’annexe I, la carte de l’application, met côte à cô
 `scan` et `ultra11y/playwright` exécutent le même axe : le `axe-core` épinglé propre à
 ultra11y et ses tags de règles, quelle que soit la version installée par le projet. L’annexe
 nomme la version qui a tourné. Si elle indique « copie du projet audité », la copie propre à
-ultra11y n’a pas pu être résolue ; réinstallez ultra11y avec ses dépendances avant de publier.
+ultra11y n’était pas résolvable — le cas attendu avec le bundle de la skill, qui tourne sans
+installation ni `node_modules` : c’est l’axe-core du projet audité qui a mesuré, et sa version
+est consignée dans chaque résultat et dans l’annexe. Cela ne compte que si cette version
+s’écarte de celle qu’ultra11y épingle (des règles axe ajoutent ou changent d’une version à
+l’autre, donc deux audits ne sont alors pas strictement comparables). Seulement quand la version
+épinglée est exigée (comparaison avec un audit antérieur, exigence du commanditaire), relancez
+`scan` avec `npx -y ultra11y`, qui apporte ses dépendances.
 
 **Un scan propre ne conclut jamais `C` sur un critère de rendu** : 3.2, 3.3, 10.4, 10.11,
 10.12, 12.9 et les autres critères de rendu ne portent que des règles de scan *candidates*, si

@@ -137,16 +137,22 @@ s’exécutent sur chaque fichier :
 | `pdf-no-text` | aucune ressource de police et aucun opérateur d’affichage de texte sur aucune page — un scan composé uniquement d’images | 1.1.1 |
 | `pdf-structure-shallow` | consultatif : balisé, mais sans titre de section, ou un tableau sans `TH` | 1.3.1 |
 
-Le JSON d’audit liste chaque document sous `documents[]` avec le résultat de chaque contrôle —
+Le JSON d’audit (un document `pack-audit`) liste chaque document sous **`core.documents`** —
+l’audit WCAG que porte `core`, pas la racine — avec le résultat de chaque contrôle —
 `fail`, `not-detected` ou `not-checked` — et le rapport les présente dans une section
 « Documents téléchargeables », en Markdown comme en HTML (`report --html`), à partir d’un seul
 modèle. **`not-detected` n’est pas une réussite** : ces contrôles prouvent l’absence des défauts
 grossiers, jamais la conformité PDF/UA, qu’un validateur (veraPDF, PAC) établit. Un fichier
 chiffré, mal formé, tronqué ou trop volumineux est signalé **illisible**, jamais comme conforme.
+**Une entrée par contenu** : le même PDF nommé dans le glob (`public/documents/formulaire.pdf`) et
+téléchargé par `scan` (`.ultra11y/documents/<sha256>.pdf`) est un seul document, repéré par son
+`sha256` ; l’entrée cite le fichier du projet (`file`), garde l’autre chemin dans `copies`, l’URL
+dans `url` et les pages qui pointent vers lui dans `pages`, et chaque défaut n’est compté qu’une
+fois par page qui le lie.
 
-Les constats sur documents vivent dans `documentFindings`, **en dehors** des critères WCAG : le
-PDF n’est pas la page qui pointe vers lui, et une version alternative conforme peut exister. Sous
-RGAA, ils sont orientés par identifiant de règle vers le **13.3** comme preuves candidates, et le
+Les constats sur documents vivent dans **`core.documentFindings`**, **en dehors** des critères
+WCAG : le PDF n’est pas la page qui pointe vers lui, et une version alternative conforme peut
+exister. Sous RGAA, ils sont orientés par identifiant de règle vers le **13.3** comme preuves candidates, et le
 brief du 13.3 liste chaque document avec ses contrôles, citable à la ligne d’en-tête `%PDF-x.y`
 du fichier — l’agent tranche, avec de quoi citer.
 

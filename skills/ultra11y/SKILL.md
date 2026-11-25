@@ -120,7 +120,7 @@ vraiment.
 > 7. **Langue** : passez TOUJOURS `--lang` correspondant à la langue de votre conversation avec
 >    l’utilisateur ; demandez-lui en cas d’ambiguïté. Sans le flag, la CLI détecte
 >    automatiquement (`<html lang>` du dépôt → la locale par défaut du référentiel actif →
->    anglais) — un repli pour les scripts et la CI, pas un substitut au fait de passer `--lang`
+>    français) — un repli pour les scripts et la CI, pas un substitut au fait de passer `--lang`
 >    vous-même.
 > 8. **Les jetons techniques restent en anglais, même dans une prose française.** Dans tout
 >    livrable en français que vous écrivez (commentaire de rapport, PRD, tickets de suivi,

@@ -17,9 +17,13 @@ exécutant **axe-core dans un vrai navigateur headless** (Playwright), sur un se
   avec les mêmes tags de règles (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`,
   `best-practice`), quelle que soit la version installée par le projet audité. La copie du
   projet n’est utilisée que lorsque celle d’ultra11y ne peut pas être résolue (le bundle
-  autonome de la skill sans `node_modules` à côté). Ce repli affiche une note. La version exécutée
-  est consignée dans chaque résultat (`DynamicResult.axe`, le `axe.json` de chaque capture) et
-  dans l’annexe du rapport. `status --browser` indique quelle copie serait exécutée.
+  autonome de la skill sans `node_modules` à côté — le cas attendu de la skill sans
+  installation). Ce repli affiche une note qui dit ce que cela signifie : l’axe-core du projet
+  audité a mesuré, et sa version est consignée dans chaque résultat (`DynamicResult.axe`, le
+  `axe.json` de chaque capture) et dans l’annexe du rapport. Cela ne compte que si cette version
+  s’écarte de celle qu’ultra11y épingle (règles ajoutées ou modifiées d’une version à l’autre) ;
+  quand la version épinglée est exigée, lancez le moteur avec `npx -y ultra11y`, qui apporte
+  ses dépendances. `status --browser` indique quelle copie serait exécutée.
 - **`--browser-path <file>`** (ou `ULTRA11Y_BROWSER_PATH`) : lancer **cet** exécutable avec le
   runtime local au lieu du navigateur que résout Playwright — le Chromium d’une distribution
   (`/usr/bin/chromium` sur Debian, ce que livre l’image d’un runner en bac à sable), que ni la
