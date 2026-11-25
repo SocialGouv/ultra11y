@@ -2757,6 +2757,7 @@ var wcag_default = {
       automatability: "judgment",
       ruleIds: [
         "img-alt-missing",
+        "img-alt-missing-decorative",
         "canvas-fallback-missing",
         "decorative-alt-misuse",
         "decorative-marked-exposed",
@@ -25981,6 +25982,16 @@ var MSG_CATALOG = {
       en: () => `Add alt="\u2026" (a description if the image conveys information, alt="" if it is decorative).`
     }
   },
+  "img-alt-missing-decorative": {
+    message: {
+      fr: (p2) => `<${p2.tag}> sans attribut alt dans un lien ou un bouton d\xE9j\xE0 intitul\xE9 par son texte \u2014 l'image le r\xE9p\xE8te, elle est d\xE9corative et doit \xEAtre ignor\xE9e.`,
+      en: (p2) => `<${p2.tag}> has no alt attribute inside a link or button its own text already names \u2014 the image repeats it, so it is decorative and must be ignored.`
+    },
+    remediation: {
+      fr: () => `Ajoutez alt="" (ou aria-hidden="true") ; si l'image apporte une information que le texte n'a pas, d\xE9crivez-la dans alt="\u2026".`,
+      en: () => `Add alt="" (or aria-hidden="true"); if the image carries information the text does not, describe it in alt="\u2026".`
+    }
+  },
   "autocomplete-token-invalid": {
     message: {
       fr: (p2) => `autocomplete="${p2.value}" n'appartient pas au vocabulaire HTML \u2014 la finalit\xE9 du champ n'est pas identifiable.`,
@@ -28616,7 +28627,7 @@ var rgaa_default = {
       },
       automation: {
         tests: {
-          "1": "judgment",
+          "1": "static",
           "2": "rendered",
           "3": "static",
           "4": "judgment",
@@ -28677,8 +28688,8 @@ var rgaa_default = {
           {
             id: "img-alt-missing",
             tests: ["1"],
-            effect: "candidate",
-            rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+            effect: "decisive-nc",
+            rationale: 'An <img> with no alt attribute and no other text alternative fails either way: 1.1.1 if it carries information, 1.2.1 if it is decorative (alt="" was required). Informative by default; 1.2 if decorative \u2014 a decorative context the engine can see is routed to 1.2 by img-alt-missing-decorative.'
           },
           {
             id: "input-image-alt-missing",
@@ -28756,11 +28767,11 @@ var rgaa_default = {
       ],
       wcag: ["1.1.1", "4.1.2"],
       appliesTo: {
-        ruleIds: ["axe:image-redundant-alt", "decorative-alt-misuse", "decorative-marked-exposed"]
+        ruleIds: ["axe:image-redundant-alt", "decorative-alt-misuse", "decorative-marked-exposed", "img-alt-missing-decorative"]
       },
       automation: {
         tests: {
-          "1": "judgment",
+          "1": "static",
           "2": "judgment",
           "3": "judgment",
           "4": "judgment",
@@ -28785,6 +28796,12 @@ var rgaa_default = {
             tests: ["1", "2", "3", "4", "5", "6"],
             effect: "candidate",
             rationale: "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            id: "img-alt-missing-decorative",
+            tests: ["1"],
+            effect: "decisive-nc",
+            rationale: 'An <img> with no alt attribute inside a link or button whose visible text already names it repeats that text: it is decorative and fails 1.2.1 (neither alt="" nor aria-hidden/role=presentation). Had it carried information, it would fail 1.1.1 instead \u2014 never a conformity.'
           }
         ]
       }
@@ -38179,27 +38196,43 @@ function controlLabel(el, doc) {
 // src/rules/images.ts
 var isHidden = isNameExempt;
 var named = (el, doc) => !!(boundAttr(el, "aria-label") ?? "").trim() || hasBoundAttr(el, "aria-labelledby") && !labelledbyResolvesEmpty(el, doc);
+var INTERACTIVE_ROLES = /* @__PURE__ */ new Set(["link", "button"]);
+var textedControl = (el) => {
+  for (const a2 of ancestors(el)) {
+    const interactive = a2.tag === "a" && attr(a2, "href") !== void 0 || a2.tag === "button" || INTERACTIVE_ROLES.has((attr(a2, "role") ?? "").trim());
+    if (interactive) return visibleLabelText(a2) !== "" ? a2 : void 0;
+  }
+  return void 0;
+};
+function unnamedImages(doc) {
+  const out = [];
+  for (const el of doc.elements) {
+    const role = attr(el, "role") ?? "";
+    const svgTree = el.tag === "svg" || ancestors(el).some((a2) => a2.tag === "svg");
+    const isImg = el.tag === "img" || el.tag === "area" || role === "img" || svgTree && (role === "graphics-document" || role === "graphics-symbol");
+    if (!isImg) continue;
+    if (isHidden(el) && el.tag !== "area") continue;
+    const altLiteral = attr(el, "alt");
+    const whitespaceAlt = altLiteral !== void 0 && altLiteral !== "" && altLiteral.trim() === "";
+    if (hasBoundAttr(el, "alt") && !whitespaceAlt || named(el, doc)) continue;
+    if (hasDynamicSpread(el)) continue;
+    if (svgTree && el.tag !== "img") {
+      if (descendants(el).some((d2) => d2.tag === "title" && visibleText(d2).trim() !== "")) continue;
+      if (doc.kind !== "html" && (mayInjectContent(el) || textContent(el).includes("{"))) continue;
+    } else if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
+    out.push({ el, titleOnly: (attr(el, "title") ?? "").trim() !== "" });
+  }
+  return out;
+}
+var decorativeContext = (el) => el.tag === "img" && attr(el, "alt") === void 0 && textedControl(el) !== void 0;
 var imgAltMissing = {
   id: "img-alt-missing",
   criteria: ["1.1.1"],
   severity: "bloquant",
   run(doc) {
     const out = [];
-    for (const el of doc.elements) {
-      const role = attr(el, "role") ?? "";
-      const svgTree = el.tag === "svg" || ancestors(el).some((a2) => a2.tag === "svg");
-      const isImg = el.tag === "img" || el.tag === "area" || role === "img" || svgTree && (role === "graphics-document" || role === "graphics-symbol");
-      if (!isImg) continue;
-      if (isHidden(el) && el.tag !== "area") continue;
-      const altLiteral = attr(el, "alt");
-      const whitespaceAlt = altLiteral !== void 0 && altLiteral !== "" && altLiteral.trim() === "";
-      if (hasBoundAttr(el, "alt") && !whitespaceAlt || named(el, doc)) continue;
-      if (hasDynamicSpread(el)) continue;
-      if (svgTree && el.tag !== "img") {
-        if (descendants(el).some((d2) => d2.tag === "title" && visibleText(d2).trim() !== "")) continue;
-        if (doc.kind !== "html" && (mayInjectContent(el) || textContent(el).includes("{"))) continue;
-      } else if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
-      if ((attr(el, "title") ?? "").trim() !== "") {
+    for (const { el, titleOnly } of unnamedImages(doc)) {
+      if (titleOnly) {
         out.push({
           criteriaId: "1.1.1",
           el,
@@ -38210,12 +38243,26 @@ var imgAltMissing = {
         });
         continue;
       }
+      if (decorativeContext(el)) continue;
       out.push({
         criteriaId: "1.1.1",
         el,
         msgId: "img-alt-missing",
         params: { tag: el.tag }
       });
+    }
+    return out;
+  }
+};
+var imgAltMissingDecorative = {
+  id: "img-alt-missing-decorative",
+  criteria: ["1.1.1"],
+  severity: "majeur",
+  run(doc) {
+    const out = [];
+    for (const { el, titleOnly } of unnamedImages(doc)) {
+      if (titleOnly || !decorativeContext(el)) continue;
+      out.push({ criteriaId: "1.1.1", el, msgId: "img-alt-missing-decorative", params: { tag: el.tag } });
     }
     return out;
   }
@@ -38373,6 +38420,7 @@ var figureCaptionUnassociated = {
 var imagesRules = [
   figureCaptionUnassociated,
   imgAltMissing,
+  imgAltMissingDecorative,
   decorativeAltMisuse,
   canvasFallbackMissing,
   inputImageAltMissing,
@@ -38596,7 +38644,7 @@ var NAME_PROHIBITED_ROLES = /* @__PURE__ */ new Set([
 ]);
 
 // src/rules/scripts-aria.ts
-var INTERACTIVE_ROLES = [
+var INTERACTIVE_ROLES2 = [
   "button",
   "link",
   "checkbox",
@@ -38616,7 +38664,7 @@ function isInteractive(el) {
   if (el.tag === "a") return hasAttr(el, "href");
   if (["button", "select", "textarea"].includes(el.tag)) return true;
   if (el.tag === "input") return (attr(el, "type") ?? "text").toLowerCase() !== "hidden";
-  return INTERACTIVE_ROLES.includes((attr(el, "role") ?? "").trim());
+  return INTERACTIVE_ROLES2.includes((attr(el, "role") ?? "").trim());
 }
 var DISABLEABLE3 = /* @__PURE__ */ new Set(["button", "input", "select", "textarea", "fieldset", "optgroup", "option"]);
 var isDisabled = (el) => DISABLEABLE3.has(el.tag) && hasAttr(el, "disabled");
@@ -38831,7 +38879,7 @@ var clickableNoninteractive = {
       const role = (attr(el, "role") ?? "").trim();
       const tiRaw = (attr(el, "tabindex") ?? "").trim();
       const hasTab = tiRaw !== "" && Number(tiRaw) >= 0;
-      const interactiveRole = INTERACTIVE_ROLES.includes(role);
+      const interactiveRole = INTERACTIVE_ROLES2.includes(role);
       if (interactiveRole && hasTab) continue;
       const noKeyboard = !hasTab;
       out.push({
@@ -43094,7 +43142,14 @@ var crossNextMetadataTitle = {
     return { findings: [], suppress };
   }
 };
-var SUPPRESSIBLE_BY_SPREAD = ["icon-only-control-unnamed", "button-empty-name", "link-empty-name", "control-label-missing", "img-alt-missing"];
+var SUPPRESSIBLE_BY_SPREAD = [
+  "icon-only-control-unnamed",
+  "button-empty-name",
+  "link-empty-name",
+  "control-label-missing",
+  "img-alt-missing",
+  "img-alt-missing-decorative"
+];
 var crossAriaForwarding = {
   id: "cross-aria-forwarding",
   criteria: ["4.1.2"],

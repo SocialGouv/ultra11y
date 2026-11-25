@@ -37,6 +37,7 @@ const SEED: Record<string, string> = {
   // images (1.1.1)
   "figure-caption-unassociated": `<main><figure><img src="c.png" alt="Courbe"><figcaption>Evolution in 2025</figcaption></figure></main>`,
   "img-alt-missing": `<main><img src="x.png"></main>`,
+  "img-alt-missing-decorative": `<main><a href="/">Home <img src="house.png"></a></main>`,
   "input-image-alt-missing": `<main><input type="image" src="go.png"></main>`,
   "object-embed-no-name": `<main><object data="chart.svg"></object></main>`,
   "chart-no-accessible-name": `<main><div class="chart"><svg><rect width="10" height="10"/></svg></div></main>`,

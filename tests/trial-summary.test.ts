@@ -58,7 +58,9 @@ let D = "";
 let REPORT = "";
 
 /** The issue's fixture — engine NC 8.3 (no lang), adjudicated C 8.6 — plus, for the mixed case,
- *  an AGENT NC on 1.1 that `--prune` can withdraw and two more agent conformities (1.2, 3.2). */
+ *  an AGENT NC on 1.1 that `--prune` can withdraw and two more agent conformities (1.2, 3.2).
+ *  The image carries alt="" so 1.1 stays an agent ruling: with no alt at all the engine would
+ *  already prove 1.1 NC (#203). */
 beforeAll(async () => {
   prev = process.cwd();
   D = realpathSync(mkdtempSync(join(tmpdir(), "u11y-trial-summary-")));
@@ -68,7 +70,7 @@ beforeAll(async () => {
     `<!doctype html>
 <html>
 <head><title>Page de démonstration</title></head>
-<body><main><h1>Démonstration</h1><img src="demo.png"></main></body>
+<body><main><h1>Démonstration</h1><img src="demo.png" alt=""></main></body>
 </html>
 `,
   );

@@ -278,9 +278,9 @@ describe("renderPackReport (derived RGAA view)", () => {
     expect(md).toContain("RGAA 4.1.2");
     expect(md).toContain("## 1. Synthèse par thématique");
     expect(md).toMatch(/RGAA \d+\.\d+ —/); // pack-keyed criterion labels
-    expect(md).toContain("30 test(s) static");
+    expect(md).toContain("32 test(s) static");
     expect(md).toContain("3 rendered");
-    expect(md).toContain("225 judgment");
+    expect(md).toContain("223 judgment");
   });
 
   // RGAA 8.1 (doctype) used to be the report's out-of-scope example: it maps only onto the

@@ -59,7 +59,7 @@ export interface ActMapping {
 // unclassified.
 export const ACT_RULES: Record<string, ActMapping> = {
   // ---- covered: the engine implements an equivalent check -------------------------
-  "23a2a8": { engineRules: ["img-alt-missing"], scope: "static" },
+  "23a2a8": { engineRules: ["img-alt-missing", "img-alt-missing-decorative"], scope: "static" },
   "59796f": { engineRules: ["input-image-alt-missing"], scope: "static" },
   "8fc3b6": { engineRules: ["object-embed-no-name"], scope: "static" },
   "7d6734": { engineRules: ["img-alt-missing"], scope: "static", note: "role=img on <svg> is handled by the same rule" },

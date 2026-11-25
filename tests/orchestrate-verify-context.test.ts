@@ -52,8 +52,8 @@ const fill = (dir: string, verdict = "supported"): string => {
   return p;
 };
 
-// The issue's fixture, verbatim: one engine NC (8.3, no lang) and one adjudicated C (8.6), in a
-// directory that holds no ledger.
+// The issue's fixture, verbatim: engine NCs on 8.3 (no lang) and 1.1 (an <img> with no alt is
+// a decisive NC since #203), and one adjudicated C (8.6), in a directory that holds no ledger.
 let prev = "";
 let D = "";
 let REPORT = "";
@@ -114,7 +114,7 @@ describe("orchestrate's verify-report commands carry the run's context (#59)", (
       readTodo(run)
         .map((i) => `${i.criteriaId}:${i.kind ?? "nc"}`)
         .sort(),
-    ).toEqual(["8.3:nc", "8.6:c"]);
+    ).toEqual(["1.1:nc", "8.3:nc", "8.6:c"]);
 
     for (const it of [readTodo(run)]) writeFileSync(join(run, "VERIFY.todo.json"), JSON.stringify(it.map((i) => ({ ...i, verdict: "supported", note: "vu" }))));
     expect(orchestrateRun(run, ENGINE, { phase: "verify-report", eco: true }).exitCode).toBe(0);
@@ -133,7 +133,7 @@ describe("orchestrate's verify-report commands carry the run's context (#59)", (
 
     const applied = await cli(argvOf(phase.apply, REPORT));
     expect(applied.code).toBe(0);
-    expect(applied.out).toMatch(/2 (claim|revendication)/);
+    expect(applied.out).toMatch(/3 (claim|revendication)/);
   });
 
   it("the fan-out workflow's fold step is the same contextual apply", async () => {
@@ -162,7 +162,7 @@ describe("orchestrate's verify-report commands carry the run's context (#59)", (
         readTodo(run)
           .map((i) => i.criteriaId)
           .sort(),
-      ).toEqual(["8.3", "8.6"]);
+      ).toEqual(["1.1", "8.3", "8.6"]);
     } finally {
       rmSync(join(D, ".ultra11y"), { recursive: true, force: true });
     }
@@ -173,7 +173,7 @@ describe("orchestrate's verify-report commands carry the run's context (#59)", (
     expect(
       (await cli(["verify", "--report", REPORT, "--in", join(run, "audit-latest.json"), "--standard", "rgaa", "--no-conformities", "--out", run])).code,
     ).toBe(0);
-    expect(readTodo(run).map((i) => i.criteriaId)).toEqual(["8.3"]);
+    expect(readTodo(run).map((i) => i.criteriaId)).toEqual(["1.1", "8.3"]);
     const apply = listPhases(run, ENGINE)[1]!.apply;
     expect(apply).toContain("--no-conformities");
     fill(run);
@@ -192,7 +192,7 @@ describe("a coverage gap from a different claim source is diagnosed as such (#59
     // The issue's « without-context » list: no --in, no ledger, cap already lifted.
     const r = await cli(["verify", "--report", REPORT, "--standard", "rgaa", "--lang", "fr", "--max-verify", "0", "--out", out]);
     expect(r.code).toBe(0);
-    expect(readTodo(out).map((i) => i.criteriaId)).toEqual(["8.3"]);
+    expect(readTodo(out).map((i) => i.criteriaId)).toEqual(["1.1", "8.3"]);
     // Said at generation time, where it can still be fixed for free.
     expect(r.err).toMatch(/--in/);
     return fill(out);

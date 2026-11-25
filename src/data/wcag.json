@@ -105,6 +105,7 @@
       "automatability": "judgment",
       "ruleIds": [
         "img-alt-missing",
+        "img-alt-missing-decorative",
         "canvas-fallback-missing",
         "decorative-alt-misuse",
         "decorative-marked-exposed",

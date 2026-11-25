@@ -10,8 +10,8 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 
 | Criterion | Tests (static / rendered / judgment) | Rules (decisive / candidate / advisory) | C by silence | Reviewed routing |
 |---|---:|---:|:---:|---|
-| 1.1 | 1 / 1 / 6 | 3 / 8 / 0 | no | deterministic NC + AI residual |
-| 1.2 | 0 / 0 / 6 | 0 / 3 / 0 | no | AI + signals |
+| 1.1 | 2 / 1 / 5 | 4 / 7 / 0 | no | deterministic NC + AI residual |
+| 1.2 | 1 / 0 / 5 | 1 / 3 / 0 | no | deterministic NC + AI residual |
 | 1.3 | 0 / 0 / 9 | 0 / 0 / 0 | no | AI |
 | 1.4 | 0 / 0 / 7 | 0 / 0 / 0 | no | AI |
 | 1.5 | 0 / 0 / 2 | 0 / 0 / 0 | no | AI |
@@ -121,7 +121,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 
 | Test | Owner | Decisive rules | Candidate signals |
 |---|---|---|---|
-| 1.1.1 | judgment | — | `axe:image-alt`, `axe:role-img-alt`, `chart-no-accessible-name`, `img-alt-missing` |
+| 1.1.1 | static | `img-alt-missing` | `axe:image-alt`, `axe:role-img-alt`, `chart-no-accessible-name` |
 | 1.1.2 | rendered | `axe:area-alt` | — |
 | 1.1.3 | static | `axe:input-image-alt`, `input-image-alt-missing` | — |
 | 1.1.4 | judgment | — | — |
@@ -129,7 +129,7 @@ The 106 criterion rows below are the one-by-one routing review. “AI + signals�
 | 1.1.6 | judgment | — | `axe:object-alt`, `object-embed-no-name` |
 | 1.1.7 | judgment | — | `object-embed-no-name` |
 | 1.1.8 | judgment | — | `canvas-fallback-missing`, `chart-no-accessible-name` |
-| 1.2.1 | judgment | — | `axe:image-redundant-alt`, `decorative-alt-misuse`, `decorative-marked-exposed` |
+| 1.2.1 | static | `img-alt-missing-decorative` | `axe:image-redundant-alt`, `decorative-alt-misuse`, `decorative-marked-exposed` |
 | 1.2.2 | judgment | — | `axe:image-redundant-alt`, `decorative-alt-misuse`, `decorative-marked-exposed` |
 | 1.2.3 | judgment | — | `axe:image-redundant-alt`, `decorative-alt-misuse`, `decorative-marked-exposed` |
 | 1.2.4 | judgment | — | `axe:image-redundant-alt`, `decorative-alt-misuse`, `decorative-marked-exposed` |
