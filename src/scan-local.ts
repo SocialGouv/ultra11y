@@ -51,7 +51,7 @@ import {
 } from "./snapshot.js";
 import { today } from "./util.js";
 import { captureAxTree } from "./screen-reader.js";
-import { MEDIA_PROBE, probeMedia } from "./media.js";
+import { MEDIA_PROBE, measureFlashInto, probeMedia } from "./media.js";
 
 export const LOCAL_ENGINE = "axe-core@playwright (local)";
 
@@ -744,9 +744,9 @@ async function runOnPage(
           }
         }
         // THE MEDIA PROBE (#208): the media inventory — tracks as loaded, captions and transcripts
-        // found beside each player — and the flash measure over a short viewport recording, on
-        // the pristine page and before axe or any probe touches it.
-        const media = await probeMedia(page, { flash: true });
+        // found beside each player — taken here, on the DOM just serialized, so its ordinals join.
+        // The flash measure is recorded below, inside the behaviour window.
+        const media = await probeMedia(page, { flash: false });
         if (media) snapshot.media = media;
       }
     }
@@ -757,6 +757,9 @@ async function runOnPage(
     // button the live-region pass clicks toggles its `aria-expanded` under the observer.
     const behaviour = snapshot ? await startBehaviour(page) : undefined;
     await behaviour?.idle();
+    // The flash measure (#208), after the idle half and before axe or any probe touches the page:
+    // screenshots mutate no DOM, so the window still opened on the DOM just serialized.
+    if (snapshot?.media) await measureFlashInto(page, snapshot.media);
 
     // The controlled axe run (src/axe-engine.ts): ultra11y's pinned axe-core and rule tags.
     const axeRun = await runAxe(axe, page, "scan");

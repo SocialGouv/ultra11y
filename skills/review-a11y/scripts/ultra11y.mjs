@@ -36010,6 +36010,210 @@ ${e.origin}`;
   return [...by.values()].sort((a2, b) => a2.version.localeCompare(b.version) || a2.origin.localeCompare(b.origin)).map((e) => ({ version: e.version, origin: e.origin, ...e.runners.size ? { runner: [...e.runners].sort().join(",") } : {} }));
 }
 
+// src/media.ts
+var FLASH_WINDOW_MS = 1500;
+var FLASH_MIN_FPS = 20;
+var FLASH_AREA_THRESHOLD = Math.round(341 * 256 / 4);
+var FRAME_WIDTH = 160;
+var CELL = 4;
+var MEDIA_MAX = 60;
+var COMPANION_WORDS = "transcri|version textuelle|texte (?:alternatif|integral|int\xE9gral)|sous-titr|audiodescri|audio-descri|description (?:audio|d\xE9taill\xE9e|detaillee)|caption|subtitle|audio description|text version";
+var MEDIA_PROBE = `(() => {
+  const MAX = ${MEDIA_MAX};
+  const WORDS = new RegExp(${JSON.stringify(COMPANION_WORDS)}, 'i');
+  const PLAYER = /youtube|youtu\\.be|vimeo|dailymotion|dai\\.ly|peertube|soundcloud|spotify|deezer|podcast|player|video|audio|wistia|brightcove|jwplayer|kaltura/i;
+  const els = (${ELEMENT_WALK})(document);
+  const ordinal = new Map(els.map((e, i) => [e, i]));
+  const sel = (e) => e.localName + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/)[0] : '');
+  const txt = (e) => ((e && (e.innerText || e.textContent)) || '').replace(/\\s+/g, ' ').trim().slice(0, 160);
+  const companions = (e) => {
+    const out = [];
+    for (const attr of ['aria-describedby', 'aria-labelledby']) {
+      for (const id of (e.getAttribute(attr) || '').split(/\\s+/).filter(Boolean)) {
+        const t = document.getElementById(id);
+        if (t) out.push({ via: attr, text: txt(t) });
+      }
+    }
+    const fig = e.closest('figure');
+    const cap = fig && fig.querySelector('figcaption');
+    if (cap) out.push({ via: 'figcaption', text: txt(cap) });
+    // Next to the player: its two nearest siblings on each side, and its wrappers', two levels up.
+    const near = (n) => {
+      const out = [];
+      for (let s = n.previousElementSibling, k = 0; s && k < 2; s = s.previousElementSibling, k++) out.push(s);
+      for (let s = n.nextElementSibling, k = 0; s && k < 2; s = s.nextElementSibling, k++) out.push(s);
+      return out;
+    };
+    let node = e;
+    for (let depth = 0; depth < 3 && node && node !== document.body; depth++) {
+      for (const sib of near(node)) {
+        if (!sib) continue;
+        if (sib.localName === 'details' && WORDS.test(txt(sib))) out.push({ via: 'details', text: txt(sib) });
+        const links = sib.matches('a[href]') ? [sib] : Array.from(sib.querySelectorAll('[href]')).filter((x) => x.localName === 'a').slice(0, 10);
+        for (const a of links) {
+          const label = txt(a) + ' ' + (a.getAttribute('title') || '') + ' ' + (a.getAttribute('aria-label') || '');
+          if (WORDS.test(label) || WORDS.test(a.getAttribute('href') || '')) out.push({ via: 'adjacent-link', text: txt(a), href: a.getAttribute('href') || '' });
+        }
+        if (!links.length && sib.localName !== 'details' && WORDS.test(txt(sib))) out.push({ via: 'adjacent-text', text: txt(sib) });
+      }
+      node = node.parentElement;
+    }
+    const seen = new Set();
+    return out.filter((c) => { const k = c.via + '|' + c.text + '|' + (c.href || ''); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 8);
+  };
+  const items = [];
+  const push = (e, kind) => {
+    if (items.length >= MAX) return;
+    const tag = e.localName;
+    const m = (tag === 'video' || tag === 'audio') ? e : null;
+    const tracks = Array.from(e.querySelectorAll ? e.querySelectorAll('track') : []).map((t) => ({
+      kind: t.getAttribute('kind') || 'subtitles',
+      ...(t.getAttribute('srclang') ? { srclang: t.getAttribute('srclang') } : {}),
+      ...(t.getAttribute('label') ? { label: t.getAttribute('label') } : {}),
+      ...(t.getAttribute('src') ? { src: t.getAttribute('src') } : {}),
+      readyState: typeof t.readyState === 'number' ? t.readyState : undefined,
+      ...(t.hasAttribute('default') ? { default: true } : {}),
+    }));
+    const src = e.currentSrc || e.getAttribute('src') || e.getAttribute('data') || (e.querySelector && e.querySelector('source') ? e.querySelector('source').getAttribute('src') : '') || '';
+    items.push({
+      tag: tag,
+      ...(ordinal.has(e) ? { i: ordinal.get(e) } : {}),
+      selector: sel(e),
+      ...(src ? { src: String(src).slice(0, 200) } : {}),
+      kind: kind,
+      ...(m ? { controls: m.controls, autoplay: m.autoplay, muted: m.muted, loop: m.loop, paused: m.paused } : {}),
+      ...(m && Number.isFinite(m.duration) ? { duration: Math.round(m.duration * 10) / 10 } : {}),
+      tracks: tracks,
+      companions: companions(e),
+    });
+  };
+  for (const e of els) {
+    const tag = e.localName;
+    if (tag === 'video' || tag === 'audio') push(e, 'temporal');
+    else if (tag === 'iframe' && PLAYER.test((e.getAttribute('src') || '') + ' ' + (e.getAttribute('title') || '') + ' ' + (e.getAttribute('allow') || ''))) push(e, 'temporal');
+    else if ((tag === 'object' || tag === 'embed') && /video|audio|mp4|webm|ogg|mp3|wav|flash|swf/i.test((e.getAttribute('type') || '') + ' ' + (e.getAttribute('src') || e.getAttribute('data') || ''))) push(e, 'temporal');
+    else if (tag === 'canvas') push(e, 'animated');
+    else if (tag === 'img' && /\\.(gif|apng)(?:[?#]|$)/i.test(e.currentSrc || e.getAttribute('src') || '')) push(e, 'animated');
+    else if (tag === 'svg' && e.querySelector('animate, animateTransform, animateMotion, set')) push(e, 'animated');
+    else if (tag === 'marquee' || tag === 'blink') push(e, 'animated');
+    else {
+      const cs = getComputedStyle(e);
+      if (cs.animationName && cs.animationName !== 'none' && parseFloat(cs.animationDuration) > 0) push(e, 'animated');
+    }
+  }
+  return items;
+})()`;
+var linear = (c) => {
+  const s2 = c / 255;
+  return s2 <= 0.04045 ? s2 / 12.92 : ((s2 + 0.055) / 1.055) ** 2.4;
+};
+function luminanceGrid(img, cell3 = CELL) {
+  const cols = Math.max(1, Math.floor(img.width / cell3));
+  const rows = Math.max(1, Math.floor(img.height / cell3));
+  const lum = new Float64Array(cols * rows);
+  for (let r2 = 0; r2 < rows; r2++)
+    for (let c = 0; c < cols; c++) {
+      let sum = 0;
+      let n = 0;
+      for (let y = r2 * cell3; y < Math.min(img.height, (r2 + 1) * cell3); y++)
+        for (let x2 = c * cell3; x2 < Math.min(img.width, (c + 1) * cell3); x2++) {
+          const p2 = img.at(x2, y);
+          if (!p2) continue;
+          sum += 0.2126 * linear(p2.r) + 0.7152 * linear(p2.g) + 0.0722 * linear(p2.b);
+          n++;
+        }
+      lum[r2 * cols + c] = n ? sum / n : 0;
+    }
+  return { cols, rows, lum };
+}
+function measureFlashes(frames, cellArea, durationMs) {
+  const fps = durationMs > 0 ? Math.round((frames.length - 1) / durationMs * 1e3 * 10) / 10 : 0;
+  const base = { frames: frames.length, durationMs: Math.round(durationMs), fps, areaThreshold: FLASH_AREA_THRESHOLD };
+  if (frames.length < 2) return { ...base, maxFlashesPerSecond: 0, flashingArea: 0, outcome: "undersampled" };
+  const cells = frames[0].lum.length;
+  const changes = Array.from({ length: cells }, () => []);
+  for (let k = 0; k < cells; k++) {
+    let ref = frames[0].lum[k];
+    let dir = 0;
+    for (const f2 of frames.slice(1)) {
+      const v2 = f2.lum[k] ?? ref;
+      const delta = v2 - ref;
+      if (Math.abs(delta) >= 0.1 && Math.min(v2, ref) < 0.8) {
+        const d2 = Math.sign(delta);
+        if (d2 !== dir) {
+          changes[k].push(f2.t);
+          dir = d2;
+        }
+        ref = v2;
+      } else if (dir > 0 && v2 > ref || dir < 0 && v2 < ref) ref = v2;
+    }
+  }
+  let maxFlashes = 0;
+  let maxArea = 0;
+  const starts = [...new Set(changes.flat())].sort((a2, b) => a2 - b);
+  for (const t0 of starts) {
+    let over = 0;
+    for (const list of changes) {
+      const n = list.filter((t3) => t3 >= t0 && t3 < t0 + 1e3).length;
+      const flashes = Math.floor(n / 2);
+      if (flashes > maxFlashes) maxFlashes = flashes;
+      if (flashes > 3) over++;
+    }
+    if (over * cellArea > maxArea) maxArea = over * cellArea;
+  }
+  const any = changes.some((l) => l.length > 0);
+  const outcome = maxFlashes > 3 && maxArea >= FLASH_AREA_THRESHOLD ? "over-threshold" : fps < FLASH_MIN_FPS ? "undersampled" : any ? "below-threshold" : "none";
+  return { ...base, maxFlashesPerSecond: maxFlashes, flashingArea: Math.round(maxArea), outcome };
+}
+async function recordFlashes(page, ms = FLASH_WINDOW_MS) {
+  let client;
+  try {
+    client = await page.context().newCDPSession(page);
+  } catch (e) {
+    return { skipped: `no DevTools session to record the viewport (${String(e?.message ?? e).split("\n")[0]})` };
+  }
+  try {
+    const vp = await page.evaluate("({ w: window.innerWidth, h: window.innerHeight })");
+    const scale = FRAME_WIDTH / Math.max(1, vp.w);
+    const clip2 = { x: 0, y: 0, width: vp.w, height: vp.h, scale };
+    const frames = [];
+    const started = Date.now();
+    while (Date.now() - started < ms) {
+      const t3 = Date.now() - started;
+      const shot = await client.send("Page.captureScreenshot", { format: "png", clip: clip2, captureBeyondViewport: false });
+      const img = decodePng(Buffer.from(shot.data, "base64"));
+      if (!img) return { skipped: "a recorded frame could not be decoded" };
+      frames.push({ t: t3, lum: luminanceGrid(img).lum });
+    }
+    const durationMs = frames.length > 1 ? frames[frames.length - 1].t - frames[0].t : 0;
+    const cssCell = CELL / scale;
+    return { flash: measureFlashes(frames, cssCell * cssCell, durationMs) };
+  } catch (e) {
+    return { skipped: `the viewport recording failed (${String(e?.message ?? e).split("\n")[0]})` };
+  } finally {
+    await client.detach().catch(() => {
+    });
+  }
+}
+async function probeMedia(page, opts) {
+  let items;
+  try {
+    items = await page.evaluate(MEDIA_PROBE) ?? [];
+  } catch {
+    return void 0;
+  }
+  if (!opts.flash) return { v: 1, items, flashSkipped: "not measured on this capture (a journey state records the media inventory only)" };
+  return measureFlashInto(page, { v: 1, items });
+}
+async function measureFlashInto(page, media) {
+  const { flash, skipped } = await recordFlashes(page);
+  delete media.flash;
+  delete media.flashSkipped;
+  if (flash) media.flash = flash;
+  if (skipped) media.flashSkipped = skipped;
+  return media;
+}
+
 // src/adjudicate-subjects.ts
 var VOLATILE = [
   [/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, "<date>"],
@@ -38135,12 +38339,12 @@ function flashAnchor(d2, page) {
       `page="${page}" flash measure did NOT run: ${media.flashSkipped ?? "no reason recorded"} \u2014 ${plural(animated, "media or animated element", "media or animated elements")} inventoried`,
       `flashskip|${media.flashSkipped ?? ""}|${animated}`
     );
-  const said = f2.outcome === "undersampled" ? `UNDERSAMPLED (${f2.fps} frames/s, below the rate a 3-per-second count needs) \u2014 measured nothing` : f2.outcome === "none" ? "no luminance flash in any cell" : f2.outcome === "below-threshold" ? `luminance changes seen, at most ${f2.maxFlashesPerSecond} flash(es)/s, flashing area ${f2.flashingArea} px\xB2 (threshold ${f2.areaThreshold} px\xB2) \u2014 under the general flash threshold` : `OVER the general flash threshold: ${f2.maxFlashesPerSecond} flashes/s over ${f2.flashingArea} px\xB2 (threshold ${f2.areaThreshold} px\xB2)`;
+  const said = f2.outcome === "undersampled" ? `UNDERSAMPLED (${f2.fps} frames/s, under the ${FLASH_MIN_FPS} frames/s a negative result needs: a faster flash would alias to a slower one or to a still page) \u2014 measured nothing` : f2.outcome === "none" ? "no luminance flash in any cell" : f2.outcome === "below-threshold" ? `luminance changes seen, at most ${f2.maxFlashesPerSecond} flash(es)/s, flashing area ${f2.flashingArea} px\xB2 (threshold ${f2.areaThreshold} px\xB2) \u2014 under the general flash threshold` : `OVER the general flash threshold: ${f2.maxFlashesPerSecond} flashes/s over ${f2.flashingArea} px\xB2 (threshold ${f2.areaThreshold} px\xB2)`;
   return hAt(
     d2,
     1,
     "probe:flash",
-    `page="${page}" flash measure RAN on a ${f2.durationMs} ms viewport recording (${f2.frames} frames, ${f2.fps} frames/s): ${said}; ${plural(animated, "media or animated element", "media or animated elements")} on the page \u2014 ${limits}`,
+    `page="${page}" flash measure RAN on a ${f2.durationMs} ms viewport recording (${f2.frames} frames, ${f2.fps} frames/s \u2014 flashing observable up to ${Math.floor(f2.fps / 2)} Hz): ${said}; ${plural(animated, "media or animated element", "media or animated elements")} on the page \u2014 ${limits}`,
     `flash|${f2.outcome}|${f2.maxFlashesPerSecond}|${animated}`
   );
 }
@@ -60216,203 +60420,6 @@ function kindLabel(kind, locale = "fr") {
   return kind.label[locale] ?? Object.values(kind.label)[0] ?? kind.id;
 }
 
-// src/media.ts
-var FLASH_WINDOW_MS = 1500;
-var FLASH_MIN_FPS = 8;
-var FLASH_AREA_THRESHOLD = Math.round(341 * 256 / 4);
-var FRAME_WIDTH = 160;
-var CELL = 4;
-var MEDIA_MAX = 60;
-var COMPANION_WORDS = "transcri|version textuelle|texte (?:alternatif|integral|int\xE9gral)|sous-titr|audiodescri|audio-descri|description (?:audio|d\xE9taill\xE9e|detaillee)|caption|subtitle|audio description|text version";
-var MEDIA_PROBE = `(() => {
-  const MAX = ${MEDIA_MAX};
-  const WORDS = new RegExp(${JSON.stringify(COMPANION_WORDS)}, 'i');
-  const PLAYER = /youtube|youtu\\.be|vimeo|dailymotion|dai\\.ly|peertube|soundcloud|spotify|deezer|podcast|player|video|audio|wistia|brightcove|jwplayer|kaltura/i;
-  const els = (${ELEMENT_WALK})(document);
-  const ordinal = new Map(els.map((e, i) => [e, i]));
-  const sel = (e) => e.localName + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/)[0] : '');
-  const txt = (e) => ((e && (e.innerText || e.textContent)) || '').replace(/\\s+/g, ' ').trim().slice(0, 160);
-  const companions = (e) => {
-    const out = [];
-    for (const attr of ['aria-describedby', 'aria-labelledby']) {
-      for (const id of (e.getAttribute(attr) || '').split(/\\s+/).filter(Boolean)) {
-        const t = document.getElementById(id);
-        if (t) out.push({ via: attr, text: txt(t) });
-      }
-    }
-    const fig = e.closest('figure');
-    const cap = fig && fig.querySelector('figcaption');
-    if (cap) out.push({ via: 'figcaption', text: txt(cap) });
-    // Next to the player: its two nearest siblings on each side, and its wrappers', two levels up.
-    const near = (n) => {
-      const out = [];
-      for (let s = n.previousElementSibling, k = 0; s && k < 2; s = s.previousElementSibling, k++) out.push(s);
-      for (let s = n.nextElementSibling, k = 0; s && k < 2; s = s.nextElementSibling, k++) out.push(s);
-      return out;
-    };
-    let node = e;
-    for (let depth = 0; depth < 3 && node && node !== document.body; depth++) {
-      for (const sib of near(node)) {
-        if (!sib) continue;
-        if (sib.localName === 'details' && WORDS.test(txt(sib))) out.push({ via: 'details', text: txt(sib) });
-        const links = sib.matches('a[href]') ? [sib] : Array.from(sib.querySelectorAll('[href]')).filter((x) => x.localName === 'a').slice(0, 10);
-        for (const a of links) {
-          const label = txt(a) + ' ' + (a.getAttribute('title') || '') + ' ' + (a.getAttribute('aria-label') || '');
-          if (WORDS.test(label) || WORDS.test(a.getAttribute('href') || '')) out.push({ via: 'adjacent-link', text: txt(a), href: a.getAttribute('href') || '' });
-        }
-        if (!links.length && sib.localName !== 'details' && WORDS.test(txt(sib))) out.push({ via: 'adjacent-text', text: txt(sib) });
-      }
-      node = node.parentElement;
-    }
-    const seen = new Set();
-    return out.filter((c) => { const k = c.via + '|' + c.text + '|' + (c.href || ''); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 8);
-  };
-  const items = [];
-  const push = (e, kind) => {
-    if (items.length >= MAX) return;
-    const tag = e.localName;
-    const m = (tag === 'video' || tag === 'audio') ? e : null;
-    const tracks = Array.from(e.querySelectorAll ? e.querySelectorAll('track') : []).map((t) => ({
-      kind: t.getAttribute('kind') || 'subtitles',
-      ...(t.getAttribute('srclang') ? { srclang: t.getAttribute('srclang') } : {}),
-      ...(t.getAttribute('label') ? { label: t.getAttribute('label') } : {}),
-      ...(t.getAttribute('src') ? { src: t.getAttribute('src') } : {}),
-      readyState: typeof t.readyState === 'number' ? t.readyState : undefined,
-      ...(t.hasAttribute('default') ? { default: true } : {}),
-    }));
-    const src = e.currentSrc || e.getAttribute('src') || e.getAttribute('data') || (e.querySelector && e.querySelector('source') ? e.querySelector('source').getAttribute('src') : '') || '';
-    items.push({
-      tag: tag,
-      ...(ordinal.has(e) ? { i: ordinal.get(e) } : {}),
-      selector: sel(e),
-      ...(src ? { src: String(src).slice(0, 200) } : {}),
-      kind: kind,
-      ...(m ? { controls: m.controls, autoplay: m.autoplay, muted: m.muted, loop: m.loop, paused: m.paused } : {}),
-      ...(m && Number.isFinite(m.duration) ? { duration: Math.round(m.duration * 10) / 10 } : {}),
-      tracks: tracks,
-      companions: companions(e),
-    });
-  };
-  for (const e of els) {
-    const tag = e.localName;
-    if (tag === 'video' || tag === 'audio') push(e, 'temporal');
-    else if (tag === 'iframe' && PLAYER.test((e.getAttribute('src') || '') + ' ' + (e.getAttribute('title') || '') + ' ' + (e.getAttribute('allow') || ''))) push(e, 'temporal');
-    else if ((tag === 'object' || tag === 'embed') && /video|audio|mp4|webm|ogg|mp3|wav|flash|swf/i.test((e.getAttribute('type') || '') + ' ' + (e.getAttribute('src') || e.getAttribute('data') || ''))) push(e, 'temporal');
-    else if (tag === 'canvas') push(e, 'animated');
-    else if (tag === 'img' && /\\.(gif|apng)(?:[?#]|$)/i.test(e.currentSrc || e.getAttribute('src') || '')) push(e, 'animated');
-    else if (tag === 'svg' && e.querySelector('animate, animateTransform, animateMotion, set')) push(e, 'animated');
-    else if (tag === 'marquee' || tag === 'blink') push(e, 'animated');
-    else {
-      const cs = getComputedStyle(e);
-      if (cs.animationName && cs.animationName !== 'none' && parseFloat(cs.animationDuration) > 0) push(e, 'animated');
-    }
-  }
-  return items;
-})()`;
-var linear = (c) => {
-  const s2 = c / 255;
-  return s2 <= 0.04045 ? s2 / 12.92 : ((s2 + 0.055) / 1.055) ** 2.4;
-};
-function luminanceGrid(img, cell3 = CELL) {
-  const cols = Math.max(1, Math.floor(img.width / cell3));
-  const rows = Math.max(1, Math.floor(img.height / cell3));
-  const lum = new Float64Array(cols * rows);
-  for (let r2 = 0; r2 < rows; r2++)
-    for (let c = 0; c < cols; c++) {
-      let sum = 0;
-      let n = 0;
-      for (let y = r2 * cell3; y < Math.min(img.height, (r2 + 1) * cell3); y++)
-        for (let x2 = c * cell3; x2 < Math.min(img.width, (c + 1) * cell3); x2++) {
-          const p2 = img.at(x2, y);
-          if (!p2) continue;
-          sum += 0.2126 * linear(p2.r) + 0.7152 * linear(p2.g) + 0.0722 * linear(p2.b);
-          n++;
-        }
-      lum[r2 * cols + c] = n ? sum / n : 0;
-    }
-  return { cols, rows, lum };
-}
-function measureFlashes(frames, cellArea, durationMs) {
-  const fps = durationMs > 0 ? Math.round((frames.length - 1) / durationMs * 1e3 * 10) / 10 : 0;
-  const base = { frames: frames.length, durationMs: Math.round(durationMs), fps, areaThreshold: FLASH_AREA_THRESHOLD };
-  if (frames.length < 2) return { ...base, maxFlashesPerSecond: 0, flashingArea: 0, outcome: "undersampled" };
-  const cells = frames[0].lum.length;
-  const changes = Array.from({ length: cells }, () => []);
-  for (let k = 0; k < cells; k++) {
-    let ref = frames[0].lum[k];
-    let dir = 0;
-    for (const f2 of frames.slice(1)) {
-      const v2 = f2.lum[k] ?? ref;
-      const delta = v2 - ref;
-      if (Math.abs(delta) >= 0.1 && Math.min(v2, ref) < 0.8) {
-        const d2 = Math.sign(delta);
-        if (d2 !== dir) {
-          changes[k].push(f2.t);
-          dir = d2;
-        }
-        ref = v2;
-      } else if (dir > 0 && v2 > ref || dir < 0 && v2 < ref) ref = v2;
-    }
-  }
-  let maxFlashes = 0;
-  let maxArea = 0;
-  const starts = [...new Set(changes.flat())].sort((a2, b) => a2 - b);
-  for (const t0 of starts) {
-    let over = 0;
-    for (const list of changes) {
-      const n = list.filter((t3) => t3 >= t0 && t3 < t0 + 1e3).length;
-      const flashes = Math.floor(n / 2);
-      if (flashes > maxFlashes) maxFlashes = flashes;
-      if (flashes > 3) over++;
-    }
-    if (over * cellArea > maxArea) maxArea = over * cellArea;
-  }
-  const any = changes.some((l) => l.length > 0);
-  const outcome = maxFlashes > 3 && maxArea >= FLASH_AREA_THRESHOLD ? "over-threshold" : fps < FLASH_MIN_FPS ? "undersampled" : any ? "below-threshold" : "none";
-  return { ...base, maxFlashesPerSecond: maxFlashes, flashingArea: Math.round(maxArea), outcome };
-}
-async function recordFlashes(page, ms = FLASH_WINDOW_MS) {
-  let client;
-  try {
-    client = await page.context().newCDPSession(page);
-  } catch (e) {
-    return { skipped: `no DevTools session to record the viewport (${String(e?.message ?? e).split("\n")[0]})` };
-  }
-  try {
-    const vp = await page.evaluate("({ w: window.innerWidth, h: window.innerHeight })");
-    const scale = FRAME_WIDTH / Math.max(1, vp.w);
-    const clip2 = { x: 0, y: 0, width: vp.w, height: vp.h, scale };
-    const frames = [];
-    const started = Date.now();
-    while (Date.now() - started < ms) {
-      const t3 = Date.now() - started;
-      const shot = await client.send("Page.captureScreenshot", { format: "png", clip: clip2, captureBeyondViewport: false });
-      const img = decodePng(Buffer.from(shot.data, "base64"));
-      if (!img) return { skipped: "a recorded frame could not be decoded" };
-      frames.push({ t: t3, lum: luminanceGrid(img).lum });
-    }
-    const durationMs = frames.length > 1 ? frames[frames.length - 1].t - frames[0].t : 0;
-    const cssCell = CELL / scale;
-    return { flash: measureFlashes(frames, cssCell * cssCell, durationMs) };
-  } catch (e) {
-    return { skipped: `the viewport recording failed (${String(e?.message ?? e).split("\n")[0]})` };
-  } finally {
-    await client.detach().catch(() => {
-    });
-  }
-}
-async function probeMedia(page, opts) {
-  let items;
-  try {
-    items = await page.evaluate(MEDIA_PROBE) ?? [];
-  } catch {
-    return void 0;
-  }
-  if (!opts.flash) return { v: 1, items, flashSkipped: "not measured on this capture (a journey state records the media inventory only)" };
-  const { flash, skipped } = await recordFlashes(page);
-  return { v: 1, items, ...flash ? { flash } : {}, ...skipped ? { flashSkipped: skipped } : {} };
-}
-
 // src/scan-local.ts
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
@@ -60792,12 +60799,13 @@ async function runOnPage(browser, axe, target, isFile, opts) {
           } catch {
           }
         }
-        const media = await probeMedia(page, { flash: true });
+        const media = await probeMedia(page, { flash: false });
         if (media) snapshot.media = media;
       }
     }
     const behaviour = snapshot ? await startBehaviour(page) : void 0;
     await behaviour?.idle();
+    if (snapshot?.media) await measureFlashInto(page, snapshot.media);
     const axeRun = await runAxe(axe, page, "scan");
     const violations = axeRun.violations.map((v2) => ({
       id: v2.id,

@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildAdjudicationWorklist, captureFilesPresent } from "../src/adjudicate.js";
 import { runAudit } from "../src/audit.js";
-import { FLASH_AREA_THRESHOLD, type LumFrame, luminanceGrid, measureFlashes } from "../src/media.js";
+import { FLASH_AREA_THRESHOLD, FLASH_MIN_FPS, type LumFrame, luminanceGrid, measureFlashes } from "../src/media.js";
 import { parseHtml } from "../src/parse/html.js";
 import type { Image } from "../src/pixel.js";
 import { PAGES_DIR, SNAPSHOT_VERSION, readSnapshot, writeSnapshot } from "../src/snapshot.js";
@@ -43,7 +43,7 @@ describe("luminanceGrid", () => {
 describe("measureFlashes counts general flashes per one-second window", () => {
   const big = FLASH_AREA_THRESHOLD; // one cell already covers the threshold area
   it("sees nothing in a steady page", () => {
-    expect(measureFlashes(frames(30, 20, 0), big, 1450)).toMatchObject({ outcome: "none", maxFlashesPerSecond: 0, flashingArea: 0 });
+    expect(measureFlashes(frames(45, 30, 0), big, 1450)).toMatchObject({ outcome: "none", maxFlashesPerSecond: 0, flashingArea: 0 });
   });
   it("calls a large area alternating at 5 Hz over the threshold", () => {
     const m = measureFlashes(frames(40, 30, 5), 400, 1300);
@@ -67,6 +67,23 @@ describe("measureFlashes counts general flashes per one-second window", () => {
     expect(measureFlashes(soft, big, 1300).outcome).toBe("none");
     const bright = frames(40, 30, 0).map((f, k) => ({ t: f.t, lum: f.lum.map(() => (k % 2 ? 1 : 0.85)) }));
     expect(measureFlashes(bright, big, 1300).outcome).toBe("none");
+  });
+  it("never returns a negative from a strobe sampled below the floor: an aliased flash is UNDERSAMPLED", () => {
+    // A 6 Hz strobe at 9 frames/s aliases to about 3 Hz (it would read « under the threshold »),
+    // a 10 Hz strobe at 10 frames/s to a still page (it would read « none »), and a page that
+    // looked still at 12 frames/s proves nothing about a strobe faster than 6 Hz.
+    for (const [fps, hz] of [
+      [9, 6],
+      [10, 10],
+      [12, 0],
+    ] as const) {
+      const n = Math.round(1.5 * fps);
+      const m = measureFlashes(frames(n, fps, hz), 400, ((n - 1) * 1000) / fps);
+      expect(m.fps, `${hz} Hz at ${fps} fps`).toBeLessThan(FLASH_MIN_FPS);
+      expect(m.outcome, `${hz} Hz at ${fps} fps`).toBe("undersampled");
+    }
+    // At the floor, the same 6 Hz strobe is resolved and comes out over the threshold.
+    expect(measureFlashes(frames(31, 20, 6), 400, 1500).outcome).toBe("over-threshold");
   });
   it("says UNDERSAMPLED — measured nothing — when the frame rate cannot see 3 flashes a second", () => {
     expect(measureFlashes(frames(6, 4, 0), big, 1250).outcome).toBe("undersampled");
@@ -138,7 +155,7 @@ describe("media.json is written, read back, and reaches 4.x and 13.7", () => {
   it("puts the flash measure first in 13.7, with what it cannot see", () => {
     const ev = evidenceOf(capture(digest()), "13.7");
     expect(ev[0]).toMatch(
-      /^probe:flash :: page="video" flash measure RAN on a 1480 ms viewport recording \(90 frames, 60 frames\/s\): no luminance flash in any cell/,
+      /^probe:flash :: page="video" flash measure RAN on a 1480 ms viewport recording \(90 frames, 60 frames\/s — flashing observable up to 30 Hz\): no luminance flash in any cell/,
     );
     expect(ev[0]).toMatch(/saturated-red flashes are not measured/);
   });

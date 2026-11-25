@@ -30,6 +30,7 @@ import { AXE_WCAG } from "./axe-map.js";
 import { computedTextPairs, renderedRulesFor, renderedRulesRan } from "./rules/rendered.js";
 import { rendersNativeLink } from "./rules/rule.js";
 import { consentContainerOf, consentNote } from "./consent.js";
+import { FLASH_MIN_FPS } from "./media.js";
 import { SR_FIELD_ROLES, SR_LIVE_ROLES, SR_SCRIPTED_STATES, SR_WIDGET_ROLES } from "./screen-reader.js";
 import type { MediaItem, SrEntry } from "./types.js";
 
@@ -2982,7 +2983,7 @@ function flashAnchor(d: Doc, page: string): Harvested | undefined {
     );
   const said =
     f.outcome === "undersampled"
-      ? `UNDERSAMPLED (${f.fps} frames/s, below the rate a 3-per-second count needs) — measured nothing`
+      ? `UNDERSAMPLED (${f.fps} frames/s, under the ${FLASH_MIN_FPS} frames/s a negative result needs: a faster flash would alias to a slower one or to a still page) — measured nothing`
       : f.outcome === "none"
         ? "no luminance flash in any cell"
         : f.outcome === "below-threshold"
@@ -2992,7 +2993,7 @@ function flashAnchor(d: Doc, page: string): Harvested | undefined {
     d,
     1,
     "probe:flash",
-    `page="${page}" flash measure RAN on a ${f.durationMs} ms viewport recording (${f.frames} frames, ${f.fps} frames/s): ${said}; ${plural(animated, "media or animated element", "media or animated elements")} on the page — ${limits}`,
+    `page="${page}" flash measure RAN on a ${f.durationMs} ms viewport recording (${f.frames} frames, ${f.fps} frames/s — flashing observable up to ${Math.floor(f.fps / 2)} Hz): ${said}; ${plural(animated, "media or animated element", "media or animated elements")} on the page — ${limits}`,
     `flash|${f.outcome}|${f.maxFlashesPerSecond}|${animated}`,
   );
 }

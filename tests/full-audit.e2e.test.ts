@@ -540,7 +540,7 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
       if (/^(contact|rubriques)-\d{2}-/.test(id)) expect(media.flashSkipped, id).toMatch(/journey state/);
       else {
         expect(media.flash?.outcome, `${id}: ${JSON.stringify(media.flash)}`).toBe("none");
-        expect(media.flash!.fps, id).toBeGreaterThanOrEqual(8);
+        expect(media.flash!.fps, id).toBeGreaterThanOrEqual(20);
       }
     }
     const say = (id: string) => readJson<Sr>(`.ultra11y/pages/${id}/sr.json`).entries.map((e) => e.text);

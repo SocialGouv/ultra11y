@@ -48,7 +48,7 @@ describe("the flash measure on a real viewport recording", () => {
     if (!browser) return;
     const css = `<style>html,body{margin:0;height:100%}#f{position:fixed;inset:0;background:#000;animation:fl 166ms steps(1) infinite}@keyframes fl{50%{background:#fff}}</style>`;
     const media = await onPage(page('<div id="f"></div>', css), (p) => probeMedia(p, { flash: true }));
-    expect(media?.flash?.fps, JSON.stringify(media?.flash)).toBeGreaterThanOrEqual(8);
+    expect(media?.flash?.fps, JSON.stringify(media?.flash)).toBeGreaterThanOrEqual(20);
     expect(media?.flash?.outcome, JSON.stringify(media?.flash)).toBe("over-threshold");
     expect(media?.flash?.maxFlashesPerSecond).toBeGreaterThan(3);
     // The running CSS animation is inventoried as something that can flash.

@@ -33,9 +33,14 @@ type Any = any;
 /** How long the viewport is recorded for the flash measure. One second is the window the
  *  criterion counts in; half a second more lets a window start after the first frame. */
 export const FLASH_WINDOW_MS = 1500;
-/** The least frame rate at which a flash rate above 3/s is observable (a 4 Hz flash is 8 changes
- *  a second). Below it the measure is `undersampled`. */
-export const FLASH_MIN_FPS = 8;
+/** The least frame rate at which a NEGATIVE result counts as a measurement. A frame sequence
+ *  resolves a flash only up to half its frame rate (Nyquist): below that a faster strobe aliases
+ *  to a slower one — a 6 Hz strobe sampled at 9 frames/s reads about 3 Hz, « under the threshold »
+ *  — or, near the frame rate, to a steady page. 20 frames/s resolves flashing up to 10 Hz, well
+ *  clear of the « more than 3 a second » the criterion rules out; below it a `none` or a
+ *  `below-threshold` is reported `undersampled` instead, which measured nothing. A flash OVER the
+ *  threshold is kept at any rate: aliasing only ever makes a strobe look slower. */
+export const FLASH_MIN_FPS = 20;
 /** A quarter of a 10° visual field at 1024×768 (341 × 256 CSS pixels): the area WCAG 2.3.1's
  *  general flash threshold applies to. */
 export const FLASH_AREA_THRESHOLD = Math.round((341 * 256) / 4);
@@ -218,6 +223,7 @@ export function measureFlashes(frames: LumFrame[], cellArea: number, durationMs:
   const any = changes.some((l) => l.length > 0);
   const outcome: FlashMeasure["outcome"] =
     maxFlashes > 3 && maxArea >= FLASH_AREA_THRESHOLD ? "over-threshold" : fps < FLASH_MIN_FPS ? "undersampled" : any ? "below-threshold" : "none";
+  // ^ the order is the point: a negative is only ever returned at or above FLASH_MIN_FPS.
   return { ...base, maxFlashesPerSecond: maxFlashes, flashingArea: Math.round(maxArea), outcome };
 }
 
@@ -264,6 +270,18 @@ export async function probeMedia(page: Any, opts: { flash: boolean }): Promise<M
     return undefined;
   }
   if (!opts.flash) return { v: 1, items, flashSkipped: "not measured on this capture (a journey state records the media inventory only)" };
+  return measureFlashInto(page, { v: 1, items });
+}
+
+/** Record the flash measure into an inventory taken earlier. `scan` takes the inventory beside
+ *  the snapshot and records the viewport only once the behaviour window's idle half has closed:
+ *  that window must open on the DOM just serialized, and screenshots touch no DOM, so recording
+ *  inside the open window costs it nothing. */
+export async function measureFlashInto(page: Any, media: MediaDigest): Promise<MediaDigest> {
   const { flash, skipped } = await recordFlashes(page);
-  return { v: 1, items, ...(flash ? { flash } : {}), ...(skipped ? { flashSkipped: skipped } : {}) };
+  delete media.flash;
+  delete media.flashSkipped;
+  if (flash) media.flash = flash;
+  if (skipped) media.flashSkipped = skipped;
+  return media;
 }
