@@ -1,9 +1,9 @@
-# The reliable run
+# L’exécution fiable
 
-One recipe, and the reasons it is that one. Everything here is measured on this repository's
-own fixture; the numbers are stated so they can be argued with.
+Une recette, et les raisons pour lesquelles c’est celle-là. Tout ici est mesuré sur la
+fixture propre à ce dépôt ; les chiffres sont donnés pour qu’on puisse les discuter.
 
-## The recipe
+## La recette
 
 ```sh
 # 1. The engine decides everything it can, for free.
@@ -39,108 +39,117 @@ ultra11y check --in audits/audit-latest.json --standard rgaa \
 ultra11y check --in audits/audit-latest.json --standard rgaa --require-rendered
 ```
 
-Step 5 prints the line that answers « did all 106 run? » directly:
+L’étape 5 affiche la ligne qui répond directement à « les 106 ont-ils tous été traités ? » :
 
 ```
 ✓ Complete grid: all 106 criteria carry a verdict.
   106 criteria — 55 engine, 12 measured (scan), 37 agent, 2 declared undecidable, 0 with no verdict.
 ```
 
-## Who adjudicates
+## Qui arbitre
 
-There is only one judge — `applyAdjudication` — and every verdict passes through it, whoever
-wrote it. The engine runs no model of its own: inside a coding agent the session rules the
-worklist (`verify --manual`), directly or fanned out to subagents with `orchestrate`
-(`references/orchestration.md`); in CI, iterion's `rgaa-audit` bot hands the same worklist to
-its read-only agents (`references/ci.md`).
+Il n’y a qu’un seul juge — `applyAdjudication` — et chaque verdict passe par lui, quel que
+soit son auteur. Le moteur ne fait tourner aucun modèle à lui : dans un agent de code, la
+session statue sur la liste de travail (`verify --manual`), directement ou en la répartissant
+entre des sous-agents avec `orchestrate` (`references/orchestration.md`) ; en CI, le bot
+`rgaa-audit` d’iterion remet la même liste de travail à ses agents en lecture seule
+(`references/ci.md`).
 
-| | why |
+| | pourquoi |
 |---|---|
-| `orchestrate --run <dir>` | Batches of 8 criteria amortise the normative context; each prompt is self-contained, and only the residue the fold refused or left unanswered goes back out on the next pass. `--eco` is the sequential low-token path. |
-| `--ledger` | A verdict paid for once becomes a claim re-verified on every later run (`verify --apply <ledger>`). |
+| `orchestrate --run <dir>` | Des lots de 8 critères amortissent le contexte normatif ; chaque prompt est autonome, et seul le résidu que l’intégration a refusé ou laissé sans réponse repart au passage suivant. `--eco` est le chemin séquentiel économe en tokens. |
+| `--ledger` | Un verdict payé une fois devient une affirmation revérifiée à chaque exécution ultérieure (`verify --apply <ledger>`). |
 
-A run with `--standard rgaa` builds and adjudicates only the RGAA criterion grid; it does not
-launch a second WCAG judgment pass.
+Une exécution avec `--standard rgaa` construit et arbitre uniquement la grille des critères
+RGAA ; elle ne lance pas une seconde passe de jugement WCAG.
 
-## Why step 2 is not optional
+## Pourquoi l’étape 2 n’est pas facultative
 
-`criterionMeasuredOn` requires page coverage. With no capture, **no mechanical criterion can be
-closed by measurement** — they stay « à évaluer » and go swell the model's bill instead of
-being decided by the engine for nothing. On this repository's fixture the worklist is 81
-criteria with no scan. Every criterion the scan closes is one you do not pay ~2 000 input
-tokens to have read.
+`criterionMeasuredOn` exige une couverture de pages. Sans capture, **aucun critère mécanique
+ne peut être clos par la mesure** — ils restent « à évaluer » et vont gonfler la facture du
+modèle au lieu d’être décidés gratuitement par le moteur. Sur la fixture de ce dépôt, la
+liste de travail compte 81 critères sans scan. Chaque critère que le scan clôt est un critère
+dont vous ne payez pas les ~2 000 tokens d’entrée pour le faire lire.
 
-## Why step 4 is not optional either
+## Pourquoi l’étape 4 n’est pas facultative non plus
 
-A cheap adjudicator does not miss things — it **over-accuses**. Measured on a full RGAA pass
-with a small model (Haiku), against a reference ledger adjudicated by a stronger model through the same gate:
+Un arbitre bon marché ne rate pas des choses — il **accuse à tort, en excès**. Mesuré sur une
+passe RGAA complète avec un petit modèle (Haiku), face à un registre de référence arbitré par
+un modèle plus puissant à travers le même garde-fou :
 
 | | |
 |---|---:|
-| criteria both settled | 48 |
-| they agreed on | 24 |
-| they disagreed on | 24 |
-| …of which Haiku said NC where the ledger said C or NA | 19 |
+| critères tranchés par les deux | 48 |
+| sur lesquels ils étaient d’accord | 24 |
+| sur lesquels ils divergeaient | 24 |
+| …dont ceux où Haiku disait NC quand le registre disait C ou NA | 19 |
 
-74 non-conformities against 57. The gate cannot catch this, and that is structural:
-`normativeRefResolves` proves the cited test belongs to the adjudicated criterion — and
-`11.2.1` really is a test of `11.2`. It never asks whether the reading was right, so an
-adjudicator that files « this field has no label » (which is 11.1's) under 11.2 passes cleanly.
+74 non-conformités contre 57. Le garde-fou ne peut pas l’attraper, et c’est structurel :
+`normativeRefResolves` prouve que le test cité appartient au critère arbitré — et `11.2.1`
+est bien un test du `11.2`. Il ne demande jamais si la lecture était juste, donc un arbitre
+qui classe « ce champ n’a pas d’étiquette » (ce qui relève du 11.1) sous le 11.2 passe sans
+encombre.
 
-The `48` above is the intersection of two measured experiment outputs, **not** a fixed number
-of RGAA criteria assigned to the agent. On every real run, read the final provenance tally.
-For example, `26 engine + 32 scan + 46 agent + 2 named undecidable = 106` is complete; calling
-that “48 agent criteria” would hide both the actual 46 model verdicts and the two explicit
-exceptions.
+Le `48` ci-dessus est l’intersection des sorties de deux expériences mesurées, **pas** un
+nombre fixe de critères RGAA confiés à l’agent. À chaque exécution réelle, lisez le décompte
+final par provenance. Par exemple, `26 engine + 32 scan + 46 agent + 2 named undecidable = 106`
+est complet ; appeler cela « 48 critères agent » masquerait à la fois les 46 verdicts
+réellement rendus par le modèle et les deux exceptions explicites.
 
-Three things now stand between that and a deliverable, and only the third is a model:
+Trois choses se dressent désormais entre cela et un livrable, et seule la troisième est un
+modèle :
 
-1. **The brief names the neighbour.** A criterion states which of its theme-mates owns the
-   adjacent question, derived from the pack's own data — for 11.2 that is 11.1, with its plain
-   title beside it.
-2. **The fold refuses the double charge.** An NC on a criterion with no engine rule of its own,
-   on the exact anchor the engine already failed a mechanical neighbour on, is refused and the
-   criterion goes back to « à évaluer » naming that neighbour.
-3. **The trial.** One reader, one element, one question — *does the cited evidence establish
-   what was claimed?* — with the instruction to refute when in doubt.
+1. **Le brief nomme le voisin.** Un critère indique lequel de ses voisins de thématique
+   possède la question adjacente, déduit des données propres du pack — pour le 11.2, c’est le
+   11.1, avec son intitulé simple à côté.
+2. **L’intégration refuse la double imputation.** Une NC sur un critère qui n’a pas de règle
+   moteur propre, sur l’ancre exacte où le moteur a déjà fait échouer un voisin mécanique, est
+   refusée et le critère repasse à « à évaluer » en nommant ce voisin.
+3. **Le procès.** Un lecteur, un élément, une question — *la preuve citée établit-elle ce qui
+   a été affirmé ?* — avec la consigne de réfuter en cas de doute.
 
-## What it costs
+## Ce que ça coûte
 
-Before batching, at criterion grain, for a full RGAA worklist:
+Avant la mise en lots, au grain critère, pour une liste de travail RGAA complète :
 
-| | tokens in |
+| | tokens en entrée |
 |---|---:|
-| before this was looked at | ≈173 000 |
-| today | ≈117 000 |
+| avant qu’on s’y intéresse | ≈173 000 |
+| aujourd’hui | ≈117 000 |
 
-The 33% came from three cuts, and only the first was free: the verdict contract was being sent
-in every brief beside a system prompt that already carried every one of its clauses (28% of the
-total, 2 144 characters × 81 criteria); the glossary keeps five terms at 420 characters instead
-of eight at 600; and the step-by-step procedure of a test whose mechanism the harvest did not
-find in the source is cut to an opening. No test's WORDING is ever abridged.
-`tests/adjudicate-context-budget.test.ts` ratchets the result — this is the bill, not a
-micro-benchmark.
+Les 33 % viennent de trois coupes, et seule la première était gratuite : le contrat de
+verdict était envoyé dans chaque brief à côté d’un prompt système qui en portait déjà chaque
+clause (28 % du total, 2 144 caractères × 81 critères) ; le glossaire garde cinq termes en
+420 caractères au lieu de huit en 600 ; et la procédure pas à pas d’un test dont la collecte
+n’a pas trouvé le mécanisme dans la source est réduite à son ouverture. La FORMULATION d’un
+test n’est jamais abrégée. `tests/adjudicate-context-budget.test.ts` verrouille le résultat
+— c’est la facture, pas un micro-benchmark.
 
-The refutation pass groups up to eight independent claims per model call by default, writes
-each numbered answer separately, and checkpoints every batch. Regenerating a worklist in the
-same directory preserves only byte-identical completed claims; changed and new claims return
-to `null`, so a repair loop pays only for what changed. A claimed conformity is one item with
-its complete citation set, not one paid call per anchor; this is required for cross-page
-criteria whose proof is the set. The worklist is capped at 40 by default
-and the coverage check is rebuilt UNCAPPED, so a bounded worklist fails the gate as `missing`
-rather than passing over the half it tried — which is why step 4 passes `--max-verify 0`.
-Lower it deliberately if you must, and then say what was dropped: a silent cap reads exactly
-like full coverage.
+La passe de contre-vérification regroupe par défaut jusqu’à huit affirmations indépendantes
+par appel au modèle, écrit chaque réponse numérotée séparément, et enregistre un point de
+reprise après chaque lot. Régénérer une liste de travail dans le même répertoire ne conserve
+que les affirmations terminées identiques à l’octet près ; les affirmations modifiées et
+nouvelles repassent à `null`, si bien qu’une boucle de réparation ne paie que ce qui a
+changé. Une conformité affirmée est un seul élément avec l’ensemble complet de ses citations,
+pas un appel payé par ancre ; c’est indispensable pour les critères multi-pages dont la
+preuve est l’ensemble. La liste de travail est plafonnée à 40 par défaut et le contrôle de
+couverture est reconstruit SANS PLAFOND, si bien qu’une liste de travail bornée fait échouer
+le garde-fou en `missing` au lieu de passer sur la moitié qu’elle a tentée — c’est pourquoi
+l’étape 4 passe `--max-verify 0`. Abaissez-le délibérément si vous y êtes obligé, et dites
+alors ce qui a été laissé de côté : un plafond silencieux se lit exactement comme une
+couverture complète.
 
-## When it goes wrong
+## Quand ça tourne mal
 
-- **The pass decided nothing.** Read the refusals it printed. A criterion the gate refused
-  carries its reason in its own justification; it is almost always a brief that never stated
-  the rule, or a harvest with no anchor on the criterion's subject — not a model that gave up.
-- **The ledger replays as stale.** Its fingerprint covers the evidence the harvest READ FROM
-  DISK. `scan --merge` now carries the snapshot inputs into that harvest, and snapshot paths
-  are checkout-independent. A genuinely changed content class still expires its criterion;
-  re-adjudicate only the named residue.
-- **The trial refuses an engine verdict.** It is left untouched and counted, on purpose: a
-  criterion the engine decides is recomputed from source every run, and a rule that produces a
-  false positive is fixed in the rule.
+- **La passe n’a rien décidé.** Lisez les refus qu’elle a affichés. Un critère que le
+  garde-fou a refusé porte sa raison dans sa propre justification ; c’est presque toujours un
+  brief qui n’a jamais énoncé la règle, ou une collecte sans ancre sur le sujet du critère —
+  pas un modèle qui a abandonné.
+- **Le registre se rejoue comme périmé.** Son empreinte couvre les preuves que la collecte a
+  LUES SUR LE DISQUE. `scan --merge` reporte désormais les entrées des instantanés de page
+  dans cette collecte, et les chemins des instantanés ne dépendent pas du checkout. Une
+  classe de contenu réellement modifiée fait toujours expirer son critère ; ne réarbitrez que
+  le résidu nommé.
+- **Le procès refuse un verdict du moteur.** Il est laissé intact et compté, exprès : un
+  critère que le moteur décide est recalculé depuis la source à chaque exécution, et une
+  règle qui produit un faux positif se corrige dans la règle.
