@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [9.1.0](https://github.com/SocialGouv/ultra11y/compare/v9.0.2...v9.1.0) (2026-11-25)
+
+
+### Features
+
+* **render:** snapshot rendered components in Chromium and show them in the report ([#217](https://github.com/SocialGouv/ultra11y/issues/217)) ([d626da9](https://github.com/SocialGouv/ultra11y/commit/d626da9507eae4c722cb042b664efa200f99dd36)), closes [#210](https://github.com/SocialGouv/ultra11y/issues/210)
+
 ## [9.0.2](https://github.com/SocialGouv/ultra11y/compare/v9.0.1...v9.0.2) (2026-11-25)
 
 
