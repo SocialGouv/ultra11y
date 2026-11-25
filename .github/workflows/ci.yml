@@ -315,13 +315,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Outside the checkout: the pinned binaries are no part of the tree under test.
       - run: echo "HARNESS_DIR=$HOME/.cache/ultra11y-harness" >> "$GITHUB_ENV"
-      # Two binaries of ~130 MB each: downloaded once per pin, then restored.
+      # Two binaries of ~130 MB each, and the npm cache OpenCode 1 installs from at boot:
+      # downloaded once per pin, then restored. The key's `npm-cache` suffix leaves behind the
+      # entries saved before #201, which hold the binaries alone.
       - name: Cache the pinned OpenCode binaries
         id: opencode-cache
         uses: actions/cache@v6
         with:
           path: ${{ env.HARNESS_DIR }}
-          key: opencode-${{ runner.os }}-${{ env.OPENCODE_V1_VERSION }}-${{ env.OPENCODE_V2_VERSION }}
+          key: opencode-${{ runner.os }}-${{ env.OPENCODE_V1_VERSION }}-${{ env.OPENCODE_V2_VERSION }}-npm-cache
       - name: Install OpenCode ${{ env.OPENCODE_V1_VERSION }} (npm) and ${{ env.OPENCODE_V2_VERSION }} (release binary)
         if: steps.opencode-cache.outputs.cache-hit != 'true'
         run: |
@@ -331,12 +333,18 @@ jobs:
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/opencode-v2.tar.gz" "https://opencode.ai/files/bin/$OPENCODE_V2_VERSION/opencode-linux-x64-baseline.tar.gz"
           echo "$OPENCODE_V2_SHA256  $RUNNER_TEMP/opencode-v2.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/opencode-v2.tar.gz" -C "$HARNESS_DIR/opencode-v2"
+          # Every OpenCode 1 boot runs `npm install @opencode-ai/plugin@<its version>` in its
+          # config directory. The smoke runs npm OFFLINE against this cache, so that install
+          # never waits on the registry (it once did, until the 300 s test timeout: #201).
+          npm install --prefix "$RUNNER_TEMP/opencode-plugin-warm" --cache "$HARNESS_DIR/npm-cache" \
+            --no-save --no-audit --no-fund --ignore-scripts "@opencode-ai/plugin@$OPENCODE_V1_VERSION"
       # ULTRA11Y_REQUIRE_OPENCODE turns the test's skip-when-absent into a failure: both majors
       # are installed here on purpose, and a skip would make the job decoration.
       - name: The plugin in real OpenCode, against a mock model
         env:
           OPENCODE_V1_BIN: ${{ env.HARNESS_DIR }}/opencode-v1/node_modules/.bin/opencode
           OPENCODE_V2_BIN: ${{ env.HARNESS_DIR }}/opencode-v2/opencode
+          ULTRA11Y_SMOKE_NPM_CACHE: ${{ env.HARNESS_DIR }}/npm-cache
           ULTRA11Y_REQUIRE_OPENCODE: "1"
         run: |
           "$OPENCODE_V1_BIN" --version
