@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [9.0.0](https://github.com/SocialGouv/ultra11y/compare/v8.5.1...v9.0.0) (2026-11-25)
+
+
+* feat!: RGAA is the only standard ultra11y shows, WCAG stays as internal mapping ([#202](https://github.com/SocialGouv/ultra11y/issues/202)) ([ff820ce](https://github.com/SocialGouv/ultra11y/commit/ff820ce53aa328ee2dac1b786b8c6e9559367291)), closes [#194](https://github.com/SocialGouv/ultra11y/issues/194) [#194](https://github.com/SocialGouv/ultra11y/issues/194)
+
+
+### BREAKING CHANGES
+
+* the default standard is RGAA 4.1.2 and no WCAG report,
+grid or rate is produced any more. `--standard wcag` exits 2, `audit --json`
+writes the RGAA document (engine result under `core`), reports are named
+rgaa-YYYY-MM-DD.md, output defaults to French without a repo language, and
+the `pack` command and `--pack`/`--override`/`--guidance` flags are removed.
+
 ## [8.5.1](https://github.com/SocialGouv/ultra11y/compare/v8.5.0...v8.5.1) (2026-11-25)
 
 
