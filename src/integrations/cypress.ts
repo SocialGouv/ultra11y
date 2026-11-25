@@ -89,6 +89,7 @@ export function registerUltra11yCommand(): void {
         const payload = {
           ...buildPayload(collected, url, "cypress", opts),
           failOn: opts.failOn,
+          ...(opts.lang ? { lang: opts.lang } : {}),
           ...(opts.report ? { report: opts.report } : {}),
           ...(shotName ? { screenshotName: shotName } : {}),
         };

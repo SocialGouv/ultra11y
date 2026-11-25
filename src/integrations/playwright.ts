@@ -38,7 +38,18 @@ import {
 } from "../document-store.js";
 import { type AxeEngine, type AxeEngineInfo, resolveAxeEngine, runAxe } from "../axe-engine.js";
 import { runLiveProbes } from "../probes.js";
-import { type AuditLike, type CheckOptions, type ProbeTuning, auditSnapshot, buildPayload, gate, stayedOnPage, writePagesReport } from "./core.js";
+import {
+  type AuditLike,
+  type CheckOptions,
+  type ProbeTuning,
+  auditSnapshot,
+  buildPayload,
+  gate,
+  localizedMessage,
+  reportOpts,
+  stayedOnPage,
+  writePagesReport,
+} from "./core.js";
 
 // Playwright's own types are not a dependency of this package (it is a peer of YOUR repo),
 // so the page object is structurally typed to exactly what is used.
@@ -371,8 +382,8 @@ export async function checkA11y(page: PlaywrightPage, opts: PlaywrightCheckOptio
       console.warn(`ultra11y: the document download failed on this page — ${e instanceof Error ? e.message : String(e)}. The snapshot was still recorded.`);
     }
   }
-  if (opts.report) writePagesReport(typeof opts.report === "object" ? opts.report : {});
-  gate(result, String(payload.meta.name), opts.failOn);
+  if (opts.report) writePagesReport(reportOpts(opts.report, opts.lang));
+  gate(result, String(payload.meta.name), opts.failOn, opts.lang, localizedMessage);
   return result;
 }
 
