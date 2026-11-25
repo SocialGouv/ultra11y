@@ -746,6 +746,27 @@ export interface PackCriterionAdjudication {
   // auditor ruled it (`auditor` says who).
   decidedBy?: "agent" | "human";
   auditor?: Auditor;
+  // PER-PAGE OUTCOMES (#197), keyed by audited page id. The verdict above is scope-wide: one
+  // NC for RGAA 11.13 whose finding sits on the contact page left the criterion « à évaluer »
+  // on every other page that carries the same kind of subject, and the strict per-page gate
+  // then needed an `--allow-undecided` exemption for those criteria. A `pages` map lets one
+  // verdict carry its per-page outcomes instead, so each page is settled on its own evidence —
+  // a page whose subject is clean gets its own C with its own citation, a page whose subject
+  // fails gets its own NC. Absent (or a page missing from the map) ⇒ every page keeps the
+  // run-wide verdict, exactly as before.
+  pages?: Record<string, PackPageAdjudication>;
+}
+
+/** One page's outcome inside a recorded verdict (#197) — the fold re-gated it per page with
+ *  the same fail-closed checks the run-level verdict passed (justification and citations for
+ *  a C/NA, groundable findings each citing a test of the criterion for an NC). No `manual`
+ *  here by construction: a page the agent could not decide is left OUT of the map and keeps
+ *  the run-wide verdict, so a recorded page outcome is always decided. */
+export interface PackPageAdjudication {
+  status: "C" | "NC" | "NA";
+  justification?: string;
+  citations?: CriterionCitation[];
+  findings?: Finding[];
 }
 
 export interface GuidelineTally {

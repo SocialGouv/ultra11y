@@ -3393,7 +3393,10 @@ function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
     // warning, not a refusal: a source-only audit is a legitimate thing to want, and the gate
     // for those who want it to fail is `check --require-rendered`.
     const unrendered = unrenderedResidual(audit, adjItems);
-    const w = writeAdjudication(adjItems, out, { standard, auditDate: audit.date, lang, unrendered, web });
+    // THE AUDITED PAGES (#197), named in the worklist so the filler knows which ids may key a
+    // `pages` map. Data, not validation: the fold checks `pages` keys against the audit itself.
+    const auditedPages = pagesOf(audit).map(({ id, name, url }) => ({ id, name, url }));
+    const w = writeAdjudication(adjItems, out, { standard, auditDate: audit.date, lang, unrendered, web, pages: auditedPages });
     if (unrendered.length) {
       const ids = unrendered.join(" · ");
       console.error(

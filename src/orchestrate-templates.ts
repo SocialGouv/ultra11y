@@ -23,6 +23,34 @@ Return ONLY the structured output specified above. Do NOT write, edit, or delete
 // Structured-output schemas the emitted workflows pass to agent(..., { schema }).
 // They mirror the fail-closed rules `verify --apply` enforces, so a fragment that
 // validates here still gets re-checked (grounding, required justifications) at fold time.
+// The citation and finding item shapes are hoisted so a per-page outcome (#197) carries
+// EXACTLY the run-level ones — two copies of these would drift, and the fold gates a page
+// verdict with the same checks it gates the run.
+const CITATION_ITEMS = {
+  type: "object",
+  required: ["file", "line"],
+  properties: { file: { type: "string" }, line: { type: "number" }, selector: { type: "string" }, snippet: { type: "string" } },
+};
+const FINDING_ITEMS = {
+  type: "object",
+  // `normativeRef` is REQUIRED by the fold (src/adjudicate.ts): an NC with none is
+  // rejected. Omitting it here made every fan-out adjudication produce NC verdicts
+  // that `verify --apply` then refused.
+  required: ["file", "line", "message", "normativeRef"],
+  properties: {
+    file: { type: "string" },
+    line: { type: "integer" },
+    selector: { type: "string" },
+    message: { type: "string" },
+    snippet: { type: "string" },
+    severity: { enum: ["bloquant", "majeur", "mineur"] },
+    normativeRef: {
+      type: "string",
+      description:
+        "The precise failed test of the ACTIVE standard. WCAG core: a success-criterion id (e.g. '1.1.1'). Country standard: a test OF THIS ITEM'S OWN CRITERION (e.g. '11.2.1' on item 11.2) — a WCAG id looks alike but denotes an unrelated test and is rejected.",
+    },
+  },
+};
 const ADJUDICATE_SCHEMA = {
   type: "object",
   required: ["verdicts"],
@@ -45,36 +73,36 @@ const ADJUDICATE_SCHEMA = {
             type: "array",
             description:
               "REQUIRED for C, and for NA when evidence was presented: the evidence items you cleared, `file`/`line` copied verbatim from this criterion's own evidence[]",
-            items: {
-              type: "object",
-              required: ["file", "line"],
-              properties: { file: { type: "string" }, line: { type: "number" }, selector: { type: "string" }, snippet: { type: "string" } },
-            },
+            items: CITATION_ITEMS,
           },
           reason: { type: ["string", "null"], enum: ["needs-rendered-dom", "undecidable", null], description: "REQUIRED for a still-manual verdict" },
           findings: {
             type: "array",
             description: "REQUIRED (>=1, groundable) for NC",
-            items: {
+            items: FINDING_ITEMS,
+          },
+          // PER-PAGE OUTCOMES (#197), mirroring the contract's `pages` clause: optional on a
+          // decided verdict, keyed by audited page id, each page verdict passing the same gate as the
+          // run-level one. No per-page `manual` — an undecided page is left OUT of the map, and
+          // it keeps the run-wide verdict.
+          pages: {
+            type: "object",
+            additionalProperties: {
               type: "object",
-              // `normativeRef` is REQUIRED by the fold (src/adjudicate.ts): an NC with none is
-              // rejected. Omitting it here made every fan-out adjudication produce NC verdicts
-              // that `verify --apply` then refused.
-              required: ["file", "line", "message", "normativeRef"],
+              required: ["verdict"],
               properties: {
-                file: { type: "string" },
-                line: { type: "integer" },
-                selector: { type: "string" },
-                message: { type: "string" },
-                snippet: { type: "string" },
-                severity: { enum: ["bloquant", "majeur", "mineur"] },
-                normativeRef: {
-                  type: "string",
-                  description:
-                    "The precise failed test of the ACTIVE standard. WCAG core: a success-criterion id (e.g. '1.1.1'). Country standard: a test OF THIS ITEM'S OWN CRITERION (e.g. '11.2.1' on item 11.2) — a WCAG id looks alike but denotes an unrelated test and is rejected.",
+                verdict: { enum: ["C", "NC", "NA"], description: "REQUIRED — a page verdict is C, NC or NA; there is no per-page manual" },
+                justification: { type: "string", description: "REQUIRED for a per-page C and NA" },
+                citations: {
+                  type: "array",
+                  description: "REQUIRED for a per-page C, and for a per-page NA when evidence was presented",
+                  items: CITATION_ITEMS,
                 },
+                findings: { type: "array", description: "REQUIRED (>=1, groundable) for a per-page NC", items: FINDING_ITEMS },
               },
             },
+            description:
+              "OPTIONAL on a decided C/NC/NA verdict: per-page outcomes keyed by AUDITED PAGE id (the worklist header lists them). Each page verdict passes the same gate as the run-level verdict, scoped to that page: every citation and finding names the page's own capture (.ultra11y/pages/<id>/dom.html) or a source it declares. A page NC needs a run-wide NC; no page C/NA where a run-wide NC finding sits. A page left unnamed keeps the run-wide verdict — there is no per-page manual. A page whose subject is clean gets its own C; a page whose subject fails gets its own NC.",
           },
         },
       },
@@ -331,7 +359,7 @@ For EACH of your criteria:
 2b. ${SEVERITY_RULE}
 3. Never guess. A criterion you cannot decide from real evidence stays \`manual\` with a reason — that is a valid, honest verdict; the scan tier or a human picks it up.
 
-Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "citations", "reason", "findings" }] }\` — your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`, and every C (plus every evidenced NA) carrying its \`citations\`. A verdict that clears a criterion without naming what it cleared is refused by the fold; the refusal costs THAT criterion — which stays « to assess » carrying the reason — and leaves every other verdict standing. So never guess to fill a gap: an honest \`manual\` is worth more than a verdict the gate throws away.
+Return (structured output): \`{ "verdicts": [{ "criteriaId", "verdict", "justification", "citations", "reason", "findings", "pages" }] }\` — your ITEMS only, every field grounded in what you actually read, every NC finding carrying its \`normativeRef\`, and every C (plus every evidenced NA) carrying its \`citations\`. \`pages\` is the optional per-page outcomes map (#197) of a decided verdict: keyed by audited page id, each page verdict passing the same gate and citing only that page's own capture or declared sources, a page \`NC\` only under a run-wide \`NC\`, so a page whose subject is clean gets its own \`C\` and a page whose subject fails gets its own \`NC\` while an undecided page stays out of the map. A verdict that clears a criterion without naming what it cleared is refused by the fold; the refusal costs THAT criterion — which stays « to assess » carrying the reason — and leaves every other verdict standing. So never guess to fill a gap: an honest \`manual\` is worth more than a verdict the gate throws away.
 ${footer}`,
     refuter: `# Contract: refuter
 

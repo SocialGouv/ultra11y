@@ -108,6 +108,16 @@ function pathMatch(a: string, b: string): boolean {
   return x === y || x.endsWith(`/${y}`) || y.endsWith(`/${x}`);
 }
 
+/** Whether a file is THIS page's own evidence (#197): its rendered capture
+ *  (`.ultra11y/pages/<id>/dom.html`, by path, the same provenance `attributePages` trusts), or a
+ *  source the page declares. The scope a per-page verdict is gated against — a page outcome
+ *  that cites any other file was settled on another page's evidence, and is refused. */
+export function fileOnPage(file: string, page: PageScope): boolean {
+  if (typeof file !== "string" || !file) return false;
+  if (snapshotPageId(file) === page.id) return true;
+  return (page.sources ?? []).some((s) => pathMatch(file, s));
+}
+
 /** Stamp `page` on every finding whose page can be established. Mutates in place, mirroring
  *  `enrichCaptureOrigins`. Findings already stamped (raised on a snapshot) are left alone. */
 export function attributePages(result: AuditResult, pages: PageScope[]): void {
@@ -657,6 +667,30 @@ function adjudicationOnPage(
     return subjectsAbsent(subjectsForPackCriterion(adjudication.standard, id, wcag), new Set(seen));
   };
   const criteria = adjudication.criteria.flatMap((c) => {
+    // A PER-PAGE OUTCOME WINS FOR ITS PAGE (#197). The run-wide verdict above is scope-wide, and
+    // that scope is exactly what left a criterion « à évaluer » on every page whose subject
+    // happened to be clean while one page failed it. A `pages` map settles each page on its own
+    // evidence — the fold re-gated every named outcome per page — so its projection here is the
+    // outcome itself, not the run-wide entry: the `pages` map is stripped from the copy (it is
+    // the other pages' business), the status becomes the page's own, the run-wide justification
+    // is overridden when the outcome carries its own, and the citations and findings are the
+    // page outcome's alone. decidedBy/auditor travel through the spread: the provenance
+    // says WHO ruled, and it ruled here too. Pages NOT named in the map fall through to the
+    // run-wide handling below, unchanged.
+    const outcome = c.pages?.[page.id];
+    if (outcome) {
+      // The run-wide citations are other pages' evidence: the page shows only its own.
+      const { pages: _perPage, citations: _runCitations, ...rest } = c;
+      return [
+        {
+          ...rest,
+          status: outcome.status,
+          ...(outcome.justification ? { justification: outcome.justification } : {}),
+          ...(outcome.citations?.length ? { citations: outcome.citations } : {}),
+          findings: outcome.findings ?? [],
+        },
+      ];
+    }
     if (c.status === "C" && absentHere(c.id)) return [{ ...c, status: "NA" as const, justification: NOTHING_ON_THIS_PAGE }];
     if (c.status !== "NC") return [c];
     const findings = c.findings.filter(onPage);

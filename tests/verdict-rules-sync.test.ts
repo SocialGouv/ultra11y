@@ -29,6 +29,9 @@ const CLAUSES: [name: string, probe: RegExp][] = [
   ["needs-rendered-dom is refused over a capture", /`needs-rendered-dom` is refused/],
   ["never guess", /Never guess/],
   ["every worklist item gets a verdict", /exactly one verdict for EVERY criterion presented/],
+  // #197: a verdict may settle each page of the audit, and an unnamed page keeps the run-wide
+  // verdict — the clause travels on every surface or a filler guesses a `pages` key into being.
+  ["a verdict may settle each page", /`pages` \(per-page outcomes[\s\S]{0,1200}keeps the run-wide verdict/],
   ["a run-wide NC can be a page-grid residual", /run-wide `NC`[\s\S]{0,240}page-level cells/],
   ["rule only on the criteria presented", /Rule ONLY on the criteria presented/],
   // The conformity half of the gate is only a deterrent if the adjudicator is told about it

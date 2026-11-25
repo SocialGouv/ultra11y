@@ -19,6 +19,8 @@ import type {
   Finding,
   Lang,
   PackCriterionAdjudication,
+  PackPageAdjudication,
+  PageScope,
   ResidualRisk,
   Severity,
   Status,
@@ -66,7 +68,7 @@ import {
 import { guidanceForCriterion } from "./guidance/index.js";
 import { guidanceExampleBlock } from "./prd.js";
 import { INAPPLICABLE_STATUS, isAdjudicated } from "./types.js";
-import { derivePages, pageGridModel } from "./pages.js";
+import { derivePages, fileOnPage, pageGridModel, pagesOf } from "./pages.js";
 
 /** Cap on CONTENT CLASSES shown per criterion — not on anchors.
  *
@@ -144,6 +146,25 @@ export interface AgentFinding {
   normativeRef?: string;
 }
 
+/** One page's outcome inside a verdict (#197).
+ *
+ *  A run-wide verdict is scope-wide: an NC for RGAA 11.13 whose finding sits on the contact
+ *  page left the criterion « à évaluer » on every other page carrying the same kind of subject
+ *  (a login form, a search form), and the strict per-page completeness gate then needed an
+ *  `--allow-undecided` exemption for those criteria. A `pages` map lets ONE verdict carry its
+ *  PER-PAGE OUTCOMES instead, so each page is settled on its own evidence: a page whose subject
+ *  is clean gets its own C with its own citation, a page whose subject fails gets its own NC.
+ *
+ *  NO "manual" here, on purpose — an undecided page stays out of the map and keeps the run-wide
+ *  verdict, so a page outcome is always C, NC or NA. Keyed by AUDITED PAGE id, and every entry
+ *  passes the same fail-closed gate the run-level verdict does. */
+export interface PageVerdict {
+  verdict: "C" | "NC" | "NA";
+  justification: string;
+  citations?: (Evidence | string)[];
+  findings?: AgentFinding[];
+}
+
 export interface AdjudicationItem {
   criteriaId: string;
   automatability: Automatability;
@@ -208,6 +229,10 @@ export interface AdjudicationItem {
   // verdict passes the SAME gate (a name is not evidence) and lands as `decidedBy: "human"`.
   decidedBy: "agent" | "human";
   auditor?: Auditor;
+  // PER-PAGE OUTCOMES (#197), keyed by AUDITED PAGE id (the worklist's header lists them).
+  // Optional on a DECIDED verdict (C, NC, NA) only — a still-`manual` one carrying pages is
+  // refused. A page absent from the map keeps the run-wide verdict.
+  pages?: Record<string, PageVerdict>;
 }
 
 export interface AdjudicationFile {
@@ -222,6 +247,10 @@ export interface AdjudicationFile {
   // Advisory to the reader, never read back by `applyAdjudication` (which validates against
   // its own constants), so a hand-edited or stale header can never widen what is accepted.
   contract?: AdjudicationContract;
+  // The audited pages of the run (#197), written into every worklist so the filler knows which
+  // ids may key a `pages` map. DATA, not validation: the fold validates `pages` keys against
+  // the audit itself, so a stale or hand-edited list here can never widen what is accepted.
+  pages?: { id: string; name: string; url: string }[];
   items: AdjudicationItem[];
 }
 
@@ -250,6 +279,7 @@ export function adjudicationContract(): AdjudicationContract {
       NA: "a non-empty justification, and citations[] whenever evidence was presented — a criterion whose subject exists NOWHERE in the audited scope is NA, never NC",
       NC: "at least one groundable finding, each naming the `file` it was observed in (an NC with no location is refused as flatly as an uncited C — and a non-conformity that rests on an ABSENCE is still observed on an element of a page, so cite that element) and each citing a normativeRef that resolves against the active standard",
       manual: `a reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`,
+      pages: `optional on a decided verdict (C, NC or NA): PER-PAGE OUTCOMES (#197), keyed by AUDITED PAGE id — { "<page id>": { verdict: "C" | "NC" | "NA", justification, citations?, findings? } }. Each page verdict passes the SAME gate as the run-level one (justification and citations for a C/NA, groundable findings each citing a test of this criterion for an NC), scoped to THAT page: every citation and finding names the page's own capture (.ultra11y/pages/<id>/dom.html) or a source the page declares — a verdict settled on another page's evidence covers only that other page. It must agree with the run-wide verdict: a page NC only under a run-wide NC, a page C never under a run-wide NA, and no page C/NA where a run-wide NC finding sits. A page left unnamed keeps the run-wide verdict; there is no per-page "manual" — a page you cannot decide stays out of the map, and a still-manual criterion carries no pages. Pack standards only: the WCAG core has no page grid of its own`,
       human: `decidedBy "human" (a human auditor's verdict, instead of the default "agent") requires auditor: { name, organisation? } — the same evidence gate applies, and the verdict is reported under the auditor's name`,
       recommendations: RECOMMENDATION_SHAPE,
       severity: `on every NC finding: ${(Object.entries(SEVERITY_RUBRIC) as [string, { en: string }][]).map(([k, v]) => `${k} = ${v.en}`).join("; ")}. One defect at one anchor keeps ONE severity, the highest, even when two criteria cite it; a recommendation is always mineur`,
@@ -964,6 +994,17 @@ export function canonicalizeAdjudication(adj: AdjudicationFile): AdjudicationFil
       const r = normalizeManualReason(it.reason);
       if (r !== undefined) it.reason = r;
     }
+    // And the same tolerance for a PER-PAGE verdict (#197): "nc" folds as "NC". Read through
+    // an `unknown` cast because this runs on the raw file, before the fold has validated the
+    // shape of `pages` — canonicalising junk here would crash instead of refusing it.
+    const pages = (it as { pages?: unknown }).pages;
+    if (pages && typeof pages === "object" && !Array.isArray(pages)) {
+      for (const pv of Object.values(pages as Record<string, PageVerdict>)) {
+        if (!pv || typeof pv !== "object") continue;
+        const v = normalizeVerdict(pv.verdict);
+        if (v === "C" || v === "NC" || v === "NA") pv.verdict = v;
+      }
+    }
   }
   return adj;
 }
@@ -1148,6 +1189,197 @@ export function applyAdjudication(
     if (list) list.push(entry);
     else groundInputs.set(criteriaId, [entry]);
   };
+  // THE GATES, EXTRACTED (#197) so the run-level loops AND the per-page loops of a `pages` map
+  // run the very same checks. Both helpers close over this fold's context (toGround,
+  // citationDrift, inAuditScope, blame, adj.standard, engineNcAt) and take the criterion id plus
+  // a MESSAGE SUBJECT: the run-level calls pass `criterion ${id}` and keep their exact historical
+  // text; a per-page call passes `criterion ${id}, page ${pageId}`, so the same refusal names the
+  // page it condemns. Behaviour is unchanged on every pre-existing path — this is a move, not a
+  // rewrite.
+  //
+  // GATE ONE CITED ANCHOR: membership in the item's own evidence, then grounding.
+  const gateCitation = (criteriaId: string, subject: string, evidence: Evidence[], c: Evidence): void => {
+    // Each citation must name evidence THIS item carried. Grounding alone would only
+    // prove the anchor exists somewhere in the tree; the pairing proves the agent ruled
+    // on what it was actually given.
+    // The anchor set is every occurrence of a class this criterion carries — the
+    // representative AND its siblings — not the representatives alone.
+    //
+    // The check proves "you ruled on what you were given". Matching only representatives
+    // proved something narrower and wrong: a class holds one anchor per rendered page, an
+    // agent with file access naturally cites the occurrence it opened, and the gate then
+    // called a real, grounded `file:line` fabricated. Measured on a real run, that is
+    // exactly how RGAA 5.8, 9.2 and 11.1 were refused. Membership was the defect;
+    // grounding — which proves the citation resolves against real source — is unchanged
+    // and still runs on every one of them.
+    const anchors = evidence.flatMap((e) => [`${e.file}:${e.line}`, ...(e.alsoAt ?? [])]);
+    // Two ways to belong, and the second one is what a good adjudicator does.
+    //
+    // The harvest anchors a rendered page (`.ultra11y/pages/<id>/dom.html`) because that
+    // is what proves the browser's output — but the place a reader goes to FIX it is the
+    // component that produced it, and that is what the agent naturally cites. Measured
+    // on a real run: 15 of the 16 citations still refused after the drift tolerance were
+    // in files this audit had read, pointing at the source behind the evidence. Refusing
+    // them called correct work fabricated.
+    //
+    // So a citation also belongs when it lands in a file the audit read. That is a real
+    // bound — a file outside the audited scope is still refused — and it is not the last
+    // one: `groundFinding` below still has to find the cited content at that file:line in
+    // the real source, which is what "not fabricated" actually means.
+    if (!cites0(anchors, c, citationDrift) && !inAuditScope(c.file)) {
+      blame(criteriaId, `${subject}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
+    }
+    // GROUND THE ANCHOR, NOT THE TRANSCRIPTION.
+    //
+    // Once a citation lands on evidence this criterion was shown, the harvested anchor is
+    // the ground truth: the engine read it out of the file, so it is there by
+    // construction. Re-checking the agent's RETYPING of it against the file tests
+    // spelling, not evidence — and it fails constantly, because an adjudicator writes the
+    // element out from the brief rather than copying the `snippet` field byte for byte.
+    //
+    // Measured on a real run: 81 criteria adjudicated, 78 of 82 citations landing exactly
+    // on a harvested anchor, and 54 verdicts refused — every one of them for
+    // `cited snippet not found`. A rendered snapshot serializes the document on ONE line,
+    // so its anchors all sit at line 2 and the grounding window is the whole page: what
+    // failed was never the location, only the transcription of it.
+    //
+    // A sibling from `alsoAt` carries no snippet (it is a bare `file:line`), so there is
+    // nothing authoritative to ground — the selector probe runs against the real file
+    // instead, which is the same check a citation with no snippet has always had.
+    //
+    // Anything OUTSIDE the harvest keeps the strict check below, unchanged. That is where
+    // a fabricated location would hide, and this must not become a way to launder one.
+    // THE CITATION FIRST, THE ANCHOR ONLY AS A FALLBACK — and the order is the whole
+    // point.
+    //
+    // Whatever the agent wrote is checked against the real file, exactly as before. That
+    // is the strongest proof there is, and it covers the case the drift window exists
+    // for: RGAA 5.2 asks about a table's summary, the harvest anchors the `<table>`, and
+    // the honest citation is the `<caption>` a line below. Grounding the anchor INSTEAD
+    // refused precisely that — measured on a real run, 5.2, 5.4, 5.5, 11.6, 11.7 and
+    // 11.9 all died on it, each a correct citation of a neighbour.
+    //
+    // Only when the citation does not ground — which is what a RETYPING looks like, and
+    // on a one-line snapshot that is most of them — does the harvested anchor stand in.
+    // It is authoritative there: the engine read it out of the file itself. And only
+    // then does recognisability have anything to say, because only then is the anchor
+    // being used to vouch for something the file did not confirm on its own.
+    const cite = { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet };
+    const { fallback, onAnchor } = evidenceFallback(evidence, c, citationDrift);
+    if (fallback) {
+      toGround(criteriaId, cite, fallback);
+    } else {
+      // WHY THE STRICT PATH APPLIED, said at the point it applies.
+      //
+      // The citation belongs (it is in a file this audit read) but it is not on an anchor
+      // THIS criterion was shown, so the paragraph above cannot let the harvest vouch for
+      // the transcription — and the refusal that follows says only `cited snippet not
+      // found`, which reads as « you mistyped » when the actionable fact is « you cited
+      // outside this criterion's evidence, so your retyping was verified literally ».
+      //
+      // Measured: that message sent a reader diagnosing RGAA 12.5 to the wrong conclusion
+      // — a fold bug — with this source open. The risk is not the lost criterion, it is
+      // the « fix » that would follow: relaxing the strict path is exactly the hole the
+      // two bounds above exist to close. So the cause travels with the refusal.
+      //
+      // It bites hardest where the criterion's subject is an ABSENCE. 12.1 and 12.5 are
+      // the repeat offenders the adjudicator prompt already names: asked to prove there is
+      // no search engine, a model cites the search form it is arguing about — which is, by
+      // definition, not among the anchors harvested for a criterion about navigation.
+      // ONLY when the citation is genuinely off-harvest. Landing on an anchor and then
+      // claiming a different KIND of element (an <img> cited as a <video>) also reaches
+      // this branch, and telling that reader « not among the harvested evidence » would
+      // be false: the anchor is right there, it is the element that is wrong. That case
+      // keeps the bare refusal, which already says the honest thing — this markup is not
+      // in the file.
+      toGround(criteriaId, cite, undefined, onAnchor ? undefined : offHarvestHint(criteriaId, evidence));
+    }
+  };
+  // GATE ONE NC FINDING: file required, normativeRef must resolve against the item's own
+  // criterion, the presupposition/double-charge check, and grounding.
+  const gateFinding = (criteriaId: string, subject: string, evidence: Evidence[], f: AgentFinding): void => {
+    // AN NC NOBODY CAN OPEN IS NOT A FINDING. Checked before the normativeRef, because a
+    // finding with no file cannot be grounded at all — there is nothing to go and read.
+    // Measured once: a model returned an NC with no `file`, the fold minted it anyway, and
+    // it reached `repoRelative`, which crashed on `undefined.split` and took every
+    // rendering after it (the report, the HTML) down with it.
+    if (typeof f.file !== "string" || !f.file.trim()) {
+      blame(
+        criteriaId,
+        `${subject}: an NC finding must name the file it was observed in — nobody can act on a non-conformity with no location. An absence is still observed somewhere: cite the element and the page you observed it on, with the file, line and snippet copied from this criterion's own evidence. If the subject exists nowhere in scope, the verdict is NA with a justification, not NC.`,
+      );
+      return;
+    }
+    // FAIL-CLOSED: every NC finding must cite a precise, resolvable test of the active
+    // standard. A good practice with no normative test is a recommendation, not an NC.
+    if (!f.normativeRef?.trim()) {
+      blame(criteriaId, `${subject}: an NC finding requires a normativeRef citing the failed test of the active standard`);
+    } else if (!normativeRefResolves(f.normativeRef, adj.standard, isCore(adj.standard) ? undefined : criteriaId)) {
+      blame(
+        criteriaId,
+        isCore(adj.standard)
+          ? `${subject}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)`
+          : `${subject}: normativeRef "${f.normativeRef}" is not a test of ${adj.standard} ${criteriaId} — cite one of its own tests (e.g. "${criteriaId}.1"); a WCAG id looks alike but denotes an unrelated test`,
+      );
+    }
+    // THE SAME DEFECT, CHARGED TWICE.
+    //
+    // A field with no label is RGAA 11.1's non-conformity, and the engine finds it with no
+    // model in the loop. 11.2 asks whether the label is RELEVANT, and every one of its six
+    // tests opens on a label that exists — so on that field it has no subject, and « no
+    // label here » filed under 11.2 is the neighbour's finding wearing the wrong number.
+    // The gate above cannot see it: 11.2.1 really is a test of 11.2, and the citation
+    // really does ground.
+    //
+    // Narrow on purpose, and this is the one check here that could refuse a true finding.
+    // It fires only when all three hold: the criterion under verdict PRESUPPOSES a
+    // mechanical neighbour's subject (`presupposedCriterion`), the engine has already ruled
+    // that neighbour non-conformant, and the anchor is literally the same file, line and
+    // selector.
+    //
+    // It read `siblingCriteria` before, and that was too wide by exactly the margin that
+    // matters. The neighbourhood is a reading aid — up to three criteria, no claim that any
+    // of them comes first — so 11.4 (« l'étiquette est-elle accolée à son champ ? ») counted
+    // 11.5 (« les champs de même nature sont-ils regroupés ? ») as a question it
+    // presupposes, and a radio group the engine ruled ungrouped became immune to 11.4 on
+    // the same control. Two defects on one element are not one defect charged twice.
+    // `presupposedCriterion` answers only where the pack singles ONE neighbour out and
+    // stands down on a tie, which keeps 11.2/11.1 and 8.6/8.5 and drops the guesses.
+    //
+    // Refused per verdict like everything else: the criterion returns to « to assess »
+    // carrying the reason, naming the neighbour, so the next pass can file it correctly.
+    if (!isCore(adj.standard) && f.file?.trim()) {
+      const presupposed = presupposedCriterion(loadPack(adj.standard), criteriaId);
+      if (presupposed && engineNcAt(anchorKey(f.file, f.line, f.selector ?? "")).has(presupposed.id))
+        blame(
+          criteriaId,
+          `${subject}: this anchor (${f.file}:${f.line}) is already the engine's non-conformity on ${adj.standard} ${presupposed.id} — « ${presupposed.title} ». ${criteriaId} asks the NEXT question about the same subject and presupposes it is there, so on this element it is not non-conformant: it has no subject. Report it on ${presupposed.id} (the engine already did), or rule ${criteriaId} on a different element.`,
+        );
+    }
+    // A candidate browser rule is evidence too. Its human-readable measurement lives in
+    // `note`, not in the DOM, and a model may copy that note into `snippet`. Once the
+    // finding resolves to this criterion's harvested anchor, ground the authoritative
+    // file/line/selector as the fallback instead of searching page markup for the probe's
+    // prose. Off-harvest findings keep the strict literal path.
+    const anchor = anchorFor(evidence, f, citationDrift);
+    const cite = { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet };
+    if (anchor && recognisablySame(f, anchor.at)) {
+      toGround(criteriaId, cite, {
+        file: anchor.at.file,
+        line: anchor.at.line,
+        selector: anchor.at.selector,
+        snippet: anchor.at.snippet,
+      });
+    } else {
+      if (!anchor && !inAuditScope(f.file))
+        blame(criteriaId, `${subject}: finding ${f.file}:${f.line} is not among this criterion's harvested evidence (fabricated?)`);
+      toGround(criteriaId, cite, undefined, anchor ? undefined : offHarvestHint(criteriaId, evidence));
+    }
+  };
+  // The audited page ids, for validating `pages` keys (#197). Memoised like `scopeCache`:
+  // only an item carrying a `pages` map ever asks for it.
+  let auditPageCache: Map<string, PageScope> | undefined;
+  const auditPageScopes = (): Map<string, PageScope> => (auditPageCache ??= new Map(pagesOf(audit).map((p) => [p.id, p])));
   for (const it of adj.items) {
     // A surplus verdict is already blamed above (« not open for adjudication ») and the fold
     // below records nothing for it. Gating it further would read `it.evidence` — which
@@ -1221,103 +1453,7 @@ export function applyAdjudication(
             : `criterion ${it.criteriaId}: a NA verdict on a criterion with evidence must cite it`,
         );
       } else if (cites.length > 0) {
-        // Each citation must name evidence THIS item carried. Grounding alone would only
-        // prove the anchor exists somewhere in the tree; the pairing proves the agent ruled
-        // on what it was actually given.
-        // The anchor set is every occurrence of a class this criterion carries — the
-        // representative AND its siblings — not the representatives alone.
-        //
-        // The check proves "you ruled on what you were given". Matching only representatives
-        // proved something narrower and wrong: a class holds one anchor per rendered page, an
-        // agent with file access naturally cites the occurrence it opened, and the gate then
-        // called a real, grounded `file:line` fabricated. Measured on a real run, that is
-        // exactly how RGAA 5.8, 9.2 and 11.1 were refused. Membership was the defect;
-        // grounding — which proves the citation resolves against real source — is unchanged
-        // and still runs on every one of them.
-        const anchors = it.evidence.flatMap((e) => [`${e.file}:${e.line}`, ...(e.alsoAt ?? [])]);
-        for (const c of cites) {
-          // Two ways to belong, and the second one is what a good adjudicator does.
-          //
-          // The harvest anchors a rendered page (`.ultra11y/pages/<id>/dom.html`) because that
-          // is what proves the browser's output — but the place a reader goes to FIX it is the
-          // component that produced it, and that is what the agent naturally cites. Measured
-          // on a real run: 15 of the 16 citations still refused after the drift tolerance were
-          // in files this audit had read, pointing at the source behind the evidence. Refusing
-          // them called correct work fabricated.
-          //
-          // So a citation also belongs when it lands in a file the audit read. That is a real
-          // bound — a file outside the audited scope is still refused — and it is not the last
-          // one: `groundFinding` below still has to find the cited content at that file:line in
-          // the real source, which is what "not fabricated" actually means.
-          if (!cites0(anchors, c, citationDrift) && !inAuditScope(c.file)) {
-            blame(it.criteriaId, `criterion ${it.criteriaId}: citation ${c.file}:${c.line} is not among this criterion's harvested evidence (fabricated?)`);
-          }
-          // GROUND THE ANCHOR, NOT THE TRANSCRIPTION.
-          //
-          // Once a citation lands on evidence this criterion was shown, the harvested anchor is
-          // the ground truth: the engine read it out of the file, so it is there by
-          // construction. Re-checking the agent's RETYPING of it against the file tests
-          // spelling, not evidence — and it fails constantly, because an adjudicator writes the
-          // element out from the brief rather than copying the `snippet` field byte for byte.
-          //
-          // Measured on a real run: 81 criteria adjudicated, 78 of 82 citations landing exactly
-          // on a harvested anchor, and 54 verdicts refused — every one of them for
-          // `cited snippet not found`. A rendered snapshot serializes the document on ONE line,
-          // so its anchors all sit at line 2 and the grounding window is the whole page: what
-          // failed was never the location, only the transcription of it.
-          //
-          // A sibling from `alsoAt` carries no snippet (it is a bare `file:line`), so there is
-          // nothing authoritative to ground — the selector probe runs against the real file
-          // instead, which is the same check a citation with no snippet has always had.
-          //
-          // Anything OUTSIDE the harvest keeps the strict check below, unchanged. That is where
-          // a fabricated location would hide, and this must not become a way to launder one.
-          // THE CITATION FIRST, THE ANCHOR ONLY AS A FALLBACK — and the order is the whole
-          // point.
-          //
-          // Whatever the agent wrote is checked against the real file, exactly as before. That
-          // is the strongest proof there is, and it covers the case the drift window exists
-          // for: RGAA 5.2 asks about a table's summary, the harvest anchors the `<table>`, and
-          // the honest citation is the `<caption>` a line below. Grounding the anchor INSTEAD
-          // refused precisely that — measured on a real run, 5.2, 5.4, 5.5, 11.6, 11.7 and
-          // 11.9 all died on it, each a correct citation of a neighbour.
-          //
-          // Only when the citation does not ground — which is what a RETYPING looks like, and
-          // on a one-line snapshot that is most of them — does the harvested anchor stand in.
-          // It is authoritative there: the engine read it out of the file itself. And only
-          // then does recognisability have anything to say, because only then is the anchor
-          // being used to vouch for something the file did not confirm on its own.
-          const cite = { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet };
-          const { fallback, onAnchor } = evidenceFallback(it.evidence, c, citationDrift);
-          if (fallback) {
-            toGround(it.criteriaId, cite, fallback);
-          } else {
-            // WHY THE STRICT PATH APPLIED, said at the point it applies.
-            //
-            // The citation belongs (it is in a file this audit read) but it is not on an anchor
-            // THIS criterion was shown, so the paragraph above cannot let the harvest vouch for
-            // the transcription — and the refusal that follows says only `cited snippet not
-            // found`, which reads as « you mistyped » when the actionable fact is « you cited
-            // outside this criterion's evidence, so your retyping was verified literally ».
-            //
-            // Measured: that message sent a reader diagnosing RGAA 12.5 to the wrong conclusion
-            // — a fold bug — with this source open. The risk is not the lost criterion, it is
-            // the « fix » that would follow: relaxing the strict path is exactly the hole the
-            // two bounds above exist to close. So the cause travels with the refusal.
-            //
-            // It bites hardest where the criterion's subject is an ABSENCE. 12.1 and 12.5 are
-            // the repeat offenders the adjudicator prompt already names: asked to prove there is
-            // no search engine, a model cites the search form it is arguing about — which is, by
-            // definition, not among the anchors harvested for a criterion about navigation.
-            // ONLY when the citation is genuinely off-harvest. Landing on an anchor and then
-            // claiming a different KIND of element (an <img> cited as a <video>) also reaches
-            // this branch, and telling that reader « not among the harvested evidence » would
-            // be false: the anchor is right there, it is the element that is wrong. That case
-            // keeps the bare refusal, which already says the honest thing — this markup is not
-            // in the file.
-            toGround(it.criteriaId, cite, undefined, onAnchor ? undefined : offHarvestHint(it.criteriaId, it.evidence));
-          }
-        }
+        for (const c of cites) gateCitation(it.criteriaId, `criterion ${it.criteriaId}`, it.evidence, c);
       }
     } else if (v === "NC") {
       if (!it.findings || it.findings.length === 0)
@@ -1325,85 +1461,7 @@ export function applyAdjudication(
           it.criteriaId,
           `criterion ${it.criteriaId}: an NC verdict requires at least one groundable finding — { file, line, message, snippet, normativeRef } pointing at a real anchor from this criterion's own evidence`,
         );
-      for (const f of it.findings ?? []) {
-        // AN NC NOBODY CAN OPEN IS NOT A FINDING. Checked before the normativeRef, because a
-        // finding with no file cannot be grounded at all — there is nothing to go and read.
-        // Measured once: a model returned an NC with no `file`, the fold minted it anyway, and
-        // it reached `repoRelative`, which crashed on `undefined.split` and took every
-        // rendering after it (the report, the HTML) down with it.
-        if (typeof f.file !== "string" || !f.file.trim()) {
-          blame(
-            it.criteriaId,
-            `criterion ${it.criteriaId}: an NC finding must name the file it was observed in — nobody can act on a non-conformity with no location. An absence is still observed somewhere: cite the element and the page you observed it on, with the file, line and snippet copied from this criterion's own evidence. If the subject exists nowhere in scope, the verdict is NA with a justification, not NC.`,
-          );
-          continue;
-        }
-        // FAIL-CLOSED: every NC finding must cite a precise, resolvable test of the active
-        // standard. A good practice with no normative test is a recommendation, not an NC.
-        if (!f.normativeRef?.trim()) {
-          blame(it.criteriaId, `criterion ${it.criteriaId}: an NC finding requires a normativeRef citing the failed test of the active standard`);
-        } else if (!normativeRefResolves(f.normativeRef, adj.standard, isCore(adj.standard) ? undefined : it.criteriaId)) {
-          blame(
-            it.criteriaId,
-            isCore(adj.standard)
-              ? `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" does not resolve to a test of ${adj.standard} (fabricated?)`
-              : `criterion ${it.criteriaId}: normativeRef "${f.normativeRef}" is not a test of ${adj.standard} ${it.criteriaId} — cite one of its own tests (e.g. "${it.criteriaId}.1"); a WCAG id looks alike but denotes an unrelated test`,
-          );
-        }
-        // THE SAME DEFECT, CHARGED TWICE.
-        //
-        // A field with no label is RGAA 11.1's non-conformity, and the engine finds it with no
-        // model in the loop. 11.2 asks whether the label is RELEVANT, and every one of its six
-        // tests opens on a label that exists — so on that field it has no subject, and « no
-        // label here » filed under 11.2 is the neighbour's finding wearing the wrong number.
-        // The gate above cannot see it: 11.2.1 really is a test of 11.2, and the citation
-        // really does ground.
-        //
-        // Narrow on purpose, and this is the one check here that could refuse a true finding.
-        // It fires only when all three hold: the criterion under verdict PRESUPPOSES a
-        // mechanical neighbour's subject (`presupposedCriterion`), the engine has already ruled
-        // that neighbour non-conformant, and the anchor is literally the same file, line and
-        // selector.
-        //
-        // It read `siblingCriteria` before, and that was too wide by exactly the margin that
-        // matters. The neighbourhood is a reading aid — up to three criteria, no claim that any
-        // of them comes first — so 11.4 (« l'étiquette est-elle accolée à son champ ? ») counted
-        // 11.5 (« les champs de même nature sont-ils regroupés ? ») as a question it
-        // presupposes, and a radio group the engine ruled ungrouped became immune to 11.4 on
-        // the same control. Two defects on one element are not one defect charged twice.
-        // `presupposedCriterion` answers only where the pack singles ONE neighbour out and
-        // stands down on a tie, which keeps 11.2/11.1 and 8.6/8.5 and drops the guesses.
-        //
-        // Refused per verdict like everything else: the criterion returns to « to assess »
-        // carrying the reason, naming the neighbour, so the next pass can file it correctly.
-        if (!isCore(adj.standard) && f.file?.trim()) {
-          const presupposed = presupposedCriterion(loadPack(adj.standard), it.criteriaId);
-          if (presupposed && engineNcAt(anchorKey(f.file, f.line, f.selector ?? "")).has(presupposed.id))
-            blame(
-              it.criteriaId,
-              `criterion ${it.criteriaId}: this anchor (${f.file}:${f.line}) is already the engine's non-conformity on ${adj.standard} ${presupposed.id} — « ${presupposed.title} ». ${it.criteriaId} asks the NEXT question about the same subject and presupposes it is there, so on this element it is not non-conformant: it has no subject. Report it on ${presupposed.id} (the engine already did), or rule ${it.criteriaId} on a different element.`,
-            );
-        }
-        // A candidate browser rule is evidence too. Its human-readable measurement lives in
-        // `note`, not in the DOM, and a model may copy that note into `snippet`. Once the
-        // finding resolves to this criterion's harvested anchor, ground the authoritative
-        // file/line/selector as the fallback instead of searching page markup for the probe's
-        // prose. Off-harvest findings keep the strict literal path.
-        const anchor = anchorFor(it.evidence, f, citationDrift);
-        const cite = { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet };
-        if (anchor && recognisablySame(f, anchor.at)) {
-          toGround(it.criteriaId, cite, {
-            file: anchor.at.file,
-            line: anchor.at.line,
-            selector: anchor.at.selector,
-            snippet: anchor.at.snippet,
-          });
-        } else {
-          if (!anchor && !inAuditScope(f.file))
-            blame(it.criteriaId, `criterion ${it.criteriaId}: finding ${f.file}:${f.line} is not among this criterion's harvested evidence (fabricated?)`);
-          toGround(it.criteriaId, cite, undefined, anchor ? undefined : offHarvestHint(it.criteriaId, it.evidence));
-        }
-      }
+      for (const f of it.findings ?? []) gateFinding(it.criteriaId, `criterion ${it.criteriaId}`, it.evidence, f);
     } else if (v === "manual") {
       if (!it.reason || !MANUAL_REASONS.has(it.reason))
         blame(it.criteriaId, `criterion ${it.criteriaId}: a manual verdict requires reason ∈ {${MANUAL_REASON_VALUES.join(", ")}}`);
@@ -1433,6 +1491,160 @@ export function applyAdjudication(
       // spent a whole worklist filling this file; "unknown verdict" alone told it nothing
       // about how to be right on the retry.
       blame(it.criteriaId, `criterion ${it.criteriaId}: unknown verdict "${String(v)}" — expected one of ${VERDICTS.join(" | ")}`);
+    }
+    // #197 — PER-PAGE OUTCOMES. A run-wide verdict is scope-wide: one NC whose finding sits on
+    // the contact page left RGAA 11.13 « à évaluer » on every other page carrying the same kind
+    // of subject, and `check --require-decided=pages` needed an `--allow-undecided` exemption
+    // for it. A `pages` map lets ONE verdict settle each page on its own evidence. Every page
+    // outcome passes the run-level gates (justification, citations, findings, normativeRef,
+    // grounding) AND is scoped to its page: every file it cites must be that page's capture or a
+    // source the page declares (`fileOnPage`). Read defensively — the file is untrusted JSON, so
+    // junk is refused, never crashed on. FAIL-CLOSED: one refused page refuses the whole item.
+    const rawPages = (it as { pages?: unknown }).pages;
+    if (rawPages !== undefined && rawPages !== null) {
+      if (!packMode) {
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: per-page outcomes ("pages") are a pack-standard feature — its keys are audited page ids, and the WCAG core carries no page grid of its own`,
+        );
+      } else if (typeof rawPages !== "object" || Array.isArray(rawPages)) {
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: "pages" must be an object keyed by audited page id (got ${Array.isArray(rawPages) ? "an array" : typeof rawPages})`,
+        );
+      } else if (v !== "C" && v !== "NC" && v !== "NA") {
+        // A page outcome REFINES a decided verdict. Under a run-wide `manual` the report row
+        // would stay « à évaluer » while the grid claimed decisions the run never stood behind.
+        blame(
+          it.criteriaId,
+          `criterion ${it.criteriaId}: per-page outcomes ("pages") refine a decided run-wide verdict (C, NC or NA) — a still-manual criterion carries none`,
+        );
+      } else {
+        const auditPages = auditPageScopes();
+        const runFindings = v === "NC" ? (it.findings ?? []).filter((f) => typeof f?.file === "string") : [];
+        for (const [pageId, rawPv] of Object.entries(rawPages as Record<string, unknown>)) {
+          const subject = `criterion ${it.criteriaId}, page ${pageId}`;
+          const page = auditPages.get(pageId);
+          if (!page || page.basis === "not-audited") {
+            const known = [...auditPages.values()].filter((p) => p.basis !== "not-audited").map((p) => p.id);
+            blame(
+              it.criteriaId,
+              `${subject} is not an audited page of this audit — "pages" keys are audited page ids${
+                known.length
+                  ? ` (known: ${known.slice(0, 8).join(", ")}${known.length > 8 ? `, +${known.length - 8} more` : ""})`
+                  : " (none — this audit has no pages in scope)"
+              }`,
+            );
+            continue;
+          }
+          if (typeof rawPv !== "object" || rawPv === null || Array.isArray(rawPv)) {
+            blame(it.criteriaId, `${subject}: a page outcome is an object { verdict, justification, citations?, findings? }`);
+            continue;
+          }
+          const pv = rawPv as { verdict?: unknown; justification?: unknown; citations?: unknown; findings?: unknown };
+          // NO PER-PAGE "manual": a page the agent cannot decide is left OUT of the map.
+          const pageV = normalizeVerdict(pv.verdict);
+          if (pageV !== "C" && pageV !== "NC" && pageV !== "NA") {
+            blame(
+              it.criteriaId,
+              `${subject}: a page verdict is C, NC or NA${pv.verdict === undefined ? "" : ` (got ${JSON.stringify(pv.verdict)})`} — an undecided page is left OUT of the map, where it keeps the run-wide verdict`,
+            );
+            continue;
+          }
+          if (pv.citations !== undefined && !Array.isArray(pv.citations)) {
+            blame(it.criteriaId, `${subject}: "citations" must be an array`);
+            continue;
+          }
+          if (pv.findings !== undefined && !Array.isArray(pv.findings)) {
+            blame(it.criteriaId, `${subject}: "findings" must be an array`);
+            continue;
+          }
+          // CONSISTENCY WITH THE RUN-WIDE VERDICT. The report row and the grid must tell one
+          // story: a page cannot fail under a run-wide C or NA, a page cannot hold a subject
+          // under a run-wide NA, and a page cannot be cleared where the run-wide NC's own
+          // findings sit.
+          if (pageV === "NC" && v !== "NC") {
+            blame(it.criteriaId, `${subject}: a page NC under a run-wide ${v} contradicts it — a criterion that fails on one page is NC run-wide`);
+            continue;
+          }
+          if (pageV === "C" && v === "NA") {
+            blame(it.criteriaId, `${subject}: a page C under a run-wide NA contradicts it — the run-wide NA says no page carries the criterion's subject`);
+            continue;
+          }
+          if (pageV !== "NC") {
+            const clash = runFindings.find((f) => fileOnPage(f.file, page));
+            if (clash) {
+              blame(
+                it.criteriaId,
+                `${subject}: a page ${pageV} contradicts the run-wide NC finding ${clash.file}:${clash.line}, which sits on this page — rule the page NC on that finding, or leave it out of the map`,
+              );
+              continue;
+            }
+          }
+          const justification = typeof pv.justification === "string" ? pv.justification : "";
+          const pageCites = ((pv.citations as unknown[] | undefined) ?? [])
+            .map((c) => readCitation(c as Evidence | string))
+            .filter((c): c is Evidence => c !== null);
+          const pageFindings = ((pv.findings as unknown[] | undefined) ?? []).filter((f): f is AgentFinding => typeof f === "object" && f !== null);
+          // THE PAGE'S EVIDENCE: the anchors of this criterion (representatives or `alsoAt`
+          // siblings) that sit on this page. It decides what a page C/NA must cite.
+          const onPage = (file: string): boolean => fileOnPage(canonicalEvidenceFile(file), page) || fileOnPage(file, page);
+          const pageEvidence = it.evidence.filter(
+            (e) => onPage(e.file) || (e.alsoAt ?? []).some((a) => a.lastIndexOf(":") > 0 && onPage(a.slice(0, a.lastIndexOf(":")))),
+          );
+          if (pageV === "C" || pageV === "NA") {
+            if (!justification.trim()) blame(it.criteriaId, `${subject}: a ${pageV} verdict requires a justification`);
+            if (pageV === "C" && it.evidenceComplete === false)
+              blame(
+                it.criteriaId,
+                `${subject}: a C verdict needs the COMPLETE evidence set, and this criterion's harvest was capped at ${it.evidence.length} of ${it.population?.classes ?? "?"} content classes — leave the page out of the map, or rule "NC" if what you did see fails`,
+              );
+            if (pageV === "C" && pageEvidence.length === 0)
+              blame(
+                it.criteriaId,
+                `${subject}: a C verdict needs this page's own evidence to cite, and none of this criterion's evidence was harvested from page ${pageId} — leave the page out of the map; "NA" only if the page provably contains nothing the criterion is about`,
+              );
+            if (pageV === "NA" && ALWAYS_APPLICABLE[adj.standard]?.has(it.criteriaId))
+              blame(
+                it.criteriaId,
+                `${subject}: applies to every page with content — « non applicable » is refused. Rule C or NC on the page's own evidence, or leave the page out of the map`,
+              );
+            if (pageEvidence.length > 0 && pageCites.length === 0)
+              blame(
+                it.criteriaId,
+                pageV === "C"
+                  ? `${subject}: a C verdict must cite at least one of the ${pageEvidence.length} evidence item(s) harvested from this page (citations: [{file, line, …}])`
+                  : `${subject}: a NA verdict on a page with evidence must cite it`,
+              );
+            for (const c of pageCites) {
+              if (!onPage(c.file)) {
+                blame(
+                  it.criteriaId,
+                  `${subject}: citation ${c.file}:${c.line} is not this page's evidence — a page outcome cites page ${pageId}'s capture or a source it declares; a verdict settled on another page's evidence covers only that other page`,
+                );
+                continue;
+              }
+              gateCitation(it.criteriaId, subject, it.evidence, c);
+            }
+          } else {
+            if (pageFindings.length === 0)
+              blame(
+                it.criteriaId,
+                `${subject}: an NC verdict requires at least one groundable finding — { file, line, message, snippet, normativeRef } pointing at a real anchor from this page's own evidence`,
+              );
+            for (const f of pageFindings) {
+              if (typeof f.file === "string" && f.file.trim() && !onPage(f.file)) {
+                blame(
+                  it.criteriaId,
+                  `${subject}: finding ${f.file}:${f.line} is not this page's evidence — a page NC rests on page ${pageId}'s capture or a source it declares; a verdict settled on another page's evidence covers only that other page`,
+                );
+                continue;
+              }
+              gateFinding(it.criteriaId, subject, it.evidence, f);
+            }
+          }
+        }
+      }
     }
     // Recommendations are independent of the verdict (a C criterion may still carry a good
     // practice) and are grounded exactly like an NC finding — no normativeRef required, as
@@ -1559,6 +1771,7 @@ export function applyAdjudication(
         ...(it.verdict === "C" || it.verdict === "NA" ? { justification: it.justification.trim(), ...citationsOf(it) } : {}),
         findings: [...fs, ...recs],
         ...ruledBy(it),
+        ...recordedPages(it),
       });
     }
     // An OPEN criterion the file never mentioned — a coverage gap, or one the caller declared
@@ -1774,7 +1987,13 @@ const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
  *  (`occurrences`/`alsoAt`/`pages`) is dropped on purpose — it describes the evidence the
  *  citation was drawn from, not the claim, and it is what made these too heavy to persist. */
 function citationsOf(it: AdjudicationItem): { citations?: CriterionCitation[] } {
-  const cites = (it.citations ?? [])
+  return citesRecord(it.citations ?? []);
+}
+
+/** The same mapping over an explicit citation list — what a per-page outcome (#197) is
+ *  persisted through, so a page's citations are narrowed exactly like the run-level ones. */
+function citesRecord(cs: readonly (Evidence | string)[]): { citations?: CriterionCitation[] } {
+  const cites = cs
     .map((c) => (typeof c === "string" ? readCitation(c) : c))
     .filter((c): c is Evidence => c !== null && c !== undefined)
     .map(({ file, line, selector, snippet, note }) => ({ file, line, selector, snippet, ...(note ? { note } : {}) }));
@@ -1795,6 +2014,36 @@ export function auditorOf(it: { auditor?: unknown }): Auditor | undefined {
 function ruledBy(it: AdjudicationItem): { decidedBy: "agent" | "human"; auditor?: Auditor } {
   const auditor = it.decidedBy === "human" ? auditorOf(it) : undefined;
   return auditor ? { decidedBy: "human", auditor } : { decidedBy: "agent" };
+}
+
+/** The per-page outcomes (#197) a verdict carries, converted exactly like the run-level one:
+ *  each page's citations through the `citationsOf` mapping, each page's NC findings through
+ *  `agentFinding`. Only a decided verdict carries them (the fold refuses pages on a `manual`),
+ *  and a refused item never reaches here.
+ *
+ *  Returns a SPREADABLE object, like `citationsOf`: a verdict without per-page outcomes writes
+ *  no `pages` key at all, so the recorded shape of every pre-existing verdict is unchanged. */
+function recordedPages(it: AdjudicationItem): { pages?: Record<string, PackPageAdjudication> } {
+  const raw = (it as { pages?: unknown }).pages;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  const out: Record<string, PackPageAdjudication> = {};
+  for (const [pageId, rawPv] of Object.entries(raw as Record<string, PageVerdict>)) {
+    // The fold has already refused a malformed map — and a refused item never lands — but this
+    // still reads the raw JSON, so an entry that carries no decided page verdict is skipped
+    // rather than minted. Mirrors the run-level NC: an NC is anchored by its findings, so its
+    // page outcome carries findings and no citations; a C/NA carries its justification and its
+    // citations.
+    const pv = rawPv as PageVerdict & { verdict?: unknown };
+    const status = normalizeVerdict(pv?.verdict);
+    if (status !== "C" && status !== "NC" && status !== "NA") continue;
+    const fs = status === "NC" ? (Array.isArray(pv.findings) ? pv.findings : []).map((f) => agentFinding(it.criteriaId, f)) : [];
+    out[pageId] = {
+      status,
+      ...(pv.justification?.trim() ? { justification: pv.justification.trim() } : {}),
+      ...(status === "NC" ? (fs.length ? { findings: fs } : {}) : { ...citesRecord(pv.citations ?? []) }),
+    };
+  }
+  return Object.keys(out).length ? { pages: out } : {};
 }
 
 /** The same, on a WCAG criterion — which may carry a previous fold's auditor to drop. */
@@ -1983,7 +2232,8 @@ const T = {
       "- `C` — conforme (renseignez `justification` ET `citations[]` : les évidences que vous avez levées, `file`/`line` recopiés depuis la liste du critère) ;",
       "- `NC` — non conforme (ajoutez au moins un `findings[]` : file/line/message, avec un `snippet` groundable ET un `normativeRef` citant le test précis échoué) ;",
       "- `NA` — non applicable (renseignez `justification` ; si des évidences sont présentées, citez-les aussi dans `citations[]` pour dire lesquelles sortent du périmètre) ;",
-      "- `manual` — indécidable statiquement (renseignez `reason` : `needs-rendered-dom` → `scan`, ou `undecidable`).",
+      "- `manual` — indécidable statiquement (renseignez `reason` : `needs-rendered-dom` → `scan`, ou `undecidable`) ;",
+      '- `pages` — résultats PAR PAGE (#197, optionnel sur un verdict tranché C/NC/NA) : objet `{ "<id de page auditée>": { verdict: "C"|"NC"|"NA", justification, citations?, findings? } }`. Chaque verdict de page passe la même porte que le verdict global, limitée à CETTE page : chaque citation et chaque constat nomme sa capture (`.ultra11y/pages/<id>/dom.html`) ou une source qu\'elle déclare. Une NC de page exige une NC globale. Une page absente de la carte garde le verdict global — il n\'y a pas de `manual` par page : une page indécidable reste hors de la carte.',
     ],
     rule: "> Ne signalez une NC que si un test précis du référentiel actif échoue — citez-le (`normativeRef`). Une bonne pratique sans test normatif est une recommandation (`recommendations[]`, non normative) : chaque entrée est un objet `{ file, line, message, selector?, snippet? }` dont `file`/`line` sont recopiés depuis les évidences du critère — une phrase seule est refusée. Une simple préoccupation UX n'est ni l'un ni l'autre.\n>\n> Symétriquement, un `C` se cite comme une NC : il faut nommer dans `citations[]` les évidences levées. **Un critère présenté sans aucune évidence ne peut pas être `C`** — c'est `manual` (`undecidable`), ou `NA` si rien n'est concerné.",
     then: "Puis : `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (échoue si un verdict manque sa justification, ses citations, son finding ou sa raison).",
@@ -2039,6 +2289,13 @@ const T = {
       `un constat d'absence ou de forme appartient au critère « mécanique » ci-dessous, un jugement de pertinence au critère « jugement ». Aide à la lecture : ne dispense d'aucun test de CE critère.`,
     roleMechanical: "mécanique — existence / forme",
     roleJudgment: "jugement — pertinence",
+    pagesNote: (pages: readonly { id: string; name: string; url: string }[]): string => {
+      const shown = pages
+        .slice(0, 8)
+        .map((p) => `${p.id} — ${p.name} (${p.url})`)
+        .join(", ");
+      return `**Pages auditées (ids utilisables comme clés de \`pages\`)** : ${shown}${pages.length > 8 ? `, … +${pages.length - 8}` : ""}`;
+    },
   },
   en: {
     title: "# Criteria adjudication (ultra11y)",
@@ -2047,7 +2304,8 @@ const T = {
       "- `C` — conformant (fill `justification` AND `citations[]`: the evidence you cleared, `file`/`line` copied from the criterion's own list);",
       "- `NC` — non-conformant (add at least one `findings[]`: file/line/message, with a groundable `snippet` AND a `normativeRef` citing the precise failed test);",
       "- `NA` — not applicable (fill `justification`; when evidence is presented, cite it too in `citations[]` to say which items are out of scope);",
-      "- `manual` — not statically decidable (fill `reason`: `needs-rendered-dom` → `scan`, or `undecidable`).",
+      "- `manual` — not statically decidable (fill `reason`: `needs-rendered-dom` → `scan`, or `undecidable`);",
+      '- `pages` — PER-PAGE outcomes (#197, optional on a decided C/NC/NA verdict): an object `{ "<audited page id>": { verdict: "C"|"NC"|"NA", justification, citations?, findings? } }`. Each page verdict passes the same gate as the run-level one, scoped to THAT page: every citation and finding names its capture (`.ultra11y/pages/<id>/dom.html`) or a source it declares. A page NC needs a run-wide NC. A page left unnamed keeps the run-wide verdict — there is no per-page `manual`: a page you cannot decide stays out of the map.',
     ],
     rule: "> Report NC only if a precise test of the active standard fails — cite it (`normativeRef`). A good practice without a normative test is a recommendation (`recommendations[]`, non-normative): each entry is an object `{ file, line, message, selector?, snippet? }` whose `file`/`line` are copied from the criterion's own evidence — a bare sentence is refused. A purely UX concern is neither.\n>\n> A `C` is cited the same way an NC is: name the evidence you cleared in `citations[]`. **A criterion presented with no evidence at all cannot be `C`** — record `manual` (`undecidable`), or `NA` only if the scope provably contains nothing the criterion is about. No harvested evidence is NOT that proof: a page with content always has a reading order, a focus order, text to space and a layout to reflow or rotate — an uncited NA is put on trial by `verify`.",
     then: "Then: `ultra11y verify --apply ADJUDICATE.todo.json --in <audit.json> --out <dir>` (fails if any verdict lacks its justification, citations, finding or reason).",
@@ -2094,6 +2352,13 @@ const T = {
       `an observation of absence or of malformed markup belongs to the « mechanical » criterion below, a judgement of relevance to the « judgment » one. A reading aid: it excuses no test of THIS criterion.`,
     roleMechanical: "mechanical — existence / form",
     roleJudgment: "judgment — relevance",
+    pagesNote: (pages: readonly { id: string; name: string; url: string }[]): string => {
+      const shown = pages
+        .slice(0, 8)
+        .map((p) => `${p.id} — ${p.name} (${p.url})`)
+        .join(", ");
+      return `**Audited pages (usable as \`pages\` keys)**: ${shown}${pages.length > 8 ? `, … +${pages.length - 8}` : ""}`;
+    },
   },
 } as const;
 
@@ -2123,12 +2388,17 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
     "`NA` is legitimate, and the questions that get you there.",
     "",
     "It is the same dataset `verify --manual` loads into `ADJUDICATE.md`, so the worklist and",
-    "this page can never disagree. Two rules govern every verdict below:",
+    "this page can never disagree. Three rules govern every verdict below:",
     "",
     "- **A non-conformity must cite a normative test that resolves.** The worklist proposes the",
     "  criterion's W3C techniques; `verify --apply` rejects a `normativeRef` that does not exist.",
     "- **A good practice with no failing test is a recommendation**, not a non-conformity — it",
     "  never flips a criterion, never enters the conformance rate.",
+    "- **A decided verdict may settle each page of the audit** (#197): an optional `pages` map",
+    "  keyed by audited page id carries per-page outcomes, each passing the same fail-closed gate",
+    "  scoped to that page — every citation and finding names the page's own capture or a source",
+    "  it declares. A page `NC` needs a run-wide `NC`. A page left unnamed keeps the run-wide",
+    "  verdict; a page whose subject is clean gets its own `C`, a page whose subject fails its own `NC`.",
     "",
   );
   const byGuideline = new Map<string, string[]>();
@@ -2355,7 +2625,14 @@ export function formatAdjudication(
   items: AdjudicationItem[],
   lang: Lang = "en",
   standard: StandardId = CORE,
-  opts: { preamble?: boolean; contract?: boolean; cwd?: string; unrendered?: string[]; web?: boolean } = {},
+  opts: {
+    preamble?: boolean;
+    contract?: boolean;
+    cwd?: string;
+    unrendered?: string[];
+    web?: boolean;
+    pages?: { id: string; name: string; url: string }[];
+  } = {},
 ): string {
   const s = T[lang];
   // Display only — the gate always reads the complete sibling set.
@@ -2433,6 +2710,11 @@ export function formatAdjudication(
   // The pack warning belongs in EVERY brief, not only the combined one: `normativeRef` is
   // per-criterion, and a WCAG id looks so much like an RGAA one that the mistake is the default.
   if (pack) out.push(`> ${s.packIntro(pack.name)}`, "");
+  // THE PAGE IDS, SAID ONCE (#197): a `pages` map is keyed by audited page id, and an
+  // adjudicator guessing an id ("contact" vs "contact-us") is a refusal for a spelling. The
+  // worklist JSON carries the same list in its header; this line is the readable form of it,
+  // one line so it lands on every per-criterion brief without swelling each one.
+  if (opts.pages?.length) out.push(`> ${s.pagesNote(opts.pages)}`, "");
   for (const it of items) {
     out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` — ${it.title}` : ""}  _(${it.automatability})_`);
     if (it.previousReview?.trim()) {
@@ -2647,7 +2929,7 @@ export interface WriteAdjudicationResult {
 export function writeAdjudication(
   items: AdjudicationItem[],
   outDir: string,
-  opts: { standard: StandardId; auditDate: string; lang?: Lang; unrendered?: string[]; web?: boolean },
+  opts: { standard: StandardId; auditDate: string; lang?: Lang; unrendered?: string[]; web?: boolean; pages?: { id: string; name: string; url: string }[] },
 ): WriteAdjudicationResult {
   mkdirSync(outDir, { recursive: true });
   items = items.map(relativizeItem);
@@ -2660,6 +2942,9 @@ export function writeAdjudication(
     standard: opts.standard,
     auditDate: opts.auditDate,
     contract: adjudicationContract(),
+    // The audited pages (#197), so the filler knows which ids may key a `pages` map. Advisory
+    // data: the fold validates `pages` keys against the audit itself, never against this list.
+    ...(opts.pages?.length ? { pages: opts.pages } : {}),
     items,
   };
   writeFileSync(todoPath, JSON.stringify(file, null, 2) + "\n");
@@ -2668,6 +2953,7 @@ export function writeAdjudication(
     formatAdjudication(items, opts.lang ?? "en", opts.standard, {
       ...(opts.unrendered?.length ? { unrendered: opts.unrendered } : {}),
       ...(opts.web ? { web: true } : {}),
+      ...(opts.pages?.length ? { pages: opts.pages } : {}),
     }),
   );
 
@@ -2703,6 +2989,9 @@ export function writeAdjudication(
         preamble: false,
         ...(mine.length ? { unrendered: mine } : {}),
         ...(opts.web ? { web: true } : {}),
+        // The page ids reach the per-criterion briefs too (#197): the CI adjudicator reads ONLY
+        // these sheets, so it is the one place it can learn which ids may key a `pages` map.
+        ...(opts.pages?.length ? { pages: opts.pages } : {}),
       }),
     );
   }

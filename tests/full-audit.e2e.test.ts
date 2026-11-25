@@ -7,7 +7,8 @@
 // the contact form sent with an invalid address), a unit test with a snapshot and a
 // Playwright spec. The only thing it does not run is a model: the auditor is a committed
 // script (tests/fixtures/full-audit-verdicts.json) that fills the worklist the engine wrote,
-// copying each citation from the evidence the engine harvested, so the same run gives the
+// copying each citation from the evidence the engine harvested and ruling the form criteria
+// (11.13, 7.5, 11.10) page by page out of that same evidence, so the same run gives the
 // same deliverable every time and costs nothing.
 //
 // What it guards is the chain itself — the hand-offs between steps that no unit test sees:
@@ -39,12 +40,33 @@ interface Anchor {
   snippet?: string;
   note?: string;
   alsoAt?: string[];
+  // The page ids this content class appears on, as the harvest's own bookkeeping recorded it.
+  pages?: string[];
 }
 interface Match {
   file?: string;
   selector?: string;
   snippetIncludes?: string;
   noteIncludes?: string;
+}
+/** One page's ruling inside a criterion's verdict: the same shape the fold gates, minus the
+ *  run-level fields a page ruling does not carry (no `manual` — an undecided page stays out of
+ *  the map and keeps the run-wide verdict). */
+interface ScriptedPageVerdict {
+  verdict: "C" | "NC" | "NA";
+  justification?: string;
+  cite?: "page";
+  // `at` draws the finding from a harvested anchor on this page's capture; `observed` cites the
+  // page's capture directly (line, selector, snippet), as an auditor who opened it would — the
+  // fold grounds it against the file strictly, since it is not on a harvested anchor.
+  findings?: {
+    at?: Match;
+    observed?: { line: number; selector: string; snippet: string };
+    from?: string;
+    message: string;
+    normativeRef: string;
+    severity: string;
+  }[];
 }
 interface ScriptedVerdict {
   verdict: "C" | "NC" | "NA" | "manual";
@@ -53,6 +75,13 @@ interface ScriptedVerdict {
   cite?: "all";
   except?: Match[];
   findings?: { at: Match; from?: string; message: string; normativeRef: string; severity: string }[];
+  // Per-page outcomes (#197), keyed by audited page id: a page whose subject fails gets its own
+  // NC, a clean one its own C, one out of scope its own NA — each gated by the fold like the
+  // run-level verdict.
+  pages?: Record<string, ScriptedPageVerdict>;
+  // The ruling for every page of the audit `pages` does not name (7.5: the axe and behaviour
+  // digests cover every page, and only two states display a status message).
+  pagesElse?: ScriptedPageVerdict;
 }
 interface AuditorScript {
   verdicts: Record<string, ScriptedVerdict>;
@@ -127,10 +156,35 @@ const matches = (e: Anchor, m: Match): boolean =>
   (m.noteIncludes === undefined || (e.note ?? "").includes(m.noteIncludes));
 const anchorOf = (e: Anchor) => ({ file: e.file, line: e.line, ...(e.selector ? { selector: e.selector } : {}), ...(e.snippet ? { snippet: e.snippet } : {}) });
 
-/** Fill ADJUDICATE.todo.json in place, the way the skill tells an agent to: a verdict per
- *  item, each citation copied from that item's own evidence. */
+/** The evidence an auditor reads to rule ONE page of a criterion: the anchors on that page's
+ *  own capture (`.ultra11y/pages/<id>/dom.html`), whether the class representative sits there or
+ *  one of its `alsoAt` siblings does — a sibling is cited at its own bare `file:line`. Nothing else:
+ *  the fold refuses a page outcome that cites another page's evidence. */
+function pagePool(evidence: Anchor[], pageId: string): Anchor[] {
+  const capture = `.ultra11y/pages/${pageId}/dom.html`;
+  const onPage = (file: string) => file === capture || file.endsWith(`/${capture}`);
+  return evidence.flatMap((e) => {
+    if (onPage(e.file)) return [e];
+    const sib = (e.alsoAt ?? []).find((a) => onPage(a.slice(0, a.lastIndexOf(":"))));
+    if (!sib) return [];
+    const at = sib.lastIndexOf(":");
+    // A sibling is a bare `file:line`, cited as such: the representative's snippet and selector
+    // (often a probe's pseudo-selector, `axe:4.1.3`) describe the representative, not that file.
+    return [{ ...e, file: sib.slice(0, at), line: Number(sib.slice(at + 1)), selector: undefined, snippet: undefined, alsoAt: undefined }];
+  });
+}
+
+/** Fill ADJUDICATE.todo.json in place, the way the skill tells an agent to: a verdict per item,
+ *  each citation copied from that item's own evidence, and — for the criteria the agent rules
+ *  page by page — an outcome per audited page (the worklist's `pages[]` header lists the ids),
+ *  each settled on that page's own evidence, which is what lets the fold close every page cell
+ *  of 11.13, 7.5 and 11.10. */
 function adjudicate(todoRel: string): void {
-  const todo = readJson<{ items: (Record<string, unknown> & { criteriaId: string; evidence?: Anchor[] })[] }>(todoRel);
+  const todo = readJson<{
+    pages?: { id: string; name: string; url: string }[] | undefined;
+    items: (Record<string, unknown> & { criteriaId: string; evidence?: Anchor[] })[];
+  }>(todoRel);
+  const auditPages = (todo.pages ?? []).map((p) => p.id);
   const unscripted = todo.items.map((i) => i.criteriaId).filter((id) => !AUDITOR.verdicts[id]);
   expect(unscripted, "the worklist asks for criteria the scripted auditor has no verdict for").toEqual([]);
   for (const item of todo.items) {
@@ -152,6 +206,43 @@ function adjudicate(todoRel: string): void {
         expect(e, `${item.criteriaId}: no harvested evidence matches ${JSON.stringify(f.at)}`).toBeDefined();
         return { ...anchorOf(e!), message: f.message, normativeRef: f.normativeRef, severity: f.severity };
       });
+    }
+    // THE PER-PAGE OUTCOMES. `pages` names its pages explicitly; `pagesElse` rules every page of
+    // the audit left unnamed. Each ruling cites or grounds what THAT page's evidence shows —
+    // the fold re-gates every entry with the same fail-closed checks as the run-level verdict.
+    if (v.pages || v.pagesElse) {
+      expect(todo.pages, "the worklist carries no pages list — the scripted auditor rules page by page").toBeDefined();
+      for (const id of Object.keys(v.pages ?? {})) {
+        expect(auditPages.includes(id), `scripted page ${id} is not a page of this audit`).toBe(true);
+      }
+      const rulings: [string, ScriptedPageVerdict][] = [...Object.entries(v.pages ?? {})];
+      if (v.pagesElse) for (const id of auditPages) if (!v.pages?.[id]) rulings.push([id, v.pagesElse]);
+      const pages: Record<string, unknown> = {};
+      for (const [pageId, pv] of rulings) {
+        const out: Record<string, unknown> = { verdict: pv.verdict };
+        if (pv.justification) out.justification = pv.justification;
+        if (pv.cite === "page") {
+          // A page C must cite its own evidence; a page NA cites it when there is any, and
+          // otherwise stands on its justification — the same rule the fold holds it to.
+          const pool = pagePool(evidence, pageId);
+          if (pv.verdict === "C") expect(pool.length, `${item.criteriaId}, page ${pageId}: no harvested evidence to cite`).toBeGreaterThan(0);
+          if (pool.length) out.citations = pool.map(anchorOf);
+        }
+        if (pv.findings) {
+          out.findings = pv.findings.map((f) => {
+            // Drawn from THAT page's own capture only (`from` reads another criterion's
+            // evidence: the 7.5 findings cite the `p#erreur` anchor of 11.10's).
+            const claim = { message: f.message, normativeRef: f.normativeRef, severity: f.severity };
+            if (f.observed) return { file: `.ultra11y/pages/${pageId}/dom.html`, ...f.observed, ...claim };
+            const source = f.from ? (todo.items.find((x) => x.criteriaId === f.from)?.evidence ?? []) : evidence;
+            const e = pagePool(source, pageId).find((x) => matches(x, f.at!));
+            expect(e, `${item.criteriaId}, page ${pageId}: no harvested evidence matches ${JSON.stringify(f.at)}`).toBeDefined();
+            return { ...anchorOf(e!), ...claim };
+          });
+        }
+        pages[pageId] = out;
+      }
+      item.pages = pages;
     }
   }
   writeFileSync(join(project, todoRel), JSON.stringify(todo, null, 2));
@@ -360,6 +451,12 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
     expect(cell("contact-04-click-button-envoyer-le-message", "7.5")).toBe("NC");
     expect(cell("contact-00-start", "11.10")).not.toBe("NC");
     expect(cell("rubriques-01-click-button-rubriques", "7.5")).not.toBe("NC");
+    // Per-page outcomes (#197): each page of 11.13, 7.5 and 11.10 is settled on its own evidence.
+    expect(cell("contact", "11.13")).toBe("NC");
+    expect(cell("connexion", "11.13")).toBe("C");
+    expect(cell("contact-05-expect-text-adresse-electronique-invalid", "7.5")).toBe("NC");
+    expect(cell("contact-05-expect-text-adresse-electronique-invalid", "11.10")).toBe("NC");
+    expect(cell("contact-00-start", "11.10")).toBe("C");
     for (const id of states) expect(existsSync(join(project, "audits", "pages", `page-${id}.md`)), id).toBe(true);
   });
 
