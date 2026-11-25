@@ -165,6 +165,22 @@ export interface PageVerdict {
   findings?: AgentFinding[];
 }
 
+/** A page outcome's findings as the fold gates them (#197): object entries naming a file. Read
+ *  from untrusted JSON, so anything else is dropped here — the fold refuses it by name, and the
+ *  recorders (`recordedPages`, the ledger) persist only what this returns. */
+export function gatedPageFindings(raw: unknown): AgentFinding[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (f): f is AgentFinding =>
+      typeof f === "object" && f !== null && typeof (f as { file?: unknown }).file === "string" && !!(f as { file: string }).file.trim(),
+  );
+}
+
+/** A page outcome's justification, trimmed, or "" when it is not a string. */
+export function pageJustification(raw: unknown): string {
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
 export interface AdjudicationItem {
   criteriaId: string;
   automatability: Automatability;
@@ -1581,7 +1597,16 @@ export function applyAdjudication(
               continue;
             }
           }
-          const justification = typeof pv.justification === "string" ? pv.justification : "";
+          if (pv.justification !== undefined && typeof pv.justification !== "string") {
+            blame(it.criteriaId, `${subject}: "justification" must be a string`);
+            continue;
+          }
+          const junk = ((pv.findings as unknown[] | undefined) ?? []).findIndex((f) => typeof f !== "object" || f === null || Array.isArray(f));
+          if (junk >= 0) {
+            blame(it.criteriaId, `${subject}: finding #${junk + 1} is not an object { file, line, message, snippet, normativeRef }`);
+            continue;
+          }
+          const justification = pageJustification(pv.justification);
           const pageCites = ((pv.citations as unknown[] | undefined) ?? [])
             .map((c) => readCitation(c as Evidence | string))
             .filter((c): c is Evidence => c !== null);
@@ -1627,6 +1652,7 @@ export function applyAdjudication(
               gateCitation(it.criteriaId, subject, it.evidence, c);
             }
           } else {
+            if (!justification) blame(it.criteriaId, `${subject}: an NC verdict on a page requires a justification`);
             if (pageFindings.length === 0)
               blame(
                 it.criteriaId,
@@ -2036,11 +2062,13 @@ function recordedPages(it: AdjudicationItem): { pages?: Record<string, PackPageA
     const pv = rawPv as PageVerdict & { verdict?: unknown };
     const status = normalizeVerdict(pv?.verdict);
     if (status !== "C" && status !== "NC" && status !== "NA") continue;
-    const fs = status === "NC" ? (Array.isArray(pv.findings) ? pv.findings : []).map((f) => agentFinding(it.criteriaId, f)) : [];
+    // Only what the gate checked: object findings naming a file, a string justification.
+    const fs = status === "NC" ? gatedPageFindings(pv.findings).map((f) => agentFinding(it.criteriaId, f)) : [];
+    const justification = pageJustification(pv.justification);
     out[pageId] = {
       status,
-      ...(pv.justification?.trim() ? { justification: pv.justification.trim() } : {}),
-      ...(status === "NC" ? (fs.length ? { findings: fs } : {}) : { ...citesRecord(pv.citations ?? []) }),
+      ...(justification ? { justification } : {}),
+      ...(status === "NC" ? (fs.length ? { findings: fs } : {}) : { ...citesRecord(Array.isArray(pv.citations) ? pv.citations : []) }),
     };
   }
   return Object.keys(out).length ? { pages: out } : {};

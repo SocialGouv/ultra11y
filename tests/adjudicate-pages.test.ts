@@ -273,7 +273,7 @@ describe("a verdict may settle each audited page (#197)", () => {
 
   it("folds a per-page verdict written in lower case and records it upper case", () => {
     // Case carries no meaning: "nc" can only mean NC, and the recorded shape is the canonical one.
-    const r = fold112({ bad: { verdict: "nc", findings: [{ ...SOURCE_FINDING }] } });
+    const r = fold112({ bad: { verdict: "nc", justification: "Étiquette non pertinente.", findings: [{ ...SOURCE_FINDING }] } });
     expect(r.rejectedCriteria, r.issues.join("\n")).toEqual([]);
     const entry = r.audit.packAdjudication?.criteria.find((c) => c.id === "11.2");
     expect(entry?.pages?.bad?.status).toBe("NC");
@@ -390,6 +390,27 @@ describe("the gate refuses a page outcome that fails its own gate (#197)", () =>
     expect(r.issues.join("\n")).toMatch(/needs this page.s own evidence to cite/);
   });
 
+  it("refuses a page NC without a justification", () => {
+    expectRefused(fold112({ bad: { verdict: "NC", findings: [{ ...SOURCE_FINDING }] } }), /an NC verdict on a page requires a justification/, "bad");
+  });
+
+  it("refuses junk page findings by name, and never records them", () => {
+    for (const junk of [null, "bad.html:3", 42, []]) {
+      const r = fold112({ bad: { verdict: "NC", justification: "x", findings: [{ ...SOURCE_FINDING }, junk] } });
+      expectRefused(r, /finding #2 is not an object/, "bad");
+    }
+  });
+
+  it("refuses a fileless page finding and a non-string page justification instead of crashing", () => {
+    const { file: _f, ...noFile } = SOURCE_FINDING;
+    expectRefused(fold112({ bad: { verdict: "NC", justification: "x", findings: [noFile] } }), /must name the file/, "bad");
+    expectRefused(
+      fold112({ bad: { verdict: "NC", justification: 42 as unknown as string, findings: [{ ...SOURCE_FINDING }] } }),
+      /"justification" must be a string/,
+      "bad",
+    );
+  });
+
   it("refuses junk in a page outcome instead of crashing on it", () => {
     const r = fold112({ good: { verdict: "C", justification: "x", citations: "good.html:3" as unknown as Evidence[] } }, {}, true);
     expectRefused(r, /"citations" must be an array/, "good");
@@ -465,6 +486,22 @@ describe("the ledger records, replays and prunes the per-page outcomes", () => {
     const refold = applyAdjudication(audit, { ...replay.adj, auditDate: audit.date }, { cwd: dir, residualReasons });
     expect(refold.rejectedCriteria, refold.issues.join("\n")).toEqual([]);
     expect(refold.ok).toBe(true);
+  });
+
+  it("records only the page findings the gate checks, whatever junk the raw file carries", () => {
+    const audit = auditOf();
+    const adj = file([
+      {
+        ...plainItem(audit),
+        verdict: "NC",
+        justification: "",
+        findings: [{ ...SOURCE_FINDING }],
+        pages: { bad: { verdict: "NC", justification: 42, findings: [{ ...SOURCE_FINDING }, null, "bad.html:3", { message: "no file" }] } },
+      } as unknown as AdjudicationItem,
+    ]);
+    const entry = entriesFrom(adj, new Set(["11.2"]), audit.date, dir).find((e) => e.criteriaId === "11.2");
+    expect(entry?.pages?.bad?.findings?.map((f) => f.file)).toEqual(["bad.html"]);
+    expect(entry?.pages?.bad && Object.hasOwn(entry.pages.bad, "justification")).toBe(false);
   });
 
   it("prunes a withdrawn anchor from the page it anchors, and drops a page-NC left findingless", () => {

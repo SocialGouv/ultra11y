@@ -36,8 +36,10 @@ import {
   type AgentFinding,
   auditorOf,
   buildAdjudicationWorklist,
+  gatedPageFindings,
   type Evidence,
   normalizeVerdict,
+  pageJustification,
   type PageVerdict,
   readCitation,
 } from "./adjudicate.js";
@@ -464,20 +466,22 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined;
     const out: Record<string, LedgerPageEntry> = {};
     for (const [pageId, rawPv] of Object.entries(raw as Record<string, unknown>)) {
-      const pv = rawPv as PageVerdict & { verdict?: unknown; findings?: AgentFinding[] };
+      const pv = rawPv as { verdict?: unknown; justification?: unknown; citations?: unknown; findings?: unknown };
       const v = normalizeVerdict(pv?.verdict);
       if (v !== "C" && v !== "NC" && v !== "NA") continue;
-      const cites = (pv.citations ?? []).map(readCitation).filter((c): c is Evidence => c !== null);
+      const cites = (Array.isArray(pv.citations) ? pv.citations : []).map(readCitation).filter((c): c is Evidence => c !== null);
+      const justification = pageJustification(pv.justification);
+      const findings = gatedPageFindings(pv.findings);
       out[pageId] = {
         status: v,
-        ...(pv.justification?.trim() ? { justification: pv.justification.trim() } : {}),
+        ...(justification ? { justification } : {}),
         ...(cites.length ? { citations: portable(cites) } : {}),
-        ...(pv.findings?.length
+        ...(findings.length
           ? // The RAW agent findings, exactly like the entry's own `findings`: the
             // `agentFinding` conversion re-runs through the fold on replay, and converting
             // here would lose the selector on the round-trip. Respelled with `portableFile`
             // like every other path in this entry.
-            { findings: portable(pv.findings) }
+            { findings: portable(findings) }
           : {}),
       };
     }

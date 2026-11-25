@@ -84,6 +84,7 @@
       "pages": {
         "contact-04-click-button-envoyer-le-message": {
           "verdict": "NC",
+          "justification": "This state displays a status message that is not announced.",
           "findings": [
             {
               "at": { "selector": "p#erreur" },
@@ -96,6 +97,7 @@
         },
         "contact-05-expect-text-adresse-electronique-invalid": {
           "verdict": "NC",
+          "justification": "This state displays a status message that is not announced.",
           "findings": [
             {
               "observed": { "line": 46, "selector": "p#erreur", "snippet": "<p id=\"erreur\">" },
@@ -179,6 +181,7 @@
       "pages": {
         "contact-04-click-button-envoyer-le-message": {
           "verdict": "NC",
+          "justification": "This state displays a format error that is tied to no field.",
           "findings": [
             {
               "at": { "selector": "p#erreur" },
@@ -190,6 +193,7 @@
         },
         "contact-05-expect-text-adresse-electronique-invalid": {
           "verdict": "NC",
+          "justification": "This state displays a format error that is tied to no field.",
           "findings": [
             {
               "observed": { "line": 46, "selector": "p#erreur", "snippet": "<p id=\"erreur\">" },
@@ -256,6 +260,7 @@
       "pages": {
         "contact": {
           "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
           "findings": [
             {
               "at": { "selector": "input[type=email]" },
@@ -267,6 +272,7 @@
         },
         "contact-00-start": {
           "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
           "findings": [
             {
               "at": { "selector": "input[type=email]" },
@@ -278,6 +284,7 @@
         },
         "contact-01-fill-label-nom-exemple": {
           "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
           "findings": [
             {
               "at": { "selector": "input[type=email]" },
@@ -289,6 +296,7 @@
         },
         "contact-02-fill-css-input-name-courriel-pas-une-adr": {
           "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
           "findings": [
             {
               "at": { "selector": "input[type=email]" },
@@ -300,6 +308,7 @@
         },
         "contact-03-fill-label-message-message-de-test": {
           "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
           "findings": [
             {
               "at": { "selector": "input[type=email]" },
@@ -311,6 +320,7 @@
         },
         "contact-04-click-button-envoyer-le-message": {
           "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
           "findings": [
             {
               "at": { "selector": "input[type=email]" },
@@ -322,6 +332,7 @@
         },
         "contact-05-expect-text-adresse-electronique-invalid": {
           "verdict": "NC",
+          "justification": "The email field of this page carries no autocomplete attribute.",
           "findings": [
             {
               "at": { "selector": "input[type=email]" },

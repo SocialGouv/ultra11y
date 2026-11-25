@@ -57516,6 +57516,15 @@ function severityRubricLine(lang) {
 var ADJUDICATE_MAX_EVIDENCE_CLASSES = 1200;
 var ALSO_AT_SHOWN = 8;
 var CITE_DRIFT_DEFAULT = 10;
+function gatedPageFindings(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (f2) => typeof f2 === "object" && f2 !== null && typeof f2.file === "string" && !!f2.file.trim()
+  );
+}
+function pageJustification(raw) {
+  return typeof raw === "string" ? raw.trim() : "";
+}
 var RECOMMENDATION_SHAPE = "optional on any verdict, never changes a status: each entry is an OBJECT { file, line, message, selector?, snippet? } \u2014 `file`/`line` (and the `snippet`) copied from this criterion's own evidence, grounded against the source exactly like an NC finding but with no normativeRef; a bare sentence, or an object without `file`, is refused";
 function adjudicationContract() {
   return {
@@ -58212,7 +58221,16 @@ function applyAdjudication(audit, adj, opts = {}) {
               continue;
             }
           }
-          const justification = typeof pv.justification === "string" ? pv.justification : "";
+          if (pv.justification !== void 0 && typeof pv.justification !== "string") {
+            blame(it.criteriaId, `${subject}: "justification" must be a string`);
+            continue;
+          }
+          const junk = (pv.findings ?? []).findIndex((f2) => typeof f2 !== "object" || f2 === null || Array.isArray(f2));
+          if (junk >= 0) {
+            blame(it.criteriaId, `${subject}: finding #${junk + 1} is not an object { file, line, message, snippet, normativeRef }`);
+            continue;
+          }
+          const justification = pageJustification(pv.justification);
           const pageCites = (pv.citations ?? []).map((c) => readCitation(c)).filter((c) => c !== null);
           const pageFindings = (pv.findings ?? []).filter((f2) => typeof f2 === "object" && f2 !== null);
           const onPage = (file) => fileOnPage(canonicalEvidenceFile(file), page) || fileOnPage(file, page);
@@ -58252,6 +58270,7 @@ function applyAdjudication(audit, adj, opts = {}) {
               gateCitation(it.criteriaId, subject, it.evidence, c);
             }
           } else {
+            if (!justification) blame(it.criteriaId, `${subject}: an NC verdict on a page requires a justification`);
             if (pageFindings.length === 0)
               blame(
                 it.criteriaId,
@@ -58513,11 +58532,12 @@ function recordedPages(it) {
     const pv = rawPv;
     const status = normalizeVerdict2(pv?.verdict);
     if (status !== "C" && status !== "NC" && status !== "NA") continue;
-    const fs = status === "NC" ? (Array.isArray(pv.findings) ? pv.findings : []).map((f2) => agentFinding(it.criteriaId, f2)) : [];
+    const fs = status === "NC" ? gatedPageFindings(pv.findings).map((f2) => agentFinding(it.criteriaId, f2)) : [];
+    const justification = pageJustification(pv.justification);
     out[pageId] = {
       status,
-      ...pv.justification?.trim() ? { justification: pv.justification.trim() } : {},
-      ...status === "NC" ? fs.length ? { findings: fs } : {} : { ...citesRecord(pv.citations ?? []) }
+      ...justification ? { justification } : {},
+      ...status === "NC" ? fs.length ? { findings: fs } : {} : { ...citesRecord(Array.isArray(pv.citations) ? pv.citations : []) }
     };
   }
   return Object.keys(out).length ? { pages: out } : {};
@@ -59324,17 +59344,19 @@ function entriesFrom(adj, accepted, date, root) {
       const pv = rawPv;
       const v2 = normalizeVerdict2(pv?.verdict);
       if (v2 !== "C" && v2 !== "NC" && v2 !== "NA") continue;
-      const cites = (pv.citations ?? []).map(readCitation).filter((c) => c !== null);
+      const cites = (Array.isArray(pv.citations) ? pv.citations : []).map(readCitation).filter((c) => c !== null);
+      const justification = pageJustification(pv.justification);
+      const findings = gatedPageFindings(pv.findings);
       out2[pageId] = {
         status: v2,
-        ...pv.justification?.trim() ? { justification: pv.justification.trim() } : {},
+        ...justification ? { justification } : {},
         ...cites.length ? { citations: portable(cites) } : {},
-        ...pv.findings?.length ? (
+        ...findings.length ? (
           // The RAW agent findings, exactly like the entry's own `findings`: the
           // `agentFinding` conversion re-runs through the fold on replay, and converting
           // here would lose the selector on the round-trip. Respelled with `portableFile`
           // like every other path in this entry.
-          { findings: portable(pv.findings) }
+          { findings: portable(findings) }
         ) : {}
       };
     }
