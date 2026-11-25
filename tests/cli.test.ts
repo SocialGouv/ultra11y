@@ -88,7 +88,7 @@ describe("parseArgs", () => {
 });
 
 describe("removed commands and flags fail loudly, naming the replacement", () => {
-  it.each(["mcp", "dev", "judge", "affected", "import"])("`%s` exits 2 with a pointer, not a bare unknown command", async (cmd) => {
+  it.each(["mcp", "dev", "judge", "import"])("`%s` exits 2 with a pointer, not a bare unknown command", async (cmd) => {
     const r = await run([cmd]);
     expect(r.code).toBe(2);
     expect(r.err).toContain("is no longer a command");

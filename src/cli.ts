@@ -13,7 +13,8 @@ import {
   type ScanRedirect,
 } from "./types.js";
 import { runAudit } from "./audit.js";
-import { decide, type PreToolUsePayload } from "./hook.js";
+import { decide, resolveBase, type PreToolUsePayload } from "./hook.js";
+import { changedSince, selectAffected, type AffectedResult } from "./affected.js";
 import {
   averageConformanceRate,
   averageRateLine,
@@ -95,10 +96,10 @@ import { ALL_ROUTES_MAX, type ObservedPage, type RouteSource, readRoutes, routeC
 import type { SampleMethodology } from "./standards/types.js";
 import { applyProposal, DEFAULT_SAMPLE_SIZE, type ProposalInput, proposeSample, type SampleProposal, skeletonOf } from "./sample-propose.js";
 import { DOCUMENTS_DIR, downloadSnapshotDocuments } from "./documents.js";
-import { runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localTierStatus } from "./scan-local.js";
+import { LOCAL_ENGINE, runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, isTransverseKind, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
 import { runFix, fixSummary } from "./fix.js";
-import { findingId, parseFailOn, findingsAtOrAbove } from "./baseline.js";
+import { findingId, parseFailOn, findingsAtOrAbove, newDynamicFindings, newUnrendered } from "./baseline.js";
 import { repoRoot, resolveEnginePath, writeHook } from "./init.js";
 import { installForTargets, parseTargets, statusReport, uninstallForTargets } from "./install/index.js";
 import { agentsMdBlock } from "./install/agents-md.js";
@@ -171,6 +172,8 @@ Usage:
   ultra11y scan     <url|file…> [--cwd <dir>] [--browser-path <file>] [--root <dir>] [--storage-state <file>] [--no-interact] [--interact-clicks] [--no-snapshot] [--no-pdf] [--max-pdf <n>] [--merge <audit.json>] [--out <dir>] [--json]
   ultra11y scan     --sample [--cwd <dir>] [--root <dir>] [--storage-state <file>] [--all-routes [--max-routes <n>]] [--merge <audit.json>] [--json]   (scan the .ultra11yrc.json page sample, then the rest of the route inventory)
   ultra11y scan     --sitemap <url> | --crawl <url> [--depth <n>] [--max <n>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--json]
+  ultra11y scan     --since <ref> --base-url <url> [--baseline <scan.json>] [--fail-on blocking|major|minor] [--max-routes <n>] [--json]   (render only the pages the diff reaches; with --baseline, fail only on NEW non-conformities)
+  ultra11y affected [--since <ref>] [--base-url <url>] [--root <dir>] [--json]   (the pages a diff reaches, over the import graph and the route inventory)
   ultra11y journey  run [<name>… | --all] [--keyboard] [--base-url <url>] [--storage-state <file>] [--cwd <dir>] [--root <dir>] [--merge <audit.json>] [--out <dir>] [--json]   (replay .ultra11y/journeys/<name>.json with axe + keyboard checks)
   ultra11y journey  list [--root <dir>] [--json]
   ultra11y sample   check [--standard rgaa] [--json]   (lint the .ultra11yrc.json page sample vs the standard's required page kinds)
@@ -340,6 +343,13 @@ Commands:
              otherwise. Threshold: ULTRA11Y_HOOK_FAIL_ON, else hook.failOn in
              .ultra11yrc.json, else blocking. Disable with ULTRA11Y_HOOK=off or
              SKIP_A11Y=1. Called by hooks/pre-tool-use.mjs, not by hand.
+  affected   The pages a change can reach: from each file changed since --since
+             (default: the repository's default branch, merge-base semantics), walk
+             the reverse import graph up to the route files (Next.js app/ and pages/,
+             layouts selecting every page below them) and the sources the sample
+             declares, then name their URLs — dynamic routes resolved against the
+             route inventory (.ultra11y/routes.json) and the sample. 'scan --since'
+             renders exactly these pages.
   pages      The per-page criterion grid — RGAA is a per-page norm, the engine's
              verdict is scope-wide, and this bridges the two. One row per criterion
              (RGAA's), one column per page URL. Rebuilt from a
@@ -368,6 +378,7 @@ Options:
   --cross-file       audit: alias of --graph
   --changed          audit/fix: only files changed vs HEAD (git; staged+unstaged+untracked, working tree)
   --since <ref>      audit/fix: only files changed vs the given git ref
+                     · scan/affected: the pages the files changed since <ref> reach
   --staged           audit/fix: only STAGED files, read from the index blob (exact commit snapshot; wins over --changed)
   --max-files <n>    audit: cap canonical files audited (logged truncation, no silent drop)
   --dedup <mode>     audit: collapse identical files — exact|normalized|off  (default: exact)
@@ -413,7 +424,11 @@ Options:
   --dry-run          fix: preview only — never write (this is the default)
   --safe             fix: apply only genuinely-automatic codemods (skip TODO placeholders / judgment proposals)
   --only <ids>       fix: limit auto-fixes to these rule ids (comma-separated)
-  --fail-on <sev>    audit/init/snapshot: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
+  --baseline <file>  scan: a previous 'scan --json' of the same pages (e.g. on the base
+                     branch's deployment); exit 1 only on findings it does not hold
+  --base-url <url>   scan --since / affected: the deployment the pages are rendered on;
+                     journey run: the base a relative startUrl resolves against
+  --fail-on <sev>    audit/init/snapshot/scan --baseline: gate severity — blocking|major|minor (fr aliases accepted)  (default: blocking)
   --hook             init: write a git pre-commit accessibility gate (staged snapshot + auto-fix by default)
   --report <file>    check/verify: the report markdown to gate
   --theme <N>        criteria: list RGAA theme N
@@ -610,6 +625,7 @@ export const COMMANDS = [
   "uninstall",
   "status",
   "journey",
+  "affected",
 ] as const;
 type Command = (typeof COMMANDS)[number];
 
@@ -653,6 +669,8 @@ const VALUE_FLAGS = new Set([
   "base-url",
   // `scan`: most linked PDF documents downloaded per run.
   "max-pdf",
+  // `scan --baseline`: a previous `scan --json`, the rendered regression gate's reference.
+  "baseline",
   "since",
   "max-files",
   "dedup",
@@ -2356,10 +2374,9 @@ export const REMOVED_FLAGS: Record<string, string> = {
   "issues-json": `${TICKETS_V3} ultra11y tickets --in <audit.json> --out <dir> --grain criterion`,
   // The CI-only surfaces, removed when ultra11y refocused on the skill.
   lite: `removed with audit --lite (the rendered regression gate). ${CI_NOTE}.`,
-  baseline: `removed (the baseline regression gate). Gate with --fail-on, or wire init --hook; ${CI_NOTE}.`,
   "write-baseline": `removed with audit --lite. ${CI_NOTE}.`,
   "baseline-approximate": `removed with audit --lite. ${CI_NOTE}.`,
-  "require-sampled": `removed with the affected command. ${CI_NOTE}.`,
+  "require-sampled": `removed: \`affected\` lists the route files no page resolves. ${CI_NOTE}.`,
   ci: `removed: init no longer writes a workflow. ${CI_NOTE}.`,
   e2e: "removed: use the ultra11y/playwright or ultra11y/cypress package exports to check pages during an E2E run.",
   diff: "removed with pages --diff (the comparison against an imported external audit).",
@@ -2398,7 +2415,6 @@ export const REMOVED_COMMANDS: Record<string, string> = {
   dev: "the dev side-car was removed. Check pages during your tests with the ultra11y/playwright or ultra11y/cypress package exports.",
   judge:
     "the headless judge was removed. The agent adjudicates through `verify --manual` / `verify --apply` (fanned out with `orchestrate`); in CI, iterion's rgaa-audit bot does.",
-  affected: `the diff-to-pages selector was removed. ${CI_NOTE}.`,
   import: "importing an external audit (and pages --diff) was removed.",
   pack: "the standards-pack toolbox was removed: ultra11y audits against RGAA 4.1.2 only, built in. Look its criteria up with `ultra11y criteria`.",
   capture:
@@ -4251,6 +4267,101 @@ async function cmdJourney(p: ParsedArgs): Promise<number> {
   return failed.length ? 1 : 0;
 }
 
+/** The pages the diff since `ref` reaches (src/affected.ts), from the project at --root: its
+ *  route inventory and its sample. A number is the exit code of a failure already reported. */
+function affectedFor(p: ParsedArgs, lang: Lang, cmd: string, ref: string | undefined): { ref: string; result: AffectedResult } | number {
+  const root = typeof p.flags.root === "string" && p.flags.root ? resolve(p.flags.root) : process.cwd();
+  const base = ref ?? resolveBase("", root);
+  if (!base) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y ${cmd} : aucune branche de base trouvée (origin/HEAD, origin/main, origin/master) — passez --since <ref>.`
+        : `ultra11y ${cmd}: no base branch found (origin/HEAD, origin/main, origin/master) — pass --since <ref>.`,
+    );
+    return 2;
+  }
+  let changed: string[];
+  try {
+    changed = changedSince(base, root);
+  } catch (e) {
+    console.error(`ultra11y ${cmd}: ${e instanceof Error ? e.message : String(e)}`);
+    return 2;
+  }
+  let sample: SamplePage[] | undefined;
+  try {
+    const pages = loadConfig(root)?.sample?.pages;
+    if (Array.isArray(pages)) sample = pages.filter((pg) => pg && typeof pg.url === "string" && typeof pg.id === "string");
+  } catch {
+    /* a broken .ultra11yrc.json is `sample check`'s to report; the route files still select */
+  }
+  const baseUrl = typeof p.flags["base-url"] === "string" && p.flags["base-url"] ? (p.flags["base-url"] as string) : undefined;
+  const inventory = readRoutes(root);
+  const result = selectAffected({ root, changed, ...(inventory ? { inventory } : {}), ...(sample ? { sample } : {}), ...(baseUrl ? { baseUrl } : {}) });
+  return { ref: base, result };
+}
+
+/** What the selection could not turn into a page, on stderr: said once, never silently dropped. */
+function warnAffectedGaps(result: AffectedResult, lang: Lang, cmd: string): void {
+  for (const u of result.unresolved)
+    console.error(
+      lang === "fr"
+        ? `⚠️ ultra11y ${cmd} : route dynamique ${u.pattern} (${u.entry}) touchée, mais aucune URL connue ne la résout — ajoutez-en une à l'inventaire des routes (\`pages discover --routes-only\`) ou à l'échantillon.`
+        : `⚠️ ultra11y ${cmd}: dynamic route ${u.pattern} (${u.entry}) is reached, but no known URL resolves it — add one to the route inventory (\`pages discover --routes-only\`) or to the sample.`,
+    );
+  if (result.unmapped.length)
+    console.error(
+      lang === "fr"
+        ? `⚠️ ultra11y ${cmd} : ${result.unmapped.length} fichier(s) de balisage modifié(s) n'atteignent aucune page : ${result.unmapped.slice(0, 5).join(", ")}${result.unmapped.length > 5 ? "…" : ""} — déclarez la page qui les rend dans \`sample.pages[].sources\`.`
+        : `⚠️ ultra11y ${cmd}: ${result.unmapped.length} changed markup file(s) reach no page: ${result.unmapped.slice(0, 5).join(", ")}${result.unmapped.length > 5 ? "…" : ""} — declare the page rendering them in \`sample.pages[].sources\`.`,
+    );
+}
+
+/** `affected` — the pages a diff reaches, printed (or --json). Read-only: renders nothing. */
+function cmdAffected(p: ParsedArgs): number {
+  const lang = resolveLang(p.flags);
+  const ref = typeof p.flags.since === "string" && p.flags.since ? (p.flags.since as string) : undefined;
+  const sel = affectedFor(p, lang, "affected", ref);
+  if (typeof sel === "number") return sel;
+  const { result } = sel;
+  if (p.flags.json) {
+    console.log(JSON.stringify({ since: sel.ref, ...result }, null, 2));
+    return 0;
+  }
+  console.log(
+    lang === "fr"
+      ? `${result.changed.length} fichier(s) modifié(s) depuis ${sel.ref} → ${result.routes.length} page(s) touchée(s)${result.routes.length ? " :" : "."}`
+      : `${result.changed.length} file(s) changed since ${sel.ref} → ${result.routes.length} page(s) reached${result.routes.length ? ":" : "."}`,
+  );
+  for (const r of result.routes) console.log(`  ${r.url ?? r.path}  ← ${r.entry}${r.changed.length ? ` (${r.changed.join(", ")})` : ""}`);
+  warnAffectedGaps(result, lang, "affected");
+  return 0;
+}
+
+/** A `scan --json` result read back as the rendered gate's baseline. */
+function readScanBaseline(path: string, lang: Lang): DynamicResult | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readText(path));
+  } catch {
+    console.error(
+      lang === "fr"
+        ? `ultra11y scan : --baseline ${path} est illisible ou n'est pas du JSON (attendu : la sortie de \`scan --json\`).`
+        : `ultra11y scan: --baseline ${path} is unreadable or not JSON (expected: the output of \`scan --json\`).`,
+    );
+    return null;
+  }
+  const r = raw as Partial<DynamicResult>;
+  if (!r || !Array.isArray(r.findings) || !r.findings.every((f) => f && typeof f.axeRule === "string" && typeof f.selector === "string")) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y scan : --baseline ${path} n'est pas un résultat de \`scan --json\` (sans --merge).`
+        : `ultra11y scan: --baseline ${path} is not a \`scan --json\` result (without --merge).`,
+    );
+    return null;
+  }
+  return { ...r, target: r.target ?? "", findings: r.findings } as DynamicResult;
+}
+
 async function cmdScan(p: ParsedArgs): Promise<number> {
   // `scan` takes `--standard` for the same reason `audit` now does: it REWRITES
   // audit-latest.json mid-chain, and a merge that silently re-keyed an RGAA document back to
@@ -4377,9 +4488,80 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     );
   }
 
+  // --since: THE PAGES THE PULL REQUEST TOUCHES, and only those (src/affected.ts), rendered on
+  // the deployment --base-url names. --baseline then turns the run into the PR's rendered gate:
+  // a non-conformity the baseline already holds is pre-existing, only a new one fails.
+  const sinceRef = typeof p.flags.since === "string" && p.flags.since ? (p.flags.since as string) : undefined;
+  const baselinePath = typeof p.flags.baseline === "string" && p.flags.baseline ? (p.flags.baseline as string) : undefined;
+  if (p.flags.baseline !== undefined && !baselinePath) {
+    console.error("ultra11y scan: --baseline needs a file (the output of a previous `scan --json`).");
+    return 2;
+  }
+  const baseline = baselinePath ? readScanBaseline(baselinePath, lang) : undefined;
+  if (baseline === null) return 2;
+  const gateOn = p.flags["fail-on"] === undefined ? "mineur" : parseFailOn(p.flags["fail-on"]);
+  if (gateOn === null) {
+    console.error(`ultra11y scan: --fail-on must be blocking|major|minor (got "${String(p.flags["fail-on"])}").`);
+    return 2;
+  }
+  let affectedUrls: string[] | undefined;
+  if (sinceRef !== undefined) {
+    if (!(typeof p.flags["base-url"] === "string" && p.flags["base-url"])) {
+      console.error(
+        lang === "fr"
+          ? "ultra11y scan : --since exige --base-url <url>, le déploiement sur lequel rendre les pages touchées (l'aperçu de la PR)."
+          : "ultra11y scan: --since requires --base-url <url>, the deployment to render the reached pages on (the PR's preview).",
+      );
+      return 2;
+    }
+    const sel = affectedFor(p, lang, "scan", sinceRef);
+    if (typeof sel === "number") return sel;
+    if (typeof p.flags["max-routes"] === "string") {
+      const n = Number(p.flags["max-routes"]);
+      if (!Number.isInteger(n) || n < 0) {
+        console.error(`ultra11y scan: --max-routes must be a non-negative integer (got "${p.flags["max-routes"]}").`);
+        return 2;
+      }
+      maxRoutes = n;
+    }
+    const urls = sel.result.routes.flatMap((r) => (r.url ? [r.url] : []));
+    affectedUrls = urls.slice(0, maxRoutes);
+    console.error(
+      lang === "fr"
+        ? `ultra11y scan : ${sel.result.changed.length} fichier(s) modifié(s) depuis ${sel.ref} → ${urls.length} page(s) touchée(s)${urls.length > maxRoutes ? `, ${maxRoutes} rendue(s) (--max-routes ; non rendues : ${urls.slice(maxRoutes).join(", ")})` : ""}.`
+        : `ultra11y scan: ${sel.result.changed.length} file(s) changed since ${sel.ref} → ${urls.length} page(s) reached${urls.length > maxRoutes ? `, ${maxRoutes} rendered (--max-routes; not rendered: ${urls.slice(maxRoutes).join(", ")})` : ""}.`,
+    );
+    warnAffectedGaps(sel.result, lang, "scan");
+    if (!affectedUrls.length) {
+      console.error(
+        lang === "fr"
+          ? "ultra11y scan : aucune page à rendre — la modification n'atteint aucune page."
+          : "ultra11y scan: no page to render — the change reaches no page.",
+      );
+      if (p.flags.json)
+        console.log(
+          JSON.stringify(
+            {
+              tool: "ultra11y",
+              engine: LOCAL_ENGINE,
+              target: "0 page(s)",
+              date: today(),
+              findings: [],
+              ...(baseline ? { gate: { baseline: baselinePath, new: [], known: 0 } } : {}),
+            },
+            null,
+            2,
+          ),
+        );
+      return 0;
+    }
+  }
+
   let dynamic: DynamicResult;
   try {
-    if (allRoutes && routePlan) {
+    if (affectedUrls) {
+      dynamic = await runScanManyLocal(affectedUrls, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath });
+    } else if (allRoutes && routePlan) {
       const sampleRun =
         useSample && sampleConfig
           ? await runSampleScanLocal(sampleConfig.pages, { cwd, storageState, lang, interact, interactClicks, snapshotRoot, browserPath })
@@ -4461,6 +4643,76 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       );
       return 1;
     }
+  }
+  // THE RENDERED GATE. Only what the baseline does not hold blocks; a page the baseline never
+  // rendered is new, so all of it is. No model decides anything here: identity is the finding's
+  // rule, criterion, route path and selector (src/baseline.ts `dynamicFindingId`).
+  if (baseline) {
+    const newAll = newDynamicFindings(dynamic, baseline);
+    const fresh = findingsAtOrAbove(newAll, gateOn);
+    const known = dynamic.findings.filter((f) => !f.advisory).length - newAll.length;
+    const measured = dynamic.scanned?.length ?? 0;
+    // A reached page that could not be rendered (HTTP >= 400, a redirect to a login, a browser
+    // crash) measured nothing — passing it would read "clean" for the page the change broke. It
+    // blocks, unless the same path was already unrenderable in the baseline.
+    const notMeasured = newUnrendered(dynamic, baseline);
+    const knownNotMeasured = (dynamic.redirected?.length ?? 0) - notMeasured.length;
+    const why = (r: ScanRedirect): string =>
+      r.reason === "http-status"
+        ? `HTTP ${r.status}`
+        : r.reason === "error"
+          ? lang === "fr"
+            ? `échec du navigateur${r.detail ? ` — ${r.detail}` : ""}`
+            : `browser failure${r.detail ? ` — ${r.detail}` : ""}`
+          : lang === "fr"
+            ? `redirigée vers ${r.landed}`
+            : `redirected to ${r.landed}`;
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          {
+            ...dynamic,
+            gate: {
+              baseline: baselinePath,
+              new: fresh,
+              known,
+              notMeasured: notMeasured.map((r) => ({
+                url: r.requested,
+                reason: r.reason ?? "redirect",
+                ...(r.status ? { status: r.status } : {}),
+                ...(r.reason === "redirect" || !r.reason ? { landed: r.landed } : {}),
+                ...(r.detail ? { detail: r.detail } : {}),
+              })),
+              knownNotMeasured,
+            },
+          },
+          null,
+          2,
+        ),
+      );
+    else {
+      console.log(
+        lang === "fr"
+          ? `Rendu des pages touchées (${dynamic.engine}) — ${measured} page(s), ${fresh.length} nouvelle(s) non-conformité(s), ${known} déjà présente(s) dans la référence ${baselinePath}${notMeasured.length ? `, ${notMeasured.length} page(s) touchée(s) non rendue(s)` : ""}.`
+          : `Rendered review of the reached pages (${dynamic.engine}) — ${measured} page(s), ${fresh.length} new non-conformity(ies), ${known} already in the baseline ${baselinePath}${notMeasured.length ? `, ${notMeasured.length} reached page(s) not rendered` : ""}.`,
+      );
+      for (const f of fresh) console.log(`  [${f.criteriaId}] ${f.page ?? dynamic.target} ${f.selector} — ${f.message}`);
+      for (const r of notMeasured)
+        console.log(
+          lang === "fr"
+            ? `  [non mesurée] ${r.requested} — ${why(r)} : rien n'a pu y être mesuré, et elle n'était pas déjà en échec dans la référence. Bloquant tant qu'elle ne s'affiche pas.`
+            : `  [not measured] ${r.requested} — ${why(r)}: nothing could be measured on it, and it was not already failing in the baseline. Blocking until it renders.`,
+        );
+    }
+    if (measured === 0 && !notMeasured.length) {
+      console.error(
+        lang === "fr"
+          ? "ultra11y scan : aucune des pages touchées n'a pu être rendue — rien n'a été mesuré. Vérifiez --base-url et la session."
+          : "ultra11y scan: none of the reached pages could be rendered — nothing was measured. Check --base-url and the session.",
+      );
+      return 1;
+    }
+    return fresh.length || notMeasured.length ? 1 : 0;
   }
   // Advisory sample-methodology lint: which normative page KINDS the configured sample
   // lacks. Standard-agnostic mechanics + RGAA-specific required kinds; scan has no
@@ -4888,6 +5140,14 @@ export async function main(argv: string[]): Promise<number> {
       return 2;
     }
   }
+  // `--baseline` left `audit`/`init` with the static regression gate; it lives on as the
+  // RENDERED gate of `scan` only.
+  if (p.flags.baseline !== undefined && p.command !== "scan") {
+    console.error(
+      `ultra11y: --baseline was removed from ${p.command} (the static baseline regression gate). Gate with --fail-on, or wire init --hook; the rendered gate is \`scan --since <ref> --base-url <url> --baseline <scan.json>\`.`,
+    );
+    return 2;
+  }
   for (const [flag, values] of Object.entries(REMOVED_FLAG_VALUES)) {
     const v = p.flags[flag];
     const replacement = typeof v === "string" && Object.hasOwn(values, v) ? values[v] : undefined;
@@ -5001,6 +5261,8 @@ export async function main(argv: string[]): Promise<number> {
       return cmdStatus(p);
     case "journey":
       return cmdJourney(p);
+    case "affected":
+      return cmdAffected(p);
     default:
       console.error(`ultra11y: "${p.command}" is not implemented yet`);
       return 1;

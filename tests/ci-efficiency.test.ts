@@ -116,13 +116,7 @@ describe("no paid adjudication workflow", () => {
   it("calls no removed command or CI output in any workflow", () => {
     for (const file of WORKFLOWS) {
       const text = read(`.github/workflows/${file}`);
-      for (const removed of [
-        /\bultra11y\.mjs (judge|mcp|dev|affected|import)\b/,
-        /--format (sarif|github)\b/,
-        /audit --lite\b/,
-        /--runtime docker\b/,
-        /init --ci\b/,
-      ]) {
+      for (const removed of [/\bultra11y\.mjs (judge|mcp|dev|import)\b/, /--format (sarif|github)\b/, /audit --lite\b/, /--runtime docker\b/, /init --ci\b/]) {
         expect(removed.test(text), `${file} matches ${removed}`).toBe(false);
       }
     }
