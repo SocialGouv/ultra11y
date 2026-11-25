@@ -167,7 +167,7 @@ ultra11y install --agents-md
 Écrit un bloc géré dans le `AGENTS.md` du dépôt. Soyez lucide sur ce que c’est : il n’y a pas d’API
 de hooks, donc **rien n’est automatique**. Le bloc rend le moteur découvrable et transmet le protocole
 d’arbitrage. Ce qui fait réellement respecter quoi que ce soit sur ces harness, c’est le garde-fou
-propre au dépôt — `ultra11y init --hook` (pre-commit git) — et, en CI, le bot `rgaa-audit` d’iterion.
+propre au dépôt — `node scripts/ultra11y.mjs init --hook` (pre-commit git) — et, en CI, le bot `rgaa-audit` d’iterion.
 
 Les critères eux-mêmes sont sur la CLI sur chaque harness : `criteria <id>` imprime les tests
 numérotés d’un critère, `criteria --glossary <term>` les termes qu’il définit, et `criteria --plan` le

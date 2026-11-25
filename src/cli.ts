@@ -36,6 +36,8 @@ import { ALL_GRAINS, ALL_PROVIDERS, TICKET_SET_SCHEMA_VERSION, type TicketGrain,
 import { detectFrameworks, renderPlan, parseStorybookIndex, storyProvenance, type Detection } from "./render.js";
 import {
   DEFAULT_RENDER_TIMEOUT_MS,
+  missingRendererPackages,
+  rendererInstallHint,
   RENDER_MANIFEST,
   TRANSPILERS,
   renderCounts,
@@ -81,6 +83,7 @@ import {
   emptyLedger,
   entriesFrom,
   isLedger,
+  LEDGER_DIR,
   ledgerPath,
   mergeLedger,
   pruneLedger,
@@ -106,6 +109,7 @@ import {
   writeRoutes,
 } from "./routes.js";
 import type { SampleMethodology } from "./standards/types.js";
+import { installInvocationRewrite, invocationFor } from "./invocation.js";
 import { applyProposal, DEFAULT_SAMPLE_SIZE, type ProposalInput, proposeSample, type SampleProposal, skeletonOf } from "./sample-propose.js";
 import { DOCUMENTS_DIR, downloadSnapshotDocuments } from "./documents.js";
 import { LOCAL_ENGINE, runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localTierStatus } from "./scan-local.js";
@@ -2617,6 +2621,11 @@ async function cmdRenderEngine(p: ParsedArgs, root: string, lang: Lang): Promise
       `  - ${u.file}${u.export === "*" ? "" : `#${u.export}`} — ${statusWord[u.status] ?? u.status}: ${u.reason ? renderReasonLabel(u.reason, lang) : "?"}${u.detail ? ` — ${u.detail}` : ""}`,
     );
   }
+  // Say WHAT to install when the renderer is what stopped the run (#233).
+  if (manifest.units.some((u) => u.reason === "no-renderer")) {
+    const hint = rendererInstallHint(missingRendererPackages(root), resolve(root), fr ? "fr" : "en");
+    if (hint) out.push(hint);
+  }
   if (manifest.testFilesIgnored)
     out.push(
       fr
@@ -2626,8 +2635,8 @@ async function cmdRenderEngine(p: ParsedArgs, root: string, lang: Lang): Promise
   if (snapshotLine) out.push(snapshotLine);
   out.push(
     fr
-      ? `→ captures dans ${join(root, CAPTURES_DIR)}, manifeste ${join(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).`
-      : `→ captures in ${join(root, CAPTURES_DIR)}, manifest ${join(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`,
+      ? `→ captures dans ${join(root, CAPTURES_DIR)}, manifeste ${join(root, RENDER_MANIFEST)}. Puis : \`ultra11y audit\` (depuis ${root}).`
+      : `→ captures in ${join(root, CAPTURES_DIR)}, manifest ${join(root, RENDER_MANIFEST)}. Then: \`ultra11y audit\` (from ${root}).`,
   );
   console.log(out.join("\n"));
   if (code)
@@ -2867,6 +2876,13 @@ function cmdCheck(p: ParsedArgs): number {
   return ok ? 0 : 1;
 }
 
+/** Is `file` a ledger at its default place — `.ultra11y/verdicts/<standard>.json` under the
+ *  working directory — rather than a file the user named somewhere else? */
+function isDefaultLedgerPath(file: string): boolean {
+  const abs = resolve(file);
+  return dirname(abs) === resolve(LEDGER_DIR) && abs.endsWith(".json");
+}
+
 function cmdVerify(p: ParsedArgs): number {
   if (p.flags.summary === true) return cmdVerifySummary(p);
   // --apply has no --standard/audit in hand — resolved below (post-standard) for the --report path.
@@ -2878,6 +2894,16 @@ function cmdVerify(p: ParsedArgs): number {
     try {
       raw = readText(apply);
     } catch {
+      // A first run has no ledger yet: replaying the default one is then a no-op, so the runbook
+      // can open with it unconditionally (#233). Any other missing file is still a usage error.
+      if (isDefaultLedgerPath(apply) && !existsSync(apply)) {
+        console.error(
+          lang === "fr"
+            ? `ⓘ ultra11y verify : aucun registre de verdicts en ${apply} (premier passage) — rien à rejouer. Le repli \`verify --apply <ADJUDICATE.todo.json> --ledger\` le créera.`
+            : `ⓘ ultra11y verify: no verdict ledger at ${apply} (first run) — nothing to replay. The fold \`verify --apply <ADJUDICATE.todo.json> --ledger\` will create it.`,
+        );
+        return 0;
+      }
       console.error(M.fileNotFound("verify", "--apply", apply, lang));
       return 2;
     }
@@ -4035,6 +4061,12 @@ async function cmdJourney(p: ParsedArgs): Promise<number> {
         ...(storageState ? { storageState } : {}),
         ...(baseUrl ? { baseUrl } : {}),
         ...(browserPathOf(p.flags) ? { browserPath: browserPathOf(p.flags) } : {}),
+        onRetry: (name, reason) =>
+          console.error(
+            lang === "fr"
+              ? `ⓘ ultra11y journey : « ${name} » — le navigateur s'est fermé en cours de route (${reason}) ; nouvel essai, une fois, dans un contexte neuf.`
+              : `ⓘ ultra11y journey: "${name}" — the browser closed mid-run (${reason}); retrying once in a fresh context.`,
+          ),
         onStep: (name, st) =>
           console.error(
             `ultra11y journey: ${name} ${st.n}. ${st.label} — ${st.status}${st.reason ? ` (${st.reason})` : ""}${st.keyboard && st.keyboard !== "focus" ? ` [${st.keyboard}]` : ""}${st.observed?.length ? ` {${st.observed.join(", ")}}` : ""}`,
@@ -5339,6 +5371,9 @@ function isInvokedDirectly(): boolean {
 // `audit --json | jq` used to receive exactly 65536 bytes of truncated, invalid JSON.
 // Letting the event loop drain naturally keeps the exit code AND the whole payload.
 if (isInvokedDirectly()) {
+  // The hints print the invocation in use (`node <skill>/scripts/ultra11y.mjs`, `npx -y
+  // ultra11y`…), not a bare `ultra11y` that is on PATH only after a global install (#233).
+  installInvocationRewrite(invocationFor(process.argv[1], process.cwd()));
   main(process.argv.slice(2)).then(
     (code) => {
       process.exitCode = code;

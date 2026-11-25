@@ -7,7 +7,7 @@
 //
 // Browser-context code is passed to page.evaluate AS STRINGS because the engine's tsconfig ships no DOM lib (it is a Node program); a typed
 // arrow body referencing document/window would not type-check.
-import { existsSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import type { AxeEngineInfo, DynamicFinding, DynamicResult, Lang, SamplePage, ScanRedirect } from "./types.js";
@@ -255,6 +255,14 @@ export function resolveLocalDeps(cwd: string, lang?: Lang): LocalDeps {
     axe = resolveAxeEngine({ cwd, ...(lang ? { lang } : {}) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    // An unreadable node_modules is not a missing Playwright: say which path to fix (#233).
+    const locked = unreadableNodeModules(cwd, e);
+    if (locked)
+      throw new Error(
+        lang === "fr"
+          ? `Playwright n'a pas pu être résolu depuis "${cwd}" : ${locked.path} est illisible (${locked.code}) — le moteur n'a pas le droit de lire ce dossier. Accordez la lecture (permissions, sandbox de l'agent, accès complet au disque sous macOS), ou passez --cwd <dossier> vers un projet lisible qui a @playwright/test + @axe-core/playwright. (${msg})`
+          : `Playwright could not be resolved from "${cwd}": ${locked.path} is unreadable (${locked.code}) — the engine is not allowed to read that directory. Grant read access (permissions, the agent's sandbox, Full Disk Access on macOS), or pass --cwd <dir> at a readable project that has @playwright/test + @axe-core/playwright. (${msg})`,
+      );
     throw new Error(
       `Playwright resolves neither from "${cwd}" nor from ultra11y itself. Both are dependencies of this package, so the usual cause is the standalone engine bundle running with no node_modules beside it: pass --cwd <dir> at a project that has @playwright/test + @axe-core/playwright (e.g. --cwd packages/app). (${msg})`,
     );
@@ -270,6 +278,29 @@ export function resolveLocalDeps(cwd: string, lang?: Lang): LocalDeps {
   return { chromium, axe };
 }
 const notedAxe = new Set<string>();
+
+const DENIED = new Set(["EPERM", "EACCES"]);
+
+/** The first `node_modules` on the resolution path from `cwd` up that cannot be listed
+ *  (EPERM/EACCES), or the path a permission error itself names. Undefined when every one that
+ *  exists is readable — then the failure really is a missing package. */
+export function unreadableNodeModules(cwd: string, err?: unknown): { path: string; code: string } | undefined {
+  const code = (err as { code?: unknown } | undefined)?.code;
+  const path = (err as { path?: unknown } | undefined)?.path;
+  if (typeof code === "string" && DENIED.has(code) && typeof path === "string") return { path, code };
+  for (let dir = resolve(cwd); ; ) {
+    const nm = join(dir, "node_modules");
+    try {
+      readdirSync(nm);
+    } catch (e) {
+      const c = (e as { code?: unknown }).code;
+      if (typeof c === "string" && DENIED.has(c)) return { path: nm, code: c };
+    }
+    const up = dirname(dir);
+    if (up === dir) return undefined;
+    dir = up;
+  }
+}
 
 /** Which Playwright `resolveLocalDeps` would load from `cwd` — its path and version — so a
  *  launch failure can name the install to fix. The engine resolves the TARGET project's

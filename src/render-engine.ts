@@ -169,6 +169,22 @@ export function resolveRenderer(root: string): ResolvedTool | undefined {
   return { ...server, name: "react-dom/server" };
 }
 
+/** The packages the React renderer needs that do not resolve from `root` (#233), so a run that
+ *  rendered nothing can say WHAT to install rather than only « introuvables ». */
+export function missingRendererPackages(root: string): string[] {
+  return [...(resolveFrom(root, "react") ? [] : ["react"]), ...(resolveFrom(root, "react-dom/server") ? [] : ["react-dom"])];
+}
+
+/** How to make the missing renderer packages resolvable, in the reader's language: install them
+ *  in the audited project, or point NODE_PATH at a node_modules that has them. */
+export function rendererInstallHint(missing: string[], root: string, lang: "fr" | "en"): string | undefined {
+  if (!missing.length) return undefined;
+  const pkgs = missing.join(" ");
+  return lang === "fr"
+    ? `  Moteur de rendu React introuvable depuis ${root} — manquant : ${missing.join(", ")}. Installez-le(s) dans le projet audité (\`npm install --save-dev ${pkgs}\`, ou \`pnpm add -D ${pkgs}\`), ou rendez-le(s) résolvable(s) avec NODE_PATH=<dossier node_modules qui les contient>, puis relancez \`ultra11y render\`.`
+    : `  React renderer not resolvable from ${root} — missing: ${missing.join(", ")}. Install them in the audited project (\`npm install --save-dev ${pkgs}\`, or \`pnpm add -D ${pkgs}\`), or make them resolvable with NODE_PATH=<a node_modules dir that has them>, then re-run \`ultra11y render\`.`;
+}
+
 export interface PathAlias {
   pattern: string;
   targets: string[];

@@ -5,21 +5,25 @@ fixture propre à ce dépôt ; les chiffres sont donnés pour qu’on puisse les
 
 ## La recette
 
+`node scripts/ultra11y.mjs` est le moteur livré avec la skill (voir « Lancer le moteur » dans
+`SKILL.md`) ; hors skill, `npx -y ultra11y` est le même moteur.
+
 ```sh
 # 1. The engine decides everything it can, for free.
-ultra11y audit <src> --standard rgaa --out audits
+node scripts/ultra11y.mjs audit <src> --standard rgaa --out audits
 
 # 2. The browser closes the mechanical ones, also for free. DO NOT SKIP THIS.
-ultra11y scan --crawl <url> --max 0 --standard rgaa \
+node scripts/ultra11y.mjs scan --crawl <url> --max 0 --standard rgaa \
   --merge audits/audit-latest.json --out audits
 
 # 3. Replay the committed ledger, then adjudicate only the residue — yourself, or fanned out.
-ultra11y verify --apply .ultra11y/verdicts/rgaa.json \
+#    On a first run there is no ledger yet: the replay says so and exits 0.
+node scripts/ultra11y.mjs verify --apply .ultra11y/verdicts/rgaa.json \
   --in audits/audit-latest.json --standard rgaa --out audits
-ultra11y verify --in audits/audit-latest.json --standard rgaa --manual --out audits
-ultra11y orchestrate --run audits --phase adjudicate      # batches + prompts for subagents (optional)
+node scripts/ultra11y.mjs verify --in audits/audit-latest.json --standard rgaa --manual --out audits
+node scripts/ultra11y.mjs orchestrate --run audits --phase adjudicate      # batches + prompts for subagents (optional)
 #   … rule every item of audits/ADJUDICATE.todo.json (or merge the subagents' fragments) …
-ultra11y verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json \
+node scripts/ultra11y.mjs verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json \
   --standard rgaa --out audits --ledger
 # Either fold exits 1 when the gate refused anything (« Repli incomplet ») — the partial audit is
 # still written and the refused criteria stay to assess: re-run --manual, rule them, fold again.
@@ -28,17 +32,17 @@ ultra11y verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.jso
 # open: every emitted item gets one grounded verdict, or an explicit manual reason.
 
 # 4. A second reader puts those claims on trial, and the outcome is APPLIED.
-ultra11y report --in audits/audit-latest.json --standard rgaa --out audits
-ultra11y verify --report audits/<report>.md --in audits/audit-latest.json --out audits --max-verify 0
-ultra11y orchestrate --run audits --phase verify-report   # one read-only reader per batch (optional)
+node scripts/ultra11y.mjs report --in audits/audit-latest.json --standard rgaa --out audits
+node scripts/ultra11y.mjs verify --report audits/<report>.md --in audits/audit-latest.json --out audits --max-verify 0
+node scripts/ultra11y.mjs orchestrate --run audits --phase verify-report   # one read-only reader per batch (optional)
 #   … give every claim of audits/VERIFY.todo.json a verdict …
-ultra11y verify --apply audits/VERIFY.todo.json --report audits/<report>.md \
+node scripts/ultra11y.mjs verify --apply audits/VERIFY.todo.json --report audits/<report>.md \
   --in audits/audit-latest.json --out audits --prune --ledger
 
 # 5. The gates. Neither is optional; one asks completeness, the other asks the instrument.
-ultra11y check --in audits/audit-latest.json --standard rgaa \
+node scripts/ultra11y.mjs check --in audits/audit-latest.json --standard rgaa \
   --require-decided=pages --allow-undecided .ultra11y/undecidable-rgaa.json
-ultra11y check --in audits/audit-latest.json --standard rgaa --require-rendered
+node scripts/ultra11y.mjs check --in audits/audit-latest.json --standard rgaa --require-rendered
 ```
 
 L’étape 5 affiche la ligne qui répond directement à « les 106 ont-ils tous été traités ? » :

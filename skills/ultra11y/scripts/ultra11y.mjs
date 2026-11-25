@@ -662,7 +662,7 @@ var require_parse = __commonJS({
       const parts = [];
       let bracket = 0;
       let paren = 0;
-      let quote = 0;
+      let quote2 = 0;
       let value = "";
       let escaped = false;
       for (const ch of input) {
@@ -677,11 +677,11 @@ var require_parse = __commonJS({
           continue;
         }
         if (ch === '"') {
-          quote = quote === 1 ? 0 : 1;
+          quote2 = quote2 === 1 ? 0 : 1;
           value += ch;
           continue;
         }
-        if (quote === 0) {
+        if (quote2 === 0) {
           if (ch === "[") {
             bracket++;
           } else if (ch === "]" && bracket > 0) {
@@ -758,7 +758,7 @@ var require_parse = __commonJS({
       }
       let bracket = 0;
       let paren = 0;
-      let quote = 0;
+      let quote2 = 0;
       let escaped = false;
       for (let i = 1; i < pattern.length; i++) {
         const ch = pattern[i];
@@ -771,10 +771,10 @@ var require_parse = __commonJS({
           continue;
         }
         if (ch === '"') {
-          quote = quote === 1 ? 0 : 1;
+          quote2 = quote2 === 1 ? 0 : 1;
           continue;
         }
-        if (quote === 1) {
+        if (quote2 === 1) {
           continue;
         }
         if (ch === "[") {
@@ -2497,11 +2497,11 @@ var require_ignore = __commonJS({
         const rules = this._rules;
         const { length } = rules;
         const shortcut = this._basenameCount * 2 >= length;
-        const basename4 = shortcut ? basenameOf(path) : path;
+        const basename5 = shortcut ? basenameOf(path) : path;
         for (let index = length - 1; index >= 0; index--) {
           const rule = rules[index];
           if (rule[mode].test(
-            shortcut && rule._basenameOnly ? basename4 : path
+            shortcut && rule._basenameOnly ? basename5 : path
           )) {
             const { negative } = rule;
             const ret = {
@@ -2659,7 +2659,7 @@ var require_ignore = __commonJS({
 
 // src/cli.ts
 import { realpathSync as realpathSync9, writeFileSync as writeFileSync20, mkdirSync as mkdirSync21, existsSync as existsSync39, copyFileSync as copyFileSync7, rmSync as rmSync8 } from "fs";
-import { join as join40, relative as relative15, resolve as resolve19, dirname as dirname22 } from "path";
+import { join as join40, relative as relative16, resolve as resolve19, dirname as dirname22 } from "path";
 import { fileURLToPath as fileURLToPath4, pathToFileURL } from "url";
 
 // src/types.ts
@@ -6573,11 +6573,11 @@ var Tokenizer = class {
       this.stateInAttributeValueNoQuotes(c);
     }
   }
-  handleInAttributeValue(c, quote) {
-    if (c === quote || !this.decodeEntities && this.fastForwardTo(quote)) {
+  handleInAttributeValue(c, quote2) {
+    if (c === quote2 || !this.decodeEntities && this.fastForwardTo(quote2)) {
       this.cbs.onattribdata(this.sectionStart, this.index);
       this.sectionStart = -1;
-      this.cbs.onattribend(quote === CharCodes2.DoubleQuote ? QuoteType.Double : QuoteType.Single, this.index + 1);
+      this.cbs.onattribend(quote2 === CharCodes2.DoubleQuote ? QuoteType.Double : QuoteType.Single, this.index + 1);
       this.state = State.BeforeAttributeName;
     } else if (this.decodeEntities && c === CharCodes2.Amp) {
       this.startEntity();
@@ -7362,9 +7362,9 @@ var Parser = class {
    * @param endIndex End index for the current parser event.
    * @internal
    */
-  onattribend(quote, endIndex) {
+  onattribend(quote2, endIndex) {
     this.endIndex = endIndex;
-    this.cbs.onattribute?.(this.attribname, this.attribvalue, quote === QuoteType.Double ? '"' : quote === QuoteType.Single ? "'" : quote === QuoteType.NoValue ? void 0 : null);
+    this.cbs.onattribute?.(this.attribname, this.attribvalue, quote2 === QuoteType.Double ? '"' : quote2 === QuoteType.Single ? "'" : quote2 === QuoteType.NoValue ? void 0 : null);
     if (this.attribs && !Object.hasOwn(this.attribs, this.attribname)) {
       this.attribs[this.attribname] = this.attribvalue;
     }
@@ -12551,7 +12551,7 @@ var jsx = (superClass) => class JSXParserMixin extends superClass {
     this.state.lineStart = this.state.pos;
     return out;
   }
-  jsxReadString(quote) {
+  jsxReadString(quote2) {
     let out = "";
     let chunkStart = ++this.state.pos;
     for (; ; ) {
@@ -12559,7 +12559,7 @@ var jsx = (superClass) => class JSXParserMixin extends superClass {
         throw this.raise(Errors.UnterminatedString, this.state.startLoc);
       }
       const ch = this.input.charCodeAt(this.state.pos);
-      if (ch === quote) break;
+      if (ch === quote2) break;
       if (ch === 38) {
         out += this.input.slice(chunkStart, this.state.pos);
         out += this.jsxReadEntity();
@@ -14439,13 +14439,13 @@ var Tokenizer2 = class extends CommentsParser {
     this.state.pos = pos;
     return code2;
   }
-  readString(quote) {
+  readString(quote2) {
     const {
       str: str2,
       pos,
       curLine,
       lineStart
-    } = readStringContents(quote === 34 ? "double" : "single", this.input, this.state.pos + 1, this.state.lineStart, this.state.curLine, this.errorHandlers_readStringContents_string);
+    } = readStringContents(quote2 === 34 ? "double" : "single", this.input, this.state.pos + 1, this.state.lineStart, this.state.curLine, this.errorHandlers_readStringContents_string);
     this.state.pos = pos + 1;
     this.state.lineStart = lineStart;
     this.state.curLine = curLine;
@@ -36731,7 +36731,7 @@ var STATE_DATA_ATTR = /^data-(?:[\w-]*-)?(?:current|active|selected|state|status
 var STATE_WORDS = "active|current|selected|error|success|warning|valid|invalid|danger|done|complete|completed|pending|positive|negative|above|below|over|under|high|low|highlight|highlighted|alert|ok|ko";
 var STATE_SEGMENT = new RegExp(`(?:^|[-_])(?:is-|has-)?(?:${STATE_WORDS})$`, "i");
 var STATE_WHOLE = new RegExp(`^(?:is-|has-)?(?:${STATE_WORDS})$`, "i");
-var STATE_CAMEL = new RegExp(`[a-z](?:${STATE_WORDS.replace(/(^|\|)(\w)/g, (_m, sep8, c) => `${sep8}${c.toUpperCase()}`)})$`);
+var STATE_CAMEL = new RegExp(`[a-z](?:${STATE_WORDS.replace(/(^|\|)(\w)/g, (_m, sep9, c) => `${sep9}${c.toUpperCase()}`)})$`);
 function stateClasses(e) {
   const raw = attr(e, "class") ?? "";
   if (raw.trim().startsWith("{")) return [];
@@ -59140,6 +59140,14 @@ function resolveRenderer(root) {
   if (!server || !resolveFrom(root, "react")) return void 0;
   return { ...server, name: "react-dom/server" };
 }
+function missingRendererPackages(root) {
+  return [...resolveFrom(root, "react") ? [] : ["react"], ...resolveFrom(root, "react-dom/server") ? [] : ["react-dom"]];
+}
+function rendererInstallHint(missing, root, lang) {
+  if (!missing.length) return void 0;
+  const pkgs = missing.join(" ");
+  return lang === "fr" ? `  Moteur de rendu React introuvable depuis ${root} \u2014 manquant : ${missing.join(", ")}. Installez-le(s) dans le projet audit\xE9 (\`npm install --save-dev ${pkgs}\`, ou \`pnpm add -D ${pkgs}\`), ou rendez-le(s) r\xE9solvable(s) avec NODE_PATH=<dossier node_modules qui les contient>, puis relancez \`ultra11y render\`.` : `  React renderer not resolvable from ${root} \u2014 missing: ${missing.join(", ")}. Install them in the audited project (\`npm install --save-dev ${pkgs}\`, or \`pnpm add -D ${pkgs}\`), or make them resolvable with NODE_PATH=<a node_modules dir that has them>, then re-run \`ultra11y render\`.`;
+}
 function aliasesOf(root) {
   for (const name of ["tsconfig.json", "jsconfig.json"]) {
     if (!existsSync19(join19(root, name))) continue;
@@ -59721,12 +59729,12 @@ function renderScopeFor(capturesDir) {
 
 // src/render-snapshot.ts
 import { createServer } from "http";
-import { existsSync as existsSync23, mkdirSync as mkdirSync10, readdirSync as readdirSync3, readFileSync as readFileSync15, realpathSync as realpathSync5, rmSync as rmSync2, statSync as statSync9, writeFileSync as writeFileSync9 } from "fs";
+import { existsSync as existsSync23, mkdirSync as mkdirSync10, readdirSync as readdirSync4, readFileSync as readFileSync15, realpathSync as realpathSync5, rmSync as rmSync2, statSync as statSync9, writeFileSync as writeFileSync9 } from "fs";
 import { createRequire as createRequire5 } from "module";
 import { dirname as dirname14, extname as extname3, isAbsolute as isAbsolute4, join as join21, relative as relative11, resolve as resolve13, sep as sep4 } from "path";
 
 // src/scan-local.ts
-import { existsSync as existsSync22, realpathSync as realpathSync4, statSync as statSync8 } from "fs";
+import { existsSync as existsSync22, readdirSync as readdirSync3, realpathSync as realpathSync4, statSync as statSync8 } from "fs";
 import { createRequire as createRequire4 } from "module";
 import { dirname as dirname13, join as join20, resolve as resolve12 } from "path";
 
@@ -60754,6 +60762,11 @@ function resolveLocalDeps(cwd, lang) {
     axe = resolveAxeEngine({ cwd, ...lang ? { lang } : {} });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    const locked = unreadableNodeModules(cwd, e);
+    if (locked)
+      throw new Error(
+        lang === "fr" ? `Playwright n'a pas pu \xEAtre r\xE9solu depuis "${cwd}" : ${locked.path} est illisible (${locked.code}) \u2014 le moteur n'a pas le droit de lire ce dossier. Accordez la lecture (permissions, sandbox de l'agent, acc\xE8s complet au disque sous macOS), ou passez --cwd <dossier> vers un projet lisible qui a @playwright/test + @axe-core/playwright. (${msg})` : `Playwright could not be resolved from "${cwd}": ${locked.path} is unreadable (${locked.code}) \u2014 the engine is not allowed to read that directory. Grant read access (permissions, the agent's sandbox, Full Disk Access on macOS), or pass --cwd <dir> at a readable project that has @playwright/test + @axe-core/playwright. (${msg})`
+      );
     throw new Error(
       `Playwright resolves neither from "${cwd}" nor from ultra11y itself. Both are dependencies of this package, so the usual cause is the standalone engine bundle running with no node_modules beside it: pass --cwd <dir> at a project that has @playwright/test + @axe-core/playwright (e.g. --cwd packages/app). (${msg})`
     );
@@ -60768,6 +60781,24 @@ function resolveLocalDeps(cwd, lang) {
   return { chromium, axe };
 }
 var notedAxe = /* @__PURE__ */ new Set();
+var DENIED = /* @__PURE__ */ new Set(["EPERM", "EACCES"]);
+function unreadableNodeModules(cwd, err) {
+  const code2 = err?.code;
+  const path = err?.path;
+  if (typeof code2 === "string" && DENIED.has(code2) && typeof path === "string") return { path, code: code2 };
+  for (let dir = resolve12(cwd); ; ) {
+    const nm = join20(dir, "node_modules");
+    try {
+      readdirSync3(nm);
+    } catch (e) {
+      const c = e.code;
+      if (typeof c === "string" && DENIED.has(c)) return { path: nm, code: c };
+    }
+    const up = dirname13(dir);
+    if (up === dir) return void 0;
+    dir = up;
+  }
+}
 function resolvedPlaywright(cwd) {
   for (const from of resolveAnchors(cwd)) {
     try {
@@ -61454,7 +61485,7 @@ function styleEntries(root) {
     if (!existsSync23(dir)) continue;
     let names = [];
     try {
-      names = readdirSync3(dir);
+      names = readdirSync4(dir);
     } catch {
       continue;
     }
@@ -61498,7 +61529,7 @@ function cssFilesUnder(dir, depth = 4) {
   const walk4 = (d2, n) => {
     let names;
     try {
-      names = readdirSync3(d2).sort();
+      names = readdirSync4(d2).sort();
     } catch {
       return;
     }
@@ -61720,7 +61751,7 @@ function writeIndex(root, index, keep) {
   const dir = join21(root, RENDER_SNAPSHOTS_DIR);
   mkdirSync10(dir, { recursive: true });
   try {
-    for (const name of readdirSync3(dir)) if (name.endsWith(".png") && !keep.has(name.slice(0, -4))) rmSync2(join21(dir, name), { force: true });
+    for (const name of readdirSync4(dir)) if (name.endsWith(".png") && !keep.has(name.slice(0, -4))) rmSync2(join21(dir, name), { force: true });
   } catch {
   }
   writeFileSync9(join21(root, RENDER_SNAPSHOT_INDEX), `${JSON.stringify(index, null, 2)}
@@ -62177,7 +62208,7 @@ function renderCriteriaReference(lang = "fr") {
 }
 
 // src/check.ts
-import { existsSync as existsSync25, readFileSync as readFileSync17, readdirSync as readdirSync4 } from "fs";
+import { existsSync as existsSync25, readFileSync as readFileSync17, readdirSync as readdirSync5 } from "fs";
 import { dirname as dirname15, join as join23 } from "path";
 
 // src/verify.ts
@@ -62782,7 +62813,7 @@ function checkSampleCaptured(root = ".", lang = "en") {
   let captured = /* @__PURE__ */ new Set();
   try {
     captured = new Set(
-      readdirSync4(join23(root, PAGES_DIR), { withFileTypes: true }).filter((d2) => d2.isDirectory()).map((d2) => d2.name).filter((id) => existsSync25(join23(root, PAGES_DIR, id, "dom.html")))
+      readdirSync5(join23(root, PAGES_DIR), { withFileTypes: true }).filter((d2) => d2.isDirectory()).map((d2) => d2.name).filter((id) => existsSync25(join23(root, PAGES_DIR, id, "dom.html")))
     );
   } catch {
   }
@@ -63376,6 +63407,34 @@ function replayLedger(audit, ledger, opts = {}) {
   };
 }
 
+// src/invocation.ts
+import { basename as basename3, isAbsolute as isAbsolute6, relative as relative12, sep as sep5 } from "path";
+var BARE = "ultra11y";
+var quote = (p2) => /[\s"'$`\\]/.test(p2) && !p2.includes('"') ? `"${p2}"` : p2;
+function invocationFor(argv1, cwd) {
+  if (!argv1) return BARE;
+  const p2 = argv1.split("\\").join("/");
+  if (p2.includes("/_npx/")) return "npx -y ultra11y";
+  if (p2.includes("/node_modules/.bin/") || p2.includes("/node_modules/ultra11y/")) return "npx ultra11y";
+  if (basename3(p2) !== "ultra11y.mjs") return BARE;
+  const rel = isAbsolute6(argv1) ? relative12(cwd, argv1) : argv1;
+  const shown = rel && !rel.startsWith("..") && !isAbsolute6(rel) ? rel.split(sep5).join("/") : argv1;
+  return `node ${quote(shown)}`;
+}
+function rewriteInvocation(text, invocation) {
+  if (invocation === BARE || !text.includes("`ultra11y ")) return text;
+  const head = text.trimStart()[0];
+  if (head === "{" || head === "[") return text;
+  return text.replace(/`ultra11y (?=[a-z-])/g, () => `\`${invocation} `);
+}
+function installInvocationRewrite(invocation) {
+  if (invocation === BARE) return;
+  for (const name of ["log", "error", "warn"]) {
+    const original = console[name].bind(console);
+    console[name] = (...args) => original(...args.map((a2) => typeof a2 === "string" ? rewriteInvocation(a2, invocation) : a2));
+  }
+}
+
 // src/sample-propose.ts
 import { createHash as createHash5 } from "crypto";
 var DEFAULT_SAMPLE_SIZE = 20;
@@ -63843,13 +63902,13 @@ function openTag(source, start) {
     i++;
   }
   if (!name) return null;
-  let quote = null;
+  let quote2 = null;
   for (; i < source.length; i++) {
     const ch = source[i];
-    if (quote) {
-      if (ch === quote) quote = null;
+    if (quote2) {
+      if (ch === quote2) quote2 = null;
     } else if (ch === '"' || ch === "'") {
-      quote = ch;
+      quote2 = ch;
     } else if (ch === ">") {
       return { tagName: name.toLowerCase(), gt: i, selfClose: source[i - 1] === "/" };
     }
@@ -64141,7 +64200,7 @@ function fixSummary(r2, lang = "fr", write = false, standard = CORE2) {
 // src/init.ts
 import { writeFileSync as writeFileSync13, mkdirSync as mkdirSync13, chmodSync, realpathSync as realpathSync6 } from "fs";
 import { execFileSync as execFileSync7 } from "child_process";
-import { join as join25, relative as relative12, sep as sep5 } from "path";
+import { join as join25, relative as relative13, sep as sep6 } from "path";
 var EN_SEV = { bloquant: "blocking", majeur: "major", mineur: "minor" };
 function repoRoot() {
   try {
@@ -64154,7 +64213,7 @@ function resolveEnginePath(root) {
   const argv1 = process.argv[1] ?? "scripts/ultra11y.mjs";
   try {
     const abs = realpathSync6(argv1);
-    return abs.startsWith(root + sep5) ? relative12(root, abs) : abs;
+    return abs.startsWith(root + sep6) ? relative13(root, abs) : abs;
   } catch {
     return argv1;
   }
@@ -64308,8 +64367,8 @@ ${BLOCK_END}
   if (!existsSync28(path)) return writeTextWithBackup(path, block);
   const current = readFileSync20(path, "utf8");
   if (blockRe().test(current)) return writeTextWithBackup(path, current.replace(blockRe(), block));
-  const sep8 = current.endsWith("\n\n") ? "" : current.endsWith("\n") ? "\n" : "\n\n";
-  return writeTextWithBackup(path, `${current}${sep8}${block}`);
+  const sep9 = current.endsWith("\n\n") ? "" : current.endsWith("\n") ? "\n" : "\n\n";
+  return writeTextWithBackup(path, `${current}${sep9}${block}`);
 }
 function removeManagedBlock(path) {
   if (!existsSync28(path)) return { path, changed: false };
@@ -66328,12 +66387,12 @@ function noticeRuns(notices) {
 }
 
 // src/serve.ts
-import { copyFileSync as copyFileSync6, createReadStream, existsSync as existsSync36, mkdirSync as mkdirSync19, readdirSync as readdirSync7, readFileSync as readFileSync29, realpathSync as realpathSync8, statSync as statSync13, writeFileSync as writeFileSync18 } from "fs";
+import { copyFileSync as copyFileSync6, createReadStream, existsSync as existsSync36, mkdirSync as mkdirSync19, readdirSync as readdirSync8, readFileSync as readFileSync29, realpathSync as realpathSync8, statSync as statSync13, writeFileSync as writeFileSync18 } from "fs";
 import { createServer as createServer2 } from "http";
-import { dirname as dirname21, extname as extname4, join as join36, posix as posix4, relative as relative14, resolve as resolve16, sep as sep7 } from "path";
+import { dirname as dirname21, extname as extname4, join as join36, posix as posix4, relative as relative15, resolve as resolve16, sep as sep8 } from "path";
 
 // src/journey.ts
-import { existsSync as existsSync35, mkdirSync as mkdirSync18, readFileSync as readFileSync27, readdirSync as readdirSync5, writeFileSync as writeFileSync17 } from "fs";
+import { existsSync as existsSync35, mkdirSync as mkdirSync18, readFileSync as readFileSync27, readdirSync as readdirSync6, writeFileSync as writeFileSync17 } from "fs";
 import { dirname as dirname20, join as join34 } from "path";
 var JOURNEYS_DIR = ".ultra11y/journeys";
 var JOURNEY_RUNS_FILE = ".ultra11y/journey-runs.json";
@@ -66451,7 +66510,7 @@ function stepPageId(journey, n, s2) {
 function listJourneyFiles(root) {
   const dir = join34(root, JOURNEYS_DIR);
   if (!existsSync35(dir)) return [];
-  return readdirSync5(dir).filter((f2) => f2.endsWith(".json")).sort().map((f2) => {
+  return readdirSync6(dir).filter((f2) => f2.endsWith(".json")).sort().map((f2) => {
     const file = `${JOURNEYS_DIR}/${f2}`;
     let validation;
     try {
@@ -66532,15 +66591,15 @@ function journeyScopeFor(root) {
 
 // src/serve-history.ts
 import { createHash as createHash7 } from "crypto";
-import { readdirSync as readdirSync6, readFileSync as readFileSync28, statSync as statSync12 } from "fs";
-import { join as join35, relative as relative13, sep as sep6 } from "path";
+import { readdirSync as readdirSync7, readFileSync as readFileSync28, statSync as statSync12 } from "fs";
+import { join as join35, relative as relative14, sep as sep7 } from "path";
 var HISTORY_MAX_DEPTH = 3;
 var HISTORY_MAX_BYTES = 64 * 1024 * 1024;
 var SKIP_DIRS = /* @__PURE__ */ new Set(["assets", "node_modules"]);
 function jsonFiles(dir, depth = 0, out = []) {
   let entries;
   try {
-    entries = readdirSync6(dir, { withFileTypes: true });
+    entries = readdirSync7(dir, { withFileTypes: true });
   } catch {
     return out;
   }
@@ -66567,7 +66626,7 @@ var slug2 = (s2) => s2.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[-.]+|-+$/g, 
 function discoverAudits(dir) {
   const found = [];
   const seen = /* @__PURE__ */ new Set();
-  const depth = (f2) => relative13(dir, f2.file).split(sep6).length;
+  const depth = (f2) => relative14(dir, f2.file).split(sep7).length;
   const files = jsonFiles(dir).sort((a2, b) => depth(a2) - depth(b) || a2.file.localeCompare(b.file));
   for (const f2 of files) {
     let raw;
@@ -66589,7 +66648,7 @@ function discoverAudits(dir) {
     seen.add(hash);
     found.push({
       file: f2.file,
-      rel: relative13(dir, f2.file).split(sep6).join("/"),
+      rel: relative14(dir, f2.file).split(sep7).join("/"),
       dir: join35(f2.file, ".."),
       mtimeMs: f2.mtimeMs,
       result: parsed
@@ -66934,7 +66993,7 @@ function safeSegment(s2) {
   return s2 !== "" && !s2.startsWith(".") && !s2.includes("/") && !s2.includes("\\") && !s2.includes("\0");
 }
 function isInside(root, p2) {
-  return p2.startsWith(root.endsWith(sep7) ? root : root + sep7);
+  return p2.startsWith(root.endsWith(sep8) ? root : root + sep8);
 }
 function resolveUnder(root, segments) {
   if (!segments.length || !segments.every(safeSegment)) return void 0;
@@ -66981,9 +67040,9 @@ function parseRequestPath(raw) {
 }
 function fileRoute(ctx, mount, abs) {
   const base = resolve16(ctx.mounts[mount]);
-  const rel = relative14(base, resolve16(abs));
+  const rel = relative15(base, resolve16(abs));
   if (!rel || rel.startsWith("..")) return void 0;
-  const segs = rel.split(sep7);
+  const segs = rel.split(sep8);
   if (!resolveUnder(base, segs)) return void 0;
   const route = `files/${mount}/${segs.join("/")}`;
   ctx.fileRoutes.add(route);
@@ -67036,7 +67095,7 @@ function auditFiles2(entry2, history) {
   const out = [];
   const list = (dir) => {
     try {
-      return readdirSync7(dir, { withFileTypes: true }).filter((d2) => d2.isFile() && !d2.name.startsWith(".") && fileKind(d2.name)).map((d2) => join36(dir, d2.name)).sort();
+      return readdirSync8(dir, { withFileTypes: true }).filter((d2) => d2.isFile() && !d2.name.startsWith(".") && fileKind(d2.name)).map((d2) => join36(dir, d2.name)).sort();
     } catch {
       return [];
     }
@@ -67414,7 +67473,7 @@ function filesDoc(ctx, entry2, history, latest, from, nav, summary, slugs) {
       continue;
     }
     rows.push([
-      { text: relative14(ctx.mounts.audits, f2).split(sep7).join("/"), mono: true, href: relHref(from, route) },
+      { text: relative15(ctx.mounts.audits, f2).split(sep8).join("/"), mono: true, href: relHref(from, route) },
       { text: t3.kinds[fileKind(f2) ?? "text"] ?? "\u2014" },
       { text: size(bytes, ctx.lang), align: "end" }
     ]);
@@ -67615,7 +67674,7 @@ import { existsSync as existsSync37, mkdirSync as mkdirSync20, readFileSync as r
 import { join as join38, resolve as resolve17 } from "path";
 
 // src/orchestrate-templates.ts
-import { basename as basename3, join as join37 } from "path";
+import { basename as basename4, join as join37 } from "path";
 
 // src/verdict-rules.ts
 var VERDICT_KINDS = `Rule it (the apply gate is FAIL-CLOSED \u2014 a verdict missing its required field does not fold, and its criterion goes back to \xAB to assess \xBB carrying the refusal):
@@ -67862,7 +67921,7 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 
 ## Which files \u2014 your prompt decides, and it wins over this document
 
-- **With a shell.** Read \`${join37(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join37(runAbs, "ADJUDICATE.todo.json")} --in ${join37(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
+- **With a shell.** Read \`${join37(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold with the engine the RUNBOOK names (its \`Engine:\` line, \`node <\u2026>/ultra11y.mjs\`): \`<engine> verify --apply ${join37(runAbs, "ADJUDICATE.todo.json")} --in ${join37(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
 - **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join37(runAbs, "ADJUDICATE.contract.md")}\` once \u2014 the verdict contract every brief points to, with the audited page ids and how to cite a page \u2014 then \`${join37(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol and its numbered tests. Write your verdicts into \`${join37(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
 
 ## For EACH criterion
@@ -67893,7 +67952,7 @@ For EACH entry:
    When unsure, choose the HARSHER verdict \u2014 a false pass is worse than a false fail.
 3. \`note\` is REQUIRED \u2014 one line grounded in what you read (quote or paraphrase the decisive code).
 
-Then fold: \`ultra11y verify --apply ${join37(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
+Then fold with the engine the RUNBOOK names (its \`Engine:\` line): \`<engine> verify --apply ${join37(runAbs, "VERIFY.todo.json")} --report ${verify.report} ${verify.flags}\` \u2014 the same audit, standard and conformity source the list was generated with, or the claims it covers and the claims the fold expects differ. Without a shell, leave the fold to whoever gave you the file.
 `;
 }
 function agentContracts(runAbs, opts = {}) {
@@ -67978,7 +68037,7 @@ ${status}
 ## The loop (play every role yourself, one item at a time)
 
 1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join37(runAbs, "audit-latest.json")}\`.
-2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join37(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join37(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. It exits 0 only when the gate refused nothing; any refusal exits 1 with the partial audit still written and a closing \xAB Repli incomplet \xBB line \u2014 the refused criteria (each line names \`criterion <id>\`, and the page when page-scoped) stay to assess: regenerate the worklist from the written audit, rule them again and fold. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
+2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join37(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join37(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. It exits 0 only when the gate refused nothing; any refusal exits 1 with the partial audit still written and a closing \xAB Repli incomplet \xBB line \u2014 the refused criteria (each line names \`criterion <id>\`, and the page when page-scoped) stay to assess: regenerate the worklist from the written audit, rule them again and fold. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model (\`verify --apply .ultra11y/verdicts/<standard>.json\` \u2014 on a first run, with no ledger yet at that default path, the replay is a no-op that exits 0); \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`${cmd("report")}\`.
 4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join37(runAbs, "VERIFY.todo.json")}\` (and \`${join37(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join37(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
 5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
@@ -67990,7 +68049,7 @@ ${status}
 ${batchList(manifest)}`;
 }
 function batchList(manifest) {
-  const lines = manifest.steps.filter((st) => st.kind === "judgment" && st.ready && st.batchFile).map((st) => `- **${basename3(st.batchFile, ".batches.json")}** \u2014 ${st.batchIds?.length ?? 0} batch(es): \`${st.batchFile}\``);
+  const lines = manifest.steps.filter((st) => st.kind === "judgment" && st.ready && st.batchFile).map((st) => `- **${basename4(st.batchFile, ".batches.json")}** \u2014 ${st.batchIds?.length ?? 0} batch(es): \`${st.batchFile}\``);
   return lines.length ? `
 The batches of the current worklists, as \`orchestrate\` without \`--eco\` writes them:
 
@@ -68654,7 +68713,7 @@ ${xs.map(line2).join("\n")}` : t3.none;
 }
 
 // src/journey-run.ts
-import { existsSync as existsSync38, readdirSync as readdirSync8, readFileSync as readFileSync32, rmSync as rmSync7 } from "fs";
+import { existsSync as existsSync38, readdirSync as readdirSync9, readFileSync as readFileSync32, rmSync as rmSync7 } from "fs";
 import { join as join39, resolve as resolve18 } from "path";
 var JOURNEY_ENGINE = "axe-core@playwright (journey)";
 var DEFAULT_TIMEOUT = 5e3;
@@ -69005,7 +69064,7 @@ var say = (id, params, lang) => resolveMessage({ message: "", msg: { id, params 
 function clearJourneySnapshots(root, name) {
   const dir = join39(root, PAGES_DIR);
   if (!existsSync38(dir)) return;
-  for (const id of readdirSync8(dir)) {
+  for (const id of readdirSync9(dir)) {
     try {
       const meta2 = JSON.parse(readFileSync32(join39(dir, id, "meta.json"), "utf8"));
       if (meta2.runner === "journey" && meta2.journey?.name === name) rmSync7(join39(dir, id), { recursive: true, force: true });
@@ -69013,14 +69072,57 @@ function clearJourneySnapshots(root, name) {
     }
   }
 }
+var BROWSER_CLOSED = /Target (?:page, context or browser |page |context |browser )?(?:has been |is )?closed|Browser has been closed/i;
+function isBrowserClosedError(message) {
+  return !!message && BROWSER_CLOSED.test(message);
+}
+async function withBrowserClosedRetry(attempt2, reset, onRetry) {
+  let reason;
+  try {
+    const rec = await attempt2();
+    if (rec.status !== "failed" || !isBrowserClosedError(rec.reason)) return rec;
+    reason = rec.reason;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isBrowserClosedError(msg)) throw e;
+    reason = firstLine3(e);
+  }
+  onRetry(reason);
+  await reset();
+  return attempt2();
+}
 async function runJourneys(entries, opts) {
   const { chromium, axe } = resolveLocalDeps(opts.cwd, opts.lang);
-  const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
+  const launch = () => launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
+  let browser = await launch();
   const result = { records: [], findings: [], unsnapshotted: [], snapshots: [], testedScs: [], scanned: [] };
   const tested = /* @__PURE__ */ new Set();
   try {
     for (const { journey, file } of entries) {
-      const rec = await runOne(browser, axe, journey, file, opts, result, tested);
+      const mark = {
+        findings: result.findings.length,
+        unsnapshotted: result.unsnapshotted.length,
+        snapshots: result.snapshots.length,
+        scanned: result.scanned.length
+      };
+      const testedBefore = new Set(tested);
+      const rec = await withBrowserClosedRetry(
+        () => runOne(browser, axe, journey, file, opts, result, tested),
+        async () => {
+          result.findings.length = mark.findings;
+          result.unsnapshotted.length = mark.unsnapshotted;
+          result.snapshots.length = mark.snapshots;
+          result.scanned.length = mark.scanned;
+          tested.clear();
+          for (const sc of testedBefore) tested.add(sc);
+          if (typeof browser.isConnected === "function" && !browser.isConnected()) {
+            await browser.close().catch(() => {
+            });
+            browser = await launch();
+          }
+        },
+        (reason) => opts.onRetry?.(journey.name, reason)
+      );
       result.records.push(rec);
     }
   } finally {
@@ -71213,7 +71315,7 @@ async function cmdPages(p2) {
   const shotsRelative = (fileDir) => {
     const m3 = /* @__PURE__ */ new Map();
     for (const pg of derived) {
-      if (existsSync39(shotOf(pg.id))) m3.set(pg.id, relative15(fileDir, shotOf(pg.id)).split("\\").join("/"));
+      if (existsSync39(shotOf(pg.id))) m3.set(pg.id, relative16(fileDir, shotOf(pg.id)).split("\\").join("/"));
     }
     return m3;
   };
@@ -72122,13 +72224,17 @@ async function cmdRenderEngine(p2, root, lang) {
       `  - ${u2.file}${u2.export === "*" ? "" : `#${u2.export}`} \u2014 ${statusWord[u2.status] ?? u2.status}: ${u2.reason ? renderReasonLabel(u2.reason, lang) : "?"}${u2.detail ? ` \u2014 ${u2.detail}` : ""}`
     );
   }
+  if (manifest.units.some((u2) => u2.reason === "no-renderer")) {
+    const hint = rendererInstallHint(missingRendererPackages(root), resolve19(root), fr2 ? "fr" : "en");
+    if (hint) out.push(hint);
+  }
   if (manifest.testFilesIgnored)
     out.push(
       fr2 ? `  ${manifest.testFilesIgnored} fichier(s) de test, de mock ou d'instantan\xE9 laiss\xE9(s) de c\xF4t\xE9 sans \xEAtre lus.` : `  ${manifest.testFilesIgnored} test, mock or snapshot file(s) left out, unread.`
     );
   if (snapshotLine) out.push(snapshotLine);
   out.push(
-    fr2 ? `\u2192 captures dans ${join40(root, CAPTURES_DIR)}, manifeste ${join40(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).` : `\u2192 captures in ${join40(root, CAPTURES_DIR)}, manifest ${join40(root, RENDER_MANIFEST)}. Then: ultra11y audit (from ${root}).`
+    fr2 ? `\u2192 captures dans ${join40(root, CAPTURES_DIR)}, manifeste ${join40(root, RENDER_MANIFEST)}. Puis : \`ultra11y audit\` (depuis ${root}).` : `\u2192 captures in ${join40(root, CAPTURES_DIR)}, manifest ${join40(root, RENDER_MANIFEST)}. Then: \`ultra11y audit\` (from ${root}).`
   );
   console.log(out.join("\n"));
   if (code2)
@@ -72276,6 +72382,10 @@ function cmdCheck(p2) {
   }
   return ok ? 0 : 1;
 }
+function isDefaultLedgerPath(file) {
+  const abs = resolve19(file);
+  return dirname22(abs) === resolve19(LEDGER_DIR) && abs.endsWith(".json");
+}
 function cmdVerify(p2) {
   if (p2.flags.summary === true) return cmdVerifySummary(p2);
   const lang = resolveLang(p2.flags, {});
@@ -72285,6 +72395,12 @@ function cmdVerify(p2) {
     try {
       raw = readText(apply);
     } catch {
+      if (isDefaultLedgerPath(apply) && !existsSync39(apply)) {
+        console.error(
+          lang === "fr" ? `\u24D8 ultra11y verify : aucun registre de verdicts en ${apply} (premier passage) \u2014 rien \xE0 rejouer. Le repli \`verify --apply <ADJUDICATE.todo.json> --ledger\` le cr\xE9era.` : `\u24D8 ultra11y verify: no verdict ledger at ${apply} (first run) \u2014 nothing to replay. The fold \`verify --apply <ADJUDICATE.todo.json> --ledger\` will create it.`
+        );
+        return 0;
+      }
       console.error(M2.fileNotFound("verify", "--apply", apply, lang));
       return 2;
     }
@@ -73056,6 +73172,9 @@ async function cmdJourney(p2) {
         ...storageState ? { storageState } : {},
         ...baseUrl ? { baseUrl } : {},
         ...browserPathOf(p2.flags) ? { browserPath: browserPathOf(p2.flags) } : {},
+        onRetry: (name, reason) => console.error(
+          lang === "fr" ? `\u24D8 ultra11y journey : \xAB ${name} \xBB \u2014 le navigateur s'est ferm\xE9 en cours de route (${reason}) ; nouvel essai, une fois, dans un contexte neuf.` : `\u24D8 ultra11y journey: "${name}" \u2014 the browser closed mid-run (${reason}); retrying once in a fresh context.`
+        ),
         onStep: (name, st) => console.error(
           `ultra11y journey: ${name} ${st.n}. ${st.label} \u2014 ${st.status}${st.reason ? ` (${st.reason})` : ""}${st.keyboard && st.keyboard !== "focus" ? ` [${st.keyboard}]` : ""}${st.observed?.length ? ` {${st.observed.join(", ")}}` : ""}`
         )
@@ -74015,6 +74134,7 @@ function isInvokedDirectly() {
   return import.meta.url === pathToFileURL(argv1).href;
 }
 if (isInvokedDirectly()) {
+  installInvocationRewrite(invocationFor(process.argv[1], process.cwd()));
   main(process.argv.slice(2)).then(
     (code2) => {
       process.exitCode = code2;
