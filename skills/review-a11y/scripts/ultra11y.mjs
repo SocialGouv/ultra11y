@@ -339,7 +339,7 @@ var require_scan = __commonJS({
     var scan = (input, options) => {
       const opts = options || {};
       const length = input.length - 1;
-      const scanToEnd = opts.parts === true || opts.scanToEnd === true;
+      const scanToEnd = opts.parts === true || opts.tokens === true || opts.scanToEnd === true;
       const slashes = [];
       const tokens = [];
       const parts = [];
@@ -445,14 +445,18 @@ var require_scan = __commonJS({
               negatedExtglob = true;
             }
             if (scanToEnd === true) {
+              let parens = 0;
               while (eos() !== true && (code2 = advance())) {
                 if (code2 === CHAR_BACKWARD_SLASH) {
                   backslashes = token.backslashes = true;
-                  code2 = advance();
+                  advance();
                   continue;
                 }
-                if (code2 === CHAR_RIGHT_PARENTHESES) {
-                  isGlob = token.isGlob = true;
+                if (code2 === CHAR_LEFT_PARENTHESES) {
+                  parens++;
+                  continue;
+                }
+                if (code2 === CHAR_RIGHT_PARENTHESES && --parens === 0) {
                   finished = true;
                   break;
                 }
@@ -506,13 +510,18 @@ var require_scan = __commonJS({
         if (opts.noparen !== true && code2 === CHAR_LEFT_PARENTHESES) {
           isGlob = token.isGlob = true;
           if (scanToEnd === true) {
+            let parens = 1;
             while (eos() !== true && (code2 = advance())) {
-              if (code2 === CHAR_LEFT_PARENTHESES) {
+              if (code2 === CHAR_BACKWARD_SLASH) {
                 backslashes = token.backslashes = true;
-                code2 = advance();
+                advance();
                 continue;
               }
-              if (code2 === CHAR_RIGHT_PARENTHESES) {
+              if (code2 === CHAR_LEFT_PARENTHESES) {
+                parens++;
+                continue;
+              }
+              if (code2 === CHAR_RIGHT_PARENTHESES && --parens === 0) {
                 finished = true;
                 break;
               }
@@ -585,32 +594,31 @@ var require_scan = __commonJS({
       if (opts.parts === true || opts.tokens === true) {
         let prevIndex;
         for (let idx = 0; idx < slashes.length; idx++) {
-          const n = prevIndex ? prevIndex + 1 : start;
+          const n2 = prevIndex !== void 0 ? prevIndex + 1 : start;
           const i = slashes[idx];
-          const value = input.slice(n, i);
+          const value2 = input.slice(n2, i);
           if (opts.tokens) {
             if (idx === 0 && start !== 0) {
               tokens[idx].isPrefix = true;
               tokens[idx].value = prefix2;
             } else {
-              tokens[idx].value = value;
+              tokens[idx].value = value2;
             }
             depth(tokens[idx]);
             state.maxDepth += tokens[idx].depth;
           }
-          if (idx !== 0 || value !== "") {
-            parts.push(value);
+          if (i >= start) {
+            parts.push(value2);
+            prevIndex = i;
           }
-          prevIndex = i;
         }
-        if (prevIndex && prevIndex + 1 < input.length) {
-          const value = input.slice(prevIndex + 1);
-          parts.push(value);
-          if (opts.tokens) {
-            tokens[tokens.length - 1].value = value;
-            depth(tokens[tokens.length - 1]);
-            state.maxDepth += tokens[tokens.length - 1].depth;
-          }
+        const n = prevIndex !== void 0 ? prevIndex + 1 : start;
+        const value = input.slice(n);
+        parts.push(value);
+        if (opts.tokens && prevIndex && prevIndex + 1 < input.length) {
+          tokens[tokens.length - 1].value = value;
+          depth(tokens[tokens.length - 1]);
+          state.maxDepth += tokens[tokens.length - 1].depth;
         }
         state.slashes = slashes;
         state.parts = parts;
@@ -799,7 +807,11 @@ var require_parse = __commonJS({
         }
       }
     };
-    var getStarExtglobSequenceOutput = (pattern) => {
+    var buildCharClassStar = (chars) => {
+      const source = chars.length === 1 ? utils.escapeRegex(chars[0]) : `[${chars.map((ch) => utils.escapeRegex(ch)).join("")}]`;
+      return `${source}*`;
+    };
+    var getStarExtglobSequenceChars = (pattern) => {
       let index = 0;
       const chars = [];
       while (index < pattern.length) {
@@ -821,8 +833,7 @@ var require_parse = __commonJS({
       if (chars.length < 1) {
         return;
       }
-      const source = chars.length === 1 ? utils.escapeRegex(chars[0]) : `[${chars.map((ch) => utils.escapeRegex(ch)).join("")}]`;
-      return `${source}*`;
+      return chars;
     };
     var repeatedExtglobRecursion = (pattern) => {
       let depth = 0;
@@ -846,14 +857,28 @@ var require_parse = __commonJS({
           return { risky: true };
         }
       }
+      const safeChars = [];
+      let sawStarSequence = false;
+      let combinable = true;
       for (const branch of branches) {
-        const safeOutput = getStarExtglobSequenceOutput(branch);
-        if (safeOutput) {
-          return { risky: true, safeOutput };
+        const chars = getStarExtglobSequenceChars(branch);
+        if (chars) {
+          sawStarSequence = true;
+          safeChars.push(...chars);
+          continue;
         }
+        const literal = normalizeSimpleBranch(branch);
+        if (literal && literal.length === 1) {
+          safeChars.push(literal);
+          continue;
+        }
+        combinable = false;
         if (repeatedExtglobRecursion(branch) > max) {
           return { risky: true };
         }
+      }
+      if (sawStarSequence) {
+        return combinable ? { risky: true, safeOutput: buildCharClassStar([...new Set(safeChars)]) } : { risky: true };
       }
       return { risky: false };
     };
@@ -1436,6 +1461,7 @@ var require_parse = __commonJS({
             rest = rest.slice(3);
             consume("/**", 3);
           }
+          const isEnd = eos() || state.parens > 0 && rest === ")".repeat(state.parens) && !extglobs.some((extglob) => extglob.type === "negate");
           if (prior.type === "bos" && eos()) {
             prev.type = "globstar";
             prev.value += value;
@@ -1445,7 +1471,7 @@ var require_parse = __commonJS({
             consume(value);
             continue;
           }
-          if (prior.type === "slash" && prior.prev.type !== "bos" && !afterStar && eos()) {
+          if (prior.type === "slash" && prior.prev.type !== "bos" && !afterStar && isEnd) {
             state.output = state.output.slice(0, -(prior.output + prev.output).length);
             prior.output = `(?:${prior.output}`;
             prev.type = "globstar";
@@ -1704,9 +1730,9 @@ var require_picomatch = __commonJS({
       }
       return { isMatch: Boolean(match), match, output };
     };
-    picomatch2.matchBase = (input, glob, options) => {
+    picomatch2.matchBase = (input, glob, options, posix3 = options && options.windows) => {
       const regex = glob instanceof RegExp ? glob : picomatch2.makeRe(glob, options);
-      return regex.test(utils.basename(input));
+      return regex.test(utils.basename(input, { windows: posix3 }));
     };
     picomatch2.isMatch = (str, patterns, options) => picomatch2(patterns, options)(str);
     picomatch2.parse = (pattern, options) => {

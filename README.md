@@ -146,4 +146,4 @@ Conventional Commits : un commit sans préfixe `feat:` ou `fix:` ne déclenche a
   ([w3c/wcag](https://github.com/w3c/wcag)), © **W3C**, sous **W3C Document License**.
 - Le format du rapport s’inspire des conventions d’audit de la DINUM et d’etalab-ia ; les règles
   d’écriture accessible sont adaptées de la skill SocialGouv. Aucun code source n’a été copié.
-- Détail de chaque source et de chaque dépendance intégrée : `NOTICE`.
+- Détail de chaque source et de chaque dépendance intégrée : `NOTICE`. Audit de maintenance et de sécurité des dépendances : `docs/dependencies.md`.
