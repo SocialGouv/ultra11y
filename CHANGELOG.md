@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [9.6.0](https://github.com/SocialGouv/ultra11y/compare/v9.5.0...v9.6.0) (2026-11-25)
+
+
+### Features
+
+* **report:** opt-in DSFR theme read from the audited project ([#221](https://github.com/SocialGouv/ultra11y/issues/221)) ([364e894](https://github.com/SocialGouv/ultra11y/commit/364e894f749a4b3f22ceea4d9101fefd40fcaeb5))
+
 # [9.5.0](https://github.com/SocialGouv/ultra11y/compare/v9.4.0...v9.5.0) (2026-11-25)
 
 
