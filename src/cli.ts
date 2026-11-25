@@ -1944,6 +1944,9 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
     return 2;
   }
 
+  // The behaviour digest (#190), checked once: a producer is untrusted input, and a digest this
+  // engine cannot read is not written as if it could.
+  const scripts = asScriptsDigest(payload.scripts);
   let dir: string;
   try {
     dir = writeSnapshot(root, {
@@ -1961,9 +1964,8 @@ async function cmdSnapshot(p: ParsedArgs): Promise<number> {
       // the process that found it, or the offline re-audit sees a page nobody ran axe on.
       ...(payload.axe ? { axe: payload.axe as RenderSignals["axe"] } : {}),
       // And for the behaviour digest (#190): what the page's scripts did during the capture
-      // window. Checked first — a producer is untrusted input, and a digest this engine cannot
-      // read is not written as if it could.
-      ...(asScriptsDigest(payload.scripts) ? { scripts: asScriptsDigest(payload.scripts) } : {}),
+      // window, as checked above — with what the check dropped recorded in it (`invalid`).
+      ...(scripts ? { scripts } : {}),
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command,
       // `scan` — writes it the one same way.

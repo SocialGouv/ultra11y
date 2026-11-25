@@ -517,37 +517,77 @@ const TIMERS_OK = (t: unknown): boolean =>
   isNum(t.inlineSetTimeout) &&
   (t.metaRefresh === undefined || isStr(t.metaRefresh));
 
-/** An optional list field, verified entry by entry: absent stays absent, a non-array or its
- *  invalid entries are dropped. `T` is the declared list type. */
-const listField = <T>(raw: unknown, ok: (e: unknown) => boolean): T | undefined => (Array.isArray(raw) ? (raw.filter(ok) as T) : undefined);
+/** What a read DROPPED, by field — kept on the digest as `invalid`, so a brief never reads a
+ *  dropped entry as an entry that was never there. */
+type Dropped = Record<string, number>;
+const drop = (dropped: Dropped, field: string, n: number): void => {
+  if (n > 0) dropped[field] = (dropped[field] ?? 0) + n;
+};
 
-/** A `Record<string, number>` (caps, truncated) with its non-numeric entries dropped. */
-const countsOf = (raw: unknown): Record<string, number> =>
-  isObj(raw) ? (Object.fromEntries(Object.entries(raw).filter(([, v]) => isNum(v))) as Record<string, number>) : {};
+/** An optional list field, verified entry by entry: absent stays absent, a non-array or its
+ *  invalid entries are dropped — and counted in `dropped` (a non-array counts 1, the whole
+ *  field). `T` is the declared list type. */
+const listField = <T>(raw: unknown, ok: (e: unknown) => boolean, field: string, dropped: Dropped): T | undefined => {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) {
+    drop(dropped, field, 1);
+    return undefined;
+  }
+  const kept = raw.filter(ok);
+  drop(dropped, field, raw.length - kept.length);
+  return kept as T;
+};
+
+/** A `Record<string, number>` (caps, truncated, invalid) with its non-numeric entries dropped —
+ *  and counted in `dropped` under `field`. */
+const countsOf = (raw: unknown, field: string, dropped: Dropped): Record<string, number> => {
+  if (!isObj(raw)) {
+    if (raw !== undefined) drop(dropped, field, 1);
+    return {};
+  }
+  const entries = Object.entries(raw);
+  const kept = entries.filter(([, v]) => isNum(v));
+  drop(dropped, field, entries.length - kept.length);
+  return Object.fromEntries(kept) as Record<string, number>;
+};
 
 /** The same check for a digest arriving from a producer (`snapshot write` reads it off stdin):
  *  the shape is verified FIELD BY FIELD against `ScriptsDigest`, and an unknown `v` or
  *  `collected` still refuses the whole digest — but within a known version, a wrong-typed list,
- *  entry or timers field is dropped, never propagated to a consumer that would crash on it. */
+ *  entry or timers field is dropped, never propagated to a consumer that would crash on it.
+ *  What was dropped is recorded in `invalid` (merged with the `invalid` an earlier read wrote),
+ *  so a brief says that what is missing could not be read, never that it was not there. */
 export function asScriptsDigest(input: unknown): ScriptsDigest | undefined {
   if (!isObj(input)) return undefined;
   const raw = input;
   if (typeof raw.v !== "number" || raw.v < 1 || raw.v > SCRIPTS_VERSION) return undefined;
   if (raw.collected !== "cdp" && raw.collected !== "dom" && raw.collected !== "none") return undefined;
-  const out: ScriptsDigest = { v: raw.v, collected: raw.collected, caps: countsOf(raw.caps) };
+  const dropped: Dropped = {};
+  // An earlier read's record of what it dropped survives the round trip through disk.
+  for (const [k, n] of Object.entries(countsOf(raw.invalid, "invalid", dropped))) drop(dropped, k, n);
+  const out: ScriptsDigest = { v: raw.v, collected: raw.collected, caps: countsOf(raw.caps, "caps", dropped) };
   if (isStr(raw.why)) out.why = raw.why;
+  else if (raw.why !== undefined) drop(dropped, "why", 1);
   if (isNum(raw.windowMs)) out.windowMs = raw.windowMs;
+  else if (raw.windowMs !== undefined) drop(dropped, "windowMs", 1);
   if (isNum(raw.idleMs)) out.idleMs = raw.idleMs;
-  const listeners = listField<NonNullable<ScriptsDigest["listeners"]>>(raw.listeners, LISTENER_OK);
-  const delegated = listField<NonNullable<ScriptsDigest["delegated"]>>(raw.delegated, DELEGATED_OK);
-  const inline = listField<NonNullable<ScriptsDigest["inline"]>>(raw.inline, INLINE_OK);
-  const ariaMutations = listField<NonNullable<ScriptsDigest["ariaMutations"]>>(raw.ariaMutations, ARIA_MUTATION_OK);
-  const liveRegions = listField<NonNullable<ScriptsDigest["liveRegions"]>>(raw.liveRegions, LIVE_REGION_OK);
-  const updates = listField<NonNullable<ScriptsDigest["updates"]>>(raw.updates, UPDATE_OK);
-  const motion = listField<NonNullable<ScriptsDigest["motion"]>>(raw.motion, MOTION_OK);
-  const animations = listField<NonNullable<ScriptsDigest["animations"]>>(raw.animations, ANIMATION_OK);
-  const resources = listField<NonNullable<ScriptsDigest["resources"]>>(raw.resources, RESOURCE_OK);
-  const truncated = countsOf(raw.truncated);
+  else if (raw.idleMs !== undefined) drop(dropped, "idleMs", 1);
+  const listeners = listField<NonNullable<ScriptsDigest["listeners"]>>(raw.listeners, LISTENER_OK, "listeners", dropped);
+  const delegated = listField<NonNullable<ScriptsDigest["delegated"]>>(raw.delegated, DELEGATED_OK, "delegated", dropped);
+  const inline = listField<NonNullable<ScriptsDigest["inline"]>>(raw.inline, INLINE_OK, "inline", dropped);
+  const ariaMutations = listField<NonNullable<ScriptsDigest["ariaMutations"]>>(raw.ariaMutations, ARIA_MUTATION_OK, "ariaMutations", dropped);
+  const liveRegions = listField<NonNullable<ScriptsDigest["liveRegions"]>>(raw.liveRegions, LIVE_REGION_OK, "liveRegions", dropped);
+  const updates = listField<NonNullable<ScriptsDigest["updates"]>>(raw.updates, UPDATE_OK, "updates", dropped);
+  const motion = listField<NonNullable<ScriptsDigest["motion"]>>(raw.motion, MOTION_OK, "motion", dropped);
+  const animations = listField<NonNullable<ScriptsDigest["animations"]>>(raw.animations, ANIMATION_OK, "animations", dropped);
+  const resources = listField<NonNullable<ScriptsDigest["resources"]>>(raw.resources, RESOURCE_OK, "resources", dropped);
+  const truncated = countsOf(raw.truncated, "truncated", dropped);
+  // The timers fields are read together (`.length` on the arrays beside the counters), so a
+  // half-valid timers object would be read as "no timers" — a statement of evidence, not the
+  // absence of one. It is dropped WHOLESALE when any field is missing or of the wrong type, and
+  // recorded as dropped, so the brief says « unreadable », never « none ».
+  const timersOk = TIMERS_OK(raw.timers);
+  if (raw.timers !== undefined && !timersOk) drop(dropped, "timers", 1);
   return {
     ...out,
     ...(listeners ? { listeners } : {}),
@@ -559,13 +599,11 @@ export function asScriptsDigest(input: unknown): ScriptsDigest | undefined {
     ...(motion ? { motion } : {}),
     ...(animations ? { animations } : {}),
     ...(resources ? { resources } : {}),
-    // The timers fields are read together (`.length` on the arrays beside the counters), so a
-    // half-valid timers object would be read as "no timers" — a statement of evidence, not the
-    // absence of one. It is dropped WHOLESALE when any field is missing or of the wrong type.
-    ...(TIMERS_OK(raw.timers) ? { timers: raw.timers as NonNullable<ScriptsDigest["timers"]> } : {}),
+    ...(timersOk ? { timers: raw.timers as NonNullable<ScriptsDigest["timers"]> } : {}),
     // The truncated counts are evidence-bearing only when non-empty; an all-invalid or
-    // non-object `truncated` simply says nothing was capped.
+    // non-object `truncated` says nothing was capped — and is itself recorded in `invalid`.
     ...(Object.keys(truncated).length ? { truncated } : {}),
+    ...(Object.keys(dropped).length ? { invalid: Object.fromEntries(Object.entries(dropped).sort(([a], [b]) => a.localeCompare(b))) } : {}),
   };
 }
 

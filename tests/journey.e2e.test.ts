@@ -143,6 +143,21 @@ describe("journey run — keyboard replay over the fixture SPA", () => {
     expect(ev.some((e) => e.startsWith("div#download") && /neither role nor tabindex/.test(e))).toBe(true);
   });
 
+  // #198 — the timer hook lives the whole journey (one navigation, a window per step), and the
+  // axe pass and the probes of every step schedule timeouts in the page's world. The fixture SPA
+  // schedules none of its own: every step, the first as the last, must say so.
+  bit("counts only the page's own timers at each step: none of ultra11y's axe or probe timeouts", () => {
+    let states = 0;
+    for (const r of run!.records)
+      for (const st of r.steps) {
+        if (!st.page) continue;
+        const s = JSON.parse(readFileSync(join(root, PAGES_DIR, st.page, "scripts.json"), "utf8")) as ScriptsDigest;
+        expect(s.timers, `${st.page}: ${JSON.stringify(s.timers)}`).toMatchObject({ source: "init", timeouts: 0, longTimeouts: [], intervals: [] });
+        states++;
+      }
+    expect(states).toBeGreaterThan(3);
+  });
+
   bit("detects a div-button Tab never reaches — 2.1.1 — and still completes the journey", () => {
     const st = rec("rapport").steps[1]!;
     expect(st.keyboard).toBe("unreachable");

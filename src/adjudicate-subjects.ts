@@ -2634,6 +2634,16 @@ function behaviourCoverage(d: Doc, page: string, s: Scripts, subject: string, fo
     );
   const cut = lists.filter((l) => s.truncated?.[l] !== undefined).map((l) => `${l} capped at ${s.caps?.[l] ?? "?"} of ${s.truncated?.[l]}`);
   if (cut.length) caveats.push(cut.join(", "));
+  // What the reader dropped as malformed (src/snapshot.ts asScriptsDigest): an entry that could
+  // not be read is not an entry that was not there. `truncated` and `caps` are named for every
+  // subject — a malformed one may hide that a list was cut.
+  const bad = [...lists, ...(listeners ? ["delegated"] : []), "truncated", "caps"].filter((l) => (s.invalid?.[l] ?? 0) > 0);
+  if (bad.length) {
+    const n = bad.reduce((sum, l) => sum + (s.invalid?.[l] ?? 0), 0);
+    caveats.push(
+      `${plural(n, "malformed entry", "malformed entries")} dropped (${bad.map((l) => `${l} ×${s.invalid?.[l]}`).join(", ")}) — absence proves nothing`,
+    );
+  }
   return hAt(
     d,
     1,
@@ -2649,7 +2659,7 @@ function behaviourSubject(
   listeners: boolean,
   lists: string[],
   anchors: (d: Doc, s: Scripts) => Harvested[],
-  found: (n: number) => string,
+  found: (n: number, s: Scripts) => string,
 ): Subject {
   return (docs) =>
     docs.flatMap((d) => {
@@ -2657,7 +2667,7 @@ function behaviourSubject(
       const s = d.signals?.scripts;
       if (page === undefined || !s) return [];
       const items = s.collected === "none" ? [] : anchors(d, s);
-      return [behaviourCoverage(d, page, s, subject, found(items.length), listeners, lists), ...items];
+      return [behaviourCoverage(d, page, s, subject, found(items.length, s), listeners, lists), ...items];
     });
 }
 
@@ -2801,7 +2811,7 @@ const BEHAVIOUR_SUBJECTS: Record<string, Subject> = {
   "behaviour:timers": behaviourSubject(
     "timers",
     false,
-    ["intervals"],
+    ["intervals", "timers"],
     (d, s) => {
       const t = s.timers;
       if (!t) return [];
@@ -2825,7 +2835,18 @@ const BEHAVIOUR_SUBJECTS: Record<string, Subject> = {
         ),
       ];
     },
-    (n) => (n ? "timers recorded" : "no timer recorded"),
+    // Only a timers record that was READ and is empty says « no timer »: a malformed one dropped by
+    // the reader is unreadable, an absent one unrecorded, an unhooked one unwatched.
+    (n, s) =>
+      n
+        ? "timers recorded"
+        : !s.timers
+          ? (s.invalid?.timers ?? 0) > 0
+            ? "timers unreadable (malformed in scripts.json)"
+            : "timers not recorded"
+          : s.timers.source === "none"
+            ? "timers not hooked (only inline scripts were read)"
+            : "no timer recorded",
   ),
 };
 

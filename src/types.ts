@@ -566,6 +566,11 @@ export interface ScriptsDigest {
   resources?: { kind: "script" | "stylesheet"; origin: "inline" | "same-origin" | "cross-origin"; url?: string; size?: number }[];
   caps: Record<string, number>;
   truncated?: Record<string, number>;
+  /** What the reader DROPPED because it was malformed, by field: the number of entries cut out
+   *  of a list, or 1 for a whole field (a list that is not one, a timers object with a missing or
+   *  wrong-typed member). Set by `asScriptsDigest`, never by a collector. A dropped entry is
+   *  evidence nobody can read, so a field named here proves nothing by its absence. */
+  invalid?: Record<string, number>;
 }
 
 /** The signals attached to a Doc parsed from a page snapshot's `dom.html`. Absent for every
