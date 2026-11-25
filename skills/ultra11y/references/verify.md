@@ -1,184 +1,194 @@
-# `check` and `verify` gates
+# Les garde-fous `check` et `verify`
 
-Two assurance levels before shipping a report, plus the agent-adjudication worklist.
+Deux niveaux d’assurance avant de livrer un rapport, plus la liste de travail d’arbitrage par l’agent.
 
-## `check` — structural integrity
+## `check` — intégrité structurelle
 
 ```
 node scripts/ultra11y.mjs check --report audits/rgaa-YYYY-MM-DD.md
 ```
-Pass the report itself; the technical annex it links to (`annexe-technique-…md` /
-`technical-annex-…md`, same directory) is read with it, and a missing annex is refused (exit 2).
-Fails (non-zero) if: one of the 5 sections is missing, a cited criterion id does not exist in
-the active standard, an `NA` criterion has no justification, or the pass rate is absent. This
-is the baseline anti-hallucination guard. `--quiet` emits only the exit code; `--json` the
-structured list of problems. For a country pack report, add `--standard <pack>` so the right
-id grammar/registry is validated.
+Passez le rapport lui-même ; l’annexe technique vers laquelle il pointe (`annexe-technique-…md` /
+`technical-annex-…md`, même répertoire) est lue avec lui, et une annexe manquante est refusée (exit 2).
+Échoue (code non nul) si : l’une des 5 sections manque, un id de critère cité n’existe pas dans le
+référentiel actif, un critère `NA` n’a pas de justification, ou le taux de réussite est absent. C’est
+la protection de base contre les hallucinations. `--quiet` n’émet que le code de sortie ; `--json` la
+liste structurée des problèmes. Pour le rapport d’un pack national, ajoutez `--standard <pack>` pour
+que la bonne grammaire d’ids / le bon registre soit validé.
 
-### Semantic gate — `check --report … --semantic`
+### Garde-fou sémantique — `check --report … --semantic`
 
 ```
 node scripts/ultra11y.mjs check --report audits/rgaa-YYYY-MM-DD.md --semantic [--verdicts VERIFY.todo.json]
 ```
-Fails **closed** if there is no adjudicated verdicts artifact (never green-but-inactive),
-re-runs the **uncapped** coverage check, and re-grounds every passing verdict against the cited
-source. `--verdicts` points at the artifact (default `VERIFY.todo.json` next to the report).
-A `file` that is a served URL (a rendered finding whose page has no `.ultra11y/pages` capture
-mapped back to source) is not a path to re-open: it is skipped like `stdin`, never reported as
+Échoue **fermé** s’il n’y a aucun artefact de verdicts arbitrés (jamais vert-mais-inactif), relance le
+contrôle de couverture **sans plafond**, et ré-ancre chaque verdict retenu contre la source citée.
+`--verdicts` pointe vers l’artefact (par défaut `VERIFY.todo.json` à côté du rapport). Un `file` qui
+est une URL servie (un constat rendu dont la page n’a aucune capture `.ultra11y/pages` rattachée à la
+source) n’est pas un chemin à rouvrir : il est ignoré comme `stdin`, jamais rapporté comme
 « cited file not found ».
 
-### Applicability gate — `check --report … --standard rgaa --in audit.json`
+### Garde-fou d’applicabilité — `check --report … --standard rgaa --in audit.json`
 
 ```
 node scripts/ultra11y.mjs check --report audits/rgaa-YYYY-MM-DD.md --standard rgaa --in audit.json
 ```
-Re-derives the pack view from the audit and fails on any **over- or under-projected** NC — the
-RGAA applicability gate, so a pack report can neither drop nor invent a criterion vs the WCAG core.
+Redérive la vue du pack à partir de l’audit et échoue sur toute NC **sur- ou sous-projetée** — le
+garde-fou d’applicabilité RGAA, pour qu’un rapport de pack ne puisse ni perdre ni inventer un critère
+par rapport au cœur WCAG.
 
-## `verify` — adversarial verification of non-conformities
+## `verify` — vérification contradictoire des non-conformités
 
 ```
 node scripts/ultra11y.mjs verify --report audits/rgaa-YYYY-MM-DD.md --semantic
 ```
-Generates a **worklist** `VERIFY.md` + `VERIFY.todo.json`: one entry per non-conformity
-(criterion ↔ `file:line` ↔ cited claim), and — by default — one per agent-claimed conformity or
-« non applicable » (`kind: "c"`, with its `citations[]`). `--max-verify` caps the
-non-conformities (default 40); the conformity half is uncapped unless `--max-verify` is given,
-because a trial cut short lets every claim past the cap keep counting as conforming. Whatever
-a cap drops is named on stderr and fails `--apply` as « missing »; `--max-verify 0` removes
-the cap. `VERIFY.todo.json` is a bare JSON array of entries (unlike `ADJUDICATE.todo.json`,
-an object with `items`).
+Génère une **liste de travail** `VERIFY.md` + `VERIFY.todo.json` : une entrée par non-conformité
+(critère ↔ `file:line` ↔ affirmation citée), et — par défaut — une par conformité ou
+« non applicable » revendiqué par l’agent (`kind: "c"`, avec ses `citations[]`). `--max-verify`
+plafonne les non-conformités (40 par défaut) ; la moitié conformités n’est pas plafonnée sauf si
+`--max-verify` est donné, parce qu’une contre-vérification écourtée laisse chaque affirmation
+au-delà du plafond continuer à compter comme conforme. Tout ce qu’un plafond écarte est nommé sur
+stderr et fait échouer `--apply` comme « missing » ; `--max-verify 0` supprime le plafond.
+`VERIFY.todo.json` est un simple tableau JSON d’entrées (contrairement à `ADJUDICATE.todo.json`, un
+objet avec `items`).
 
-**Generate and apply with the same context.** The claimed conformities come from `--in <audit.json>`
-(the audit the report came from), else `--conformities <file>`, else the standard's ledger in the
-current directory. With none of them only the non-conformities are tried — the generation warns,
-and a green `--apply` says it covered non-conformities only. The list's context is recorded beside
-it in `VERIFY.context.json` (audit, standard, conformity source, what a cap dropped), so when
-`--apply` finds claims « missing » it tells a cap (`--max-verify 0` fixes it) from a list built from
-another claim source (regenerate it with the apply's `--in`/`--standard`/`--conformities`; lifting
-a cap that never applied changes nothing). `--no-conformities` and `--max-verify` stay available,
-and make a partial trial. For each entry, open the cited code and assign a verdict in
-`VERIFY.todo.json`:
+**Générez et appliquez avec le même contexte.** Les conformités revendiquées viennent de
+`--in <audit.json>` (l’audit dont provient le rapport), sinon de `--conformities <file>`, sinon du
+registre du référentiel dans le répertoire courant. Sans aucun d’eux, seules les non-conformités sont
+mises à l’épreuve — la génération avertit, et un `--apply` vert dit qu’il n’a couvert que les
+non-conformités. Le contexte de la liste est enregistré à côté d’elle dans `VERIFY.context.json`
+(audit, référentiel, source de conformités, ce qu’un plafond a écarté), de sorte que lorsque `--apply`
+trouve des affirmations « missing », il distingue un plafond (`--max-verify 0` le corrige) d’une liste
+construite à partir d’une autre source d’affirmations (régénérez-la avec les
+`--in`/`--standard`/`--conformities` de l’application ; lever un plafond qui ne s’est jamais appliqué
+ne change rien). `--no-conformities` et `--max-verify` restent disponibles, et produisent une
+contre-vérification partielle. Pour chaque entrée, ouvrez le code cité et attribuez un verdict dans
+`VERIFY.todo.json` :
 
-- `supported` — the non-conformity is real;
-- `partial` — real but the criterion/wording is imprecise;
-- `refuted` — false (the cited element is actually conforming);
-- `unsupported` — the cited element is not enough to decide.
+- `supported` — la non-conformité est réelle ;
+- `partial` — réelle mais le critère / la formulation est imprécis ;
+- `refuted` — fausse (l’élément cité est en réalité conforme) ;
+- `unsupported` — l’élément cité ne suffit pas pour décider.
 
-In `--semantic` mode, explicitly confirm the cited snippet **supports** the non-conformity.
-The worklist-generation step also accepts `--json` (emits `{mdPath, todoPath, count, items}`
-so an agent can fill verdicts in-memory). **Prioritise `preliminary` findings** (SFC/library
-source, see `references/false-positives.md`): refute the ones the rendered DOM disproves.
-Then apply the gate:
+En mode `--semantic`, confirmez explicitement que l’extrait cité **étaye** la non-conformité. L’étape
+de génération de la liste de travail accepte aussi `--json` (émet `{mdPath, todoPath, count, items}`
+pour qu’un agent puisse remplir les verdicts en mémoire). **Traitez en priorité les constats
+`preliminary`** (source SFC / bibliothèque, voir `references/false-positives.md`) : réfutez ceux que
+le DOM rendu dément. Puis appliquez le garde-fou :
 ```
 node scripts/ultra11y.mjs verify --apply VERIFY.todo.json --report audits/rgaa-YYYY-MM-DD.md --in audit.json
 ```
-The gate fails (non-zero) if any entry is `refuted`, `unsupported`, or unadjudicated. Every
-retained claim is also re-grounded against the cited source. A conformity is grounded the way
-the fold grounded it: a citation that is one of its criterion's own harvested anchors falls
-back to that anchor (the engine read its snippet out of the file), so a retyping the fold
-accepted at `verify --apply <adjudication>` is not refused again at trial — pass `--in
-<audit.json>` so the harvest can be re-derived; a citation that is NOT one of the criterion's
-anchors must still match the source literally. Goal: no fabricated non-conformity survives
-into the final report, and no accepted conformity is re-refused one gate later.
+Le garde-fou échoue (code non nul) si une entrée est `refuted`, `unsupported` ou non arbitrée. Chaque
+affirmation retenue est aussi ré-ancrée contre la source citée. Une conformité est ancrée comme le fold
+l’a ancrée : une citation qui est l’une des ancres collectées pour son critère se rabat sur cette
+ancre (le moteur a lu son extrait dans le fichier), donc une ressaisie que le fold a acceptée à
+`verify --apply <adjudication>` n’est pas refusée à nouveau lors de la contre-vérification — passez
+`--in <audit.json>` pour que la collecte puisse être redérivée ; une citation qui n’est PAS l’une des
+ancres du critère doit toujours correspondre littéralement à la source. Objectif : aucune
+non-conformité fabriquée ne survit jusqu’au rapport final, et aucune conformité acceptée n’est
+re-réfutée un garde-fou plus loin.
 
-**An agent's « non applicable » stands trial too.** An NA clears a criterion (the audit folds it
-to `C`, and the rate counts it as conforming), so the worklist carries it like any claimed
-conformity. When it cites nothing — the usual case: nothing was harvested for the criterion —
-the item is marked `uncited` and asks the scope-level question instead: is there REALLY nothing
-on the audited pages the criterion is about? An empty harvest is not proof: a page with content
-always has a reading order (RGAA 10.11, 10.12, 13.9), a focus order (12.8) and markup to
-validate (8.2). Refuted or unsupported, the criterion goes back to « à évaluer ». The one NA that
-is NOT tried is the one the engine's own absence fold already proves — every subject of the
-criterion is an element species (`<img>`, `<table>`, a form control…) and none exists anywhere in
-the scope.
+**Le « non applicable » d’un agent passe aussi en contre-vérification.** Un NA valide un critère
+(l’audit le replie en `C`, et le taux le compte comme conforme), donc la liste de travail le porte
+comme n’importe quelle conformité revendiquée. Quand il ne cite rien — le cas habituel : rien n’a été
+collecté pour le critère — l’item est marqué `uncited` et pose à la place la question au niveau du
+périmètre : n’y a-t-il VRAIMENT rien, sur les pages auditées, qui relève du critère ? Une collecte vide
+n’est pas une preuve : une page avec du contenu a toujours un ordre de lecture (RGAA 10.11, 10.12,
+13.9), un ordre de tabulation (12.8) et un balisage à valider (8.2). Réfuté ou non étayé, le critère
+revient à « à évaluer ». Le seul NA qui n’est PAS mis à l’épreuve est celui que le fold d’absence du
+moteur prouve déjà — chaque sujet du critère est une espèce d’élément (`<img>`, `<table>`, un contrôle
+de formulaire…) et aucune n’existe nulle part dans le périmètre.
 
-### The counter-review summary — `verify --summary`
+### Le bilan de contre-vérification — `verify --summary`
 
 ```
 node scripts/ultra11y.mjs verify --summary --verdicts VERIFY.filled.json --report audits/rgaa-YYYY-MM-DD.md \
   --in audit.json --standard rgaa [--pruned pruned/audit-latest.json] [--out <dir>] [--json]
 ```
-Writes `TRIAL.md` (or the same data as JSON on stdout): the bilan of one trial, **read-only**. It
-names the audit, verdicts, report and pruned audit it was built from (path, date, sha256), then
-separates:
+Écrit `TRIAL.md` (ou les mêmes données en JSON sur stdout) : le bilan d’une contre-vérification, **en
+lecture seule**. Il nomme l’audit, les verdicts, le rapport et l’audit élagué à partir desquels il a
+été construit (chemin, date, sha256), puis sépare :
 
-- **coverage** — claims expected from this report and this `--in` audit, covered, missing, and
-  *foreign* (verdicts for claims this audit does not make: a list drawn from another audit);
-- **verdicts**, counted in claims per kind (non-conformity / claimed conformity) — `supported`,
-  `partial`, `refuted`, `unsupported`, blank, invalid, missing — with the distinct criteria apart;
-- **confirmed findings** (`supported`/`partial`), each with its note;
-- **withdrawals applied** — an agent judgement `--prune` withdrew, shown applied only when the
-  `--pruned` audit no longer carries it; without `--pruned` every withdrawal is listed as *not
-  shown applied*;
-- **contested engine decisions — unresolved** (`skippedEngine`): `--prune` leaves them in the audit
-  and the report on purpose; the bilan never turns them into a conformity or a confirmed finding;
-- **never tried** claims;
-- **the semantic gate** (`check --semantic` on this report and these verdicts) **apart from** the
-  verdicts' application (`verify --apply … --prune` accepted or refused).
+- **la couverture** — les affirmations attendues de ce rapport et de cet audit `--in`, couvertes,
+  manquantes et *étrangères* (des verdicts pour des affirmations que cet audit ne fait pas : une liste
+  tirée d’un autre audit) ;
+- **les verdicts**, comptés en affirmations par type (non-conformité / conformité revendiquée) —
+  `supported`, `partial`, `refuted`, `unsupported`, vides, invalides, manquants — avec les critères
+  distincts à part ;
+- **les constats confirmés** (`supported`/`partial`), chacun avec sa note ;
+- **les retraits appliqués** — un jugement d’agent que `--prune` a retiré, montré comme appliqué
+  seulement quand l’audit `--pruned` ne le porte plus ; sans `--pruned`, chaque retrait est listé comme
+  *non constaté appliqué* ;
+- **les décisions du moteur contestées — non résolues** (`skippedEngine`) : `--prune` les laisse
+  volontairement dans l’audit et le rapport ; le bilan ne les transforme jamais en conformité ni en
+  constat confirmé ;
+- les affirmations **jamais mises à l’épreuve** ;
+- **le garde-fou sémantique** (`check --semantic` sur ce rapport et ces verdicts) **séparément de**
+  l’application des verdicts (`verify --apply … --prune` accepté ou refusé).
 
-The headline says « counter-review run — audit NOT validated » until the gate is green with
-nothing missing, foreign or contested. All three inputs are required — no ledger and no
-`VERIFY.todo.json` next to the report is ever picked up — and the command exits 0 once the bilan is
-written: it is a report, `check --semantic` stays the gate.
+Le titre dit « counter-review run — audit NOT validated » tant que le garde-fou n’est pas vert sans
+rien de manquant, d’étranger ou de contesté. Les trois entrées sont obligatoires — aucun registre ni
+aucun `VERIFY.todo.json` à côté du rapport n’est jamais repris automatiquement — et la commande sort
+avec 0 une fois le bilan écrit : c’est un rapport, `check --semantic` reste le garde-fou.
 
-## `verify --manual` — adjudicate the residual (judgment / needs-rendering) criteria
+## `verify --manual` — arbitrer les critères résiduels (jugement / besoin de rendu)
 
-The **AI agent** decides the `manual` criteria itself, gated. Run from the audit's cwd
-(harvesting re-reads the audited source files):
+L’**agent IA** décide lui-même des critères `manual`, sous garde-fou. Lancez depuis le cwd de l’audit
+(la collecte relit les fichiers source audités) :
 ```
 node scripts/ultra11y.mjs verify --report audits/rgaa-YYYY-MM-DD.md --in audit.json --manual --out .
 ```
-This emits an **ADJUDICATION worklist** — `ADJUDICATE.todo.json` + `ADJUDICATE.md`, one item per
-residual criterion, pre-loaded with the engine's harvested evidence (every image's `alt`, every
-link's text + context, the literal colour pairs, control labels, the heading outline, ARIA state,
-`tabindex`, lang-of-parts). Fill each item's `verdict` (provenance `decidedBy: "agent"` recorded):
+Cela émet une **liste de travail d’ARBITRAGE** — `ADJUDICATE.todo.json` + `ADJUDICATE.md`, un item par
+critère résiduel, préchargé avec les preuves collectées par le moteur (l’`alt` de chaque image, le
+texte + contexte de chaque lien, les paires de couleurs littérales, les étiquettes des contrôles, le
+plan des titres, l’état ARIA, `tabindex`, les changements de langue). Remplissez le `verdict` de chaque
+item (provenance `decidedBy: "agent"` enregistrée) :
 
-- `C` / `NA` — with a `justification` from the evidence;
-- `NC` — with ≥1 **groundable** finding (`file`/`line`/`message`/`snippet`);
-- `manual` — with a `reason`: `"needs-rendered-dom"` (decide via `scan`) or `"undecidable"`.
+- `C` / `NA` — avec une `justification` tirée des preuves ;
+- `NC` — avec ≥1 constat **ancrable** (`file`/`line`/`message`/`snippet`) ;
+- `manual` — avec un `reason` : `"needs-rendered-dom"` (décider via `scan`) ou `"undecidable"`.
 
-Fold the verdicts back FAIL-CLOSED:
+Repliez les verdicts en mode FAIL-CLOSED (en cas de doute, refuser) :
 ```
 node scripts/ultra11y.mjs verify --apply ADJUDICATE.todo.json --in audit.json --out .
 ```
-It rejects a null verdict, a `C`/`NA` without a `justification`, an `NC` without a groundable
-finding, a `manual` without a `reason`, or any uncovered residual criterion. An open criterion the
-file does not mention at all is not a refusal — nothing was offered — and is named apart in
-`notInWorklist[]` (« hors de la liste »): folding a lot of 11 out of 46 criteria reports
-`rejected: 0, notInWorklist: [35 ids]`, never « 35 rejected ». It stays « to assess » and keeps
-`ok: false` (the fold is incomplete); `--strict` still refuses on it. A verdict for a
-criterion that is no longer open — one a previous fold already decided — is likewise refused by
-name (« not open for adjudication »), never re-applied: re-folding the same file on the
-written-back audit answers `ok: false` with that criterion in `rejectedCriteria[]`. Agent `NC`s become
-real `agent:<sc>` findings that re-render in the report's §2 and re-enter the verify worklist;
-`report`/`prd` re-render with the adjudicated statuses; §5 shrinks to only still-`manual` items.
-A `manual` verdict — or a coverage gap — on a criterion the engine had provisionally closed for
-want of a subject stays in §5 only: it is never counted in the NA column, which remains a subset
-of §3's C.
+Il rejette un verdict nul, un `C`/`NA` sans `justification`, un `NC` sans constat ancrable, un
+`manual` sans `reason`, ou tout critère résiduel non couvert. Un critère ouvert que le fichier ne
+mentionne pas du tout n’est pas un refus — rien n’a été proposé — et il est nommé à part dans
+`notInWorklist[]` (« hors de la liste ») : replier un lot de 11 critères sur 46 rapporte
+`rejected: 0, notInWorklist: [35 ids]`, jamais « 35 rejetés ». Il reste « à évaluer » et maintient
+`ok: false` (le fold est incomplet) ; `--strict` refuse toujours sur lui. Un verdict pour un critère
+qui n’est plus ouvert — un critère qu’un fold précédent a déjà décidé — est de même refusé nommément
+(« not open for adjudication »), jamais réappliqué : replier à nouveau le même fichier sur l’audit
+réécrit répond `ok: false` avec ce critère dans `rejectedCriteria[]`. Les `NC` de l’agent deviennent de
+vrais constats `agent:<sc>` qui se réaffichent dans le §2 du rapport et réintègrent la liste de travail
+de vérification ; `report`/`prd` se réaffichent avec les statuts arbitrés ; le §5 se réduit aux seuls
+items encore `manual`. Un verdict `manual` — ou un trou de couverture — sur un critère que le moteur
+avait provisoirement clos faute de sujet reste uniquement dans le §5 : il n’est jamais compté dans la
+colonne NA, qui reste un sous-ensemble des C du §3.
 
-### A human auditor's verdict — `decidedBy: "human"`
+### Le verdict d’un auditeur humain — `decidedBy: "human"`
 
-A named human auditor adjudicates through the **same worklist**: on each item they rule, set
-`"decidedBy": "human"` and `"auditor": { "name": "Jeanne Dupont", "organisation": "Access42" }`
-(`organisation` optional) beside the verdict. The fold applies the **same gate** — a human `C`
-cites the harvested evidence, a human `NC` carries groundable findings; a name is not evidence —
-and refuses a human verdict with no `auditor.name`, or any `decidedBy` other than `agent` /
-`human`. A landed verdict is recorded as `decidedBy: "human"` with its `auditor` in the audit,
-the pack document and the verdict ledger (`--ledger`; a replay restores both), and:
+Un auditeur humain nommé arbitre via la **même liste de travail** : sur chaque item sur lequel il
+statue, il définit `"decidedBy": "human"` et `"auditor": { "name": "Jeanne Dupont", "organisation": "Access42" }`
+(`organisation` facultatif) à côté du verdict. Le fold applique le **même garde-fou** — un `C` humain
+cite les preuves collectées, un `NC` humain porte des constats ancrables ; un nom n’est pas une
+preuve — et refuse un verdict humain sans `auditor.name`, ou tout `decidedBy` autre que `agent` /
+`human`. Un verdict qui atterrit est enregistré comme `decidedBy: "human"` avec son `auditor` dans
+l’audit, le document du pack et le registre des verdicts (`--ledger` ; un rejeu restaure les deux), et :
 
-- counts like any decided verdict in the conformity rate, and stays out of the **automatic**
-  rate (a judgement, not a measurement);
-- reads « auditeur (Jeanne Dupont, Access42) » in the report's « Décidé par » column (never
-  « IA »), gets its own list in §3 and its own count in the annex's provenance line, and is
-  marked `C†` (the agent's is `C*`) in the page grid and the page sheets;
-- is **not** put on the automatic refutation trial: `verify --report`'s conformity worklist
-  tries the agent's conformities only (a named auditor is the second reader), and a refuter
-  withdrawing a human verdict anyway is left standing by `--prune`, which says so.
+- compte comme tout verdict décidé dans le taux de conformité, et reste hors du taux **automatique**
+  (un jugement, pas une mesure) ;
+- se lit « auditeur (Jeanne Dupont, Access42) » dans la colonne « Décidé par » du rapport (jamais
+  « IA »), a sa propre liste dans le §3 et son propre compte dans la ligne de provenance de l’annexe,
+  et est marqué `C†` (celui de l’agent est `C*`) dans la grille par page et les fiches de page ;
+- n’est **pas** soumis à la contre-vérification automatique : la liste de travail de conformités de
+  `verify --report` ne met à l’épreuve que les conformités de l’agent (un auditeur nommé est le second
+  lecteur), et un réfutateur qui retire quand même un verdict humain voit ce verdict maintenu par
+  `--prune`, qui le signale.
 
-## Residual risk
+## Risque résiduel
 
-After adjudication, only the criteria the agent marked `manual` (`needs-rendered-dom` /
-`undecidable`) stay in the report's "to assess manually" section — never mark them conforming
-without a recorded, gated justification (agent adjudication via `verify --manual`, or `scan`
-evidence for the rendering criteria).
+Après l’arbitrage, seuls les critères que l’agent a marqués `manual` (`needs-rendered-dom` /
+`undecidable`) restent dans la section « à évaluer manuellement » du rapport — ne les marquez jamais
+conformes sans une justification enregistrée et contrôlée par un garde-fou (arbitrage par l’agent via
+`verify --manual`, ou preuves `scan` pour les critères de rendu).
