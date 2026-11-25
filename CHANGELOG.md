@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [9.6.4](https://github.com/SocialGouv/ultra11y/compare/v9.6.3...v9.6.4) (2026-11-25)
+
+
+### Bug Fixes
+
+* **adjudicate:** grounded page verdicts on still-manual criteria, absence-based page NA, findings not shown on a page ([#234](https://github.com/SocialGouv/ultra11y/issues/234)) ([60d7c84](https://github.com/SocialGouv/ultra11y/commit/60d7c84853013326c389e9773a7ac0f6442d6552)), closes [#231](https://github.com/SocialGouv/ultra11y/issues/231)
+
 ## [9.6.3](https://github.com/SocialGouv/ultra11y/compare/v9.6.2...v9.6.3) (2026-11-25)
 
 

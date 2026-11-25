@@ -3,7 +3,7 @@ name: review-a11y
 description: "À utiliser pour la REVUE d’accessibilité d’un code frontend modifié : fichiers indexés (staged), diff de travail, branche ou pull request ; des demandes comme « revue a11y », « est-ce accessible ? » ou « quelque chose à corriger avant le merge ? » ('review a11y', 'is this accessible?', 'anything to fix before merge?') ; et les constats d’un hook ou de la CI sur un changement. Lance le moteur embarqué sans installation avec analyse JSX/TSX inter-fichiers, ne rend que les pages qu’atteint le diff (Playwright + axe, ne bloquant que sur les non-conformités nouvelles par rapport à la base), puis arbitre les candidats et renvoie une revue RGAA 4.1.2 classée par sévérité (par critère RGAA, le WCAG seulement comme correspondance) avec correctifs file:line, risques résiduels de rendu et un verdict. Utiliser plutôt `ultra11y` pour les audits du dépôt entier, les rapports de conformité datés, les backlogs PRD ou l’écriture de balisage accessible."
 license: MIT
 metadata:
-  version: 9.6.3
+  version: 9.6.4
 ---
 
 # review-a11y — revue d’accessibilité du code modifié
