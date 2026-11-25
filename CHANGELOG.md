@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [9.6.2](https://github.com/SocialGouv/ultra11y/compare/v9.6.1...v9.6.2) (2026-11-25)
+
+
+### Bug Fixes
+
+* **cli:** first-run ledger, real invocation in hints, render and journey messages, one retry on a closed browser ([#235](https://github.com/SocialGouv/ultra11y/issues/235)) ([8e58705](https://github.com/SocialGouv/ultra11y/commit/8e58705235c38ebba4b8299098c2a90a27d4069a)), closes [#233](https://github.com/SocialGouv/ultra11y/issues/233)
+
 ## [9.6.1](https://github.com/SocialGouv/ultra11y/compare/v9.6.0...v9.6.1) (2026-11-25)
 
 
