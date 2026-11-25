@@ -36893,6 +36893,18 @@ function pageRules(docs, d2) {
     return { ...rule, where };
   });
 }
+function headingAnchors(docs, tags) {
+  return docs.flatMap(
+    (d2) => elementsByTag(d2, ...tags).concat(d2.elements.filter((e) => roleOf(e) === "heading")).map(
+      (e) => h(
+        d2,
+        e,
+        `<${e.tag}${roleOf(e) === "heading" ? ` role="heading" aria-level="${attr(e, "aria-level") ?? ""}"` : ""}> text="${t(e)}"`,
+        `heading|${e.tag}|${attr(e, "aria-level") ?? ""}|${t(e)}`
+      )
+    )
+  );
+}
 var SUBJECTS = {
   // Every image-like element and the alternative it carries. Class = (alt, src): the same
   // logo on 38 pages is one decision, not 38.
@@ -36936,16 +36948,11 @@ var SUBJECTS = {
     })
   ),
   // Headings, labels, legends and captions — the text judged for descriptiveness.
-  headings: (docs) => docs.flatMap(
-    (d2) => elementsByTag(d2, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption").concat(d2.elements.filter((e) => roleOf(e) === "heading")).map(
-      (e) => h(
-        d2,
-        e,
-        `<${e.tag}${roleOf(e) === "heading" ? ` role="heading" aria-level="${attr(e, "aria-level") ?? ""}"` : ""}> text="${t(e)}"`,
-        `heading|${e.tag}|${attr(e, "aria-level") ?? ""}|${t(e)}`
-      )
-    )
-  ),
+  // WCAG 2.4.6 is « Headings AND Labels », so its subject carries both.
+  headings: (docs) => headingAnchors(docs, ["h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption"]),
+  // The heading outline and nothing else — <h1>–<h6> and `role="heading"`, every element RGAA
+  // 9.1's tests name. 9.1 used `headings` and its brief listed every <label> in scope (#222).
+  headingOutline: (docs) => headingAnchors(docs, ["h1", "h2", "h3", "h4", "h5", "h6"]),
   // Form controls and the label/placeholder/instruction attached to them.
   controls: (docs) => docs.flatMap(
     (d2) => d2.elements.filter(isFormField).map((e) => {
@@ -37083,13 +37090,21 @@ var SUBJECTS = {
     // every brand link to `index.html` was presented as the site map.
     ...elementsByTag(d2, "a").filter((e) => /plan[-_]du[-_]site|sitemap|site[-_]map/i.test(attr(e, "href") ?? "") || /\bplan du site\b|\bsite ?map\b/i.test(t(e, 60))).map((e) => h(d2, e, `site map / index link text="${t(e, 40)}" href="${attr(e, "href")}"`, `sitemap|${attr(e, "href")}`))
   ]),
-  // The repeated blocks whose ORDER must not change from page to page. One class per page so
-  // "same relative order everywhere" is answerable from the evidence itself.
+  // The repeated blocks whose ORDER must not change from page to page.
+  //
+  // The class is the block's CONTENT — its tag, its place among the page's repeated blocks and
+  // the order of its links — never the page it was read on (#222). It used to be one class per
+  // page, so every page was its own class: 12.2 listed 66 classes for three blocks on the
+  // full-audit fixture. Keyed on content, the same header on twenty pages is one class whose
+  // `alsoAt` names each page's capture, and a page whose block differs — another order, another
+  // place — is a class of its own: « same relative order everywhere » reads as one class per
+  // block, and every departure from it shows up as an extra class.
   repeatedBlocks: (docs) => docs.flatMap((d2) => {
-    const page = pageOfDoc(d2.file) ?? "source";
-    return elementsByTag(d2, "header", "nav", "footer").map((e) => {
+    const blocks = elementsByTag(d2, "header", "nav", "footer");
+    return blocks.map((e, i) => {
       const order2 = elementsByTag(d2, "a").filter((a2) => ancestors(a2).includes(e)).map((a2) => t(a2, 24)).slice(0, 20).join(" \u203A ");
-      return h(d2, e, `page="${page}" <${e.tag}> order: ${order2}`, `repeated|${page}|${e.tag}`);
+      const place = `${i + 1}/${blocks.length}`;
+      return h(d2, e, `<${e.tag}> block ${place} order: ${order2}`, `repeated|${e.tag}|${place}|${order2}`);
     });
   }),
   // Elements whose ARIA name, role or state is authored rather than native.
@@ -38430,6 +38445,10 @@ var PACK_SUBJECTS = {
     // handed every <nav> and aria-pressed button of the page beside the images they are about.
     "1.2": ["images"],
     "1.9": ["images"],
+    // 1.3 (is the text alternative RELEVANT?) inherited the same `aria` and behaviour subjects
+    // from WCAG 4.1.2, and its brief listed the landmarks, the « Rubriques » disclosure, the
+    // search form and the scripts.json digest beside the images (#222).
+    "1.3": ["images"],
     // Theme 2 — frames. Both criteria are about the frame and its title, and nothing else.
     "2.1": ["frames"],
     "2.2": ["frames"],
@@ -38449,7 +38468,8 @@ var PACK_SUBJECTS = {
     "8.9": ["structure"],
     "8.10": ["readingOrder", "langParts"],
     // Theme 9 — structure.
-    "9.1": ["headings"],
+    // The outline only: `headings` also carries labels, legends and captions for WCAG 2.4.6.
+    "9.1": ["headingOutline"],
     "9.2": ["landmarks"],
     "9.3": ["lists"],
     "9.4": ["quotes"],
@@ -54014,31 +54034,39 @@ function packResultNeedsAdjudication(pc, criterion) {
   if (pc.status === "manual") return true;
   return isProvisionalJudgmentInapplicable(pc, criterion);
 }
-function candidateFindingEvidence(findings, limit) {
+function candidateFindingEvidence(findings, limit, anchored = /* @__PURE__ */ new Set()) {
   const snapshots = findings.filter((finding) => isSnapshotFile(finding.file));
   const local = findings.filter((finding) => !/^https?:\/\//i.test(finding.file));
   const pool = snapshots.length ? snapshots : local;
   const seen = /* @__PURE__ */ new Set();
-  const evidence = [];
+  const groups = /* @__PURE__ */ new Map();
   for (const finding of pool) {
-    const key2 = `${finding.file}:${finding.line}:${finding.selectorHint}`;
-    if (seen.has(key2)) continue;
-    seen.add(key2);
-    evidence.push({
-      file: finding.file,
-      line: finding.line,
-      selector: finding.selectorHint === "document" ? "" : finding.selectorHint,
-      snippet: finding.snippet,
-      note: finding.message,
-      ...finding.page ? { pages: [finding.page] } : {}
-    });
-    if (evidence.length >= limit) break;
+    const selector = finding.selectorHint === "document" ? "" : finding.selectorHint;
+    const at = `${finding.file}:${finding.line}:${selector}`;
+    if (seen.has(at) || anchored.has(at)) continue;
+    seen.add(at);
+    const cls2 = `${finding.ruleId}|${finding.message}|${selector}|${(finding.snippet ?? "").trim()}`;
+    const group = groups.get(cls2);
+    if (group) group.push(finding);
+    else if (groups.size < limit) groups.set(cls2, [finding]);
   }
-  return evidence;
+  return [...groups.values()].map((group) => {
+    const rep = group[0];
+    const pages = [...new Set(group.map((f2) => f2.page).filter((p2) => p2 !== void 0))];
+    return {
+      file: rep.file,
+      line: rep.line,
+      selector: rep.selectorHint === "document" ? "" : rep.selectorHint,
+      snippet: rep.snippet,
+      note: rep.message,
+      ...group.length > 1 ? { occurrences: group.length, alsoAt: group.slice(1).map((f2) => `${f2.file}:${f2.line}`) } : {},
+      ...pages.length ? { pages } : {}
+    };
+  });
 }
 function withCandidates(harvest, findings, limit) {
   const anchored = new Set(harvest.map((e) => `${e.file}:${e.line}:${e.selector}`));
-  const extra = candidateFindingEvidence(findings, limit).filter((e) => !anchored.has(`${e.file}:${e.line}:${e.selector}`));
+  const extra = candidateFindingEvidence(findings, limit, anchored);
   return extra.length ? [...harvest, ...extra] : harvest;
 }
 function buildAdjudicationWorklist(audit, opts = {}) {
@@ -54088,8 +54116,8 @@ function buildAdjudicationWorklist(audit, opts = {}) {
           evidence: candidates2,
           population: {
             classes: (item.evidence.length ? item.population?.classes ?? item.evidence.length : 0) + candidates2.length - item.evidence.length,
-            occurrences: (item.evidence.length ? item.population?.occurrences ?? item.evidence.length : 0) + candidates2.length - item.evidence.length,
-            files: new Set(candidates2.map((evidence) => evidence.file)).size,
+            occurrences: (item.evidence.length ? item.population?.occurrences ?? item.evidence.length : 0) + candidates2.slice(item.evidence.length).reduce((sum, evidence) => sum + (evidence.occurrences ?? 1), 0),
+            files: new Set(candidates2.flatMap((evidence) => [evidence.file, ...(evidence.alsoAt ?? []).map((a2) => a2.slice(0, a2.lastIndexOf(":")))])).size,
             pages: new Set(candidates2.flatMap((evidence) => evidence.pages ?? [])).size
           }
         } : {},
@@ -55064,6 +55092,11 @@ var T = {
     renderedAvailable: (files) => `**RENDU DISPONIBLE.** Cet audit a ing\xE9r\xE9 des captures de page : le rendu de la page est sur le disque, sous \`.ultra11y/pages/<id>/\` \u2014 ${listFiles(files, CAPTURE_FILE_LABEL.fr, "et")}. Un crit\xE8re \xAB \xE0 restituer \xBB \u2014 information par la couleur, op\xE9rabilit\xE9 clavier d'un script, geste au pointeur \u2014 se tranche DEPUIS CES FICHIERS : lisez-les comme vous liriez la source. \`needs-rendered-dom\` reste la bonne r\xE9ponse pour un crit\xE8re dont aucune capture ne porte le sujet, et pour lui seul.`,
     nothingRendered: (ids2) => `**AUCUN RENDU DANS CETTE PORT\xC9E.** ${ids2.length} crit\xE8re(s) exigent une page rendue, et aucune page n'a \xE9t\xE9 instantan\xE9e ici : personne ne peut les trancher depuis la source, et \`needs-rendered-dom\` est pour eux la seule r\xE9ponse honn\xEAte. Rendez AVANT d'adjuger \u2014 \`ultra11y scan <url> --merge <audit.json>\` (ou \`scan --sample\`) \u2014 puis reconstruisez cette liste : la mesure en ferme la plupart sans mod\xE8le, donc sans facture. Concern\xE9s : ${ids2.map((id) => `\`${id}\``).join(" \xB7 ")}`,
     briefContract: "> **CONTRAT DE VERDICT** \u2014 le pli est FERM\xC9 : un verdict auquel il manque son champ obligatoire est refus\xE9, et son crit\xE8re retourne \xAB \xE0 \xE9valuer \xBB en portant le refus. Renseignez le verdict de CE crit\xE8re, ici :",
+    contractTitle: "# Contrat de verdict (ultra11y) \u2014 commun \xE0 chaque brief `adjudicate/<crit\xE8re>.md`",
+    contractLead: "Ce fichier est \xE9crit UNE fois par liste de travail : chaque brief y renvoie au lieu de le r\xE9p\xE9ter. Lisez-le avant le premier brief ; ses r\xE8gles valent pour chaque crit\xE8re.",
+    sharedContract: (file) => `> **CONTRAT DE VERDICT** \u2014 dans \`${file}\` (\xE0 c\xF4t\xE9 du dossier \`adjudicate/\`), commun \xE0 tous les crit\xE8res : lisez-le UNE fois avant le premier brief. Le pli est FERM\xC9 : un verdict qui ne le respecte pas est refus\xE9, et son crit\xE8re retourne \xAB \xE0 \xE9valuer \xBB. Un \`normativeRef\` cite un test de CE crit\xE8re (liste en fin de brief), jamais un id WCAG.`,
+    renderedHere: "> **RENDU DISPONIBLE pour ce crit\xE8re** \u2014 ses \xE9vidences sont ancr\xE9es dans des captures (`.ultra11y/pages/<id>/`, fichiers list\xE9s dans le contrat) : tranchez depuis ces fichiers, `needs-rendered-dom` serait refus\xE9 ici.",
+    perPage: "> **STATUER PAGE PAR PAGE.** Une \xE9vidence repr\xE9sente une CLASSE de contenu : le m\xEAme \xE9l\xE9ment rendu sur plusieurs pages n'est list\xE9 qu'une fois. Sa mention `sur \u2026` donne chaque page o\xF9 la classe appara\xEEt, sous la forme `<id>:<ligne>`. Un verdict de page cite la capture de CETTE page : `file` = `.ultra11y/pages/<id>/dom.html`, `line` = la ligne indiqu\xE9e, `snippet` omis ou recopi\xE9 de la repr\xE9sentante (m\xEAme contenu). Une page absente de la mention `sur \u2026` ne porte pas cette classe. `aussi en` liste les autres occurrences hors capture (la source).",
     absenceRule: "> **UNE NC EN FORME D'ABSENCE S'ANCRE QUAND M\xCAME.** \xAB Il n'y a pas de second syst\xE8me de navigation \xBB, \xAB il n'y a pas de moteur de recherche \xBB, \xAB aucun message d'erreur ne sugg\xE8re le format attendu \xBB : une absence se CONSTATE quelque part. Citez l'\xE9l\xE9ment et la page o\xF9 vous l'avez constat\xE9e \u2014 le `<nav>`, le `<header>`, le formulaire \u2014 avec son `file`, sa `line` et son `snippet`. Une NC sans `file` est refus\xE9e aussi s\xFBrement qu'un `C` sans citations. Et si le sujet du crit\xE8re n'existe nulle part dans le p\xE9rim\xE8tre audit\xE9, le verdict n'est pas `NC` : c'est `NA`, avec sa justification.",
     incomplete: "LECTURE INCOMPL\xC8TE \u2014 un \xAB C \xBB sera refus\xE9 sur ce crit\xE8re",
     // WHAT AN EMPTY HARVEST MAY BE ANSWERED WITH, said outright.
@@ -55097,9 +55130,9 @@ var T = {
     neighboursLead: () => `un constat d'absence ou de forme appartient au crit\xE8re \xAB m\xE9canique \xBB ci-dessous, un jugement de pertinence au crit\xE8re \xAB jugement \xBB. Aide \xE0 la lecture : ne dispense d'aucun test de CE crit\xE8re.`,
     roleMechanical: "m\xE9canique \u2014 existence / forme",
     roleJudgment: "jugement \u2014 pertinence",
-    pagesNote: (pages) => {
-      const shown = pages.slice(0, 8).map((p2) => `${p2.id} \u2014 ${p2.name} (${p2.url})`).join(", ");
-      return `**Pages audit\xE9es (ids utilisables comme cl\xE9s de \`pages\`)** : ${shown}${pages.length > 8 ? `, \u2026 +${pages.length - 8}` : ""}`;
+    pagesNote: (pages, all = false) => {
+      const shown = pages.slice(0, all ? pages.length : 8).map((p2) => `${p2.id} \u2014 ${p2.name} (${p2.url})`).join(", ");
+      return `**Pages audit\xE9es (ids utilisables comme cl\xE9s de \`pages\`)** : ${shown}${!all && pages.length > 8 ? `, \u2026 +${pages.length - 8}` : ""}`;
     }
   },
   en: {
@@ -55124,6 +55157,11 @@ var T = {
     renderedAvailable: (files) => `**THE RENDERED PAGE IS AVAILABLE.** This audit ingested page captures: the rendered page is on disk under \`.ultra11y/pages/<id>/\` \u2014 ${listFiles(files, CAPTURE_FILE_LABEL.en, "and")}. A needs-rendering criterion \u2014 information by colour, keyboard operability of a script, a pointer gesture \u2014 is decided FROM THOSE FILES: read them as you would read the source. \`needs-rendered-dom\` stays the right answer for a criterion no capture carries the subject of, and for that alone.`,
     nothingRendered: (ids2) => `**NOTHING WAS RENDERED IN THIS SCOPE.** ${ids2.length} criteria need a rendered page, and no page was snapshotted here: nobody can settle them from source, and \`needs-rendered-dom\` is the only honest answer for them. Render BEFORE adjudicating \u2014 \`ultra11y scan <url> --merge <audit.json>\` (or \`scan --sample\`) \u2014 then rebuild this worklist: the measurement closes most of them with no model in the loop, and so with no bill. Affected: ${ids2.map((id) => `\`${id}\``).join(" \xB7 ")}`,
     briefContract: "> **VERDICT CONTRACT** \u2014 the fold is FAIL-CLOSED: a verdict missing its required field is refused, and its criterion goes back to \xAB to assess \xBB carrying the refusal. Record THIS criterion's verdict, here:",
+    contractTitle: "# Verdict contract (ultra11y) \u2014 shared by every `adjudicate/<criterion>.md` brief",
+    contractLead: "This file is written ONCE per worklist: every brief points here instead of repeating it. Read it before the first brief; its rules apply to every criterion.",
+    sharedContract: (file) => `> **VERDICT CONTRACT** \u2014 in \`${file}\` (next to the \`adjudicate/\` directory), shared by every criterion: read it ONCE before the first brief. The fold is FAIL-CLOSED: a verdict that breaks it is refused, and its criterion goes back to \xAB to assess \xBB. A \`normativeRef\` cites a test of THIS criterion (listed at the end of the brief), never a WCAG id.`,
+    renderedHere: "> **THE RENDERED PAGE IS AVAILABLE for this criterion** \u2014 its evidence is anchored in captures (`.ultra11y/pages/<id>/`, files listed in the contract): decide from those files, `needs-rendered-dom` would be refused here.",
+    perPage: "> **RULING PAGE BY PAGE.** An evidence line stands for a content CLASS: the same element rendered on several pages is listed once. Its `on \u2026` mention gives every page the class appears on, as `<id>:<line>`. A page verdict cites THAT page's capture: `file` = `.ultra11y/pages/<id>/dom.html`, `line` = the line given, `snippet` omitted or copied from the representative (same content). A page missing from the `on \u2026` mention does not carry that class. `also at` lists the other occurrences outside the captures (the source).",
     absenceRule: "> **AN NC SHAPED LIKE AN ABSENCE STILL HAS TO BE ANCHORED.** \xAB There is no second navigation system \xBB, \xAB there is no search engine \xBB, \xAB no error message suggests the expected format \xBB: an absence is OBSERVED somewhere. Cite the element and the page you observed it on \u2014 the `<nav>`, the `<header>`, the form \u2014 with its `file`, `line` and `snippet`. An NC with no `file` is refused exactly as surely as a `C` with no citations. And when the criterion's subject exists nowhere in the audited scope, the verdict is not `NC`: it is `NA`, with its justification.",
     incomplete: "INCOMPLETE READING \u2014 a C will be refused on this criterion",
     none: '**NO EVIDENCE WAS HARVESTED FOR THIS CRITERION.** A `C` will be REFUSED here however good the justification: the gate requires at least one citation and there is nothing to cite. Two answers are accepted, and they say different things \u2014 `NA`: nothing in the audited scope is concerned (no script, no document, no component of that kind); `manual` with `reason: "undecidable"`: the subject may exist, but nothing here lets you see it.',
@@ -55148,9 +55186,9 @@ var T = {
     neighboursLead: () => `an observation of absence or of malformed markup belongs to the \xAB mechanical \xBB criterion below, a judgement of relevance to the \xAB judgment \xBB one. A reading aid: it excuses no test of THIS criterion.`,
     roleMechanical: "mechanical \u2014 existence / form",
     roleJudgment: "judgment \u2014 relevance",
-    pagesNote: (pages) => {
-      const shown = pages.slice(0, 8).map((p2) => `${p2.id} \u2014 ${p2.name} (${p2.url})`).join(", ");
-      return `**Audited pages (usable as \`pages\` keys)**: ${shown}${pages.length > 8 ? `, \u2026 +${pages.length - 8}` : ""}`;
+    pagesNote: (pages, all = false) => {
+      const shown = pages.slice(0, all ? pages.length : 8).map((p2) => `${p2.id} \u2014 ${p2.name} (${p2.url})`).join(", ");
+      return `**Audited pages (usable as \`pages\` keys)**: ${shown}${!all && pages.length > 8 ? `, \u2026 +${pages.length - 8}` : ""}`;
     }
   }
 };
@@ -55220,9 +55258,20 @@ function plainTest(s2) {
 }
 function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
   const s2 = T[lang];
+  const shared = opts.sharedContract !== void 0 && opts.contract !== false;
   const { showAlsoAt: shown } = adjudicationLimits(opts.cwd);
   const pack = isCore(standard) ? void 0 : loadPack(standard);
-  const out = opts.contract === false ? [] : opts.preamble === false ? [s2.briefContract, "", ...s2.verdicts, "", s2.rule, "", s2.absenceRule, "", `> ${severityRubricLine(lang)}`, ""] : [s2.title, "", s2.intro, "", ...s2.verdicts, "", s2.rule, "", s2.absenceRule, "", `> ${severityRubricLine(lang)}`, "", s2.then, ""];
+  const out = shared ? [s2.sharedContract(opts.sharedContract), ""] : opts.contract === false ? [] : opts.preamble === false ? [s2.briefContract, "", ...s2.verdicts, "", s2.rule, "", s2.absenceRule, "", `> ${severityRubricLine(lang)}`, ""] : [s2.title, "", s2.intro, "", ...s2.verdicts, "", s2.rule, "", s2.absenceRule, "", `> ${severityRubricLine(lang)}`, "", s2.then, ""];
+  if (shared) {
+    if (items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) out.push(s2.renderedHere, "");
+    if (opts.unrendered?.length) out.push(`> ${s2.nothingRendered(opts.unrendered)}`, "");
+  } else out.push(...runWideNotes(items, lang, pack, opts));
+  out.push(...criterionSections(items, lang, standard, pack, opts, shown));
+  return out.join("\n");
+}
+function runWideNotes(items, lang, pack, opts, allPages = false) {
+  const s2 = T[lang];
+  const out = [];
   if (items.some((it) => it.evidence.some((e) => isSnapshotFile(e.file)))) {
     out.push(
       `> ${s2.renderedAvailable(
@@ -55238,7 +55287,12 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
     out.push(`> ${s2.nothingRendered(opts.unrendered)}`, "");
   }
   if (pack) out.push(`> ${s2.packIntro(pack.name)}`, "");
-  if (opts.pages?.length) out.push(`> ${s2.pagesNote(opts.pages)}`, "");
+  if (opts.pages?.length) out.push(`> ${s2.pagesNote(opts.pages, allPages)}`, "");
+  return out;
+}
+function criterionSections(items, lang, standard, pack, opts, shown) {
+  const s2 = T[lang];
+  const out = [];
   for (const it of items) {
     out.push(`## ${pack ? `${pack.name} ` : ""}${it.criteriaId}${it.title ? ` \u2014 ${it.title}` : ""}  _(${it.automatability})_`);
     if (it.previousReview?.trim()) {
@@ -55269,10 +55323,15 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
     if (!it.evidence.length) out.push(s2.none, "");
     else {
       for (const e of it.evidence) {
+        const onPages = [e.file, ...e.alsoAt ?? []].map((a2, i) => i === 0 ? { file: a2, line: String(e.line) } : { file: a2.slice(0, a2.lastIndexOf(":")), line: a2.slice(a2.lastIndexOf(":") + 1) }).flatMap(({ file, line: line2 }) => {
+          const page = pageOfDoc(file);
+          return page !== void 0 ? [`${page}:${line2}`] : [];
+        });
+        const elsewhere = (e.alsoAt ?? []).filter((a2) => pageOfDoc(a2.slice(0, a2.lastIndexOf(":"))) === void 0);
         const extra = [
           e.occurrences && e.occurrences > 1 ? `\xD7${e.occurrences}` : "",
-          e.pages?.length ? `${s2.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "\u2026" : ""}` : "",
-          e.alsoAt?.length ? `${s2.alsoAt} ${e.alsoAt.slice(0, shown).join(", ")}${e.alsoAt.length > shown ? "\u2026" : ""}` : ""
+          onPages.length > 1 || onPages.length === 1 && !isSnapshotFile(e.file) ? `${s2.on} ${onPages.join(", ")}` : !onPages.length && e.pages?.length ? `${s2.on} ${e.pages.slice(0, 4).join(", ")}${e.pages.length > 4 ? "\u2026" : ""}` : "",
+          elsewhere.length ? `${s2.alsoAt} ${elsewhere.slice(0, shown).join(", ")}${elsewhere.length > shown ? "\u2026" : ""}` : ""
         ].filter(Boolean).join(" ");
         out.push(`- \`${e.file}:${e.line}\` (\`${e.selector}\`)${extra ? ` [${extra}]` : ""}${e.note ? ` \u2014 ${e.note}` : ""}`);
         if (e.snippet?.trim()) {
@@ -55358,7 +55417,7 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
       }
     }
   }
-  return out.join("\n");
+  return out;
 }
 function writeAdjudication(items, outDir, opts) {
   mkdirSync5(outDir, { recursive: true });
@@ -55391,21 +55450,43 @@ function writeAdjudication(items, outDir, opts) {
   const itemsDir = join14(outDir, "adjudicate");
   mkdirSync5(itemsDir, { recursive: true });
   const unrendered = new Set(opts.unrendered ?? []);
+  const contractPath = join14(outDir, ADJUDICATION_CONTRACT_FILE);
+  writeFileSync5(contractPath, formatAdjudicationContract(items, opts.lang ?? "en", opts.standard, opts.pages?.length ? { pages: opts.pages } : {}));
   for (const it of items) {
     const mine = unrendered.has(it.criteriaId) ? [it.criteriaId] : [];
     writeFileSync5(
       join14(itemsDir, `${it.criteriaId}.md`),
       formatAdjudication([it], opts.lang ?? "en", opts.standard, {
         preamble: false,
+        sharedContract: ADJUDICATION_CONTRACT_FILE,
         ...mine.length ? { unrendered: mine } : {},
-        ...opts.web ? { web: true } : {},
-        // The page ids reach the per-criterion briefs too (#197): the CI adjudicator reads ONLY
-        // these sheets, so it is the one place it can learn which ids may key a `pages` map.
-        ...opts.pages?.length ? { pages: opts.pages } : {}
+        ...opts.web ? { web: true } : {}
       })
     );
   }
-  return { todoPath, mdPath, verdictsPath, itemsDir, count: items.length };
+  return { todoPath, mdPath, verdictsPath, itemsDir, contractPath, count: items.length };
+}
+var ADJUDICATION_CONTRACT_FILE = "ADJUDICATE.contract.md";
+function formatAdjudicationContract(items, lang = "en", standard = CORE2, opts = {}) {
+  const s2 = T[lang];
+  const pack = isCore(standard) ? void 0 : loadPack(standard);
+  return [
+    s2.contractTitle,
+    "",
+    s2.contractLead,
+    "",
+    ...s2.verdicts,
+    "",
+    s2.rule,
+    "",
+    s2.absenceRule,
+    "",
+    `> ${severityRubricLine(lang)}`,
+    "",
+    s2.perPage,
+    "",
+    ...runWideNotes(items, lang, pack, opts, true)
+  ].join("\n");
 }
 var PREFILLED_CITATIONS = 3;
 var CITATION_SNIPPET_MAX = 120;
@@ -67692,7 +67773,7 @@ There is no fan-out here and no ITEMS selection: you handle EVERY criterion, one
 ## Which files \u2014 your prompt decides, and it wins over this document
 
 - **With a shell.** Read \`${join37(runAbs, "ADJUDICATE.todo.json")}\`, fill each item's verdict in place, then fold: \`ultra11y verify --apply ${join37(runAbs, "ADJUDICATE.todo.json")} --in ${join37(runAbs, "audit-latest.json")} --out ${runAbs}\`. Each criterion's brief cites the standard's official page for it; if a wording stays ambiguous and you have a web tool, you MAY read that page to settle it \u2014 never to contradict the vendored text, and a web page is never a \`normativeRef\`.
-- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join37(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol, its numbered tests and this contract in short form. Write your verdicts into \`${join37(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
+- **Without a shell** (CI: Read, Grep, Glob, Edit, Write only). Do NOT open \`ADJUDICATE.todo.json\` or \`ADJUDICATE.md\` \u2014 they run to hundreds of kilobytes and will swamp your context. Read \`${join37(runAbs, "ADJUDICATE.contract.md")}\` once \u2014 the verdict contract every brief points to, with the audited page ids and how to cite a page \u2014 then \`${join37(runAbs, "adjudicate")}/<criteriaId>.md\`, one small brief per criterion carrying its evidence, its decision protocol and its numbered tests. Write your verdicts into \`${join37(runAbs, "ADJUDICATE.verdicts.json")}\` \u2014 the ONLY file you write. Someone else folds; you never run the engine.
 
 ## For EACH criterion
 
@@ -68051,7 +68132,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
         "adjudicate-worklist",
         "Adjudication worklist \u2014 the criteria the engine could not decide",
         [audit],
-        [adjTodo, join38(run, "ADJUDICATE.md"), join38(run, "ADJUDICATE.verdicts.json"), join38(run, "adjudicate")],
+        [adjTodo, join38(run, "ADJUDICATE.md"), join38(run, "ADJUDICATE.verdicts.json"), join38(run, "ADJUDICATE.contract.md"), join38(run, "adjudicate")],
         { "0": "worklist written (possibly empty: nothing to adjudicate)", "2": EXIT_USAGE },
         "adjudicate"
       ),
@@ -68060,7 +68141,7 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
         adj,
         "adjudicator",
         "Adjudicate \u2014 fill every item's verdict (C/NC/NA/manual)",
-        [adjTodo, join38(run, "adjudicate")],
+        [adjTodo, join38(run, "ADJUDICATE.contract.md"), join38(run, "adjudicate")],
         "adjudicate-fold"
       ),
       engine(
@@ -72337,7 +72418,7 @@ function cmdVerifyWorklist(p2, langIn) {
         lang === "fr" ? `${w2.count} crit\xE8re(s) \xE0 adjuger \u2192 ${w2.mdPath}, ${w2.todoPath}` : `${w2.count} criterion(ia) to adjudicate \u2192 ${w2.mdPath}, ${w2.todoPath}`
       );
     console.error(
-      lang === "fr" ? `  Le texte de chaque crit\xE8re (tests num\xE9rot\xE9s, m\xE9thodologie de test du r\xE9f\xE9rentiel, glossaire) est dans ${w2.itemsDir}/<crit\xE8re>.md \u2014 lisez-le avant de trancher.` : `  Each criterion's own text (numbered tests, the standard's test methodology, glossary) is in ${w2.itemsDir}/<criterion>.md \u2014 read it before ruling.`
+      lang === "fr" ? `  Le texte de chaque crit\xE8re (tests num\xE9rot\xE9s, m\xE9thodologie de test du r\xE9f\xE9rentiel, glossaire) est dans ${w2.itemsDir}/<crit\xE8re>.md \u2014 lisez-le avant de trancher ; le contrat de verdict commun \xE0 tous est dans ${w2.contractPath}, \xE0 lire une fois.` : `  Each criterion's own text (numbered tests, the standard's test methodology, glossary) is in ${w2.itemsDir}/<criterion>.md \u2014 read it before ruling; the verdict contract shared by all of them is in ${w2.contractPath}, to read once.`
     );
     return 0;
   }

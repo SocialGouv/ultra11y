@@ -79,6 +79,17 @@ describe("the contract is dropped only where a system prompt already carries it"
     expect(sys).toMatch(/citation/i);
   });
 
+  // The on-disk briefs (#222): the contract is written ONCE to ADJUDICATE.contract.md and each
+  // brief carries a one-line pointer. The saving is the whole inline contract, per criterion.
+  it("is a one-line pointer under `sharedContract`, saving the whole inline contract per brief", () => {
+    const inline = formatAdjudication(one(), "fr", "rgaa", { preamble: false });
+    const shared = formatAdjudication(one(), "fr", "rgaa", { preamble: false, sharedContract: "ADJUDICATE.contract.md" });
+    expect(shared).toMatch(/CONTRAT DE VERDICT/);
+    expect(shared).toContain("ADJUDICATE.contract.md");
+    expect(shared).not.toMatch(/UNE NC EN FORME D'ABSENCE/);
+    expect(inline.length - shared.length).toBeGreaterThan(2000);
+  });
+
   it("still renders the criterion itself, its tests and its evidence", () => {
     const md = formatAdjudication(one(), "fr", "rgaa", { preamble: false, contract: false });
     expect(md).toMatch(/^#{1,3} .*\d+\.\d+/m);

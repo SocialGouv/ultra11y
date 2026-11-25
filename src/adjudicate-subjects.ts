@@ -1098,6 +1098,22 @@ function pageRules(docs: Doc[], d: Doc): (CssRule & { where: string })[] {
   });
 }
 
+/** Headings by tag, plus `role="heading"` (RGAA 9.1's tests name it beside <hx>). */
+function headingAnchors(docs: Doc[], tags: string[]): Harvested[] {
+  return docs.flatMap((d) =>
+    elementsByTag(d, ...tags)
+      .concat(d.elements.filter((e) => roleOf(e) === "heading"))
+      .map((e) =>
+        h(
+          d,
+          e,
+          `<${e.tag}${roleOf(e) === "heading" ? ` role="heading" aria-level="${attr(e, "aria-level") ?? ""}"` : ""}> text="${t(e)}"`,
+          `heading|${e.tag}|${attr(e, "aria-level") ?? ""}|${t(e)}`,
+        ),
+      ),
+  );
+}
+
 export const SUBJECTS: Record<string, Subject> = {
   // Every image-like element and the alternative it carries. Class = (alt, src): the same
   // logo on 38 pages is one decision, not 38.
@@ -1162,20 +1178,12 @@ export const SUBJECTS: Record<string, Subject> = {
     ),
 
   // Headings, labels, legends and captions — the text judged for descriptiveness.
-  headings: (docs) =>
-    docs.flatMap((d) =>
-      elementsByTag(d, "h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption")
-        // RGAA 9.1's tests name `role="heading"` + `aria-level` beside <hx>.
-        .concat(d.elements.filter((e) => roleOf(e) === "heading"))
-        .map((e) =>
-          h(
-            d,
-            e,
-            `<${e.tag}${roleOf(e) === "heading" ? ` role="heading" aria-level="${attr(e, "aria-level") ?? ""}"` : ""}> text="${t(e)}"`,
-            `heading|${e.tag}|${attr(e, "aria-level") ?? ""}|${t(e)}`,
-          ),
-        ),
-    ),
+  // WCAG 2.4.6 is « Headings AND Labels », so its subject carries both.
+  headings: (docs) => headingAnchors(docs, ["h1", "h2", "h3", "h4", "h5", "h6", "label", "legend", "caption"]),
+
+  // The heading outline and nothing else — <h1>–<h6> and `role="heading"`, every element RGAA
+  // 9.1's tests name. 9.1 used `headings` and its brief listed every <label> in scope (#222).
+  headingOutline: (docs) => headingAnchors(docs, ["h1", "h2", "h3", "h4", "h5", "h6"]),
 
   // Form controls and the label/placeholder/instruction attached to them.
   controls: (docs) =>
@@ -1350,18 +1358,26 @@ export const SUBJECTS: Record<string, Subject> = {
         .map((e) => h(d, e, `site map / index link text="${t(e, 40)}" href="${attr(e, "href")}"`, `sitemap|${attr(e, "href")}`)),
     ]),
 
-  // The repeated blocks whose ORDER must not change from page to page. One class per page so
-  // "same relative order everywhere" is answerable from the evidence itself.
+  // The repeated blocks whose ORDER must not change from page to page.
+  //
+  // The class is the block's CONTENT — its tag, its place among the page's repeated blocks and
+  // the order of its links — never the page it was read on (#222). It used to be one class per
+  // page, so every page was its own class: 12.2 listed 66 classes for three blocks on the
+  // full-audit fixture. Keyed on content, the same header on twenty pages is one class whose
+  // `alsoAt` names each page's capture, and a page whose block differs — another order, another
+  // place — is a class of its own: « same relative order everywhere » reads as one class per
+  // block, and every departure from it shows up as an extra class.
   repeatedBlocks: (docs) =>
     docs.flatMap((d) => {
-      const page = pageOfDoc(d.file) ?? "source";
-      return elementsByTag(d, "header", "nav", "footer").map((e) => {
+      const blocks = elementsByTag(d, "header", "nav", "footer");
+      return blocks.map((e, i) => {
         const order = elementsByTag(d, "a")
           .filter((a) => ancestors(a).includes(e))
           .map((a) => t(a, 24))
           .slice(0, 20)
           .join(" › ");
-        return h(d, e, `page="${page}" <${e.tag}> order: ${order}`, `repeated|${page}|${e.tag}`);
+        const place = `${i + 1}/${blocks.length}`;
+        return h(d, e, `<${e.tag}> block ${place} order: ${order}`, `repeated|${e.tag}|${place}|${order}`);
       });
     }),
 
@@ -3086,6 +3102,10 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // handed every <nav> and aria-pressed button of the page beside the images they are about.
     "1.2": ["images"],
     "1.9": ["images"],
+    // 1.3 (is the text alternative RELEVANT?) inherited the same `aria` and behaviour subjects
+    // from WCAG 4.1.2, and its brief listed the landmarks, the « Rubriques » disclosure, the
+    // search form and the scripts.json digest beside the images (#222).
+    "1.3": ["images"],
     // Theme 2 — frames. Both criteria are about the frame and its title, and nothing else.
     "2.1": ["frames"],
     "2.2": ["frames"],
@@ -3105,7 +3125,8 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "8.9": ["structure"],
     "8.10": ["readingOrder", "langParts"],
     // Theme 9 — structure.
-    "9.1": ["headings"],
+    // The outline only: `headings` also carries labels, legends and captions for WCAG 2.4.6.
+    "9.1": ["headingOutline"],
     "9.2": ["landmarks"],
     "9.3": ["lists"],
     "9.4": ["quotes"],

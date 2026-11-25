@@ -112,19 +112,41 @@ modèle :
 
 ## Ce que ça coûte
 
-Avant la mise en lots, au grain critère, pour une liste de travail RGAA complète :
+Mesuré sur un audit complet réel — la fixture `tests/fixtures/full-audit-app` parcourue de bout
+en bout par `tests/full-audit.e2e.test.ts` (scan de l’échantillon, toutes les routes et deux
+parcours : 21 pages et états de page, 102 critères RGAA confiés au jugement). Le test écrit la
+mesure à côté de la liste de travail, dans `audits/brief-budget.json` : la somme des caractères
+des briefs `audits/adjudicate/*.md` et du contrat `audits/ADJUDICATE.contract.md`, divisée par
+quatre pour l’ordre de grandeur en tokens.
 
-| | tokens en entrée |
-|---|---:|
-| avant qu’on s’y intéresse | ≈173 000 |
-| aujourd’hui | ≈117 000 |
+| lecture de toute la liste de travail, brief par brief | caractères | tokens en entrée (≈ caractères / 4) |
+|---|---:|---:|
+| avant #222 | 1 607 526 | ≈402 000 |
+| aujourd’hui (102 briefs + le contrat, lu une fois) | 1 114 838 + 7 275 | ≈280 500 |
 
-Les 33 % viennent de trois coupes, et seule la première était gratuite : le contrat de
-verdict était envoyé dans chaque brief à côté d’un prompt système qui en portait déjà chaque
-clause (28 % du total, 2 144 caractères × 81 critères) ; le glossaire garde cinq termes en
-420 caractères au lieu de huit en 600 ; et la procédure pas à pas d’un test dont la collecte
-n’a pas trouvé le mécanisme dans la source est réduite à son ouverture. La FORMULATION d’un
-test n’est jamais abrégée. `tests/adjudicate-context-budget.test.ts` verrouille le résultat
+Le chiffre de ≈117 000 tokens que cette page annonçait valait pour une liste de travail
+SANS capture (81 critères, des preuves de source seulement) ; il ne décrivait pas un audit
+complet, dont chaque critère porte les preuves de toutes les pages capturées. Les ≈30 % gagnés
+viennent de trois corrections (#222) :
+
+- **le contrat de verdict est écrit une fois**, dans `ADJUDICATE.contract.md`, au lieu d’être
+  répété dans chaque brief (≈6,5 Ko × 102) : les verdicts et leurs champs, les règles de
+  citation et d’absence, la gravité, l’inventaire des captures, l’avertissement du référentiel
+  et les ids de toutes les pages. Chaque brief garde une ligne qui y renvoie, et ce qui lui est
+  propre : ses preuves sont-elles ancrées dans une capture, lui manque-t-il un rendu ;
+- **une preuve par classe de contenu, quelle que soit la page** : la page ne fait plus partie de
+  la classe des blocs répétés, et un même signal candidat sur chaque page n’est plus qu’une
+  classe. Sur cette fixture, 12.2 passe de 66 classes à 4, 12.4/12.5 de 70 à 8, 7.1 de 60 à 22.
+  Chaque page d’une classe reste listée (`sur <id>:<ligne>`), pour qu’un verdict de page cite
+  sa propre capture ;
+- **les sujets hors critère sont retirés** : 1.3 ne reçoit plus que les images (15 → 2 classes),
+  9.1 plus que les titres, sans les `<label>` (23 → 18).
+
+Ce qui reste est surtout le texte normatif de chaque critère — tests, méthodologie officielle,
+glossaire en entier (#182) — que rien ne coupe : c’est ce qu’on lit pour trancher. Une
+orchestration en lots (`orchestrate --run`) partage ce contexte entre huit critères ; la
+lecture brief par brief ci-dessus est le pire cas. `tests/adjudicate-context-budget.test.ts`
+verrouille le brief par critère et `tests/full-audit.e2e.test.ts` la facture de l’audit complet
 — c’est la facture, pas un micro-benchmark.
 
 La passe de contre-vérification regroupe par défaut jusqu’à huit affirmations indépendantes

@@ -391,7 +391,7 @@ export function buildManifest(runDir: string, engineAbs: string, batchSize = BAT
         "adjudicate-worklist",
         "Adjudication worklist — the criteria the engine could not decide",
         [audit],
-        [adjTodo, join(run, "ADJUDICATE.md"), join(run, "ADJUDICATE.verdicts.json"), join(run, "adjudicate")],
+        [adjTodo, join(run, "ADJUDICATE.md"), join(run, "ADJUDICATE.verdicts.json"), join(run, "ADJUDICATE.contract.md"), join(run, "adjudicate")],
         { "0": "worklist written (possibly empty: nothing to adjudicate)", "2": EXIT_USAGE },
         "adjudicate",
       ),
@@ -400,7 +400,7 @@ export function buildManifest(runDir: string, engineAbs: string, batchSize = BAT
         adj,
         "adjudicator",
         "Adjudicate — fill every item's verdict (C/NC/NA/manual)",
-        [adjTodo, join(run, "adjudicate")],
+        [adjTodo, join(run, "ADJUDICATE.contract.md"), join(run, "adjudicate")],
         "adjudicate-fold",
       ),
       engine(

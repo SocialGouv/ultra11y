@@ -3245,8 +3245,8 @@ function cmdVerifyWorklist(p: ParsedArgs, langIn: Lang): number {
     // ruling from memory, which is the one thing this whole pipeline exists to prevent.
     console.error(
       lang === "fr"
-        ? `  Le texte de chaque critère (tests numérotés, méthodologie de test du référentiel, glossaire) est dans ${w.itemsDir}/<critère>.md — lisez-le avant de trancher.`
-        : `  Each criterion's own text (numbered tests, the standard's test methodology, glossary) is in ${w.itemsDir}/<criterion>.md — read it before ruling.`,
+        ? `  Le texte de chaque critère (tests numérotés, méthodologie de test du référentiel, glossaire) est dans ${w.itemsDir}/<critère>.md — lisez-le avant de trancher ; le contrat de verdict commun à tous est dans ${w.contractPath}, à lire une fois.`
+        : `  Each criterion's own text (numbered tests, the standard's test methodology, glossary) is in ${w.itemsDir}/<criterion>.md — read it before ruling; the verdict contract shared by all of them is in ${w.contractPath}, to read once.`,
     );
     return 0;
   }

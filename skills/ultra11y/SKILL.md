@@ -80,7 +80,10 @@ vraiment.
 >    paires (texte, href) distinctes. Statuer sur le représentant, c’est statuer sur tous, et
 >    c’est ce qui rend un `C` honnête atteignable ; une citation qui nomme N’IMPORTE QUELLE
 >    occurrence d’une classe que porte le critère est acceptée, alors citez celle que vous avez
->    réellement ouverte.
+>    réellement ouverte. La page ne fait pas partie de la classe : le même en-tête sur vingt
+>    pages est UNE classe, et le brief liste chacune de ses pages en `sur <id>:<ligne>`. Un
+>    verdict de page cite l’occurrence de CETTE page (`.ultra11y/pages/<id>/dom.html` à cette
+>    ligne) — le garde-fou refuse l’occurrence d’une autre page.
 > 4. **Le reliquat est explicite, jamais conforme en silence** : l’agent IA *arbitre* lui-même
 >    chaque critère *de jugement* (`verify --manual`, sous contrôle), et les critères *de rendu*
 >    vont à `scan`. **Un scan propre ne conclut jamais `C`** : le contrat d’automatisation du RGAA marque ces règles comme preuves *candidates* (RGAA 3.2, 3.3, 10.4,
@@ -456,7 +459,9 @@ laissant l’agent piloter les étapes de jugement et de contenu :
    `verify --manual` écrit aussi un petit brief par critère (`adjudicate/<criteriaId>.md`) portant
    la formulation officielle du critère dans le RGAA, ses tests numérotés et sa
    **méthodologie de test** (le RGAA en publie une pour chacun de ses 258 tests), plus ses termes
-   du glossaire, sa note technique et ses cas particuliers. Lisez ce brief ; c’est le RGAA
+   du glossaire, sa note technique et ses cas particuliers. Le contrat de verdict, commun à tous
+   les critères, n’est écrit qu’une fois, dans `ADJUDICATE.contract.md` : chaque brief y renvoie,
+   lisez-le avant le premier. Lisez ce brief ; c’est le RGAA
    qui décide, jamais le critère de succès WCAG qui est derrière. Chaque brief cite aussi la
    page officielle du critère : si une formulation reste ambiguë et que vous disposez d’un outil
    web, vous pouvez aller la lire — jamais pour contredire le texte embarqué, et une page web

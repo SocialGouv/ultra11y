@@ -120,6 +120,7 @@ Remplissez exactement l’un des deux. `verify --apply` accepte l’un ou l’au
 repli, donc le choix dépend de ce qui convient à votre contexte, jamais de ce que vérifie le
 garde-fou.
 | `adjudicate/<criteriaId>.md` | un petit brief par critère : ses preuves, la formulation et les tests propres au critère (avec la méthodologie de test du référentiel), les termes de son glossaire et ses tests citables |
+| `ADJUDICATE.contract.md` | le contrat de verdict commun à tous les briefs, écrit une seule fois : verdicts et champs exigés, règles de citation et d’absence, gravité, comment statuer page par page, ids des pages auditées. Chaque brief y renvoie au lieu de le répéter |
 
 Pourquoi cette séparation existe, mesuré plutôt que supposé : sous le RGAA, jusqu’à 92 critères
 portent des tests de jugement. Une liste de travail mesurée portait 1590 ancres récoltées —

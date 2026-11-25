@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { runAudit } from "../src/audit.js";
-import { buildAdjudicationWorklist, formatAdjudication, writeAdjudication } from "../src/adjudicate.js";
+import { ADJUDICATION_CONTRACT_FILE, buildAdjudicationWorklist, formatAdjudication, writeAdjudication } from "../src/adjudicate.js";
 import { PAGES_DIR, SNAPSHOT_VERSION, writeSnapshot } from "../src/snapshot.js";
 
 const DOM = `<!doctype html><html lang="fr"><head><title>Accueil</title></head><body><header><nav aria-label="Principale"><ul><li><a href="/a">A</a></li></ul></nav></header><main><h1>Accueil</h1><form action="/n"><label for="e">E-mail</label><input id="e" name="e" type="email" required></form></main></body></html>`;
@@ -86,17 +86,45 @@ describe("the per-criterion brief carries the verdict contract", () => {
   });
 });
 
-describe("writeAdjudication puts the contract on every sheet it writes", () => {
-  it("every brief on disk carries it, not just the combined document", () => {
+// THE CONTRACT ON DISK IS WRITTEN ONCE (#222). Inline in each of the 102 briefs of a full RGAA
+// run, the run-wide blocks were ~6.5 KB a brief, ~38 % of what the briefs weighed. Every brief now
+// names the one file that carries them — the adjudicator is never left without the rules, it reads
+// them once instead of 102 times.
+describe("writeAdjudication writes the contract once and points every sheet to it", () => {
+  it("every brief on disk names the contract file, and the contract file carries every clause", () => {
     const out = mkdtempSync(join(tmpdir(), "u11y-brief-out-"));
-    const items = worklist(sourceOnly());
-    const w = writeAdjudication(items, out, { standard: "rgaa", auditDate: "2026-08-20", lang: "fr" });
+    const items = worklist(withSnapshots());
+    const pages = [{ id: "accueil", name: "Accueil", url: "https://x/" }];
+    const w = writeAdjudication(items, out, { standard: "rgaa", auditDate: "2026-08-20", lang: "fr", pages });
     expect(w.count).toBeGreaterThan(0);
+    expect(w.contractPath).toBe(join(out, ADJUDICATION_CONTRACT_FILE));
+    const contract = readFileSync(w.contractPath, "utf8");
+    for (const v of ["`C`", "`NC`", "`NA`", "`manual`", "`pages`"]) expect(contract).toContain(v);
+    expect(contract).toMatch(/ABSENCE/);
+    expect(contract).toMatch(/normativeRef/);
+    expect(contract).toMatch(/GRAVITÉ/);
+    expect(contract).toMatch(/Référentiel actif : \*\*RGAA\*\*/);
+    expect(contract).toMatch(/RENDU DISPONIBLE/);
+    expect(contract).toMatch(/STATUER PAGE PAR PAGE/);
+    expect(contract).toContain("accueil — Accueil");
     for (const it of items) {
       const md = readFileSync(join(w.itemsDir, `${it.criteriaId}.md`), "utf8");
       expect(md, `brief ${it.criteriaId}`).toMatch(/CONTRAT DE VERDICT/);
-      expect(md, `brief ${it.criteriaId}`).toMatch(/ABSENCE/);
+      expect(md, `brief ${it.criteriaId}`).toContain(ADJUDICATION_CONTRACT_FILE);
+      // …and does not restate it.
+      expect(md, `brief ${it.criteriaId}`).not.toMatch(/UNE NC EN FORME D'ABSENCE/);
+      expect(md, `brief ${it.criteriaId}`).not.toMatch(/^- `NC` — non conforme/m);
     }
+  });
+
+  it("keeps on each brief what is that criterion's own: its capture-anchored evidence", () => {
+    const out = mkdtempSync(join(tmpdir(), "u11y-brief-own-"));
+    const w = writeAdjudication(worklist(withSnapshots()), out, { standard: "rgaa", auditDate: "2026-08-20", lang: "fr" });
+    expect(readFileSync(join(w.itemsDir, "12.1.md"), "utf8")).toMatch(/RENDU DISPONIBLE pour ce critère/);
+    const src = mkdtempSync(join(tmpdir(), "u11y-brief-own-src-"));
+    const ws = writeAdjudication(worklist(sourceOnly()), src, { standard: "rgaa", auditDate: "2026-08-20", lang: "fr" });
+    expect(readFileSync(join(ws.itemsDir, "12.1.md"), "utf8")).not.toMatch(/RENDU DISPONIBLE/);
+    expect(readFileSync(ws.contractPath, "utf8")).not.toMatch(/RENDU DISPONIBLE/);
   });
 
   it("hands a criterion its OWN unrendered warning, and no other criterion's", () => {
