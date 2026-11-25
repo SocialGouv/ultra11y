@@ -23,10 +23,19 @@
 //
 // It SKIPS when no OpenCode is installed. `pnpm test:opencode` runs it; point it at binaries
 // with OPENCODE_V1_BIN / OPENCODE_V2_BIN, otherwise the `opencode` on PATH is used for
-// whichever major it is. V1 is `npx -y opencode-ai@1.19.5` away; its first run downloads the
-// `@ai-sdk/openai-compatible` provider package the mock is spoken to through. V2 is the
-// release binary (opencode.ai/files/bin/<version>/). The `opencode-smoke` CI job pins both
-// and sets ULTRA11Y_REQUIRE_OPENCODE=1, which turns a skip into a failure.
+// whichever major it is. V1 is `npx -y opencode-ai@1.19.5` away. V2 is the release binary
+// (opencode.ai/files/bin/<version>/). The `opencode-smoke` CI job pins both and sets
+// ULTRA11Y_REQUIRE_OPENCODE=1, which turns a skip into a failure.
+//
+// NO NETWORK, NO BLIND WAIT (#201). Every OpenCode 1 boot runs `npm install @opencode-ai/plugin`
+// in its config directory before it answers a single request — from the registry, into the
+// sandbox's empty npm cache: ~10 s when the registry is quick, and when it was not, the first
+// HTTP call (unbounded) waited on it until the 300 s test timeout, with no word of where. So:
+//   - npm runs OFFLINE against a shared cache (ULTRA11Y_SMOKE_NPM_CACHE, pre-warmed by CI; a
+//     cold cache fails that install at once, which the plugin under test does not need);
+//   - model-list fetches and auto-update are off;
+//   - each phase has its own budget, each HTTP call its own timeout, a dead server fails the
+//     wait at once, and a timeout names the phase and prints the tail of OpenCode's output.
 import { type ChildProcess, execFileSync, spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -38,10 +47,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PASSWORD = "ultra11y-smoke";
+/** npm's cache for every sandbox: CI pre-warms it with `@opencode-ai/plugin@<V1>`. */
+const NPM_CACHE = process.env.ULTRA11Y_SMOKE_NPM_CACHE || join(tmpdir(), "ultra11y-opencode-smoke-npm-cache");
 
 function majorOf(bin: string): number | null {
   try {
-    const r = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 20_000 });
+    const r = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 20_000, stdio: ["ignore", "pipe", "pipe"] });
     const m = /\bv?(\d+)\.\d+\.\d+/.exec(r.stdout ?? "");
     return r.status === 0 && m ? Number(m[1]) : null;
   } catch {
@@ -123,20 +134,50 @@ function freePort(): Promise<number> {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-async function until<T>(what: string, fn: () => Promise<T | null | undefined | false>, ms = 90_000): Promise<T> {
-  const end = Date.now() + ms;
+
+/** Per-phase budgets: each well under the test timeout, so a stall fails in ITS phase. */
+const PHASE = { boot: 60_000, skills: 30_000, plugin: 30_000, tool: 45_000 } as const;
+/** One HTTP call to the server; an answer that never comes must not outlive its phase. */
+const CALL_MS = 20_000;
+
+/** Poll `fn` until it returns a truthy value. Bounded twice over: the deadline is checked
+ *  around every attempt, and an attempt that hangs is cut off at the deadline. `dead`
+ *  ends the wait at once (the server exited); `diag` is appended to any failure. */
+async function until<T>(
+  what: string,
+  fn: () => Promise<T | null | undefined | false>,
+  ms: number,
+  opts: { dead?: () => string | null; diag?: () => string } = {},
+): Promise<T> {
+  const start = Date.now();
+  const end = start + ms;
   let lastError: unknown;
+  const fail = (why: string) =>
+    new Error(`${why} while waiting for ${what}${lastError ? ` (last error: ${String(lastError)})` : ""}${opts.diag ? `\n${opts.diag()}` : ""}`);
   while (Date.now() < end) {
+    const dead = opts.dead?.();
+    if (dead) throw fail(dead);
+    let timer: NodeJS.Timeout | undefined;
     try {
-      const v = await fn();
+      const v = await Promise.race([
+        fn(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("attempt still pending at the deadline")), Math.max(0, end - Date.now()));
+        }),
+      ]);
       if (v) return v;
     } catch (e) {
       lastError = e;
+    } finally {
+      clearTimeout(timer);
     }
     await sleep(500);
   }
-  throw new Error(`timed out waiting for ${what}${lastError ? ` (${String(lastError)})` : ""}`);
+  throw fail(`timed out after ${Math.round((Date.now() - start) / 1000)} s`);
 }
+
+/** The last `n` lines of a captured output. */
+const tail = (text: string, n = 40) => text.trimEnd().split("\n").slice(-n).join("\n");
 
 // ---------------------------------------------------------------------------------------
 // One isolated OpenCode, one fixture repository.
@@ -219,6 +260,15 @@ function sandbox(major: 1 | 2, mockUrl: string): Sandbox {
     OPENCODE_SERVER_PASSWORD: PASSWORD,
     MOCK_API_KEY: "x",
     ULTRA11Y_BIN: wrapper,
+    // No network at boot (see the header): npm offline on a shared cache, no model list, no update.
+    npm_config_cache: NPM_CACHE,
+    npm_config_offline: "true",
+    npm_config_audit: "false",
+    npm_config_fund: "false",
+    npm_config_update_notifier: "false",
+    OPENCODE_DISABLE_MODELS_FETCH: "1",
+    OPENCODE_DISABLE_AUTOUPDATE: "1",
+    OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
   });
   return { root, proj, env, engineRuns: () => (existsSync(counter) ? readFileSync(counter, "utf8").length : 0) };
 }
@@ -247,9 +297,16 @@ function pinPackage(sb: Sandbox, major: 1 | 2) {
 interface Running {
   child: ChildProcess;
   log: () => string;
-  call: (method: string, path: string, body?: unknown) => Promise<unknown>;
+  call: (method: string, path: string, body?: unknown, ms?: number) => Promise<unknown>;
+  /** The tail of the server's output, for a failure message. */
+  diag: () => string;
+  /** `until`, bound to this server: fails at once if it exits, and prints its output tail. */
+  until: <T>(what: string, fn: () => Promise<T | null | undefined | false>, ms: number) => Promise<T>;
   stop: () => Promise<void>;
 }
+
+/** Every server started, so none outlives the file even when a test is cut short. */
+const children = new Set<ChildProcess>();
 
 async function serve(bin: string, major: 1 | 2, sb: Sandbox): Promise<Running> {
   const port = await freePort();
@@ -267,27 +324,45 @@ async function serve(bin: string, major: 1 | 2, sb: Sandbox): Promise<Running> {
   });
   const auth = `Basic ${Buffer.from(`opencode:${PASSWORD}`).toString("base64")}`;
   const where = major === 2 ? `location%5Bdirectory%5D=${encodeURIComponent(sb.proj)}` : `directory=${encodeURIComponent(sb.proj)}`;
-  const call = async (method: string, path: string, body?: unknown) => {
+  children.add(child);
+  const call = async (method: string, path: string, body?: unknown, ms = CALL_MS) => {
     const r = await fetch(`http://127.0.0.1:${port}${path}${path.includes("?") ? "&" : "?"}${where}`, {
       method,
       headers: { authorization: auth, "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(ms),
+    }).catch((e: unknown) => {
+      throw new Error(`${method} ${path}: ${(e as Error).name === "TimeoutError" ? `no answer in ${ms / 1000} s` : String(e)}`);
     });
     if (!r.ok) throw new Error(`${method} ${path}: HTTP ${r.status} ${await r.text()}`);
     const text = await r.text();
     return text ? JSON.parse(text) : null;
   };
-  await until("the server to answer", async () => (await call("GET", major === 2 ? "/api/skill" : "/skill")) !== undefined, 60_000);
-  return {
+  const dead = () => (child.exitCode !== null || child.signalCode !== null ? `OpenCode exited (${child.exitCode ?? child.signalCode})` : null);
+  const diag = () => `--- OpenCode ${major} (${bin}), last lines of its output ---\n${tail(out) || "(no output)"}`;
+  const stop = async () => {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGTERM");
+      await Promise.race([new Promise((r) => child.once("exit", r)), sleep(5_000)]);
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    }
+    children.delete(child);
+  };
+  const srv: Running = {
     child,
     log: () => out,
     call,
-    stop: async () => {
-      child.kill("SIGTERM");
-      await Promise.race([new Promise((r) => child.once("exit", r)), sleep(5_000)]);
-      if (child.exitCode === null) child.kill("SIGKILL");
-    },
+    diag,
+    until: (what, fn, ms) => until(what, fn, ms, { dead, diag }),
+    stop,
   };
+  try {
+    await srv.until("the server to answer (boot)", async () => (await call("GET", major === 2 ? "/api/skill" : "/skill")) !== undefined, PHASE.boot);
+  } catch (e) {
+    await stop();
+    throw e;
+  }
+  return srv;
 }
 
 /** V2 wraps every answer in `{ location, data }`; V1 answers bare. */
@@ -305,24 +380,48 @@ interface ToolOutcome {
 
 /** Prompt `CMD: <command>` in a session and return the shell tool part it produced. */
 async function runCommand(srv: Running, major: 1 | 2, command: string, sessionID?: string): Promise<ToolOutcome & { sessionID: string }> {
+  try {
+    return await promptOnce(srv, major, command, sessionID);
+  } catch (e) {
+    // A poll already carries the server's output; a direct call does not.
+    const msg = String((e as Error).message ?? e);
+    throw msg.includes("--- OpenCode") ? e : new Error(`running \`${command}\`: ${msg}\n${srv.diag()}`);
+  }
+}
+
+async function promptOnce(srv: Running, major: 1 | 2, command: string, sessionID?: string): Promise<ToolOutcome & { sessionID: string }> {
   if (major === 2) {
     const id = sessionID ?? ((data(await srv.call("POST", "/api/session", {})) as { id: string }).id as string);
     const before = await toolParts2(srv, id);
-    await srv.call("POST", `/api/session/${id}/prompt`, { text: `CMD: ${command}` });
-    const part = await until(`the shell call for ${command}`, async () => {
-      const parts = await toolParts2(srv, id);
-      return parts.length > before.length && ["completed", "error"].includes(parts[0]?.status ?? "") ? parts[0] : null;
-    });
+    await srv.call("POST", `/api/session/${id}/prompt`, { text: `CMD: ${command}` }, PHASE.tool);
+    const part = await srv.until(
+      `the shell call for ${command}`,
+      async () => {
+        const parts = await toolParts2(srv, id);
+        return parts.length > before.length && ["completed", "error"].includes(parts[0]?.status ?? "") ? parts[0] : null;
+      },
+      PHASE.tool,
+    );
     return { ...part, sessionID: id };
   }
   const id = sessionID ?? ((await srv.call("POST", "/session", {})) as { id: string }).id;
   const before = await toolParts1(srv, id);
-  await srv.call("POST", `/session/${id}/message`, { model: { providerID: "mock", modelID: "m" }, parts: [{ type: "text", text: `CMD: ${command}` }] });
-  const part = await until(`the bash call for ${command}`, async () => {
-    const parts = await toolParts1(srv, id);
-    const last = parts[parts.length - 1];
-    return parts.length > before.length && ["completed", "error"].includes(last?.status ?? "") ? last : null;
-  });
+  // V1 answers this POST only once the turn is over, the tool call included.
+  await srv.call(
+    "POST",
+    `/session/${id}/message`,
+    { model: { providerID: "mock", modelID: "m" }, parts: [{ type: "text", text: `CMD: ${command}` }] },
+    PHASE.tool,
+  );
+  const part = await srv.until(
+    `the bash call for ${command}`,
+    async () => {
+      const parts = await toolParts1(srv, id);
+      const last = parts[parts.length - 1];
+      return parts.length > before.length && ["completed", "error"].includes(last?.status ?? "") ? last : null;
+    },
+    PHASE.tool,
+  );
   return { ...part, sessionID: id };
 }
 
@@ -372,6 +471,7 @@ for (const major of [1, 2] as const) {
       mock = await startMock();
     });
     afterAll(async () => {
+      for (const c of children) if (c.exitCode === null && c.signalCode === null) c.kill("SIGKILL");
       await new Promise((r) => mock?.server.close(r));
       for (const r of roots) rmSync(r, { recursive: true, force: true });
     });
@@ -383,19 +483,27 @@ for (const major of [1, 2] as const) {
       const srv = await serve(bin as string, major, sb);
       try {
         // Loaded: both skills appear, and only our plugin adds them.
-        const ids = await until("the bundled skills", async () => {
-          const s = await skillIds(srv, major);
-          return s.includes("ultra11y") && s.includes("review-a11y") ? s : null;
-        });
+        const ids = await srv.until(
+          "the bundled skills",
+          async () => {
+            const s = await skillIds(srv, major);
+            return s.includes("ultra11y") && s.includes("review-a11y") ? s : null;
+          },
+          PHASE.skills,
+        );
         expect(ids).toEqual(expect.arrayContaining(["ultra11y", "review-a11y"]));
         if (major === 2) {
           // OpenCode 2 marks a plugin active once setup() has RETURNED, after the skills it
           // registers already show — so the status is polled, never read once (#138).
-          const status = await until("the plugin to report active", async () => {
-            const plugins = data(await srv.call("GET", "/api/plugin")) as Array<{ id: string; state: { status: string } }>;
-            const s = plugins.find((p) => p.id === "ultra11y")?.state.status;
-            return s === "active" ? s : null;
-          });
+          const status = await srv.until(
+            "the plugin to report active",
+            async () => {
+              const plugins = data(await srv.call("GET", "/api/plugin")) as Array<{ id: string; state: { status: string } }>;
+              const s = plugins.find((p) => p.id === "ultra11y")?.state.status;
+              return s === "active" ? s : null;
+            },
+            PHASE.plugin,
+          );
           expect(status).toBe("active");
         }
         expect(srv.log()).not.toMatch(/failed to load plugin/i);
@@ -428,18 +536,26 @@ for (const major of [1, 2] as const) {
       pinPackage(sb, major);
       const srv = await serve(bin as string, major, sb);
       try {
-        await until("the bundled skills from the pinned package", async () => {
-          const s = await skillIds(srv, major);
-          return s.includes("ultra11y") && s.includes("review-a11y");
-        });
+        await srv.until(
+          "the bundled skills from the pinned package",
+          async () => {
+            const s = await skillIds(srv, major);
+            return s.includes("ultra11y") && s.includes("review-a11y");
+          },
+          PHASE.skills,
+        );
         if (major === 2) {
           // OpenCode 2 marks a plugin active once setup() has RETURNED, after the skills it
           // registers already show — so the status is polled, never read once (#138).
-          const status = await until("the plugin to report active", async () => {
-            const plugins = data(await srv.call("GET", "/api/plugin")) as Array<{ id: string; state: { status: string } }>;
-            const s = plugins.find((p) => p.id === "ultra11y")?.state.status;
-            return s === "active" ? s : null;
-          });
+          const status = await srv.until(
+            "the plugin to report active",
+            async () => {
+              const plugins = data(await srv.call("GET", "/api/plugin")) as Array<{ id: string; state: { status: string } }>;
+              const s = plugins.find((p) => p.id === "ultra11y")?.state.status;
+              return s === "active" ? s : null;
+            },
+            PHASE.plugin,
+          );
           expect(status).toBe("active");
         }
         expect(srv.log()).not.toMatch(/failed to load plugin/i);
