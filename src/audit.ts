@@ -44,7 +44,7 @@ import { GRAPH_ONLY_EXT } from "./glob.js";
 import { readText, today } from "./util.js";
 import { resolveMessage } from "./messages.js";
 import { reflowClippedParams } from "./probes.js";
-import { isPdfPath, loadPdfDoc, pdfDocFromBytes, readDocumentOrigin } from "./documents.js";
+import { isPdfPath, loadPdfDoc, mergeDocumentAudit, pdfDocFromBytes, readDocumentOrigin } from "./documents.js";
 import { PDF_MAX_BYTES } from "./parse/pdf.js";
 import { pdfCheckOutcomes } from "./rules/pdf.js";
 import { INAPPLICABLE_STATUS } from "./types.js";
@@ -395,8 +395,13 @@ interface Accum {
   metadataTitleShells: Set<string>;
   allFindings: Finding[];
   packFindings: Finding[]; // declarative pack-rule findings (namespaced pack:<key>:<id>)
-  documents: DocumentAudit[]; // downloadable documents read (PDF), with their check outcomes
-  documentFindings: Finding[]; // document-rule findings — never folded into the WCAG verdict
+  // Downloadable documents read (PDF), ONE per distinct content: each with its check outcomes and
+  // its findings, page-less — they are attributed to the linking pages in `finalize`, once the
+  // pages of every copy are known (a PDF named as an input and the same file downloaded by
+  // `scan` are one document). Never folded into the WCAG verdict.
+  documents: { audit: DocumentAudit; findings: Finding[] }[];
+  documentsByDigest: Map<string, { audit: DocumentAudit; findings: Finding[] }>;
+  duplicateDocuments: number; // copies of an already-folded document (same SHA-256)
   fileCount: number;
   opaqueLibs: Set<string>; // component-library specifiers rendered but not source-analysable
   opaqueFiles: number; // count of source files that render such components
@@ -502,7 +507,8 @@ function newAccum(): Accum {
     allFindings: [],
     packFindings: [],
     documents: [],
-    documentFindings: [],
+    documentsByDigest: new Map(),
+    duplicateDocuments: 0,
     fileCount: 0,
     opaqueLibs: new Set(),
     opaqueFiles: 0,
@@ -763,24 +769,49 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
  *  the document is not the page that links it, and a conforming alternate version may exist, so
  *  nothing here may make a WCAG criterion of the scope non-conformant — or conformant. What the
  *  fold does record is that a downloadable document EXISTS (the `downloadDocs` subject, scope-wide
- *  and on every page linking it), which keeps RGAA 13.3/13.4 open for the adjudicator. */
+ *  and on every page linking it), which keeps RGAA 13.3/13.4 open for the adjudicator.
+ *
+ *  ONE DOCUMENT PER CONTENT. A copy of a document already folded (same SHA-256 — the PDF named in
+ *  the audit glob and the same file `scan` downloaded into `.ultra11y/documents/`) is not a second
+ *  document: its path and origin (URL, linking pages) are merged into the first entry and its
+ *  findings, identical by construction, are not raised again. */
 function foldDocument(acc: Accum, doc: Doc): void {
-  const findings = runRules(doc);
   const pages = doc.document?.pages ?? [];
-  for (const f of findings) {
-    // Attributed to every page a reader reaches the document from — the page is where RGAA asks
-    // « does each downloadable document have an accessible version? ».
-    if (pages.length) for (const page of pages) acc.documentFindings.push({ ...f, page });
-    else acc.documentFindings.push(f);
-  }
-  acc.documents.push(documentAudit(doc, new Set(findings.map((f) => f.ruleId))));
   acc.subjectsSeen.add("downloadDocs");
   for (const page of pages) {
     const own = acc.pageSubjects.get(page) ?? new Set<string>();
     own.add("downloadDocs");
     acc.pageSubjects.set(page, own);
   }
+  const known = doc.digest ? acc.documentsByDigest.get(doc.digest) : undefined;
+  if (known) {
+    mergeDocumentAudit(known.audit, documentAudit(doc, new Set()));
+    acc.duplicateDocuments++;
+    return;
+  }
+  const findings = runRules(doc);
+  const entry = { audit: documentAudit(doc, new Set(findings.map((f) => f.ruleId))), findings };
+  acc.documents.push(entry);
+  if (doc.digest) acc.documentsByDigest.set(doc.digest, entry);
   acc.fileCount++;
+}
+
+/** A document's findings, attributed to every page a reader reaches it from — the page is where
+ *  RGAA asks « does each downloadable document have an accessible version? » — or page-less when
+ *  no linking page is known. Done once all copies are folded, so the pages are all of them. */
+function documentFindingsOf(documents: Accum["documents"]): Finding[] {
+  const out: Finding[] = [];
+  for (const { audit, findings } of documents) {
+    const pages = audit.pages ?? [];
+    // Cited on the entry's file, which a later copy may have replaced (the project's own file
+    // over the one `scan` stored — mergeDocumentAudit).
+    for (const raw of findings) {
+      const f = raw.file === audit.file ? raw : { ...raw, file: audit.file };
+      if (pages.length) for (const page of pages) out.push({ ...f, page });
+      else out.push(f);
+    }
+  }
+  return out;
 }
 
 function documentAudit(doc: Doc, fired: ReadonlySet<string>): DocumentAudit {
@@ -788,6 +819,7 @@ function documentAudit(doc: Doc, fired: ReadonlySet<string>): DocumentAudit {
   const text: DocumentAudit["text"] = !f?.readable || !f.contentScanned ? "unknown" : f.textOps > 0 ? "yes" : f.fonts > 0 ? "unknown" : "no";
   return {
     file: doc.file,
+    ...(doc.digest ? { sha256: doc.digest } : {}),
     ...(doc.document?.url ? { url: doc.document.url } : {}),
     ...(doc.document?.pages?.length ? { pages: doc.document.pages } : {}),
     format: "pdf",
@@ -1048,6 +1080,7 @@ function axeFindings(violations: NonNullable<NonNullable<RenderSignals["axe"]>["
 }
 
 function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): AuditResult {
+  const documentFindings = documentFindingsOf(acc.documents);
   const criteria: CriterionResult[] = [];
   const residualRisks: ResidualRisk[] = [];
 
@@ -1203,8 +1236,8 @@ function finalize(acc: Accum, inputs: string[], extra: FinalizeExtra = {}): Audi
     criteria,
     findings: acc.allFindings,
     ...(acc.packFindings.length ? { packFindings: acc.packFindings } : {}),
-    ...(acc.documents.length ? { documents: acc.documents } : {}),
-    ...(acc.documentFindings.length ? { documentFindings: acc.documentFindings } : {}),
+    ...(acc.documents.length ? { documents: acc.documents.map((d) => d.audit) } : {}),
+    ...(documentFindings.length ? { documentFindings } : {}),
     residualRisks,
     conformancePct,
   };
@@ -1325,18 +1358,10 @@ export function runAudit(opts: AuditInput): AuditResult {
       let doc: Doc;
       try {
         if (statSync(file).size > PDF_MAX_BYTES) doc = loadPdfDoc(file);
-        else {
-          const bytes = readFileSync(file);
-          if (dedupMode !== "off") {
-            const h = createHash("sha1").update(bytes).digest("hex");
-            if (seen.has(h)) {
-              duplicateFiles++;
-              continue;
-            }
-            seen.add(h);
-          }
-          doc = pdfDocFromBytes(bytes, file, readDocumentOrigin(file));
-        }
+        // Copies of one document (same bytes) are folded together by `foldDocument`, which
+        // keeps every copy's origin — skipping the copy here dropped the linking pages of the
+        // one `scan` downloaded whenever the same PDF was also named in the glob (issue #225).
+        else doc = pdfDocFromBytes(readFileSync(file), file, readDocumentOrigin(file));
       } catch {
         continue; // vanished between discovery and read
       }
@@ -1387,6 +1412,7 @@ export function runAudit(opts: AuditInput): AuditResult {
   }
 
   const canonicalFiles = acc.fileCount;
+  duplicateFiles += acc.duplicateDocuments;
   // Respect --max-files for stdin too (don't let the stdin doc push past the cap).
   if (opts.inputs.includes("-") && opts.stdin !== undefined && !(opts.maxFiles && opts.maxFiles > 0 && acc.fileCount >= opts.maxFiles)) {
     foldDoc(acc, parseSource(opts.stdin, "<stdin>", { forceJsx: opts.forceJsx }), graph);

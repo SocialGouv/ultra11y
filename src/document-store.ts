@@ -211,11 +211,18 @@ export function recordDocumentPages(file: string, url: string, pageIds: Iterable
   writeFileSync(file.replace(/\.pdf$/i, ".json"), `${JSON.stringify({ kind: SIDECAR_KIND, v: SIDECAR_VERSION, url: prev?.url ?? url, pages }, null, 2)}\n`);
 }
 
+/** A document's identity: the SHA-256 of its bytes, hex. The name `scan` stores it under, and the
+ *  key the audit folds copies of one document on — a PDF named as an audit input and the same
+ *  file downloaded by `scan` are ONE document, not two (issue #225). */
+export function documentDigest(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
 /** Store a document under `<root>/.ultra11y/documents/<sha256>.pdf` with its sidecar. Named by its
  *  bytes, so the same document linked from many pages (or fetched again next run) is one file. */
 export function storeDocument(root: string, url: string, bytes: Buffer, pageIds: Iterable<string>): string {
   const dir = join(root, DOCUMENTS_DIR);
-  const sha = createHash("sha256").update(bytes).digest("hex");
+  const sha = documentDigest(bytes);
   const file = join(dir, `${sha}.pdf`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, bytes);

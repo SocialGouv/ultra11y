@@ -50,6 +50,8 @@ export interface Doc {
   // (the URL `scan` downloaded it from, the pages that link it). See src/documents.ts.
   pdf?: PdfFacts;
   document?: DocumentOrigin;
+  // Set on a `pdf` Doc whose bytes were read: their SHA-256, the key copies of one document fold on.
+  digest?: string;
   // JSX only: import specifiers of component-LIBRARY components rendered in this
   // file (e.g. "@codegouvfr/react-dsfr/Button"). Their real HTML output lives in
   // node_modules and is invisible to source analysis — a source verdict is
