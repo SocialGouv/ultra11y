@@ -2,10 +2,10 @@
 // files and the sample's declared sources, then the URLs those pages answer at.
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
+import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildAffectedGraph, changedSince, routeOfFile, selectAffected, type AffectedInput } from "../src/affected.js";
+import { buildAffectedGraph, changedSince, isNextProject, routeOfFile, selectAffected, type AffectedInput } from "../src/affected.js";
 import { readRoutes } from "../src/routes.js";
 import { main } from "../src/cli.js";
 import type { DepGraph } from "../src/graph/graph.js";
@@ -27,8 +27,60 @@ describe("routeOfFile", () => {
     expect(routeOfFile(file)).toEqual(expected);
   });
 
-  it.each(["src/components/Button.tsx", "pages/api/hello.ts", "src/pages/_helpers/x.tsx", "src/app/page.test.tsx"])("%s is no route file", (file) => {
+  it.each([
+    "src/components/Button.tsx",
+    "pages/api/hello.ts",
+    "src/pages/_helpers/x.tsx",
+    "src/app/page.test.tsx",
+    // Not at the router root: a directory NAMED pages/ or app/ deeper down is no file router.
+    "components/pages/X.tsx",
+    "src/components/pages/Home.tsx",
+    "src/features/app/page.tsx",
+    "packages/web/src/app/layout.tsx",
+  ])("%s is no route file", (file) => {
     expect(routeOfFile(file)).toBeNull();
+  });
+});
+
+// Rf5f1b1: a `src/pages/` directory is Next's Pages Router only in a Next project. In a Vite +
+// react-router SPA it holds plain components, and the page that renders them is the one the
+// sample declares — classing `src/pages/Home.tsx` as a route stopped the walk before it.
+describe("file routing is read only in a Next.js project", () => {
+  let dir: string;
+  const write = (rel: string, content: string) => {
+    mkdirSync(join(dir, rel, ".."), { recursive: true });
+    writeFileSync(join(dir, rel), content);
+  };
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "u11y-spa-"));
+    write("package.json", JSON.stringify({ name: "spa", dependencies: { react: "19.0.0", "react-router": "7.0.0", vite: "6.0.0" } }));
+    write("src/components/Card.tsx", "export function Card() { return <article>card</article>; }\n");
+    write("src/pages/Home.tsx", 'import { Card } from "../components/Card";\nexport default function Home() { return <Card />; }\n');
+    write("src/routes.tsx", 'import Home from "./pages/Home";\nexport const routes = [{ path: "/", element: <Home /> }];\n');
+  });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  const sample = [{ id: "accueil", url: "https://spa.example/", sources: ["src/routes.tsx"] }];
+
+  it("detects Next from package.json or a next.config.*, and nothing else", () => {
+    expect(isNextProject(ROOT)).toBe(true);
+    expect(isNextProject(dir)).toBe(false);
+  });
+
+  it("in a SPA, the walk goes through src/pages/ up to the sample's declared source", () => {
+    const r = selectAffected({ root: dir, changed: ["src/components/Card.tsx"], sample });
+    expect(r.routes.map((x) => [x.path, x.entry, x.kind])).toEqual([["/", "src/routes.tsx", "sample"]]);
+    expect(r.unmapped).toEqual([]);
+  });
+
+  it("in a SPA with no declared source, the change is reported unmapped — never a guessed route", () => {
+    const r = selectAffected({ root: dir, changed: ["src/components/Card.tsx"] });
+    expect(r.routes).toEqual([]);
+    expect(r.unmapped).toEqual(["src/components/Card.tsx"]);
+  });
+
+  it("the very same tree in a Next project reads src/pages/Home.tsx as the /Home route", () => {
+    const r = selectAffected({ root: dir, changed: ["src/components/Card.tsx"], next: true });
+    expect(r.routes.map((x) => x.path)).toEqual(["/Home"]);
   });
 });
 

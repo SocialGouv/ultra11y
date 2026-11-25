@@ -7,19 +7,32 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { DynamicFinding, DynamicResult } from "../src/types.js";
-import { dynamicFindingId, newDynamicFindings } from "../src/baseline.js";
+import type { DynamicFinding, DynamicResult, ScanRedirect } from "../src/types.js";
+import { dynamicFindingId, newDynamicFindings, newUnrendered } from "../src/baseline.js";
 
 const rendered: string[][] = [];
 let page: (url: string) => DynamicFinding[] = () => [];
+// A URL the mocked browser cannot render, the way runScanManyLocal records it: refused, not scanned.
+let broken: (url: string) => ScanRedirect | undefined = () => undefined;
 
 vi.mock("../src/scan-local.js", async (orig) => ({
   ...(await orig<typeof import("../src/scan-local.js")>()),
   runScanManyLocal: vi.fn(async (urls: string[]): Promise<DynamicResult> => {
     rendered.push(urls);
-    return { tool: "ultra11y", engine: "mock", target: `${urls.length} page(s)`, date: "2026-01-01", findings: urls.flatMap(page), scanned: urls };
+    const redirected = urls.flatMap((u) => broken(u) ?? []);
+    const ok = urls.filter((u) => !broken(u));
+    return {
+      tool: "ultra11y",
+      engine: "mock",
+      target: `${urls.length} page(s)`,
+      date: "2026-01-01",
+      findings: ok.flatMap(page),
+      ...(ok.length ? { scanned: ok } : {}),
+      ...(redirected.length ? { redirected } : {}),
+    };
   }),
 }));
+const http500 = (url: string): ScanRedirect => ({ id: "x", name: url, requested: url, landed: url, reason: "http-status", status: 500 });
 
 const { main } = await import("../src/cli.js");
 
@@ -73,6 +86,15 @@ describe("newDynamicFindings", () => {
   });
 });
 
+describe("newUnrendered", () => {
+  it("keeps the refused pages whose path the baseline did not already refuse, across hosts", () => {
+    const pr = http500("https://pr/contact");
+    expect(newUnrendered({ redirected: [pr, http500("https://pr/aide")] }, { redirected: [http500("https://prod/aide/")] })).toEqual([pr]);
+    expect(newUnrendered({ redirected: [pr] }, {})).toEqual([pr]);
+    expect(newUnrendered({}, { redirected: [pr] })).toEqual([]);
+  });
+});
+
 describe("scan --since --base-url --baseline", () => {
   let dir: string;
   const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -98,9 +120,9 @@ describe("scan --since --base-url --baseline", () => {
     vi.restoreAllMocks();
     return { code, out: out.join("\n"), err: err.join("\n") };
   }
-  const baseline = (findings: DynamicFinding[]): string => {
+  const baseline = (findings: DynamicFinding[], redirected?: ScanRedirect[]): string => {
     const file = join(dir, "baseline.json");
-    writeFileSync(file, JSON.stringify({ tool: "ultra11y", engine: "e", target: "2 page(s)", date: "d", findings }));
+    writeFileSync(file, JSON.stringify({ tool: "ultra11y", engine: "e", target: "2 page(s)", date: "d", findings, ...(redirected ? { redirected } : {}) }));
     return file;
   };
 
@@ -122,6 +144,41 @@ describe("scan --since --base-url --baseline", () => {
   afterEach(() => {
     rendered.length = 0;
     page = () => [];
+    broken = () => undefined;
+  });
+
+  // R2278fa: a reached page that cannot be rendered measured nothing, so it cannot pass.
+  it("a reached page the PR breaks (HTTP 500) blocks, even when every other page is clean", async () => {
+    broken = (url) => (url.endsWith("/contact") ? http500(url) : undefined);
+    const r = await scan(["--baseline", baseline([])]);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("1 page(s) touchée(s) non rendue(s)");
+    expect(r.out).toContain("[non mesurée] https://pr-7.preview.example/contact — HTTP 500");
+  });
+
+  it("a page redirected elsewhere (a login wall) blocks too, and --json lists it as not measured", async () => {
+    broken = (url) =>
+      url.endsWith("/contact") ? { id: "contact", name: url, requested: url, landed: "https://pr-7.preview.example/login", reason: "redirect" } : undefined;
+    const r = await scan(["--baseline", baseline([]), "--json"]);
+    expect(r.code).toBe(1);
+    const doc = JSON.parse(r.out) as { gate: { new: unknown[]; notMeasured: { url: string; reason: string; landed?: string }[]; knownNotMeasured: number } };
+    expect(doc.gate.new).toEqual([]);
+    expect(doc.gate.notMeasured).toEqual([{ url: "https://pr-7.preview.example/contact", reason: "redirect", landed: "https://pr-7.preview.example/login" }]);
+    expect(doc.gate.knownNotMeasured).toBe(0);
+  });
+
+  it("a page that was already unrenderable in the baseline is pre-existing, and does not block", async () => {
+    broken = (url) => (url.endsWith("/contact") ? http500(url) : undefined);
+    const r = await scan(["--baseline", baseline([], [http500("https://prod.example.fr/contact")])]);
+    expect(r.code).toBe(0);
+    expect(r.out).not.toContain("non mesurée");
+  });
+
+  it("every reached page unrenderable, all already so in the baseline, still fails: nothing was measured", async () => {
+    broken = (url) => http500(url);
+    const r = await scan(["--baseline", baseline([], [http500("https://prod.example.fr/"), http500("https://prod.example.fr/contact")])]);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("rien n'a été mesuré");
   });
 
   it("renders only the pages the diff reaches, on the preview", async () => {

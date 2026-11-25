@@ -87,8 +87,9 @@ node scripts/ultra11y.mjs scan --since origin/main --base-url <PR deployment> --
 
 - **Which pages**: `affected` walks the reverse import graph from every file changed since the
   merge-base (`<base>...HEAD`, plus uncommitted and untracked files) up to the route files —
-  Next.js `app/**/page.*` and `pages/**`; a `layout`/`template` (or `_app`) selects every page
-  below it — and to the files `.ultra11yrc.json` `sample.pages[].sources` declare. Dynamic
+  in a Next.js project only (a `next.config.*` or `next` in package.json), `app/**/page.*` and
+  `pages/**` at the router root (or under `src/`); a `layout`/`template` (or `_app`) selects
+  every page below it — and to the files `.ultra11yrc.json` `sample.pages[].sources` declare. Dynamic
   routes (`[id]`, `[...slug]`) resolve against the route inventory (`.ultra11y/routes.json`,
   from `pages discover --routes-only`) and the sample. The base URL is the user's to give (ask
   for it when unknown); both scans render the **same paths**, since the selection depends on
@@ -96,9 +97,11 @@ node scripts/ultra11y.mjs scan --since origin/main --base-url <PR deployment> --
 - **What blocks**: with `--baseline`, `scan` exits 1 only on rendered findings the baseline does
   not hold (identity = axe rule, criterion, route path, selector — host-free). A page new to
   the baseline is new, all of it. Advisory (best-practice) findings never block. `--fail-on`
-  narrows the gate (default: any severity). The `gate.new` array of the `--json` output is the
-  blocking list; `gate.known` counts the pre-existing ones (Core rule 2: one line, out of the
-  verdict).
+  narrows the gate (default: any severity). A reached page that cannot be rendered (HTTP error,
+  redirect to a login, browser crash) measured nothing and **blocks** too, unless the same path
+  was already unrenderable in the baseline. The `gate.new` and `gate.notMeasured` arrays of the
+  `--json` output are the blocking list; `gate.known` / `gate.knownNotMeasured` count the
+  pre-existing ones (Core rule 2: one line, out of the verdict).
 - **What it cannot see**: a changed file reaching no page is listed as unmapped, a dynamic
   route no known URL resolves as unresolved — name both in the report as **not rendered**,
   never as clean. No deployment available → skip §1b and keep the rendering criteria as

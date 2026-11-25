@@ -7,7 +7,8 @@
 // to the files a page starts from, then name those pages' URLs.
 //
 // A page starts from:
-//   - a file-system route file: a Next.js App Router `app/**/page.*` (its URL is its directory,
+//   - in a Next.js project only, and only under the router root (`app/`, `pages/`, or the same
+//     under `src/`), a file-system route file: an App Router `app/**/page.*` (its URL is its directory,
 //     route groups `(x)` and parallel slots `@x` dropped), a `layout`/`template` (every page
 //     below it), or a Pages Router `pages/**` file (`_app`/`_document` wrap every page);
 //   - a source a sample page declares (`.ultra11yrc.json` `sample.pages[].sources`), which is
@@ -22,7 +23,7 @@
 // is file-level (a barrel selects every page importing it), and a changed markup file that
 // reaches no page is reported rather than dropped.
 import { execFileSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, posix, relative, resolve } from "node:path";
 import { discover } from "./discover.js";
 import { GRAPH_ONLY_EXT, isTestArtifact, toPosix } from "./glob.js";
@@ -70,21 +71,43 @@ export interface AffectedInput {
   baseUrl?: string;
   /** A prebuilt graph over the root (tests); built from the root's files otherwise. */
   graph?: DepGraph;
+  /** Read Next.js route files from their paths; detected from the root (`isNextProject`) when unset. */
+  next?: boolean;
 }
 
 const MARKUP_EXT = /\.(?:html?|xhtml|jsx|tsx|vue|svelte|astro|mdx)$/i;
-const APP_PAGE = /(?:^|\/)app\/(?:(.+)\/)?page\.(?:tsx|jsx|ts|js|mdx)$/;
-const APP_WRAPPER = /(?:^|\/)app\/(?:(.+)\/)?(?:layout|template)\.(?:tsx|jsx|ts|js)$/;
-// Pages Router (Next.js, also Nuxt/Astro file routing): `pages/**`, minus API routes.
-const PAGES_FILE = /(?:^|\/)pages\/(?!api\/)(.+)\.(?:tsx|jsx|ts|js|mdx|md|vue|astro|svelte)$/;
+// Next.js file routing lives at the ROUTER ROOT only — `app/` or `pages/` directly under the
+// project root, or under `src/`. Anywhere deeper (`src/components/pages/X.tsx`, a react-router
+// SPA's `src/features/app/page.tsx`) the directory name means nothing, and treating the file as a
+// route would stop the walk before it reaches the page that really renders it.
+const APP_PAGE = /^(?:src\/)?app\/(?:(.+)\/)?page\.(?:tsx|jsx|ts|js|mdx)$/;
+const APP_WRAPPER = /^(?:src\/)?app\/(?:(.+)\/)?(?:layout|template)\.(?:tsx|jsx|ts|js)$/;
+// Pages Router: `pages/**`, minus API routes.
+const PAGES_FILE = /^(?:src\/)?pages\/(?!api\/)(.+)\.(?:tsx|jsx|ts|js|mdx|md)$/;
+const NEXT_CONFIGS = ["next.config.js", "next.config.mjs", "next.config.cjs", "next.config.ts", "next.config.mts"];
+
+/** Is the project at `root` a Next.js application — the only router whose route files this
+ *  module reads from their paths? A `next.config.*`, or `next` among the package.json
+ *  dependencies. Anything else (Vite + react-router, Remix…) selects through the sample's
+ *  declared sources, and a `src/pages/Home.tsx` there is just a component. */
+export function isNextProject(root: string): boolean {
+  if (NEXT_CONFIGS.some((f) => existsSync(join(root, f)))) return true;
+  try {
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as Record<string, Record<string, string> | undefined>;
+    return ["dependencies", "devDependencies", "peerDependencies"].some((k) => typeof pkg[k]?.next === "string");
+  } catch {
+    return false;
+  }
+}
 
 /** URL segments of an App Router directory: route groups and parallel slots render no segment. */
 function appSegments(dir: string | undefined): string[] {
   return (dir ?? "").split("/").filter((s) => s && !/^\(.*\)$/.test(s) && !s.startsWith("@"));
 }
 
-/** The route pattern a route file serves, its kind, and — for a wrapper — the directory whose
- *  pages it wraps. `null` when the file is no route file. */
+/** The route pattern a Next.js route file serves (`rel` is project-root-relative), its kind,
+ *  and — for a wrapper — the directory whose pages it wraps. `null` when the file is no route
+ *  file. Only meaningful in a Next.js project (see `isNextProject`). */
 export function routeOfFile(rel: string): { kind: "page" | "layout"; pattern: string; dir?: string } | null {
   if (isTestArtifact(rel)) return null;
   const page = rel.match(APP_PAGE);
@@ -95,7 +118,7 @@ export function routeOfFile(rel: string): { kind: "page" | "layout"; pattern: st
   if (pages) {
     const segs = (pages[1] ?? "").split("/");
     // `_app`/`_document` wrap every page of the router; any other `_x` is not a route.
-    if (segs.at(-1) === "_app" || segs.at(-1) === "_document") return { kind: "layout", pattern: "/", dir: rel.match(/^(.*?(?:^|\/)pages)\//)?.[1] ?? "pages" };
+    if (segs.at(-1) === "_app" || segs.at(-1) === "_document") return { kind: "layout", pattern: "/", dir: rel.startsWith("src/") ? "src/pages" : "pages" };
     if (segs.some((s) => s.startsWith("_"))) return null;
     if (segs.at(-1) === "index") segs.pop();
     return { kind: "page", pattern: `/${segs.join("/")}` };
@@ -127,12 +150,12 @@ function rebase(path: string, known: string | undefined, baseUrl: string | undef
 
 /** Every graph file reached walking the import edges backwards from `start`, `start` included.
  *  A route file stops the walk: whatever imports a page does not render it. */
-function reverseClosure(graph: DepGraph, start: string, rel: (f: string) => string): Set<string> {
+function reverseClosure(graph: DepGraph, start: string, isRoute: (key: string) => boolean): Set<string> {
   const seen = new Set<string>([start]);
   const queue = [start];
   while (queue.length) {
     const cur = queue.shift() as string;
-    if (cur !== start && routeOfFile(rel(cur))) continue;
+    if (cur !== start && isRoute(cur)) continue;
     for (const importer of importersOf(graph, cur)) {
       if (seen.has(importer)) continue;
       seen.add(importer);
@@ -157,6 +180,8 @@ export function selectAffected(input: AffectedInput): AffectedResult {
   // Graph keys are the paths discovery produced (cwd-relative or absolute, as the root was
   // given); everything reported is root-relative. Translate at the boundary.
   const keyOf = new Map([...graph.known].map((k) => [toRel(k), k]));
+  const next = input.next ?? isNextProject(root);
+  const routeOf = (rel: string): ReturnType<typeof routeOfFile> => (next ? routeOfFile(rel) : null);
 
   // Known pages: the sample first (its URL and its declared sources), then the inventory.
   const known = new Map<string, { url: string; sampleId?: string }>();
@@ -168,7 +193,7 @@ export function selectAffected(input: AffectedInput): AffectedResult {
       const k = posix.normalize(toPosix(src)).replace(/^\.\//, "");
       sourceOf.set(k, [...(sourceOf.get(k) ?? []), s]);
     }
-  const pageFiles = [...graph.known].map(toRel).filter((f) => routeOfFile(f)?.kind === "page");
+  const pageFiles = [...graph.known].map(toRel).filter((f) => routeOf(f)?.kind === "page");
 
   const routes = new Map<string, AffectedRoute>();
   const unresolved = new Map<string, { entry: string; pattern: string }>();
@@ -203,18 +228,18 @@ export function selectAffected(input: AffectedInput): AffectedResult {
     const key = keyOf.get(file);
     // A file the graph does not hold (a stylesheet, a deleted file) reaches only itself, and
     // only while it exists: a deleted page has nothing left to render.
-    const reached = key ? [...reverseClosure(graph, key, toRel)].map(toRel) : existsSync(join(root, file)) ? [file] : [];
+    const reached = key ? [...reverseClosure(graph, key, (k) => routeOf(toRel(k)) !== null)].map(toRel) : existsSync(join(root, file)) ? [file] : [];
     let hit = false;
     for (const f of reached) {
       for (const s of sourceOf.get(f) ?? []) {
         add(routePath(s.url), f, "sample", file, s.id);
         hit = true;
       }
-      const route = routeOfFile(f);
+      const route = routeOf(f);
       if (!route) continue;
       hit = true;
       if (route.kind === "page") addPattern(route.pattern, f, f, "page", file);
-      else for (const pf of pageFiles.filter((p) => p.startsWith(`${route.dir}/`))) addPattern(routeOfFile(pf)!.pattern, pf, f, "layout", file);
+      else for (const pf of pageFiles.filter((p) => p.startsWith(`${route.dir}/`))) addPattern(routeOf(pf)!.pattern, pf, f, "layout", file);
     }
     if (!hit && MARKUP_EXT.test(file) && !isTestArtifact(file) && existsSync(join(root, file))) unmapped.push(file);
   }

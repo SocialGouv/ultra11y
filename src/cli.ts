@@ -99,7 +99,7 @@ import { DOCUMENTS_DIR, downloadSnapshotDocuments } from "./documents.js";
 import { LOCAL_ENGINE, runScanLocal, runScanManyLocal, runCrawlScanLocal, runSampleScanLocal, localTierStatus } from "./scan-local.js";
 import { validateSample, lintSample, kindLabel, isTransverseKind, proposeSamplePages, mergeSample, sampleFromSnapshots, unionSample } from "./sample.js";
 import { runFix, fixSummary } from "./fix.js";
-import { findingId, parseFailOn, findingsAtOrAbove, newDynamicFindings } from "./baseline.js";
+import { findingId, parseFailOn, findingsAtOrAbove, newDynamicFindings, newUnrendered } from "./baseline.js";
 import { repoRoot, resolveEnginePath, writeHook } from "./init.js";
 import { installForTargets, parseTargets, statusReport, uninstallForTargets } from "./install/index.js";
 import { agentsMdBlock } from "./install/agents-md.js";
@@ -4652,16 +4652,59 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
     const fresh = findingsAtOrAbove(newAll, gateOn);
     const known = dynamic.findings.filter((f) => !f.advisory).length - newAll.length;
     const measured = dynamic.scanned?.length ?? 0;
-    if (p.flags.json) console.log(JSON.stringify({ ...dynamic, gate: { baseline: baselinePath, new: fresh, known } }, null, 2));
+    // A reached page that could not be rendered (HTTP >= 400, a redirect to a login, a browser
+    // crash) measured nothing — passing it would read "clean" for the page the change broke. It
+    // blocks, unless the same path was already unrenderable in the baseline.
+    const notMeasured = newUnrendered(dynamic, baseline);
+    const knownNotMeasured = (dynamic.redirected?.length ?? 0) - notMeasured.length;
+    const why = (r: ScanRedirect): string =>
+      r.reason === "http-status"
+        ? `HTTP ${r.status}`
+        : r.reason === "error"
+          ? lang === "fr"
+            ? `échec du navigateur${r.detail ? ` — ${r.detail}` : ""}`
+            : `browser failure${r.detail ? ` — ${r.detail}` : ""}`
+          : lang === "fr"
+            ? `redirigée vers ${r.landed}`
+            : `redirected to ${r.landed}`;
+    if (p.flags.json)
+      console.log(
+        JSON.stringify(
+          {
+            ...dynamic,
+            gate: {
+              baseline: baselinePath,
+              new: fresh,
+              known,
+              notMeasured: notMeasured.map((r) => ({
+                url: r.requested,
+                reason: r.reason ?? "redirect",
+                ...(r.status ? { status: r.status } : {}),
+                ...(r.reason === "redirect" || !r.reason ? { landed: r.landed } : {}),
+                ...(r.detail ? { detail: r.detail } : {}),
+              })),
+              knownNotMeasured,
+            },
+          },
+          null,
+          2,
+        ),
+      );
     else {
       console.log(
         lang === "fr"
-          ? `Rendu des pages touchées (${dynamic.engine}) — ${measured} page(s), ${fresh.length} nouvelle(s) non-conformité(s), ${known} déjà présente(s) dans la référence ${baselinePath}.`
-          : `Rendered review of the reached pages (${dynamic.engine}) — ${measured} page(s), ${fresh.length} new non-conformity(ies), ${known} already in the baseline ${baselinePath}.`,
+          ? `Rendu des pages touchées (${dynamic.engine}) — ${measured} page(s), ${fresh.length} nouvelle(s) non-conformité(s), ${known} déjà présente(s) dans la référence ${baselinePath}${notMeasured.length ? `, ${notMeasured.length} page(s) touchée(s) non rendue(s)` : ""}.`
+          : `Rendered review of the reached pages (${dynamic.engine}) — ${measured} page(s), ${fresh.length} new non-conformity(ies), ${known} already in the baseline ${baselinePath}${notMeasured.length ? `, ${notMeasured.length} reached page(s) not rendered` : ""}.`,
       );
       for (const f of fresh) console.log(`  [${f.criteriaId}] ${f.page ?? dynamic.target} ${f.selector} — ${f.message}`);
+      for (const r of notMeasured)
+        console.log(
+          lang === "fr"
+            ? `  [non mesurée] ${r.requested} — ${why(r)} : rien n'a pu y être mesuré, et elle n'était pas déjà en échec dans la référence. Bloquant tant qu'elle ne s'affiche pas.`
+            : `  [not measured] ${r.requested} — ${why(r)}: nothing could be measured on it, and it was not already failing in the baseline. Blocking until it renders.`,
+        );
     }
-    if (measured === 0) {
+    if (measured === 0 && !notMeasured.length) {
       console.error(
         lang === "fr"
           ? "ultra11y scan : aucune des pages touchées n'a pu être rendue — rien n'a été mesuré. Vérifiez --base-url et la session."
@@ -4669,7 +4712,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       );
       return 1;
     }
-    return fresh.length ? 1 : 0;
+    return fresh.length || notMeasured.length ? 1 : 0;
   }
   // Advisory sample-methodology lint: which normative page KINDS the configured sample
   // lacks. Standard-agnostic mechanics + RGAA-specific required kinds; scan has no

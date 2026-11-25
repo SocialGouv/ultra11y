@@ -3,7 +3,7 @@
 // selectorHint (ambiguous), so two runs agree on which finding is which (the scan
 // merge de-duplicates on it, the ledger and the evidence crops key on it).
 import { routePath } from "./routes.js";
-import type { DynamicFinding, DynamicResult, Finding, Severity } from "./types.js";
+import type { DynamicFinding, DynamicResult, Finding, ScanRedirect, Severity } from "./types.js";
 
 const RANK: Record<Severity, number> = { bloquant: 0, majeur: 1, mineur: 2 };
 
@@ -45,4 +45,14 @@ export function dynamicFindingId(f: Pick<DynamicFinding, "axeRule" | "criteriaId
 export function newDynamicFindings(current: DynamicResult, baseline: Pick<DynamicResult, "findings" | "target">): DynamicFinding[] {
   const known = new Set(baseline.findings.map((f) => dynamicFindingId(f, baseline.target)));
   return current.findings.filter((f) => !f.advisory && !known.has(dynamicFindingId(f, current.target)));
+}
+
+/** The reached pages `current` could not render (an error status, a redirect elsewhere, a
+ *  browser crash) that rendered in the baseline, or that the baseline never tried. A page the
+ *  change broke measured nothing, so it cannot pass for clean: it blocks like a new finding.
+ *  Only a path that was ALREADY unrenderable in the baseline (matched on its route path) is
+ *  pre-existing. */
+export function newUnrendered(current: Pick<DynamicResult, "redirected">, baseline: Pick<DynamicResult, "redirected">): ScanRedirect[] {
+  const known = new Set((baseline.redirected ?? []).map((r) => routePath(r.requested)));
+  return (current.redirected ?? []).filter((r) => !known.has(routePath(r.requested)));
 }
