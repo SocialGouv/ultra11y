@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [9.6.3](https://github.com/SocialGouv/ultra11y/compare/v9.6.2...v9.6.3) (2026-11-25)
+
+
+### Bug Fixes
+
+* **adjudicate:** decision protocols in every brief, whole methodologies, adjudication.md by RGAA criterion ([#236](https://github.com/SocialGouv/ultra11y/issues/236)) ([39bcaed](https://github.com/SocialGouv/ultra11y/commit/39bcaed4702c9934bef01dcbd2e9bfacb278488c))
+
 ## [9.6.2](https://github.com/SocialGouv/ultra11y/compare/v9.6.1...v9.6.2) (2026-11-25)
 
 
