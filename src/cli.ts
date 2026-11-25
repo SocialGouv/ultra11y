@@ -3517,7 +3517,7 @@ function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): num
     console.log(
       JSON.stringify(
         {
-          ok: true,
+          ok: r.rejected === 0,
           auditPath,
           applied: r.applied,
           stillManual: r.stillManual,
@@ -3540,8 +3540,8 @@ function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): num
   else {
     console.log(
       lang === "fr"
-        ? `✓ ${r.applied} verdict(s) rejoué(s) depuis le registre, ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""} → ${auditPath}`
-        : `✓ ${r.applied} verdict(s) replayed from the ledger, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} → ${auditPath}`,
+        ? `${r.rejected ? "⚠" : "✓"} ${r.applied} verdict(s) rejoué(s) depuis le registre, ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""} → ${auditPath}`
+        : `${r.rejected ? "⚠" : "✓"} ${r.applied} verdict(s) replayed from the ledger, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""} → ${auditPath}`,
     );
     // Named, never merely counted: these are exactly the criteria a refresh pass has to
     // adjudicate, and a silent count is what let a half-covered grid read as complete.
@@ -3563,8 +3563,11 @@ function replayLedgerFile(p: ParsedArgs, ledger: VerdictLedger, lang: Lang): num
           ? `ℹ ${rp.obsolete.length} entrée(s) obsolète(s) (le moteur les décide désormais) : ${rp.obsolete.join(", ")}`
           : `ℹ ${rp.obsolete.length} obsolete entry(ies) (the engine now decides them): ${rp.obsolete.join(", ")}`,
       );
+    // The refusals were only counted on the line above; name them, as the fold does.
+    if (r.rejected) for (const i of r.issues) console.error(`  ✗ ${i}`);
+    return reportIncompleteFold(r.rejected, auditPath, lang);
   }
-  return 0;
+  return r.rejected ? 1 : 0;
 }
 
 /** Name the open criteria a fold did not carry, APART from the refusals. A lot (a partial
@@ -3591,6 +3594,23 @@ function reportNotInWorklist(ids: string[], lang: Lang): void {
       ? `ℹ ${ids.length} critère(s) hors de la liste — absent(s) de ce fichier, rien n'a été refusé ; ils restent à évaluer : ${shown}`
       : `ℹ ${ids.length} criterion(ia) not in this worklist — absent from this file, nothing was refused; they stay to assess: ${shown}`,
   );
+}
+
+/** A PARTIAL FOLD IS NOT A SUCCESS (#223). The audit is written — every verdict that proved
+ *  itself lands — but a caller reading only the exit code must not take a fold that refused
+ *  criteria for a complete adjudication: those criteria stay to assess. Exit 1, the CLI's
+ *  « the gate said no » code (2 stays usage / invalid input), with one closing line giving the
+ *  count. Refused is not residual: a `manual` verdict (undecidable, later named under
+ *  `check --allow-undecided`) landed, and is not counted here; neither is a criterion the
+ *  file never mentioned (`notInWorklist`, a lot). */
+function reportIncompleteFold(rejected: number, auditPath: string, lang: Lang): number {
+  if (rejected === 0) return 0;
+  console.error(
+    lang === "fr"
+      ? `✗ Repli incomplet : ${rejected} critère(s) refusé(s) par la porte, qui reste(nt) à évaluer. L'audit partiel est écrit (${auditPath}) ; régénérez la liste depuis cet audit, retranchez ces critères et repliez à nouveau.`
+      : `✗ Incomplete fold: ${rejected} criterion(ia) refused by the gate, still to assess. The partial audit is written (${auditPath}); regenerate the worklist from it, rule those criteria again and fold again.`,
+  );
+  return 1;
 }
 
 /** `verify --apply <adjudication.json> --in <audit.json> --out <dir>` — fold an AI
@@ -3694,7 +3714,7 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
     console.log(
       JSON.stringify(
         {
-          ok: true,
+          ok: r.rejected === 0,
           auditPath,
           applied: r.applied,
           stillManual: r.stillManual,
@@ -3712,13 +3732,15 @@ function applyAdjudicationFile(p: ParsedArgs, adj: AdjudicationFile, lang: Lang)
         2,
       ),
     );
-  else
+  else {
     console.log(
       lang === "fr"
-        ? `✓ ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} hors de la liste` : ""} → ${auditPath}`
-        : `✓ ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} not in this worklist` : ""} → ${auditPath}`,
+        ? `${r.rejected ? "⚠" : "✓"} ${r.applied} critère(s) adjugé(s), ${r.stillManual} laissé(s) en résiduel${r.rejected ? `, ${r.rejected} refusé(s)` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} hors de la liste` : ""} → ${auditPath}`
+        : `${r.rejected ? "⚠" : "✓"} ${r.applied} criterion(ia) adjudicated, ${r.stillManual} left residual${r.rejected ? `, ${r.rejected} refused` : ""}${r.notInWorklist.length ? `, ${r.notInWorklist.length} not in this worklist` : ""} → ${auditPath}`,
     );
-  return 0;
+    return reportIncompleteFold(r.rejected, auditPath, lang);
+  }
+  return r.rejected ? 1 : 0;
 }
 
 async function cmdFix(p: ParsedArgs): Promise<number> {

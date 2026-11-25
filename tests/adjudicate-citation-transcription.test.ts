@@ -117,6 +117,9 @@ describe("a citation that lands on harvested evidence is grounded against that e
     // there. Recognisability does not blame on its own — it only decides whether the harvested
     // anchor may vouch for a citation the file could not confirm, and here it may not.
     expect(r.issues.join("\n")).toMatch(/cited snippet not found/);
+    // …and names the criterion it condemns, like every other refusal line (#223).
+    const line = r.issues.find((i) => i.includes("cited snippet not found"));
+    expect(line).toMatch(new RegExp(`^criterion ${base.criteriaId.replace(/\./g, "\\.")}: cited snippet not found in `));
   });
 
   it("accepts the same element with its attributes in another order and some of them dropped", () => {

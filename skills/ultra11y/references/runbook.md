@@ -21,6 +21,8 @@ ultra11y orchestrate --run audits --phase adjudicate      # batches + prompts fo
 #   … rule every item of audits/ADJUDICATE.todo.json (or merge the subagents' fragments) …
 ultra11y verify --apply audits/ADJUDICATE.todo.json --in audits/audit-latest.json \
   --standard rgaa --out audits --ledger
+# Either fold exits 1 when the gate refused anything (« Repli incomplet ») — the partial audit is
+# still written and the refused criteria stay to assess: re-run --manual, rule them, fold again.
 
 # The worklist is authoritative. A run-wide NC may be present because other page cells remain
 # open: every emitted item gets one grounded verdict, or an explicit manual reason.

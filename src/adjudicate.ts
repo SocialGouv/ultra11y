@@ -1166,7 +1166,7 @@ export function applyAdjudication(
   // flat list) for the same reason as `blame`: a failed citation has to condemn its own
   // criterion and no other.
   type Ground = { file: string; line: number; selector?: string; snippet?: string };
-  const groundInputs = new Map<string, { g: Ground; fallback?: Ground; offHarvest?: string }[]>();
+  const groundInputs = new Map<string, { subject: string; g: Ground; fallback?: Ground; offHarvest?: string }[]>();
   // Memoised: only a citation that missed its criterion's own anchors ever asks for it.
   let scopeCache: Set<string> | undefined;
   const { citationDrift } = adjudicationLimits(opts.cwd);
@@ -1196,11 +1196,13 @@ export function applyAdjudication(
   };
   const toGround = (
     criteriaId: string,
+    /** The refusal's prefix, as the gates use it: `criterion <id>` or `criterion <id>, page <id>`. */
+    subject: string,
     g: { file: string; line: number; selector?: string; snippet?: string },
     fallback?: { file: string; line: number; selector?: string; snippet?: string },
     offHarvest?: string,
   ) => {
-    const entry = { g, ...(fallback ? { fallback } : {}), ...(offHarvest ? { offHarvest } : {}) };
+    const entry = { subject, g, ...(fallback ? { fallback } : {}), ...(offHarvest ? { offHarvest } : {}) };
     const list = groundInputs.get(criteriaId);
     if (list) list.push(entry);
     else groundInputs.set(criteriaId, [entry]);
@@ -1283,7 +1285,7 @@ export function applyAdjudication(
     const cite = { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet };
     const { fallback, onAnchor } = evidenceFallback(evidence, c, citationDrift);
     if (fallback) {
-      toGround(criteriaId, cite, fallback);
+      toGround(criteriaId, subject, cite, fallback);
     } else {
       // WHY THE STRICT PATH APPLIED, said at the point it applies.
       //
@@ -1308,7 +1310,7 @@ export function applyAdjudication(
       // be false: the anchor is right there, it is the element that is wrong. That case
       // keeps the bare refusal, which already says the honest thing — this markup is not
       // in the file.
-      toGround(criteriaId, cite, undefined, onAnchor ? undefined : offHarvestHint(criteriaId, evidence));
+      toGround(criteriaId, subject, cite, undefined, onAnchor ? undefined : offHarvestHint(criteriaId, evidence));
     }
   };
   // GATE ONE NC FINDING: file required, normativeRef must resolve against the item's own
@@ -1380,7 +1382,7 @@ export function applyAdjudication(
     const anchor = anchorFor(evidence, f, citationDrift);
     const cite = { file: f.file, line: f.line, selector: f.selector, snippet: f.snippet };
     if (anchor && recognisablySame(f, anchor.at)) {
-      toGround(criteriaId, cite, {
+      toGround(criteriaId, subject, cite, {
         file: anchor.at.file,
         line: anchor.at.line,
         selector: anchor.at.selector,
@@ -1389,7 +1391,7 @@ export function applyAdjudication(
     } else {
       if (!anchor && !inAuditScope(f.file))
         blame(criteriaId, `${subject}: finding ${f.file}:${f.line} is not among this criterion's harvested evidence (fabricated?)`);
-      toGround(criteriaId, cite, undefined, anchor ? undefined : offHarvestHint(criteriaId, evidence));
+      toGround(criteriaId, subject, cite, undefined, anchor ? undefined : offHarvestHint(criteriaId, evidence));
     }
   };
   // The audited page ids, for validating `pages` keys (#197). Memoised like `scopeCache`:
@@ -1685,7 +1687,7 @@ export function applyAdjudication(
         );
         continue;
       }
-      toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
+      toGround(it.criteriaId, `criterion ${it.criteriaId}`, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
     }
   }
 
@@ -1695,7 +1697,7 @@ export function applyAdjudication(
   // flat `groundItems` produced.
   const grounding: GroundingSummary = { grounded: 0, moved: 0, failed: 0, issues: [] };
   for (const [criteriaId, inputs] of groundInputs) {
-    for (const { g, fallback, offHarvest } of inputs) {
+    for (const { subject, g, fallback, offHarvest } of inputs) {
       let r = groundFinding(g, { cwd: opts.cwd });
       // The harvested anchor vouches for a citation the file could not confirm on its own —
       // an adjudicator's retyping of an element it did read. `moved` either way: what
@@ -1713,7 +1715,10 @@ export function applyAdjudication(
           // The cause travels with the refusal, and only when it IS the cause: a citation that
           // never reached the literal check (a missing file, a line out of range) is not an
           // off-harvest problem, and saying so would send the reader chasing the wrong thing.
-          const issue = offHarvest && r.issue.startsWith("cited snippet not found") ? `${r.issue}${offHarvest}` : r.issue;
+          // And it names its criterion (and page) like every other refusal line (#223): a bare
+          // « cited snippet not found in … » among 50 refusals said nothing about which verdict
+          // to go and fix.
+          const issue = `${subject}: ${offHarvest && r.issue.startsWith("cited snippet not found") ? `${r.issue}${offHarvest}` : r.issue}`;
           grounding.issues.push(issue);
           blame(criteriaId, issue);
         }

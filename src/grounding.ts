@@ -18,6 +18,9 @@ export interface GroundingInput {
    *  criterion's own harvested anchors (see src/adjudicate.ts). Optional; absent on the
    *  strict inputs, which must ground literally. */
   fallback?: GroundingInput;
+  /** Who the citation belongs to (`criterion <id>`), prefixed to its issue by `groundItems` so
+   *  a grounding refusal names the verdict it condemns, like every other refusal line (#223). */
+  subject?: string;
 }
 
 export interface GroundingVerdict {
@@ -139,7 +142,7 @@ export function groundItems(items: GroundingInput[], opts: { cwd?: string } = {}
       if (r.moved) s.moved++;
     } else {
       s.failed++;
-      if (r.issue) s.issues.push(r.issue);
+      if (r.issue) s.issues.push(it.subject ? `${it.subject}: ${r.issue}` : r.issue);
     }
   }
   return s;

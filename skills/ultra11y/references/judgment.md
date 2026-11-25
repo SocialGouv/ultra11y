@@ -255,6 +255,11 @@ verdicts sur 96, un est revenu `null`, et l’ancien repli au niveau fichier a �
 bien qu’un arbitrage à 16 $ a publié « à évaluer » sur toute la grille dans un job qui a
 signalé un succès.
 
+Appliquer n’est pas réussir : un repli qui a refusé au moins un critère est **incomplet** et sort
+en 1, l’audit partiel étant tout de même écrit. Seul un repli sans aucun refus sort en 0 — un appelant
+qui ne lit que le code de sortie ne prend donc jamais 46 critères refusés pour un arbitrage abouti.
+Les `manual` avec raison et les critères hors de la liste (`notInWorklist[]`) ne sont pas des refus.
+
 `--strict` rétablit le repli tout-ou-rien pour un appelant qui le veut vraiment (un livrable
 validé en une seule passe) ; dans ce cas, un arbitrage rejeté laisse `audit-latest.json` intact.
 

@@ -5,7 +5,7 @@
 // and the human output listed the 35 under « refused by the gate ». They were only the criteria
 // absent from that lot — no verdict was offered for them, so none was refused. They are named
 // apart (`notInWorklist`, « hors de la liste »), and `rejected` counts the gate's refusals only.
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -101,14 +101,23 @@ describe("verify --apply on a partial worklist (#132)", () => {
     const { path, inLot, open } = writeLot("lot3.json", 3, { nullFirst: true });
 
     const r = await run(["verify", "--apply", path, "--in", join(out, "audit-latest.json"), "--out", out, "--json"]);
-    expect(r.code, r.err).toBe(0);
+    // A refusal inside the lot makes the fold incomplete: exit 1, audit still written (#223).
+    expect(r.code, r.err).toBe(1);
     const j = JSON.parse(r.out) as ApplyJson;
+    expect(j.ok).toBe(false);
     expect(j.rejected).toBe(1);
     expect(j.rejectedCriteria).toEqual([inLot[0]]);
     expect(j.issues.join("\n")).not.toMatch(/coverage gap/);
     expect(j.notInWorklist).toEqual(open.filter((id) => !inLot.includes(id)));
 
     const human = await run(["verify", "--apply", path, "--in", join(out, "audit-latest.json"), "--out", join(dir, "R3h"), "--lang", "en"]);
+    expect(human.code).toBe(1);
     expect(human.err).toMatch(/1 criterion\(ia\) refused by the gate/);
+    expect(human.err).toMatch(/Incomplete fold: 1 criterion\(ia\) refused by the gate/);
+    expect(existsSync(join(dir, "R3h", "audit-latest.json"))).toBe(true);
+
+    const fr = await run(["verify", "--apply", path, "--in", join(out, "audit-latest.json"), "--out", join(dir, "R3fr"), "--lang", "fr"]);
+    expect(fr.code).toBe(1);
+    expect(fr.err).toMatch(/Repli incomplet : 1 critère\(s\) refusé\(s\) par la porte/);
   });
 });
