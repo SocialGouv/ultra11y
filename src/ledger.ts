@@ -40,6 +40,7 @@ import {
   type Evidence,
   normalizeVerdict,
   pageJustification,
+  pageNotShown,
   type PageVerdict,
   readCitation,
 } from "./adjudicate.js";
@@ -66,6 +67,15 @@ export interface LedgerPageEntry {
   justification?: string;
   citations?: Evidence[];
   findings?: AgentFinding[];
+  /** #231 — the run-wide findings (`file:line`, portable spelling) ruled not shown on this page. */
+  notShownHere?: string[];
+}
+
+/** A `file:line` reference split at its LAST colon (a Windows drive letter keeps its own). */
+function splitRef(ref: string): { file: string; line: number } {
+  const i = ref.lastIndexOf(":");
+  const line = i > 0 ? Number(ref.slice(i + 1)) : Number.NaN;
+  return i > 0 && Number.isInteger(line) ? { file: ref.slice(0, i), line } : { file: ref, line: 0 };
 }
 
 export interface LedgerEntry {
@@ -390,6 +400,11 @@ function reanchorPages(
       // The stored page findings are the raw agent findings (see `entriesFrom`), so they are
       // re-anchored as such and land back on the verdict item as what it carries.
       ...(p.findings ? { findings: reanchor(p.findings, today, currentFiles, root) ?? [] } : {}),
+      // Moved exactly like the run-level findings they name, so the fold can match them again;
+      // one that no longer matches is refused there, fail-closed.
+      ...(p.notShownHere?.length
+        ? { notShownHere: (reanchor(p.notShownHere.map(splitRef), today, currentFiles, root) ?? []).map((r) => `${r.file}:${r.line}`) }
+        : {}),
     };
   }
   return out;
@@ -472,6 +487,7 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
       const cites = (Array.isArray(pv.citations) ? pv.citations : []).map(readCitation).filter((c): c is Evidence => c !== null);
       const justification = pageJustification(pv.justification);
       const findings = gatedPageFindings(pv.findings);
+      const notShownHere = v === "NC" ? [] : pageNotShown(pv).map(splitRef);
       out[pageId] = {
         status: v,
         ...(justification ? { justification } : {}),
@@ -483,6 +499,7 @@ export function entriesFrom(adj: AdjudicationFile, accepted: ReadonlySet<string>
             // like every other path in this entry.
             { findings: portable(findings) }
           : {}),
+        ...(notShownHere.length ? { notShownHere: portable(notShownHere).map((r) => `${r.file}:${r.line}`) } : {}),
       };
     }
     return Object.keys(out).length ? out : undefined;

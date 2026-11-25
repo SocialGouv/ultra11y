@@ -22,12 +22,15 @@ travail et cette page ne peuvent jamais diverger. Trois règles gouvernent chaqu
   du critère ; `verify --apply` rejette un `normativeRef` qui n’existe pas.
 - **Une bonne pratique sans test en échec est une recommandation**, pas une non-conformité — elle
   ne fait jamais basculer un critère et n’entre jamais dans le taux de conformité.
-- **Un verdict tranché peut statuer sur chaque page de l’audit** (#197) : une table `pages`
+- **Un verdict peut statuer sur chaque page de l’audit** (#197) : une table `pages`
   facultative, indexée par identifiant de page auditée, porte des résultats par page, chacun
   passant le même contrôle fermé par défaut, restreint à cette page — chaque citation et chaque
   constat nomme la capture propre de la page ou une source qu’elle déclare. Un `NC` de page exige
-  un `NC` global. Une page non nommée garde le verdict global ; une page dont le sujet est sain
-  reçoit son propre `C`, une page dont le sujet échoue son propre `NC`.
+  un `NC` global ; un verdict global `manual` peut trancher ses pages en `C` ou `NA` (#231). Un
+  `NA` de page sans preuve du critère cite la capture de la page là où l’absence a été constatée,
+  et `notShownHere` nomme un constat global ancré sur la page mais qui n’y est pas affiché
+  (`references/judgment.md`). Une page non nommée garde le verdict global ; une page dont le
+  sujet est sain reçoit son propre `C`, une page dont le sujet échoue son propre `NC`.
 
 ## Thématique 1 — Images
 

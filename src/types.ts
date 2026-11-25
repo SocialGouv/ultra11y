@@ -881,6 +881,10 @@ export interface PackPageAdjudication {
   justification?: string;
   citations?: CriterionCitation[];
   findings?: Finding[];
+  /** #231 — the run-wide NC findings (`file:line`) anchored on this page whose defect the
+   *  adjudicator ruled NOT shown here (a journey state where the error is not displayed). The
+   *  run-wide NC stands; this page's C/NA rests on its own citations. */
+  notShownHere?: string[];
 }
 
 export interface GuidelineTally {
