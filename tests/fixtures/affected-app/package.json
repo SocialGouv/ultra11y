@@ -1,7 +1,0 @@
-{
-  "name": "affected-app",
-  "private": true,
-  "dependencies": {
-    "next": "15.0.0"
-  }
-}
