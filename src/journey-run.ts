@@ -477,6 +477,8 @@ export interface JourneyRunOptions {
   baseUrl?: string;
   browserPath?: string;
   onStep?: (journey: string, step: JourneyStepRecord) => void;
+  /** A journey is replayed once more, in a fresh context, after a transient browser close. */
+  onRetry?: (journey: string, reason: string) => void;
 }
 
 export interface JourneyRunResult {
@@ -507,15 +509,71 @@ function clearJourneySnapshots(root: string, name: string): void {
   }
 }
 
+/** Playwright's error when the page, context or browser went away under a call — on a cold
+ *  start it can hit the very first goto of a run and is gone on the next try (#233). */
+const BROWSER_CLOSED = /Target (?:page, context or browser |page |context |browser )?(?:has been |is )?closed|Browser has been closed/i;
+
+export function isBrowserClosedError(message: string | undefined): boolean {
+  return !!message && BROWSER_CLOSED.test(message);
+}
+
+/** Run one journey; on a transient browser close — returned as the failure reason, or thrown —
+ *  run it ONCE more from scratch, after `reset` undid the first attempt's partial output. A
+ *  second close, or any other failure, is the journey's outcome. */
+export async function withBrowserClosedRetry(
+  attempt: () => Promise<JourneyRecord>,
+  reset: () => Promise<void>,
+  onRetry: (reason: string) => void,
+): Promise<JourneyRecord> {
+  let reason: string | undefined;
+  try {
+    const rec = await attempt();
+    if (rec.status !== "failed" || !isBrowserClosedError(rec.reason)) return rec;
+    reason = rec.reason!;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!isBrowserClosedError(msg)) throw e;
+    reason = firstLine(e);
+  }
+  onRetry(reason);
+  await reset();
+  return attempt();
+}
+
 /** Replay journeys, one browser for all, one context per journey. */
 export async function runJourneys(entries: { journey: Journey; file: string }[], opts: JourneyRunOptions): Promise<JourneyRunResult> {
   const { chromium, axe } = resolveLocalDeps(opts.cwd, opts.lang);
-  const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
+  const launch = () => launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
+  let browser = await launch();
   const result: JourneyRunResult = { records: [], findings: [], unsnapshotted: [], snapshots: [], testedScs: [], scanned: [] };
   const tested = new Set<string>();
   try {
     for (const { journey, file } of entries) {
-      const rec = await runOne(browser, axe, journey, file, opts, result, tested);
+      // What the first attempt may have added, so a retry starts from the same state.
+      const mark = {
+        findings: result.findings.length,
+        unsnapshotted: result.unsnapshotted.length,
+        snapshots: result.snapshots.length,
+        scanned: result.scanned.length,
+      };
+      const testedBefore = new Set(tested);
+      const rec = await withBrowserClosedRetry(
+        () => runOne(browser, axe, journey, file, opts, result, tested),
+        async () => {
+          result.findings.length = mark.findings;
+          result.unsnapshotted.length = mark.unsnapshotted;
+          result.snapshots.length = mark.snapshots;
+          result.scanned.length = mark.scanned;
+          tested.clear();
+          for (const sc of testedBefore) tested.add(sc);
+          // runOne opens a fresh context; a browser that went away with it is launched again.
+          if (typeof browser.isConnected === "function" && !browser.isConnected()) {
+            await browser.close().catch(() => {});
+            browser = await launch();
+          }
+        },
+        (reason) => opts.onRetry?.(journey.name, reason),
+      );
       result.records.push(rec);
     }
   } finally {

@@ -211,7 +211,7 @@ Deux étapes par page contrôlée, et la fixture ne possède aucune des deux :
 
 1. la page est collectée **dans le navigateur** avec le collecteur propre du moteur — DOM,
    condensé des styles calculés, boîtes englobantes ;
-2. la charge utile est envoyée à `ultra11y snapshot write`, qui persiste
+2. la charge utile est envoyée à la commande `snapshot write` du moteur, qui persiste
    `.ultra11y/pages/<id>/` **et** l’audite, en renvoyant l’`AuditResult`.
 
 La fixture ne sait donc rien du format d’instantané, du commentaire de provenance ni de
