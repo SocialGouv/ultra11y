@@ -7,16 +7,38 @@
 // that carries the accessibility guarantees (landmarks, captions, `scope`, status letters).
 //
 // The default is deliberately NEUTRAL: system fonts, a small palette, no third-party design
-// system. A State design system (DSFR) would be the natural candidate for a swap, and is
-// blocked on its licensing (#212) — which is precisely why the stylesheet is isolated.
+// system. The State design system (DSFR) is OPT-IN (`--theme dsfr`, #212) and is NEVER shipped
+// by ultra11y: `@gouvfr/dsfr` is etalab-2.0 but carries binding terms of use (its
+// doc/legal/cgu.md) — clause [14] reserves it to sites on `.gouv.fr` and forbids modifying its
+// Fundamentals, clause [18] forbids any use that could be confused with an official service.
+// So `loadDsfrTheme` reads the stylesheet from the AUDITED PROJECT's own installation — the
+// project that accepted those terms (`.dsfr.yml`) — inlines its files byte for byte, and fails
+// loudly when the package is absent. It never downloads, never falls back.
 //
-// A theme replaces the CSS only. It must keep every status distinguishable WITHOUT colour (the
-// letters do that, in the markup) and keep the contrast of its own palette at AA in both
-// colour schemes — a report whose own page fails 1.4.3 has no standing.
+// A theme changes the look and the CLASS NAMES only (`markup`). It must keep every status
+// distinguishable WITHOUT colour (the letters do that, in the markup) and keep the contrast of
+// its own palette at AA — a report whose own page fails 1.4.3 has no standing. The structure
+// that carries the accessibility guarantees (landmarks, captions, `scope`, one h1, skip link,
+// `lang`) is the same in every theme: src/html.ts emits it, the theme does not.
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
+import type { Lang } from "./types.js";
+
+/** The themes the HTML tier knows. `neutral` is the default and needs nothing installed. */
+export const THEME_NAMES = ["neutral", "dsfr"] as const;
+export type ThemeName = (typeof THEME_NAMES)[number];
+
+export const isThemeName = (v: unknown): v is ThemeName => typeof v === "string" && (THEME_NAMES as readonly string[]).includes(v);
 
 /** A named stylesheet for the HTML tier. */
 export interface Theme {
-  name: string;
+  name: ThemeName;
+  /** The markup flavour src/html.ts emits. `dsfr` maps the same structure onto DSFR classes
+   *  (fr-table, fr-badge, fr-callout…); the accessibility structure is identical in both. */
+  markup: "neutral" | "dsfr";
+  /** A print-only sheet, inlined into a `<style media="print">`. */
+  printCss?: string;
   /** Inlined into each page's `<style>`: pages are opened from file:// and artifact viewers,
    *  so a linked stylesheet would be one more file that can go missing. */
   css: string;
@@ -30,6 +52,7 @@ export interface Theme {
  *  `contrastRatio` — an accessibility report whose own palette fails 1.4.3 has no standing. */
 export const NEUTRAL_THEME: Theme = {
   name: "neutral",
+  markup: "neutral",
   css: `
  :root { color-scheme: light dark; --bg:#fff; --fg:#111; --line:#e3e3e6; --mut:#666; --soft:#f6f6f8;
          --c:#0a7d33; --nc:#b3261e; --m:#b06000; --accent:#0b5fa5; }
@@ -85,3 +108,102 @@ export const NEUTRAL_THEME: Theme = {
    a { color:inherit; text-decoration:underline; }
  }`,
 };
+
+/** ultra11y's OWN additions to the DSFR theme, appended after the project's DSFR stylesheet and
+ *  kept apart from it: the DSFR files themselves are inlined unmodified (CGU clause [14]). Only
+ *  what DSFR has no class for — a table's group row, the current document in the navigation,
+ *  the native `<details>` (DSFR's accordion needs its JavaScript, and this page carries none)
+ *  and the print rules that keep a finding with its evidence. Colours come from DSFR's own
+ *  tokens, so the contrast stays the one DSFR guarantees. */
+const DSFR_COMPANION_CSS = `
+ .fr-table tr.u11y-group th { background:var(--background-alt-grey); font-weight:700; }
+ .u11y-docs [aria-current="page"] { font-weight:700; }
+ .u11y-details { margin:0 0 1.5rem; border:1px solid var(--border-default-grey); padding:.5rem 1rem; }
+ .u11y-details > summary { cursor:pointer; font-weight:700; }
+ .fr-content-media img { max-width:100%; height:auto; border:1px solid var(--border-default-grey); }
+ code { overflow-wrap:anywhere; }
+ @media print {
+   .fr-skiplinks, .u11y-docs { display:none; }
+   h2, h3 { break-after:avoid-page; page-break-after:avoid; }
+   figure, table, .fr-callout, .fr-alert, details { break-inside:avoid-page; page-break-inside:avoid; }
+   details[open], details:not([open]) > *:not(summary) { display:revert; }
+ }`;
+
+/** Raised when `--theme dsfr` cannot use the DSFR of the audited project. Its message is meant
+ *  for the person running the command, in their language. */
+export class DsfrUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DsfrUnavailableError";
+  }
+}
+
+const DSFR_PACKAGE = "@gouvfr/dsfr";
+/** The official full bundle (core + every component + utilities) and its print sheet — the two
+ *  files DSFR's own documentation tells a site to link. Taken whole: trimming them down to the
+ *  components this page uses would be modifying the package's files. */
+const DSFR_CSS = "dist/dsfr.min.css";
+const DSFR_PRINT_CSS = "dist/dsfr.print.min.css";
+
+function dsfrMessage(lang: Lang, root: string, detail: string): string {
+  return lang === "fr"
+    ? `ultra11y : le thème « dsfr » charge le Système de design de l'État (${DSFR_PACKAGE}) depuis l'installation du projet audité, et ${detail} (racine du projet : ${root}). ` +
+        "ultra11y ne fournit pas le DSFR et ne le télécharge jamais : ses conditions d'utilisation (doc/legal/cgu.md du paquet) en réservent l'usage aux sites en .gouv.fr, " +
+        "interdisent d'en modifier les Fondamentaux et toute confusion avec un service officiel. " +
+        `Si votre site y a droit, installez-le dans le projet (\`npm install ${DSFR_PACKAGE}\`, qui demande d'accepter ces conditions dans un fichier .dsfr.yml), ` +
+        "puis relancez depuis sa racine ou avec --root <projet>. Sinon, gardez le thème par défaut (--theme neutral)."
+    : `ultra11y: the "dsfr" theme loads the French State design system (${DSFR_PACKAGE}) from the audited project's own installation, and ${detail} (project root: ${root}). ` +
+        "ultra11y does not ship the DSFR and never downloads it: its terms of use (the package's doc/legal/cgu.md) reserve it to .gouv.fr websites, " +
+        "forbid modifying its Fundamentals and any confusion with an official service. " +
+        `If your site is entitled to it, install it in the project (\`npm install ${DSFR_PACKAGE}\`, which asks you to accept those terms in a .dsfr.yml file), ` +
+        "then run again from its root or with --root <project>. Otherwise keep the default theme (--theme neutral).";
+}
+
+/** Where the project's DSFR lives, resolved exactly as the project's own code would resolve
+ *  it — Node's module resolution from `<root>/package.json` — so npm, pnpm (symlinked) and
+ *  hoisted workspaces all work. ultra11y's own dependencies are never consulted. */
+export function resolveDsfrDir(root: string): string | undefined {
+  try {
+    const req = createRequire(join(resolve(root), "package.json"));
+    return dirname(req.resolve(`${DSFR_PACKAGE}/package.json`));
+  } catch {
+    return undefined;
+  }
+}
+
+/** The DSFR theme, built from the project's installed `@gouvfr/dsfr`. Throws
+ *  `DsfrUnavailableError` — never a silent fallback to the neutral look — when the package is
+ *  absent or its bundle is not where DSFR publishes it. */
+export function loadDsfrTheme(root: string, lang: Lang = "fr"): Theme {
+  const abs = resolve(root);
+  const fail = (fr: string, en: string): DsfrUnavailableError => new DsfrUnavailableError(dsfrMessage(lang, abs, lang === "fr" ? fr : en));
+  const dir = resolveDsfrDir(abs);
+  if (!dir) throw fail(`${DSFR_PACKAGE} y est introuvable`, `${DSFR_PACKAGE} cannot be found there`);
+  let name: unknown;
+  try {
+    name = (JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { name?: unknown }).name;
+  } catch {
+    name = undefined;
+  }
+  if (name !== DSFR_PACKAGE) throw fail(`${dir} n'est pas le paquet ${DSFR_PACKAGE}`, `${dir} is not the ${DSFR_PACKAGE} package`);
+  const cssPath = join(dir, DSFR_CSS);
+  if (!existsSync(cssPath)) throw fail(`son fichier ${DSFR_CSS} est absent (${cssPath})`, `its ${DSFR_CSS} is missing (${cssPath})`);
+  const css = readFileSync(cssPath, "utf8");
+  const printPath = join(dir, DSFR_PRINT_CSS);
+  const printCss = existsSync(printPath) ? readFileSync(printPath, "utf8") : undefined;
+  // Inlined into a <style>: a stylesheet that could close the element would inject markup. The
+  // files are never edited to make them fit (clause [14]) — such a file is refused instead.
+  for (const [p, text] of [
+    [cssPath, css],
+    [printPath, printCss ?? ""],
+  ] as const) {
+    if (/<\/style/i.test(text))
+      throw fail(`${p} contient « </style » et ne peut pas être inclus tel quel`, `${p} contains "</style" and cannot be inlined as is`);
+  }
+  return { name: "dsfr", markup: "dsfr", css: `${css}\n${DSFR_COMPANION_CSS}`, ...(printCss ? { printCss } : {}) };
+}
+
+/** The theme a command renders with: `neutral` needs nothing; `dsfr` reads the project at `root`. */
+export function resolveTheme(name: ThemeName, root: string, lang: Lang = "fr"): Theme {
+  return name === "dsfr" ? loadDsfrTheme(root, lang) : NEUTRAL_THEME;
+}

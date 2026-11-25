@@ -547,6 +547,39 @@ node scripts/ultra11y.mjs serve --static site                # the same pages as
   (GitHub Pages, une publication iterion). La cible ne doit pas chevaucher le répertoire des
   audits.
 
+### Thème des pages HTML (`--theme neutral|dsfr`)
+
+`report --html`, `pages --html`, `serve` et `serve --static` acceptent `--theme`. Le flag
+prime sur `"html": { "theme": … }` de `.ultra11yrc.json` (lu à la racine `--root`) ; sans l'un
+ni l'autre, le thème est `neutral`, l'apparence habituelle.
+
+```sh
+node scripts/ultra11y.mjs report --in audits/audit-latest.json --html --theme dsfr --root .
+node scripts/ultra11y.mjs serve --theme dsfr --root .
+```
+
+- **ultra11y ne fournit jamais le DSFR.** `--theme dsfr` résout `@gouvfr/dsfr/package.json`
+  depuis la racine du projet audité (`--root`, sinon le répertoire courant), avec la résolution
+  de Node (npm, pnpm, workspaces). Il intègre `dist/dsfr.min.css` et `dist/dsfr.print.min.css`
+  **tels quels** dans un `<style>` de chaque page, y compris pour `serve` : la CSP du serveur
+  n'autorise que les styles en ligne, et l'export statique reste ainsi autonome.
+- **Paquet absent : code 2**, avec un message qui explique que le projet doit installer le DSFR
+  lui-même (en acceptant ses conditions, `.dsfr.yml`) et qu'il est réservé aux sites en
+  `.gouv.fr`. Aucun repli silencieux, aucun téléchargement. Rien n'est écrit avant ce contrôle.
+- **Balisage DSFR** : `fr-skiplinks`, `fr-header` simple (sans bloc-marque : l'administration
+  émettrice n'est pas connue ; l'en-tête dit « Audit d'accessibilité — Rapport généré par
+  ultra11y »), navigation en `fr-tags-group`, contenu en `fr-container`, tableaux `fr-table`
+  (cellules en variante multiligne), statuts en `fr-badge` (lettre conservée, sans icône),
+  notes en `fr-callout` et avertissements en `fr-alert` (variante warning), `fr-footer` simple.
+  Aucun JavaScript du DSFR : `<details>` reste natif.
+- **Même structure accessible** dans les deux thèmes : `lang`, lien d'évitement vers `<main>`,
+  un seul `h1`, tableaux avec `<caption>` et `scope`, statut jamais porté par la seule couleur.
+  Les tests auditent les pages DSFR avec le moteur lui-même.
+- **Limites** : les icônes et la police Marianne que la CSS du DSFR référence par chemin relatif
+  ne sont pas copiées à côté du rapport ; la page retombe sur la police de repli du DSFR et
+  n'affiche pas d'icône décorative. Le mode sombre du DSFR dépend de son JavaScript : le thème
+  `dsfr` est clair.
+
 ## Produire des instantanés
 
 Tout ce qui pilote un navigateur peut en écrire un — c’est le format qui fait contrat, pas le

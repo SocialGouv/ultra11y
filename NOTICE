@@ -147,6 +147,51 @@ examples are "Code Components" as defined by that license and are covered by the
 W3C Software License. Attribution: « WCAG 2.2 — W3C ».
 
 ================================================================================
+Système de design de l'État (DSFR) — NON fourni par ultra11y
+================================================================================
+
+ultra11y ne contient, ne redistribue et ne télécharge AUCUN fichier du Système
+de design de l'État (paquet npm `@gouvfr/dsfr`). Le paquet n'est ni une
+dépendance ni une dépendance de développement d'ultra11y, et aucun de ses
+fichiers n'est copié dans ce dépôt, dans le bundle `scripts/ultra11y.mjs` ou
+dans `dist/`. Le site du projet (socialgouv.github.io/ultra11y, hors .gouv.fr)
+garde son apparence neutre.
+
+Pourquoi : `@gouvfr/dsfr` est publié sous licence etalab-2.0, mais il est
+accompagné de conditions générales d'utilisation contraignantes
+(`doc/legal/cgu.md` du paquet), qui s'ajoutent à la licence :
+
+  - clause [14] : « L'utilisation des Ressources a pour seule destination la
+    conception, le développement et la mise à disposition du public de sites
+    internet exploités avec l'extension [.gouv.fr] ou d'applications
+    mobiles. Les Fondamentaux du DSFR ne peuvent pas être modifiés […] » ;
+  - clause [18] : « L'utilisation des Ressources doit s'effectuer de manière
+    loyale et conforme à leur finalité, en veillant notamment à ne pas créer
+    de confusion, directe ou indirecte, avec un service public, une
+    administration de l'État ou un site officiel relevant du périmètre
+    gouvernemental. »
+
+Le paquet refuse d'ailleurs de s'installer sans consentement explicite à ces
+conditions (fichier `.dsfr.yml` dans le projet). Un outil d'audit utilisé par
+des sites qui ne sont pas tous en .gouv.fr ne peut donc pas l'embarquer.
+
+Ce que fait ultra11y à la place : l'option `--theme dsfr` (report --html,
+pages --html, serve, serve --static ; ou `"html": { "theme": "dsfr" }` dans
+.ultra11yrc.json) lit `dist/dsfr.min.css` et `dist/dsfr.print.min.css` dans
+l'installation du PROJET AUDITÉ — résolue par Node depuis la racine du projet
+(`--root`) —, c'est-à-dire chez un projet qui a lui-même accepté ces
+conditions. Ces fichiers sont intégrés tels quels, sans modification ni
+découpage (clause [14]) ; ultra11y n'y ajoute que quelques règles à lui, à la
+suite et séparées. Le rapport ne dessine pas le bloc-marque (Marianne) : son
+en-tête dit seulement « Audit d'accessibilité — Rapport généré par ultra11y »,
+pour éviter toute confusion avec un service officiel (clause [18]). Si le
+paquet est absent, la commande échoue (code 2) avec une explication ; elle ne
+se rabat jamais en silence sur le thème neutre.
+
+Le respect des CGU du DSFR dans le rapport ainsi produit (diffusion sur un
+site en .gouv.fr, notamment) relève du projet qui l'utilise.
+
+================================================================================
 Inspiration
 ================================================================================
 

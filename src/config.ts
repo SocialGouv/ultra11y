@@ -45,6 +45,10 @@ export interface Ultra11yConfig {
     transport?: "auto" | "cli" | "rest";
     maxTickets?: number;
   };
+  // The HTML deliverables (`report --html`, `pages --html`, `serve`). `theme`: `neutral`
+  // (default) or `dsfr`, read from the project's own `@gouvfr/dsfr`, which ultra11y never ships
+  // (src/theme.ts). `--theme` wins, the same precedence `standard` has.
+  html?: { theme?: string };
   // How much a criterion is shown, and how strictly a citation is read. Every one of these
   // was a constant compiled into the engine, and every one of them is a JUDGEMENT about a
   // codebase rather than a fact about accessibility: how large a population an adjudicator

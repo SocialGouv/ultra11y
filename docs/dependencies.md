@@ -101,6 +101,20 @@ remplacée, aucun code de `src/` ne change.
 - Les autres usages ne sont pas couverts par la bibliothèque standard : pas de parseur HTML, ni
   d'AST JSX, ni de moteur de globs compatible gitignore, ni de lecteur de `tsconfig` dans Node.
 
+## Dépendance délibérément absente : `@gouvfr/dsfr`
+
+Le Système de design de l'État n'est **pas** une dépendance d'ultra11y, ni de runtime ni de
+développement, et ne doit pas le devenir (#212). Le paquet est sous etalab-2.0, mais ses
+conditions d'utilisation (`doc/legal/cgu.md`) en réservent l'usage aux sites en `.gouv.fr`
+(clause [14], qui interdit aussi de modifier les Fondamentaux) et interdisent toute confusion
+avec un service officiel (clause [18]) ; son script `preinstall` refuse de s'installer sans
+consentement (`.dsfr.yml`). Un outil utilisé hors `.gouv.fr` ne peut pas l'embarquer.
+
+Le thème HTML `--theme dsfr` le lit donc dans l'installation **du projet audité**
+(`createRequire` depuis `--root`, `src/theme.ts`) et échoue avec une explication s'il est
+absent. Les tests utilisent un faux paquet minimal créé dans un dossier temporaire, jamais les
+vrais fichiers du DSFR. Détail et texte des clauses : `NOTICE`.
+
 ## Montées de version faites
 
 Uniquement des correctifs ou mineures sans changement de comportement :
