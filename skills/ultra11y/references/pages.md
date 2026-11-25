@@ -1,11 +1,11 @@
-# Page snapshots — auditing a real page, offline
+# Instantanés de page — auditer une vraie page, hors ligne
 
-A **capture** (`render`) is a rendered *component*. A **snapshot** is a rendered
-*page*: the whole document as the browser built it, plus the signals only a browser has
-(computed styles, boxes, accessibility tree, a screenshot), stored on disk so the static
-engine can re-audit it later with **no browser**.
+Une **capture** (`render`) est un *composant* rendu. Un **instantané** est une *page* rendue :
+le document entier tel que le navigateur l’a construit, plus les signaux que seul un navigateur
+possède (styles calculés, boîtes, arbre d’accessibilité, une capture d’écran), stockés sur disque
+pour que le moteur statique puisse le ré-auditer plus tard **sans navigateur**.
 
-That difference is not cosmetic. It is what makes a whole class of criteria decidable.
+Cette différence n’est pas cosmétique. C’est ce qui rend toute une classe de critères décidable.
 
 ```
 .ultra11y/pages/<page-id>/
@@ -31,170 +31,187 @@ That difference is not cosmetic. It is what makes a whole class of criteria deci
   screen.png    viewport screenshot (pixel tier)
 ```
 
-The last two are the measurement half, and they are what lets a page CONCLUDE rather than
-merely report. `renderedProvesOn` reads `pageCoverage.scs` / `.axe`, both derived from them, so
-a page with no `probes.json` can raise a rendering non-conformity and can never earn a
-rendering conformity — 1.4.4, 1.4.10 and 1.4.12 have no offline rule at all, and 1.4.3's
-canonical decider is axe. `probed` is written only for a probe that really ran: one that threw,
-a viewport that would not resize, an override that would not apply — none of them reach it,
-because their silence is not a measurement.
+Les deux derniers sont la moitié « mesure », et ce sont eux qui permettent à une page de
+CONCLURE plutôt que de simplement signaler. `renderedProvesOn` lit `pageCoverage.scs` / `.axe`,
+tous deux dérivés d’eux, si bien qu’une page sans `probes.json` peut lever une non-conformité de
+rendu mais ne peut jamais obtenir une conformité de rendu — 1.4.4, 1.4.10 et 1.4.12 n’ont aucune
+règle hors ligne, et le juge canonique de 1.4.3 est axe. `probed` n’est écrit que pour une sonde
+qui a réellement tourné : une sonde qui a levé une exception, un viewport qui n’a pas voulu se
+redimensionner, une surcharge qui n’a pas voulu s’appliquer — aucune d’elles n’y figure, parce
+que leur silence n’est pas une mesure.
 
-`scripts.json` is the behaviour half (#190). The script criteria — RGAA 7.1, 7.3, 7.5, 13.1,
-13.8; WCAG 2.1.1, 2.2.1, 2.2.2, 4.1.2, 4.1.3 — are judged on what the page DOES, which markup
-does not show: a `<div>` with a click listener is markup-identical to a `<div>`. After the DOM is
-serialized, the producer leaves the page alone for ~2 s (whatever changes then changed on its
-own: a carousel, a ticker), then runs its probes (an `aria-expanded` a button toggles shows up
-then). Listeners are read through CDP (`DOMDebugger.getEventListeners`) when the producer has a
-session — `scan` and `ultra11y/playwright` on Chromium — and from the DOM alone otherwise
-(`ultra11y/cypress`: inline `on*` handlers and `on*` properties). The file says which in
-`collected` (`cdp` | `dom` | `none`), every list is capped (`caps`, `truncated`), and elements are
-indexed with the same document-order ordinal as `styles.json`. The adjudication briefs of those
-criteria quote it as evidence, element by element, after a coverage line saying how it was
-collected — so a page whose behaviour could not be read is never mistaken for one with nothing to
-find. `ultra11y/playwright` and `ultra11y/cypress` take `behaviour: false` to skip it, or
-`{ windowMs }` to change the window.
+`scripts.json` est la moitié « comportement » (#190). Les critères de script — RGAA 7.1, 7.3,
+7.5, 13.1, 13.8 ; WCAG 2.1.1, 2.2.1, 2.2.2, 4.1.2, 4.1.3 — se jugent sur ce que la page FAIT, ce
+que le balisage ne montre pas : un `<div>` avec un écouteur de clic a un balisage identique à un
+`<div>`. Une fois le DOM sérialisé, le producteur laisse la page tranquille pendant ~2 s (tout ce
+qui change alors a changé de lui-même : un carrousel, un bandeau défilant), puis lance ses sondes
+(un `aria-expanded` qu’un bouton bascule apparaît à ce moment-là). Les écouteurs sont lus via CDP
+(`DOMDebugger.getEventListeners`) quand le producteur dispose d’une session — `scan` et
+`ultra11y/playwright` sous Chromium — et à partir du DOM seul sinon (`ultra11y/cypress` :
+gestionnaires `on*` en ligne et propriétés `on*`). Le fichier indique lequel dans `collected`
+(`cdp` | `dom` | `none`), chaque liste est plafonnée (`caps`, `truncated`), et les éléments sont
+indexés avec le même ordinal d’ordre du document que `styles.json`. Les briefs d’arbitrage de ces
+critères le citent comme preuve, élément par élément, après une ligne de couverture qui dit
+comment il a été collecté — ainsi une page dont le comportement n’a pas pu être lu n’est jamais
+confondue avec une page où il n’y a rien à trouver. `ultra11y/playwright` et `ultra11y/cypress`
+acceptent `behaviour: false` pour le sauter, ou `{ windowMs }` pour changer la fenêtre.
 
-`audit` ingests `.ultra11y/pages` automatically, exactly as it ingests `.ultra11y/captures`
-(`--no-captures` opts out of both). Nothing new to run:
+`audit` ingère `.ultra11y/pages` automatiquement, exactement comme il ingère
+`.ultra11y/captures` (`--no-captures` désactive les deux). Rien de nouveau à lancer :
 
 ```
 node scripts/ultra11y.mjs audit "src/**/*.tsx" --jsx     # snapshots folded in automatically
 ```
 
-## Why a snapshot decides more than a capture
+## Pourquoi un instantané décide plus qu’une capture
 
-A component capture is a **fragment**: no `<html>`, no `<head>`. The engine's `scope: "page"`
-rules are deliberately skipped on fragments (`isFullDocument`), because a `<button>` has no
-business declaring a page language. A snapshot **is** a full document, so those rules run:
+Une capture de composant est un **fragment** : pas de `<html>`, pas de `<head>`. Les règles
+`scope: "page"` du moteur sont délibérément sautées sur les fragments (`isFullDocument`), parce
+qu’un `<button>` n’a pas à déclarer une langue de page. Un instantané **est** un document complet,
+donc ces règles tournent :
 
-| Rule | WCAG | RGAA |
+| Règle | WCAG | RGAA |
 |---|---|---|
 | `html-lang-missing` | 3.1.1 | **8.3** |
 | `title-missing-empty` | 2.4.2 | **8.5 / 8.6** |
 | `missing-main-landmark` | 1.3.1 | 12.6 |
 
-None of these can be judged from a component render, and several cannot be judged from source
-either once a framework injects the document shell. The snapshot is where they become real.
+Aucune d’elles ne peut être jugée à partir du rendu d’un composant, et plusieurs ne peuvent pas
+non plus l’être à partir de la source dès qu’un framework injecte la coquille du document. C’est
+dans l’instantané qu’elles deviennent réelles.
 
-> Do **not** "fix" this by wrapping component captures in a full document. A component
-> rendered on its own has no `<html lang>` and no `<title>`, so every component capture would
-> report two blocking non-conformities that describe nothing a user could experience.
-> Component captures stay fragments, on purpose.
+> Ne « corrigez » **pas** cela en enveloppant les captures de composants dans un document
+> complet. Un composant rendu seul n’a ni `<html lang>` ni `<title>`, donc chaque capture de
+> composant signalerait deux non-conformités bloquantes qui ne décrivent rien qu’un utilisateur
+> puisse vivre. Les captures de composants restent des fragments, à dessein.
 
-## Page identity
+## Identité de la page
 
-`dom.html` carries the ordinary provenance comment, with two extra fields:
+`dom.html` porte le commentaire de provenance ordinaire, avec deux champs supplémentaires :
 
 ```html
 <!-- ultra11y:capture v="1" source="app/page.tsx" page="accueil" url="https://example.com/" -->
 ```
 
-Every finding raised on it is stamped with `page` (the stable id) **and** `origin.sourceFile`
-(the source that rendered it). That pair is what the per-page criterion grid joins on, and
-what lets a finding found *at render time* be reported *against the code that caused it*.
+Chaque constat levé dessus est estampillé avec `page` (l’id stable) **et** `origin.sourceFile`
+(la source qui l’a rendu). C’est sur cette paire que se fait la jointure de la grille des
+critères par page, et c’est ce qui permet à un constat trouvé *au moment du rendu* d’être
+rapporté *contre le code qui l’a causé*.
 
-Ids are slugified from the URL path (accent-folded, lowercased): `/nous-contacter` →
-`nous-contacter`, `/` → `accueil`. A producer may pass an explicit id instead. An id must
-match `[a-z0-9][a-z0-9-]*` — it becomes a directory name, so it cannot be allowed to traverse.
+Les ids sont dérivés du chemin de l’URL (accents retirés, en minuscules) : `/nous-contacter` →
+`nous-contacter`, `/` → `accueil`. Un producteur peut passer un id explicite à la place. Un id
+doit correspondre à `[a-z0-9][a-z0-9-]*` — il devient un nom de répertoire, on ne peut donc pas
+le laisser remonter l’arborescence.
 
-## The join key, and why it is verified
+## La clé de jointure, et pourquoi elle est vérifiée
 
-`styles.json`, `boxes.json`, `axtree.json`, `sr.json` and `media.json` index elements by **document-order ordinal**,
-not by CSS selector — a selector would have to survive serialization and re-parsing, an
-ordinal does not. Each entry repeats its `tag`, and the join (`alignedStyles`) checks every
-one against the re-parsed DOM.
+`styles.json`, `boxes.json`, `axtree.json`, `sr.json` et `media.json` indexent les éléments par
+**ordinal d’ordre du document** (document-order), pas par sélecteur CSS — un sélecteur devrait
+survivre à la sérialisation et à la ré-analyse, un ordinal non. Chaque entrée répète son `tag`, et
+la jointure (`alignedStyles`) vérifie chacune d’elles contre le DOM ré-analysé.
 
-**On any mismatch the entire digest is refused**, not just the offending entry. A silently
-shifted index would attribute one element's colour to another and manufacture a
-non-conformity out of nothing — the exact failure mode this tool exists to prevent. A refused
-digest simply leaves the rendering criteria `manual`, which is the honest outcome.
+**À la moindre discordance, le condensé entier est refusé**, pas seulement l’entrée fautive. Un
+index décalé en silence attribuerait la couleur d’un élément à un autre et fabriquerait une
+non-conformité à partir de rien — exactement le mode d’échec que cet outil existe pour empêcher.
+Un condensé refusé laisse simplement les critères de rendu à `manual`, ce qui est l’issue
+honnête.
 
-The collector is bounded (`COLLECT_MAX_ELEMENTS`); when it truncates, `truncated: true` is
-recorded so the tail reads as *unmeasured*, never as *clean*.
+Le collecteur est borné (`COLLECT_MAX_ELEMENTS`) ; quand il tronque, `truncated: true` est
+enregistré pour que la fin se lise comme *non mesurée*, jamais comme *propre*.
 
-## The rendered tier — criteria only a browser can answer, decided offline
+## Le niveau rendu — des critères auxquels seul un navigateur peut répondre, décidés hors ligne
 
-A snapshot carries what a browser knows and source does not. Six rules read it, and they
-run inside the ordinary `audit` — **no browser, no running server**, from a
-committed artefact. That is the point: CI decides these without booting the app.
+Un instantané porte ce que sait un navigateur et que la source ignore. Six règles le lisent, et
+elles tournent dans l’`audit` ordinaire — **sans navigateur, sans serveur lancé**, à partir d’un
+artefact commité. C’est tout l’intérêt : la CI les décide sans démarrer l’application.
 
-| Rule | WCAG | RGAA | Reads |
+| Règle | WCAG | RGAA | Lit |
 |---|---|---|---|
-| `rendered-contrast` | 1.4.3 | **3.2 / 10.5** | computed `color` vs the nearest opaque ancestor background |
-| `rendered-contrast-pixel` | 1.4.3 | **3.2 / 10.5** | the screenshot, where the CSSOM cannot answer |
-| `rendered-link-colour-only` | 1.4.1 | **10.6** | computed styles of a link inside running text |
-| `rendered-nontext-contrast` | 1.4.11 | **3.3** | a control's computed fill and its four borders |
-| `rendered-focus-not-visible` | 2.4.7 | **10.7** | the stylesheet's `:focus` rules |
-| `rendered-orientation-lock` | 1.3.4 | **13.9** | `@media (orientation:…)` rules |
+| `rendered-contrast` | 1.4.3 | **3.2 / 10.5** | la `color` calculée face à l’arrière-plan de l’ancêtre opaque le plus proche |
+| `rendered-contrast-pixel` | 1.4.3 | **3.2 / 10.5** | la capture d’écran, là où le CSSOM ne peut pas répondre |
+| `rendered-link-colour-only` | 1.4.1 | **10.6** | les styles calculés d’un lien à l’intérieur d’un texte courant |
+| `rendered-nontext-contrast` | 1.4.11 | **3.3** | le remplissage calculé d’un contrôle et ses quatre bordures |
+| `rendered-focus-not-visible` | 2.4.7 | **10.7** | les règles `:focus` de la feuille de style |
+| `rendered-orientation-lock` | 1.3.4 | **13.9** | les règles `@media (orientation:…)` |
 
-**`rendered-contrast` beats the inline-literal rule** it sits beside: `contrast-literal` can
-only judge colours written inline in the markup, so it says nothing about a real stylesheet.
-The computed value is the value the user sees, and large-text thresholds need no unit guessing
-because the browser already resolved everything to px.
+**`rendered-contrast` l’emporte sur la règle des littéraux en ligne** à côté de laquelle elle
+se trouve : `contrast-literal` ne peut juger que les couleurs écrites en ligne dans le balisage,
+elle ne dit donc rien d’une vraie feuille de style. La valeur calculée est la valeur que voit
+l’utilisateur, et les seuils du texte de grande taille n’exigent aucune devinette sur les unités
+parce que le navigateur a déjà tout résolu en px.
 
-**`rendered-contrast-pixel` exists for one case**: text over a gradient, a background image or
-a translucent stack. There, `background-color` is `rgba(0,0,0,0)` and no style analysis will
-recover the real backdrop — a documented blind spot of every CSSOM-based check, axe-core
-included. The screenshot is the only place the answer exists. It is deliberately narrow: it
-runs **only** where `rendered-contrast` declined, so one defect is never counted twice, and it
-reports only when the measured region has one dominant colour. Contrast against a photograph
-is not a single number, and pretending it is would be a fabricated finding.
+**`rendered-contrast-pixel` existe pour un seul cas** : du texte sur un dégradé, une image de
+fond ou un empilement translucide. Là, `background-color` vaut `rgba(0,0,0,0)` et aucune analyse
+de style ne retrouvera le vrai arrière-plan — un angle mort documenté de toute vérification
+fondée sur le CSSOM, axe-core compris. La capture d’écran est le seul endroit où la réponse
+existe. Elle est délibérément étroite : elle ne tourne **que** là où `rendered-contrast` s’est
+abstenue, si bien qu’un défaut n’est jamais compté deux fois, et elle ne signale que lorsque la
+zone mesurée a une couleur dominante unique. Le contraste face à une photographie n’est pas un
+nombre unique, et prétendre le contraire serait un constat fabriqué.
 
-**`rendered-link-colour-only` makes RGAA 10.6 decidable at all** — it had no rule before. A
-coloured link with `text-decoration: none` in a paragraph is invisible to source analysis (the
-rule lives in a stylesheet) and to axe-core. It is scoped to links *with text* *inside a text
-block*, which is where the criterion applies; a nav or button-styled link is out of scope by
-construction, and an underline, a bottom border, a background or a distinctly heavier weight
-all clear it.
+**`rendered-link-colour-only` rend RGAA 10.6 décidable tout court** — il n’avait aucune règle
+auparavant. Un lien coloré avec `text-decoration: none` dans un paragraphe est invisible pour
+l’analyse de source (la règle vit dans une feuille de style) et pour axe-core. Elle est limitée
+aux liens *avec du texte* *à l’intérieur d’un bloc de texte*, là où le critère s’applique ; un
+lien de navigation ou stylé en bouton est hors périmètre par construction, et un soulignement,
+une bordure inférieure, un arrière-plan ou une graisse nettement plus forte suffisent tous à le
+lever.
 
-**`rendered-nontext-contrast` gives RGAA 3.3 its first rule.** A control is distinguishable
-when its fill contrasts with the surroundings, **or** when a drawn border contrasts with either
-side of itself — three independent ways to pass, deliberately generous. What remains is the
-unambiguous failure: a borderless field the same colour as the page. It declines outright when
-a `box-shadow` or a visible `outline` might be drawing the boundary instead.
+**`rendered-nontext-contrast` donne à RGAA 3.3 sa première règle.** Un contrôle est
+distinguable quand son remplissage contraste avec son environnement, **ou** quand une bordure
+dessinée contraste avec l’un ou l’autre de ses côtés — trois façons indépendantes de passer,
+délibérément généreuses. Ce qui reste est l’échec sans ambiguïté : un champ sans bordure de la
+même couleur que la page. Elle s’abstient purement et simplement quand un `box-shadow` ou un
+`outline` visible pourrait dessiner la limite à la place.
 
-**Two criteria are properties of the STYLESHEET, not of any element's computed style**, and
-`css.json` is the only place they exist. `rendered-focus-not-visible` catches the classic
-`*:focus { outline: none }` reset — reported **only** when no `:focus` rule anywhere in the
-document restores an affordance, so a targeted reset that a sibling rule replaces is never
-flagged. `rendered-orientation-lock` catches a media query that turns the whole document a
-quarter turn; a decorative element rotated in landscape is legitimate and is not flagged.
+**Deux critères sont des propriétés de la FEUILLE DE STYLE, pas du style calculé d’un
+élément**, et `css.json` est le seul endroit où ils existent. `rendered-focus-not-visible`
+attrape la réinitialisation classique `*:focus { outline: none }` — signalée **seulement**
+quand aucune règle `:focus` nulle part dans le document ne rétablit d’indicateur, si bien qu’une
+réinitialisation ciblée qu’une règle sœur remplace n’est jamais signalée.
+`rendered-orientation-lock` attrape une media query qui fait pivoter tout le document d’un quart
+de tour ; un élément décoratif tourné en paysage est légitime et n’est pas signalé.
 
-Both **decline when `unreadable > 0`** — a cross-origin stylesheet the browser would not let us
-read. Silence there means *"I could not look"*, not *"nothing there"*, and the difference is
-the whole point.
+Les deux **s’abstiennent quand `unreadable > 0`** — une feuille de style d’une autre origine que
+le navigateur ne nous laisserait pas lire. Le silence y signifie *« je n’ai pas pu regarder »*,
+pas *« il n’y a rien »*, et la différence est tout l’enjeu.
 
-RGAA 10.7 was already reachable through the live `scan` probe (`dyn-focus-visible`), which
-needs a browser and a running app. The CSSOM route decides it **offline**.
+RGAA 10.7 était déjà atteignable via la sonde en direct de `scan` (`dyn-focus-visible`), qui
+nécessite un navigateur et une application lancée. La voie du CSSOM le décide **hors ligne**.
 
-### What makes this tier trustworthy
+### Ce qui rend ce niveau digne de confiance
 
-It can say "non-conforming" because it can also say **"I don't know"**. Each of these leaves
-the criterion undecided rather than guessing:
+Il peut dire « non conforme » parce qu’il peut aussi dire **« je ne sais pas »**. Chacun de ces
+cas laisse le critère non décidé plutôt que de deviner :
 
-- no ancestor declares an opaque background, or the backdrop is an image → no CSSOM verdict;
-- the screenshot region is genuinely varied → no pixel verdict;
-- a stylesheet was cross-origin and unreadable → no stylesheet verdict;
-- a `box-shadow` or `outline` might be the boundary → no boundary verdict;
-- the element sits past the collector's cap (`truncated: true`) → no signals, no verdict;
-- the style digest does not verify against the DOM → the **whole** digest is refused.
+- aucun ancêtre ne déclare d’arrière-plan opaque, ou l’arrière-plan est une image → pas de
+  verdict CSSOM ;
+- la zone de la capture d’écran est réellement variée → pas de verdict pixel ;
+- une feuille de style était d’une autre origine et illisible → pas de verdict de feuille de
+  style ;
+- un `box-shadow` ou un `outline` pourrait être la limite → pas de verdict de limite ;
+- l’élément se trouve au-delà du plafond du collecteur (`truncated: true`) → pas de signaux, pas
+  de verdict ;
+- le condensé de styles ne se vérifie pas contre le DOM → le condensé **entier** est refusé.
 
-And without `doc.signals` — every ordinary source file — the rules do not fire at all, so
-adding this tier cannot change a single pre-existing verdict.
+Et sans `doc.signals` — c’est le cas de tout fichier source ordinaire — les règles ne se
+déclenchent pas du tout, si bien que l’ajout de ce niveau ne peut changer aucun verdict
+préexistant.
 
-### How much of RGAA the engine can evidence
+### Quelle part du RGAA le moteur peut étayer
 
-`tests/rgaa-coverage.test.ts` pins a floor of **50 of 106** criteria mapped onto an engine
-rule, up from 43 before this tier — the rendered rules plus two declarative pack rules
-(`optgroup` without `label`, an invalid `dir` value). A refactor that silently unmaps a
-criterion fails CI rather than quietly shrinking the audit. Criteria nothing can
-decide stay at zero *visibly*: RGAA 8.1 maps only to the removed WCAG 4.1.1, and 13.3 depends
-on downloadable office documents.
+`tests/rgaa-coverage.test.ts` fixe un plancher de **50 sur 106** critères rattachés à une règle
+du moteur, contre 43 avant ce niveau — les règles de rendu plus deux règles déclaratives du pack
+(`optgroup` sans `label`, une valeur `dir` invalide). Une refonte qui détache silencieusement un
+critère fait échouer la CI au lieu de rétrécir l’audit sans bruit. Les critères que rien ne peut
+décider restent à zéro, *visiblement* : RGAA 8.1 ne correspond qu’au WCAG 4.1.1 supprimé, et 13.3
+dépend de documents bureautiques téléchargeables.
 
-## The per-page grid
+## La grille par page
 
-RGAA is a **per-page** norm: an audit runs over a declared sample and each criterion gets a
-status *on each page*. The engine's verdict is scope-wide. `pages` bridges the two.
+Le RGAA est une norme **par page** : un audit porte sur un échantillon déclaré et chaque critère
+reçoit un statut *sur chaque page*. Le verdict du moteur vaut pour tout le périmètre. `pages`
+fait le pont entre les deux.
 
 ```
 node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa
@@ -203,54 +220,59 @@ node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --
 #   → also writes audits/pages.json — the same projection, for a machine
 ```
 
-`--json --out <dir>` writes `<dir>/pages.json` beside the sheets it mirrors. The grid, the
-dossiers and the HTML are documents for a person; this is the one file a later job, a badge or
-a dashboard can read without re-deriving anything, and stdout alone cannot serve them — in CI
-the caller is an orchestrator step, and a criterion × page matrix does not fit in a step
-output. Its shape is `{ pages: [{ id, name, url, basis, criteria: [{ id, status, decidedBy }],
+`--json --out <dir>` écrit `<dir>/pages.json` à côté des fiches dont il est le miroir. La grille,
+les dossiers et le HTML sont des documents pour une personne ; celui-ci est l’unique fichier
+qu’un job ultérieur, un badge ou un tableau de bord peut lire sans rien re-dériver, et la sortie
+standard seule ne peut pas les servir — en CI, l’appelant est une étape d’orchestrateur, et une
+matrice critère × page ne tient pas dans une sortie d’étape. Sa forme est `{ pages: [{ id, name, url, basis, criteria: [{ id, status, decidedBy }],
 conformancePct, decided, total }], unattributed, averageRate }`.
 
-`averageRate` (under a pack only) is the RGAA **« taux moyen de conformité »** — the second
-figure the method asks of a sample, beside the global rate: `{ pct, pages: [{ id, name, url,
-pct, validated, applicable, open }], excluded, open }`. Each page is rated with the page formula
-over that page alone — conforming ÷ (conforming + non-conforming), so a page's `applicable` is
-its decided criteria, the not-applicable ones excluded, as the RGAA method counts them — `pct` is
-the mean of those exact ratios rounded once, a page with no decided criterion is listed in
-`excluded` and left out of the mean (never counted as 100 %), and `open` counts the criteria
-still to assess on those pages: while it is above zero every rate — and so the mean — is
-provisional. The grid prints the same line under its table, followed by each page's rate as its
-sheet prints it; `report` prints it under its headline rate, in its summary and as the last
-column of « Taux par page ».
+`averageRate` (sous un pack uniquement) est le **« taux moyen de conformité »** du RGAA — le
+second chiffre que la méthode demande pour un échantillon, à côté du taux global : `{ pct, pages: [{ id, name, url,
+pct, validated, applicable, open }], excluded, open }`. Chaque page est notée avec la formule de
+la page appliquée à cette seule page — conformes ÷ (conformes + non conformes), si bien que
+l’`applicable` d’une page est l’ensemble de ses critères décidés, les non applicables exclus,
+comme la méthode RGAA les compte — `pct` est la moyenne de ces ratios exacts arrondie une seule
+fois, une page sans aucun critère décidé est listée dans `excluded` et laissée hors de la moyenne
+(jamais comptée à 100 %), et `open` compte les critères encore à évaluer sur ces pages : tant
+qu’il est supérieur à zéro, chaque taux — et donc la moyenne — est provisoire. La grille imprime
+la même ligne sous son tableau, suivie du taux de chaque page tel que sa fiche l’imprime ;
+`report` l’imprime sous son taux principal, dans sa synthèse et comme dernière colonne de « Taux
+par page ».
 
-Until #156 the page rate was the global formula over the page (validated ÷ validated + NC + to
-assess). On pages judged from source a criterion non-conforming on another page is « à évaluer »
-there, and run-wide verdicts land on every page, so an open criterion weighed exactly like a
-non-conformity and every page printed the overall rate. The global rate keeps that formula: it
-is a floor over the whole sample, and its open criteria are part of the claim it makes.
+Jusqu’à #156, le taux de page était la formule globale appliquée à la page (validés ÷ validés +
+NC + à évaluer). Sur les pages jugées depuis la source, un critère non conforme sur une autre
+page y est « à évaluer », et les verdicts valables pour toute l’exécution atterrissent sur chaque
+page, si bien qu’un critère ouvert pesait exactement comme une non-conformité et que chaque page
+imprimait le taux global. Le taux global garde cette formule : c’est un plancher sur tout
+l’échantillon, et ses critères ouverts font partie de l’affirmation qu’il porte.
 
-One row per criterion (the pack's own under `--standard`), one column per page:
-`C` conforming · `NC` non-conforming · `—` not applicable · `?` to assess. The same grid is
-embedded in `report` whenever pages are in scope.
+Une ligne par critère (ceux du pack sous `--standard`), une colonne par page :
+`C` conforme · `NC` non conforme · `—` non applicable · `?` à évaluer. La même grille est
+intégrée à `report` dès que des pages sont dans le périmètre.
 
-A column is headed by the page's **URL**, not its name. A name is not an address — two routes
-of one app are routinely both called « Accueil », and a `<title>` is written for a browser tab
-rather than for a column. When every page in scope shares an origin (what a crawl of one site
-produces) the header is the **path** and the origin is stated once above the table, because
-nine columns of `https://example.fr/mentions-legales.html` is a table nobody reads; a
-mixed-origin run keeps full URLs, since there the origin *is* part of the identity. It rebuilds from a committed `audit.json`
-**alone** — no snapshots on disk, no browser — because `scope.pages` records the pages and
-every finding carries its `page`.
+Une colonne a pour en-tête l’**URL** de la page, pas son nom. Un nom n’est pas une adresse —
+deux routes d’une même application s’appellent couramment toutes deux « Accueil », et un
+`<title>` est écrit pour un onglet de navigateur plutôt que pour une colonne. Quand toutes les
+pages du périmètre partagent une origine (ce que produit l’exploration (crawl) d’un seul site),
+l’en-tête est le **chemin** et l’origine est indiquée une seule fois au-dessus du tableau, parce
+que neuf colonnes de `https://example.fr/mentions-legales.html` forment un tableau que personne
+ne lit ; une exécution aux origines mêlées garde les URL complètes, puisque là l’origine *fait*
+partie de l’identité. Elle se reconstruit à partir d’un `audit.json` commité **seul** — sans
+instantané sur disque, sans navigateur — parce que `scope.pages` enregistre les pages et que
+chaque constat porte sa `page`.
 
-The per-page status is not computed a second time: a per-page *view* of the audit is fed to
-the very same projection the report uses (`derivePackResults`). Grid and report therefore
-agree by construction — out-of-scope criteria (RGAA 8.1), scoped-out siblings, pack overrides
-and advisory handling all come from one implementation, not from a second one that drifts.
+Le statut par page n’est pas calculé une seconde fois : une *vue* par page de l’audit est
+fournie à la même projection que celle qu’utilise le rapport (`derivePackResults`). La grille et
+le rapport concordent donc par construction — les critères hors périmètre (RGAA 8.1), les
+critères frères écartés du périmètre, les surcharges du pack et le traitement des
+recommandations viennent tous d’une seule implémentation, pas d’une seconde qui dériverait.
 
-## The per-page REPORT (`pages --format report`)
+## Le RAPPORT par page (`pages --format report`)
 
-The grid answers *"which criteria fail, across the pages?"* — the right shape for a diff, the
-wrong one for a page owner: with 106 RGAA criteria over N pages nobody reads a column. The
-report answers *"what is the state of THIS page?"*.
+La grille répond à *« quels critères échouent, à travers les pages ? »* — la bonne forme pour un
+diff, la mauvaise pour le responsable d’une page : avec 106 critères RGAA sur N pages, personne
+ne lit une colonne. Le rapport répond à *« quel est l’état de CETTE page ? »*.
 
 ```
 node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --format report --out audits
@@ -260,217 +282,234 @@ node scripts/ultra11y.mjs pages --in audits/audit-latest.json --standard rgaa --
 #   → audits/pages/index.md + audits/pages/page-<id>.md      (recommended past 3–4 pages)
 ```
 
-Each page's sheet carries, in order: its identity (name, URL, auth badge, snapshot/source
-basis), **its screenshot**, its rate and C/NC/NA/to-assess tally, **every criterion of the
-active standard** with its status on that page, then each non-conformity as the ordinary
-**auditor conformance block**.
+La fiche de chaque page porte, dans l’ordre : son identité (nom, URL, badge d’authentification,
+base instantané/source), **sa capture d’écran**, son taux et son décompte C/NC/NA/à évaluer,
+**chaque critère du référentiel actif** avec son statut sur cette page, puis chaque
+non-conformité sous la forme du **bloc de conformité de l’auditeur** ordinaire.
 
-Two things it deliberately does NOT do:
+Deux choses qu’elle ne fait délibérément PAS :
 
-- **It re-decides nothing.** Every status comes from `derivePages` and, under a pack, from
-  `derivePackResults(pageView(…))` — the very projection the grid and the report already use.
-  A second implementation would drift, and the first symptom of drift in an accessibility
-  report is a criterion silently declared conforming.
-- **It invents no format.** The non-conformities are rendered by `renderAuditorUnit`, so a
-  page sheet, the compliance report, the PRD and the GitHub issue are the same block — and
-  the occurrence lines stay parseable by `verify`.
+- **Elle ne redécide rien.** Chaque statut vient de `derivePages` et, sous un pack, de
+  `derivePackResults(pageView(…))` — la même projection que la grille et le rapport utilisent
+  déjà. Une seconde implémentation dériverait, et le premier symptôme d’une dérive dans un
+  rapport d’accessibilité est un critère déclaré conforme en silence.
+- **Elle n’invente aucun format.** Les non-conformités sont rendues par `renderAuditorUnit`, si
+  bien qu’une fiche de page, le rapport de conformité, le PRD et l’issue GitHub sont le même
+  bloc — et les lignes d’occurrence restent analysables par `verify`.
 
-The screenshot is **copied next to the report** when you pass `--out`: each page's
-`.ultra11y/pages/<id>/screen.png` lands in `<out>/assets/<id>.png` and is linked relatively
-from there. That is what makes the output directory self-contained — CI uploads `audits/`
-alone as the artefact, and a `../../.ultra11y/…` reference would be a broken image in every
-sheet the reviewer opens. Without `--out` (streaming to stdout) the path stays relative,
-since there is no directory to keep intact. A page with no screenshot says so, rather than
-showing nothing.
+La capture d’écran est **copiée à côté du rapport** quand vous passez `--out` : le
+`.ultra11y/pages/<id>/screen.png` de chaque page atterrit dans `<out>/assets/<id>.png` et y est
+lié de façon relative. C’est ce qui rend le répertoire de sortie autonome — la CI téléverse
+`audits/` seul comme artefact, et une référence `../../.ultra11y/…` serait une image cassée dans
+chaque fiche qu’ouvre le relecteur. Sans `--out` (flux vers la sortie standard), le chemin reste
+relatif, puisqu’il n’y a aucun répertoire à garder intact. Une page sans capture d’écran le dit,
+plutôt que de ne rien montrer.
 
-Sheets are named `page-<id>.md`: a page whose id is `index` — the ordinary id for an
-`index.html` target — would otherwise be written over the index itself.
+Les fiches sont nommées `page-<id>.md` : une page dont l’id est `index` — l’id ordinaire pour une
+cible `index.html` — serait sinon écrite par-dessus l’index lui-même.
 
-`check` recognizes these files (they carry an `ultra11y:pages-report` marker) and runs the
-gates that mean something here — above all **no invented criterion** — instead of demanding
-the §1–5 structure of a conformance document.
+`check` reconnaît ces fichiers (ils portent un marqueur `ultra11y:pages-report`) et lance les
+contrôles qui ont un sens ici — avant tout **aucun critère inventé** — au lieu d’exiger la
+structure §1–5 d’un document de conformité.
 
-### Four honesty rules
+### Quatre règles d’honnêteté
 
-**0. A page is recorded only if the browser stayed on it, and answered.** A sample page's
-declared `id` and `name` are the identity the report speaks, and they are applied to whatever was
-on screen. So a route that redirects — an expired session bouncing to sign-in, a wizard step the
-application state does not open — would be filed under the requested page's name while showing
-something else: a sheet, a screenshot and a rate that describe a different screen, with nothing
-about the document looking wrong.
+**0. Une page n’est enregistrée que si le navigateur y est resté, et qu’elle a répondu.** L’`id`
+et le `name` déclarés d’une page de l’échantillon sont l’identité dont parle le rapport, et ils
+sont appliqués à ce qui se trouvait à l’écran. Une route qui redirige — une session expirée
+renvoyée vers la connexion, une étape d’assistant que l’état de l’application n’ouvre pas —
+serait donc classée sous le nom de la page demandée tout en montrant autre chose : une fiche, une
+capture d’écran et un taux qui décrivent un autre écran, sans que rien dans le document ne semble
+anormal.
 
-`scan --sample` refuses two ways:
+`scan --sample` refuse de deux façons :
 
-- **It moved.** The address is compared as the app routes: the **path** always; the **fragment**
-  and the **query** when the request carried one, because a hash-router app puts the route there
-  and `#/admin` → `#/login` is exactly the bounce this rule exists for; the **host**, since a
-  same-path landing on an IdP is the same misattribution (a scheme, a port or a `www.` differ
-  freely — that is canonicalisation). The comparison uses the URL captured right after the
-  navigation settles, before any probe could click something that routes.
-- **It answered an error.** A framework's own not-found page is a complete, valid document
-  served at the address you asked for — `notFound()` in Next is exactly that — so no address
-  comparison can see it. The HTTP status can: anything ≥ 400 is refused.
+- **Elle a bougé.** L’adresse est comparée comme l’application route : le **chemin** toujours ;
+  le **fragment** et la **requête** quand la demande en portait un, parce qu’une application à
+  routeur par hash y place la route et que `#/admin` → `#/login` est exactement le renvoi pour
+  lequel cette règle existe ; l’**hôte**, puisqu’un atterrissage au même chemin sur un fournisseur
+  d’identité est la même mauvaise attribution (un schéma, un port ou un `www.` peuvent différer
+  librement — c’est de la canonicalisation). La comparaison utilise l’URL capturée juste après que
+  la navigation s’est stabilisée, avant qu’une sonde puisse cliquer sur quelque chose qui route.
+- **Elle a répondu une erreur.** La propre page « introuvable » d’un framework est un document
+  complet et valide servi à l’adresse demandée — `notFound()` dans Next est exactement cela — donc
+  aucune comparaison d’adresses ne peut la voir. Le statut HTTP, lui, le peut : tout ce qui est
+  ≥ 400 est refusé.
 
-A refused page is **named in the report**, with what was asked, what was reached and why, and it
-is removed from `scope.sample` — leaving it there would put it back in the grid with the same
-basis as a page really visited, so the deliverable would claim we looked at it. A run where
-*every* page was refused exits non-zero: that is not a partial result, it is a scan that measured
-nothing. A page reported missing is a bug in the sample or in the state you seeded, and both are
-fixable; a page reported under the wrong name is a false conformance claim.
+Une page refusée est **nommée dans le rapport**, avec ce qui a été demandé, ce qui a été atteint
+et pourquoi, et elle est retirée de `scope.sample` — l’y laisser la remettrait dans la grille
+avec la même base qu’une page réellement visitée, et le livrable prétendrait alors que nous
+l’avons examinée. Une exécution où *toutes* les pages ont été refusées sort avec un code non
+nul : ce n’est pas un résultat partiel, c’est un scan qui n’a rien mesuré. Une page signalée
+manquante est un bug dans l’échantillon ou dans l’état que vous avez préparé, et les deux se
+corrigent ; une page signalée sous le mauvais nom est une fausse déclaration de conformité.
 
-**1. A finding is attributed to a page only when something says so.** In order: the snapshot
-path it was raised on (`.ultra11y/pages/<id>/dom.html` — the id is *in the path*, which is what
-lets `pages` repair an audit produced before the stamp worked, with no `dom.html` left on disk),
-the scanned page URL, the `scan --sample` page name, then the page's own recorded `sources`.
-Anything else stays **unattributed** and is reported as a count — never spread across every
-page, which would invent non-conformities. A shared component matches the first page
-deterministically rather than being duplicated onto each. The count spans both channels: a pack
-finding no page claims is counted too.
+**1. Un constat n’est attribué à une page que lorsque quelque chose le dit.** Dans l’ordre : le
+chemin de l’instantané sur lequel il a été levé (`.ultra11y/pages/<id>/dom.html` — l’id est *dans
+le chemin*, ce qui permet à `pages` de réparer un audit produit avant que l’estampille ne
+fonctionne, sans aucun `dom.html` restant sur disque), l’URL de la page scannée, le nom de page
+de `scan --sample`, puis les `sources` enregistrées par la page elle-même. Tout le reste reste
+**non attribué** et est rapporté sous forme de compte — jamais réparti sur toutes les pages, ce
+qui inventerait des non-conformités. Un composant partagé est rattaché de façon déterministe à
+la première page plutôt que dupliqué sur chacune. Le compte couvre les deux canaux : un constat
+du pack qu’aucune page ne revendique est compté lui aussi.
 
-**2. "No finding here" means conforming only for a page whose real DOM was audited.** Four
-bases, and only the first earns `C` by silence:
+**2. « Aucun constat ici » ne signifie conforme que pour une page dont le DOM réel a été
+audité.** Quatre bases, et seule la première obtient `C` par le silence :
 
-| `basis` | What it means | Silence means |
+| `basis` | Ce que cela signifie | Le silence signifie |
 |---|---|---|
-| `snapshot` | this audit read the page's serialized DOM | conforming, for the `static` criteria |
-| `attributed` | no snapshot — only source findings were mapped onto it | nothing; the criteria stay `manual` |
-| `not-audited` | a snapshot exists, but **this** audit never read it | nothing; the criteria stay `manual` |
-| `loading` | the snapshot was captured while the page still declared itself loading (`meta.loading`: `aria-busy`, a spinner, « Chargement… ») | nothing; its findings count, but none of its measurements credits coverage |
+| `snapshot` | cet audit a lu le DOM sérialisé de la page | conforme, pour les critères `static` |
+| `attributed` | pas d’instantané — seuls des constats de source y ont été rattachés | rien ; les critères restent `manual` |
+| `not-audited` | un instantané existe, mais **cet** audit ne l’a jamais lu | rien ; les critères restent `manual` |
+| `loading` | l’instantané a été capturé alors que la page se déclarait encore en chargement (`meta.loading` : `aria-busy`, un indicateur de chargement, « Chargement… ») | rien ; ses constats comptent, mais aucune de ses mesures ne crédite de couverture |
 
-For the last three, **absence of evidence is not evidence of absence**: no rule ran against that
-page's document, so its undecided criteria stay `manual` rather than earning a verdict by
-silence. The grid marks which is which, and warns when any page is not a snapshot.
+Pour les trois dernières, **l’absence de preuve n’est pas la preuve de l’absence** : aucune
+règle n’a tourné sur le document de cette page, donc ses critères non décidés restent `manual`
+plutôt que d’obtenir un verdict par le silence. La grille indique laquelle est laquelle, et
+avertit dès qu’une page n’est pas un instantané.
 
-`not-audited` is a separate word on purpose. A source-only `audit` records every snapshot
-directory on disk as a page in scope while reading none of them, and calling those pages
-"source" would tell the reader they have no snapshot — a different false statement, not a
-smaller one. The evidence is `scope.pagesAudited`, written beside `scope.pages` on every audit
-(as `[]` when none: a guard that is absent whenever there is nothing to report is a guard that
-switches itself off exactly when it matters). An audit written before that field existed leaves
-it undefined, is read as "unknown", and keeps its recorded basis.
+`not-audited` est un mot distinct à dessein. Un `audit` portant uniquement sur la source
+enregistre chaque répertoire d’instantané sur disque comme une page du périmètre sans en lire
+aucun, et appeler ces pages « source » dirait au lecteur qu’elles n’ont pas d’instantané — une
+autre fausse déclaration, pas une moindre. La preuve est `scope.pagesAudited`, écrit à côté de
+`scope.pages` dans chaque audit (sous la forme `[]` quand il n’y en a aucune : un garde-fou
+absent chaque fois qu’il n’y a rien à signaler est un garde-fou qui se désactive lui-même
+exactement quand il compte). Un audit écrit avant que ce champ n’existe le laisse indéfini, est
+lu comme « inconnu », et garde la base qu’il avait enregistrée.
 
-**A rate over nothing is not a rate.** The per-page rate is the RGAA page formula,
-conforming ÷ (conforming + non-conforming): a criterion with no subject on the page leaves it,
-and so does one still to assess — those are counted beside the rate, which is marked provisional
-while any remain: `96 % (70/73) · provisional, 9 to assess`. It is **null** when nothing was
-decided — rendered `—`, never a number, and always beside its denominator: `— (0/106)` under the
-core, `— (0/0) · 12 to assess` under a pack. Returning 100
-there is how thirty-eight sheets reported a perfect page for an app a human auditor had just
-found sixteen non-conformities in: the criteria were all « à évaluer », so nothing was decided,
-so the rate was 100. The index cell carries the same bracket as the sheet's rate line, from one shared computation, so the artefact people paste into a pull
-request can no longer say something its own sheet contradicts.
+**Un taux calculé sur rien n’est pas un taux.** Le taux par page est la formule de page du RGAA,
+conformes ÷ (conformes + non conformes) : un critère sans objet sur la page en sort, tout comme
+un critère encore à évaluer — ceux-là sont comptés à côté du taux, qui est marqué provisoire
+tant qu’il en reste : `96 % (70/73) · provisional, 9 to assess`. Il est **nul** quand rien n’a
+été décidé — rendu `—`, jamais un nombre, et toujours à côté de son dénominateur : `— (0/106)`
+sous le cœur, `— (0/0) · 12 to assess` sous un pack. Renvoyer 100 dans ce cas, c’est ainsi que
+trente-huit fiches ont rapporté une page parfaite pour une application dans laquelle un auditeur
+humain venait de trouver seize non-conformités : les critères étaient tous « à évaluer », donc
+rien n’était décidé, donc le taux valait 100. La cellule de l’index porte le même crochet que la
+ligne de taux de la fiche, issu d’un seul calcul partagé, si bien que l’artefact que l’on colle
+dans une pull request ne peut plus dire quelque chose que sa propre fiche contredit.
 
-**3. Silence only decides what the engine CAN decide.** A scope-wide `NC` on a judgment
-criterion means one definite failure fired *somewhere* — not that the engine can rule on that
-criterion. On a page where the failure did not fire, the engine knows "no definite failure
-here", which is not "conforming": alt relevance, link purpose and reading order are still
-nobody's verdict. So only criteria whose test-level matrix opts into `completeBySilence` earn
-`C` from a fully measured silent run — under RGAA that is **8.3 and 8.5, and
-those two only**. A rule that covers one sub-test, one precondition or one allowed mechanism
-cannot close the rest of the criterion. Everything else stays « à évaluer » until `scan`, the
-snapshot tier or an adjudication decides it. Before this rule a page with no images scored 100%
-on « chaque image a-t-elle une alternative pertinente ? », a rate computed over criteria nobody
-had assessed.
+**3. Le silence ne décide que ce que le moteur PEUT décider.** Un `NC` valable pour tout le
+périmètre sur un critère qui demande un jugement signifie qu’un échec certain s’est déclenché
+*quelque part* — pas que le moteur peut statuer sur ce critère. Sur une page où l’échec ne s’est
+pas déclenché, le moteur sait « pas d’échec certain ici », ce qui n’est pas « conforme » : la
+pertinence de l’alternative, la fonction du lien et l’ordre de lecture ne sont toujours le
+verdict de personne. Seuls les critères dont la matrice au niveau des tests opte pour
+`completeBySilence` obtiennent donc `C` à partir d’une exécution silencieuse entièrement mesurée
+— sous le RGAA, ce sont **8.3 et 8.5, et ces deux-là seulement**. Une règle qui couvre un
+sous-test, une précondition ou un mécanisme autorisé ne peut pas clore le reste du critère. Tout
+le reste reste « à évaluer » jusqu’à ce que `scan`, le niveau instantané ou un arbitrage le
+décide. Avant cette règle, une page sans images obtenait 100 % sur « chaque image a-t-elle une
+alternative pertinente ? », un taux calculé sur des critères que personne n’avait évalués.
 
-What a criterion CAN be decided as, without any of that, is a separate question: since the
-engine learned to prove applicability (`src/audit.ts` `SUBJECT_MATTER`), a criterion whose
-subject matter is absent from the whole scope closes as a justified `NA` — so a repository with
-no media reports RGAA theme 4 as not applicable rather than as « à évaluer ».
+Ce en quoi un critère PEUT être décidé, sans rien de tout cela, est une autre question : depuis
+que le moteur a appris à prouver l’applicabilité (`src/audit.ts` `SUBJECT_MATTER`), un critère
+dont l’objet est absent de tout le périmètre se clôt en `NA` justifié — ainsi un dépôt sans
+médias rapporte la thématique 4 du RGAA comme non applicable plutôt que comme « à évaluer ».
 
-A non-normative recommendation never flips a page criterion to `NC`, exactly as in core.
+Une recommandation non normative ne fait jamais basculer un critère de page en `NC`, exactement
+comme dans le cœur.
 
-### Repeated occurrences, folded
+### Occurrences répétées, regroupées
 
-Per-page attribution surfaces design-system defects at their true multiplicity: one DSFR
-link-styling rule can be 472 findings over 38 pages from 7 distinct selectors. A page sheet
-therefore groups occurrences by `(file, ruleId, selectorHint)` under a counted header —
+L’attribution par page fait apparaître les défauts du design system à leur vraie multiplicité :
+une seule règle de style de lien du DSFR peut représenter 472 constats sur 38 pages à partir de
+7 sélecteurs distincts. Une fiche de page regroupe donc les occurrences par
+`(file, ruleId, selectorHint)` sous un en-tête compté —
 `` **`a.fr-link`** — lien identifié par la couleur seule · ×12 ``.
 
-It is a **display** fold. The header is deliberately not checkbox-shaped, every occurrence keeps
-its own parseable line indented beneath it, and the block still announces the raw count — so
-`verify` builds exactly as many items grouped as ungrouped and no claimed non-conformity escapes
-adjudication by being tucked under a heading. `ruleId` is in the key because WCAG 1.4.3 carries
-both a CSSOM measurement and a screenshot measurement, and presenting those as one defect would
-be a lie. It is off everywhere else: the backlog, `prd --split criterion` and every tracker issue
-body are byte-identical to what they were.
+C’est un regroupement d’**affichage**. L’en-tête n’a délibérément pas la forme d’une case à
+cocher, chaque occurrence garde sa propre ligne analysable indentée en dessous, et le bloc
+annonce toujours le compte brut — si bien que `verify` construit exactement autant d’éléments
+groupés que non groupés et qu’aucune non-conformité déclarée n’échappe à l’arbitrage en étant
+rangée sous un en-tête. `ruleId` fait partie de la clé parce que WCAG 1.4.3 porte à la fois une
+mesure CSSOM et une mesure sur capture d’écran, et les présenter comme un seul défaut serait un
+mensonge. Il est désactivé partout ailleurs : le backlog, `prd --split criterion` et le corps de
+chaque issue du tracker sont identiques octet pour octet à ce qu’ils étaient.
 
-### Showing the defect, not only citing it (`--evidence`)
+### Montrer le défaut, pas seulement le citer (`--evidence`)
 
-`selectorHint` is lossy by construction — first class only, `href` truncated — and every
-rendered-tier finding on a client-rendered page is anchored at `dom.html:2`, the `<html>`
-element. What a non-technical reviewer receives is `` `.ultra11y/pages/accueil/dom.html:412`
-(`div.card`) ``, which locates nothing.
+`selectorHint` est avec perte par construction — première classe seulement, `href` tronqué — et
+chaque constat du niveau rendu sur une page rendue côté client est ancré à `dom.html:2`,
+l’élément `<html>`. Ce que reçoit un relecteur non technique est
+`` `.ultra11y/pages/accueil/dom.html:412`
+(`div.card`) ``, ce qui ne localise rien.
 
 ```sh
 node scripts/ultra11y.mjs pages --in audits/audit-latest.json --format report \
   --split page --evidence --out audits/pages
 ```
 
-Each occurrence gains an inert sub-bullet with an annotated crop of the offending element,
-written to `assets/<page-id>/<hash>.png`:
+Chaque occurrence gagne une sous-puce inerte avec un recadrage annoté de l’élément fautif, écrit
+dans `assets/<page-id>/<hash>.png` :
 
 ```md
 - [ ] `.ultra11y/pages/accueil/dom.html:412` (`div.card`) — <img> without an alt attribute…
   - ![Cropped capture of the img element on the accueil page, outlined](./assets/accueil/c90959b13aa2.png)
 ```
 
-**Derived at render time, never stamped on the finding.** A rectangle in pixels is a property
-of the image: a box written onto a `Finding` becomes silently wrong the moment the audit is
-re-rendered against another capture. The join goes `sourceStart` → document-order ordinal →
-`boxes.json`, through the same `alignedBoxes` the rendered tier uses — including its refusal
-to align a digest whose tags disagree. `Finding` gains no field.
+**Dérivé au moment du rendu, jamais estampillé sur le constat.** Un rectangle en pixels est une
+propriété de l’image : une boîte écrite sur un `Finding` devient fausse en silence dès que
+l’audit est rendu à nouveau contre une autre capture. La jointure va de `sourceStart` → ordinal
+d’ordre du document → `boxes.json`, via le même `alignedBoxes` qu’utilise le niveau rendu — y
+compris son refus d’aligner un condensé dont les balises ne concordent pas. `Finding` ne gagne
+aucun champ.
 
-The mark is not monochrome: a white halo, a red ring, corner brackets whose shape says "here",
-and a dashed inner line that survives a monochrome print. This tool reports 1.4.1 failures; its
-own deliverable cannot commit one.
+Le marquage n’est pas monochrome : un halo blanc, un anneau rouge, des crochets d’angle dont la
+forme dit « ici », et une ligne intérieure en pointillés qui survit à une impression en noir et
+blanc. Cet outil signale des échecs 1.4.1 ; son propre livrable ne peut pas en commettre un.
 
-**Nothing is cut in silence.** Thirteen refusal reasons, each with its own sentence, counted
-per page and per criterion in the sheet itself:
+**Rien n’est coupé en silence.** Treize motifs de refus, chacun avec sa propre phrase, comptés
+par page et par critère dans la fiche elle-même :
 
-| Reason | What happened |
+| Motif | Ce qui s’est passé |
 |---|---|
-| `no-snapshot` | the capture this finding's own path names is not on this disk |
-| `no-screenshot` | the producer captured no image for that page |
-| `unreadable-image` · `no-boxes` · `truncated` | the capture or the box digest cannot be trusted |
-| `no-offsets` · `unjoinable` | the finding has no byte range, or it resolves to no element |
-| `page-scope` | the finding is about the document, not an element you can frame |
-| `zero-area` · `below-the-fold` | the element is invisible, or outside a viewport-only capture |
-| `unknown-scale` | the device pixel ratio could not be derived — a crop would be off-target |
-| `deduplicated` | the same defect on the same element — another occurrence's picture shows it |
-| `capped` | a **distinct** defect went undrawn: 6 per rule, 12 per page, `--evidence-max` per run |
+| `no-snapshot` | la capture que nomme le propre chemin de ce constat n’est pas sur ce disque |
+| `no-screenshot` | le producteur n’a capturé aucune image pour cette page |
+| `unreadable-image` · `no-boxes` · `truncated` | la capture ou le condensé des boîtes n’est pas fiable |
+| `no-offsets` · `unjoinable` | le constat n’a pas de plage d’octets, ou elle ne se résout en aucun élément |
+| `page-scope` | le constat porte sur le document, pas sur un élément que l’on peut encadrer |
+| `zero-area` · `below-the-fold` | l’élément est invisible, ou hors d’une capture limitée au viewport |
+| `unknown-scale` | le ratio de pixels de l’appareil n’a pas pu être dérivé — un recadrage tomberait à côté |
+| `deduplicated` | le même défaut sur le même élément — l’image d’une autre occurrence le montre |
+| `capped` | un défaut **distinct** n’a pas été dessiné : 6 par règle, 12 par page, `--evidence-max` par exécution |
 
-The last two are counted apart on purpose. `deduplicated` costs the reader nothing — the
-defect is on screen, under another occurrence. `capped` is a real gap, and it is the only one
-a setting can close.
+Les deux derniers sont comptés à part à dessein. `deduplicated` ne coûte rien au lecteur — le
+défaut est à l’écran, sous une autre occurrence. `capped` est un vrai manque, et c’est le seul
+qu’un réglage peut combler.
 
-A finding raised on SOURCE is in neither column: it never had pixels, so it is not an
-occurrence that failed to be illustrated, and a repository audited from source alone gets no
-notice at all rather than one line per finding.
+Un constat levé sur la SOURCE ne figure dans aucune des deux colonnes : il n’a jamais eu de
+pixels, ce n’est donc pas une occurrence qui n’a pas pu être illustrée, et un dépôt audité à
+partir de la seule source ne reçoit aucune mention plutôt qu’une ligne par constat.
 
-An occurrence with no picture must never read as an occurrence with no defect, so the sheet
-says how many were not illustrated and why. So does the combined document, the HTML sheets and
-the composite — every surface that can show a crop can say what it did not show.
+Une occurrence sans image ne doit jamais se lire comme une occurrence sans défaut, c’est pourquoi
+la fiche dit combien n’ont pas été illustrées et pourquoi. Le document combiné, les fiches HTML
+et le composite font de même — chaque surface qui peut montrer un recadrage peut dire ce qu’elle
+n’a pas montré.
 
-Without `--evidence` the Markdown is **byte-identical** to what it was. The crop bullet carries
-no `[ ]`, so `verify` builds the same worklist with or without it — indentation alone would not
-be enough, since `AUDITOR_OCCURRENCE` is anchored `^\s*-\s\[ \]` and tolerates leading space.
+Sans `--evidence`, le Markdown est **identique octet pour octet** à ce qu’il était. La puce du
+recadrage ne porte pas de `[ ]`, si bien que `verify` construit la même liste de travail avec ou
+sans elle — l’indentation seule ne suffirait pas, puisque `AUDITOR_OCCURRENCE` est ancré
+`^\s*-\s\[ \]` et tolère des espaces en tête.
 
-### The same, as a page (`--html`)
+### La même chose, sous forme de page (`--html`)
 
-`--html` writes `index.html` and one `page-<id>.html` beside the Markdown they mirror.
-Self-contained: no script, no external asset, nothing pointing outside the output directory.
+`--html` écrit `index.html` et un `page-<id>.html` par page à côté du Markdown dont ils sont le
+miroir. Autonome : aucun script, aucune ressource externe, rien qui pointe hors du répertoire de
+sortie.
 
-**The printable single file comes from `report --html`, not from here.** One composite per
-artifact: emitting one from both commands would put a second copy of every inlined crop into
-the same upload, so `pages --html` deliberately writes none.
+**Le fichier unique imprimable vient de `report --html`, pas d’ici.** Un composite par
+artefact : en émettre un depuis les deux commandes mettrait une seconde copie de chaque recadrage
+intégré dans le même téléversement, donc `pages --html` n’en écrit délibérément aucun.
 
 ```sh
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --html --evidence --out audits
 ```
 
-### Browsing the results and their history (`serve`)
+### Parcourir les résultats et leur historique (`serve`)
 
-`serve` turns the audits directory into a small local site, read-only:
+`serve` transforme le répertoire des audits en un petit site local, en lecture seule :
 
 ```sh
 node scripts/ultra11y.mjs serve                              # http://127.0.0.1:4711/ (next free port when busy)
@@ -478,51 +517,57 @@ node scripts/ultra11y.mjs serve --in audits --port 8080      # another directory
 node scripts/ultra11y.mjs serve --static site                # the same pages as plain files, relative links only
 ```
 
-- **The history is the directory.** Every current audit JSON under `--in` (default `audits`,
-  up to three levels deep) is one audit: keep dated copies — `audits/2026-09-01/audit-latest.json`
-  beside the run's `audits/audit-latest.json` — and they line up by their `date`. Identical
-  copies count once; other JSON (pages.json, worklists, ticket sets) is ignored.
-- **Per audit:** its dashboard (summary, synthesis, the grid of the 106 criteria, the per-page
-  scoreboard), the page index with the RGAA **mean rate**, one sheet per page with its
-  screenshot, the journeys, the component snapshots (`.ultra11y/render-snapshots/index.json`)
-  and its files — the report, the annex (with Annex I, the application map, when the annex has
-  one), the JSON.
-- **Between two successive audits:** the conformity-rate and mean-rate change in points, the
-  criteria per status before and after, every criterion whose status changed (fixed,
-  regression, decided, reopened, requalified) and each page's rate change.
-- **Nothing is recomputed.** The rates are the report's own (`conformanceRate`,
-  `averageConformanceRate`, the page sheet's rate); the pages are the HTML report's builders.
-- **Captures belong to the latest audit only.** `.ultra11y/pages` and `.ultra11y/render-snapshots`
-  hold the current state; an older audit shows a screenshot only when one was copied beside it
-  (`assets/<page>.png`, as `pages --format report` does).
-- **Security:** `node:http` only, bound to `127.0.0.1` unless `--host` says otherwise, `GET`/`HEAD`
-  only, a loopback `Host` required. Raw files are served from the audits directory,
-  `.ultra11y/pages` and `.ultra11y/render-snapshots` alone, with their content type; a path that
-  climbs out of them, a link that points out of them, a dot-file or a directory is refused.
-- **`--static <dir>`** writes every page and copies exactly the files they show. All links are
-  relative, so the export works from any sub-path (GitHub Pages, an iterion publication). The
-  target must not overlap the audits directory.
+- **L’historique, c’est le répertoire.** Chaque JSON d’audit courant sous `--in` (par défaut
+  `audits`, jusqu’à trois niveaux de profondeur) est un audit : gardez des copies datées —
+  `audits/2026-09-01/audit-latest.json` à côté du `audits/audit-latest.json` de l’exécution — et
+  elles s’alignent selon leur `date`. Les copies identiques comptent une fois ; les autres JSON
+  (pages.json, listes de travail, jeux de tickets) sont ignorés.
+- **Par audit :** son tableau de bord (résumé, synthèse, la grille des 106 critères, le tableau
+  des scores par page), l’index des pages avec le **taux moyen** du RGAA, une fiche par page avec
+  sa capture d’écran, les parcours, les instantanés de composants
+  (`.ultra11y/render-snapshots/index.json`) et ses fichiers — le rapport, l’annexe (avec
+  l’annexe I, la carte de l’application, quand l’annexe en a une), le JSON.
+- **Entre deux audits successifs :** l’évolution en points du taux de conformité et du taux
+  moyen, les critères par statut avant et après, chaque critère dont le statut a changé (corrigé,
+  régression, décidé, rouvert, requalifié) et l’évolution du taux de chaque page.
+- **Rien n’est recalculé.** Les taux sont ceux du rapport lui-même (`conformanceRate`,
+  `averageConformanceRate`, le taux de la fiche de page) ; les pages sont produites par les
+  constructeurs du rapport HTML.
+- **Les captures n’appartiennent qu’au dernier audit.** `.ultra11y/pages` et
+  `.ultra11y/render-snapshots` contiennent l’état courant ; un audit plus ancien ne montre une
+  capture d’écran que lorsqu’une a été copiée à côté de lui (`assets/<page>.png`, comme le fait
+  `pages --format report`).
+- **Sécurité :** `node:http` uniquement, lié à `127.0.0.1` sauf si `--host` dit autrement,
+  `GET`/`HEAD` uniquement, un en-tête `Host` de boucle locale exigé. Les fichiers bruts sont
+  servis depuis le répertoire des audits, `.ultra11y/pages` et `.ultra11y/render-snapshots`
+  seulement, avec leur type de contenu ; un chemin qui en sort, un lien qui pointe hors d’eux, un
+  fichier caché (commençant par un point) ou un répertoire est refusé.
+- **`--static <dir>`** écrit chaque page et copie exactement les fichiers qu’elles montrent.
+  Tous les liens sont relatifs, donc l’export fonctionne depuis n’importe quel sous-chemin
+  (GitHub Pages, une publication iterion). La cible ne doit pas chevaucher le répertoire des
+  audits.
 
-## Producing snapshots
+## Produire des instantanés
 
-Anything that drives a browser can write one — the format is the contract, not the producer.
-The engine ships a browser-side collector (`COLLECT_SNAPSHOT`) that returns the DOM, the
-style digest and the boxes for the current page in a single `page.evaluate`; a producer
-writes that alongside a `meta.json`.
+Tout ce qui pilote un navigateur peut en écrire un — c’est le format qui fait contrat, pas le
+producteur. Le moteur livre un collecteur côté navigateur (`COLLECT_SNAPSHOT`) qui renvoie le
+DOM, le condensé de styles et les boîtes de la page courante en un seul `page.evaluate` ; un
+producteur écrit cela accompagné d’un `meta.json`.
 
-Two producers ship with the engine, and they both evaluate that one collector:
+Deux producteurs sont livrés avec le moteur, et tous deux évaluent ce même collecteur :
 
-| Producer | When it runs | Notes |
+| Producteur | Quand il tourne | Notes |
 |---|---|---|
-| `scan` | a URL, a sitemap, a crawl, or the declared sample | on by default (`--no-snapshot` opts out); collected on the **pristine** page, before axe and before any probe |
-| the `ultra11y/playwright` · `ultra11y/cypress` exports | inside your Playwright/Cypress run | the page in the state your test built (logged in, modal open) |
+| `scan` | une URL, un sitemap, une exploration (crawl), ou l’échantillon déclaré | activé par défaut (`--no-snapshot` le désactive) ; collecté sur la page **intacte**, avant axe et avant toute sonde |
+| les exports `ultra11y/playwright` · `ultra11y/cypress` | à l’intérieur de votre exécution Playwright/Cypress | la page dans l’état que votre test a construit (connecté, modale ouverte) |
 
-`scan` is the one that makes a **served site** auditable page by page: without a snapshot a
-scanned URL is `basis: "attributed"` and, by honesty rule 2 below, can never earn a
-conforming verdict. With one, the page-scoped rules run, the runtime-injected DOM is
-audited, and the page re-audits offline. `scan --merge` audits the snapshots it just wrote
-and folds them in, so the grid is populated in the same run.
+`scan` est celui qui rend un **site servi** auditable page par page : sans instantané, une URL
+scannée est en `basis: "attributed"` et, par la règle d’honnêteté 2 ci-dessus, ne peut jamais
+obtenir un verdict conforme. Avec un instantané, les règles de portée page tournent, le DOM
+injecté à l’exécution est audité, et la page se ré-audite hors ligne. `scan --merge` audite les
+instantanés qu’il vient d’écrire et les intègre, si bien que la grille est remplie dans la même
+exécution.
 
-A malformed or unreadable snapshot is skipped, never fatal: one broken producer run must not
-blind the whole report. A snapshot whose `meta.v` is newer than the engine understands is
-**refused** rather than half-read.
+Un instantané malformé ou illisible est ignoré, jamais fatal : une seule exécution de producteur
+défaillante ne doit pas aveugler tout le rapport. Un instantané dont le `meta.v` est plus récent
+que ce que comprend le moteur est **refusé** plutôt qu’à moitié lu.

@@ -1,13 +1,14 @@
-# Structure — headings, landmarks, lists, tables
+# Structure — titres, régions, listes, tableaux
 
-1.3.1 is the criterion that fails most often in real audits, because it covers everything a
-sighted user reads from layout alone. The test is always the same: **is the relationship I
-can see also programmatically determinable?**
+1.3.1 est le critère qui échoue le plus souvent dans les audits réels, parce qu’il couvre tout
+ce qu’un utilisateur voyant lit à partir de la seule mise en page. Le test est toujours le même :
+**la relation que je vois est-elle aussi déterminable par programmation ?**
 
-## Headings
+## Titres
 
-Headings are the primary navigation aid for screen-reader users — most jump between them
-rather than reading linearly. Judge the OUTLINE, not the styling.
+Les titres sont la principale aide à la navigation pour les utilisateurs de lecteurs d’écran —
+la plupart sautent de l’un à l’autre plutôt que de lire de façon linéaire. Jugez le PLAN, pas le
+style.
 
 ```html
 <h1>Quarterly report</h1>
@@ -17,18 +18,19 @@ rather than reading linearly. Judge the OUTLINE, not the styling.
   <h2>Costs</h2>
 ```
 
-- Never skip a level going down (`h2` → `h4`). Going back up is fine (`h3` → `h2`).
-- Style with CSS, not by picking a level. A "small heading" is still an `h2` if it opens a
-  second-level section.
-- A visually styled `<div class="title">` is not a heading. Either mark it up, or accept it
-  is not part of the outline.
-- One `<h1>` per page is a convention, not a rule — the engine reports it as a
-  recommendation, never a non-conformity.
+- Ne sautez jamais de niveau en descendant (`h2` → `h4`). Remonter ne pose pas de problème
+  (`h3` → `h2`).
+- Stylez avec le CSS, pas en choisissant un niveau. Un « petit titre » reste un `h2` s’il ouvre
+  une section de deuxième niveau.
+- Un `<div class="title">` stylé visuellement n’est pas un titre. Soit balisez-le, soit acceptez
+  qu’il ne fasse pas partie du plan.
+- Un seul `<h1>` par page est une convention, pas une règle — le moteur le signale comme une
+  recommandation, jamais comme une non-conformité.
 
-Engine rules: `heading-order-skip`, `empty-heading`; `h1-missing`/`h1-multiple` (advisory).
-Yours: whether each heading actually **describes** its section (2.4.6).
+Règles du moteur : `heading-order-skip`, `empty-heading` ; `h1-missing`/`h1-multiple`
+(indicatives). À vous : savoir si chaque titre **décrit** réellement sa section (2.4.6).
 
-## Landmarks
+## Régions
 
 ```html
 <header>            <!-- banner -->
@@ -41,16 +43,18 @@ Yours: whether each heading actually **describes** its section (2.4.6).
 <footer>…</footer>  <!-- contentinfo -->
 ```
 
-- Every piece of content should sit inside a landmark; text stranded between them is
-  unreachable by landmark navigation.
-- Name repeated landmarks: two `<nav>`s need `aria-label` to be told apart. One `<nav>`
-  needs no label — "Navigation navigation" is what a redundant one produces.
-- `<main>` is the target of the skip link, and needs `tabindex="-1"` to accept focus.
+- Tout contenu doit se trouver à l’intérieur d’une région ; un texte échoué entre elles est
+  inatteignable par la navigation par régions.
+- Nommez les régions répétées : deux `<nav>` ont besoin d’un `aria-label` pour être
+  distinguées. Un seul `<nav>` n’a pas besoin d’intitulé — « Navigation navigation » est ce que
+  produit un intitulé redondant.
+- `<main>` est la cible du lien d’évitement, et a besoin de `tabindex="-1"` pour accepter le
+  focus.
 
-Engine rules: `missing-main-landmark`, `multiple-main-landmark`, `nav-landmark-missing`,
+Règles du moteur : `missing-main-landmark`, `multiple-main-landmark`, `nav-landmark-missing`,
 `nav-landmark-unnamed`, `skip-link-target-missing`.
 
-## Lists
+## Listes
 
 ```html
 <ul>                       <!-- unordered: order carries no meaning -->
@@ -65,19 +69,20 @@ Engine rules: `missing-main-landmark`, `multiple-main-landmark`, `nav-landmark-m
 </dl>
 ```
 
-Screen readers announce "list, 5 items" — that count is the information. A run of `<div>`s
-separated by `<br>` announces nothing. Only `<li>` (and `<script>`/`<template>`) may be a
-direct child of `<ul>`/`<ol>`; only `<dt>`/`<dd>` (optionally wrapped in a `<div>`) of `<dl>`.
+Les lecteurs d’écran annoncent « liste, 5 éléments » — ce nombre est l’information. Une suite de
+`<div>` séparés par des `<br>` n’annonce rien. Seuls des `<li>` (et `<script>`/`<template>`)
+peuvent être enfants directs de `<ul>`/`<ol>` ; seuls des `<dt>`/`<dd>` (éventuellement
+enveloppés dans un `<div>`) peuvent l’être de `<dl>`.
 
-**The recap-screen pattern** is the one most often got wrong: a "Your details" summary built
-from `<div class="label">` / `<div class="value">` pairs conveys the relationship visually
-only. Use `<dl>`, or associate the pair programmatically. Engine rules: `list-structure`,
-`dl-structure`.
+**Le motif de l’écran récapitulatif** est celui qui est le plus souvent raté : un résumé « Vos
+informations » construit à partir de paires `<div class="label">` / `<div class="value">` ne
+transmet la relation que visuellement. Utilisez `<dl>`, ou associez la paire par programmation.
+Règles du moteur : `list-structure`, `dl-structure`.
 
-## Tables
+## Tableaux
 
-A table is for **data**. Using one for layout is not a failure in itself, but it must then
-be marked `role="presentation"` and carry no data markup.
+Un tableau sert aux **données**. En utiliser un pour la mise en page n’est pas un échec en soi,
+mais il doit alors être marqué `role="presentation"` et ne porter aucun balisage de données.
 
 ```html
 <table>
@@ -91,14 +96,14 @@ be marked `role="presentation"` and carry no data markup.
 </table>
 ```
 
-- `scope` takes exactly `col`, `row`, `colgroup`, `rowgroup`. `scope="column"` is invalid and
-  silently does nothing (engine rule: `scope-value-invalid` is a declared gap — check it by
-  eye until it lands).
-- `<caption>` is the name; keep it SHORT. A long explanation belongs in a paragraph
-  associated via `aria-describedby`, not in the caption (RGAA 5.5).
+- `scope` prend exactement `col`, `row`, `colgroup`, `rowgroup`. `scope="column"` est invalide
+  et ne fait silencieusement rien (règle du moteur : `scope-value-invalid` est une lacune
+  déclarée — vérifiez-le à l’œil jusqu’à ce qu’elle soit livrée).
+- `<caption>` est le nom ; gardez-le COURT. Une longue explication a sa place dans un paragraphe
+  associé via `aria-describedby`, pas dans la légende (RGAA 5.5).
 
-**Complex tables** — irregular headers, spans, two header rows — need explicit wiring, since
-`scope` can no longer express the relationship:
+**Les tableaux complexes** — en-têtes irréguliers, fusions de cellules, deux lignes d’en-tête —
+demandent un câblage explicite, puisque `scope` ne peut plus exprimer la relation :
 
 ```html
 <table>
@@ -110,29 +115,30 @@ be marked `role="presentation"` and carry no data markup.
 </table>
 ```
 
-Every `headers` id must name a header cell **of the same table** (engine rule:
-`headers-attr-dangling`), and a header no cell references heads nothing (`th-no-data-cells`).
-Mixing `scope` and `headers` in one table is where associations quietly get lost — pick one.
+Chaque id de `headers` doit désigner une cellule d’en-tête **du même tableau** (règle du
+moteur : `headers-attr-dangling`), et un en-tête qu’aucune cellule ne référence n’est l’en-tête
+de rien (`th-no-data-cells`). Mélanger `scope` et `headers` dans un même tableau, c’est là que
+les associations se perdent sans bruit — choisissez l’un des deux.
 
-`colspan`/`rowspan` are fine in a simple table; once they make the header structure
-irregular, switch to `headers`/`id`. Engine rules: `data-table-no-headers`,
+`colspan`/`rowspan` conviennent dans un tableau simple ; dès qu’ils rendent la structure des
+en-têtes irrégulière, passez à `headers`/`id`. Règles du moteur : `data-table-no-headers`,
 `table-caption-missing`, `layout-table-data-markup`, `sortable-header-no-aria-sort`.
 
-## 1.3.2 Meaningful Sequence
+## 1.3.2 Ordre séquentiel logique
 
-The DOM order is the reading order. CSS that reorders content visually
-(`order`, `flex-direction: row-reverse`, `position: absolute`, `grid-area`) makes the two
-diverge, and the divergence becomes a failure when it changes the meaning.
+L’ordre du DOM est l’ordre de lecture. Le CSS qui réordonne visuellement le contenu
+(`order`, `flex-direction: row-reverse`, `position: absolute`, `grid-area`) fait diverger les
+deux, et la divergence devient un échec lorsqu’elle change le sens.
 
-Test: read the DOM top to bottom. Does the sequence still make sense? A sidebar declared
-between two paragraphs of an article will be read in the middle of the article.
+Test : lisez le DOM de haut en bas. La séquence a-t-elle encore un sens ? Une barre latérale
+déclarée entre deux paragraphes d’un article sera lue au milieu de l’article.
 
-## What the engine settles, and what stays yours
+## Ce que le moteur tranche, et ce qui reste à vous
 
-| Decided by the engine | Yours to adjudicate |
+| Décidé par le moteur | À vous d’arbitrer |
 |---|---|
-| Heading level skips, empty headings, malformed lists and description lists | Whether a heading **describes** its section (2.4.6) |
-| Missing/duplicate `<main>`, unnamed repeated `<nav>`, broken skip-link target | Whether every region of content sits in a landmark |
-| Data table with no headers, no caption, dangling `headers`, unreferenced `<th>` | Whether a table is data or layout in the first place |
-| — | Whether a visual relationship (recap screens, columns) exists programmatically (1.3.1) |
-| — | Whether the DOM order preserves meaning (1.3.2) |
+| Sauts de niveau de titre, titres vides, listes et listes de description mal formées | Si un titre **décrit** sa section (2.4.6) |
+| `<main>` manquant/en double, `<nav>` répétés sans nom, cible de lien d’évitement cassée | Si chaque zone de contenu se trouve dans une région |
+| Tableau de données sans en-têtes, sans légende, `headers` pendants, `<th>` non référencés | Si un tableau est un tableau de données ou de mise en page, d’abord |
+| — | Si une relation visuelle (écrans récapitulatifs, colonnes) existe par programmation (1.3.1) |
+| — | Si l’ordre du DOM préserve le sens (1.3.2) |
