@@ -367,7 +367,7 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
           "audits",
           "--ledger",
         ]);
-        expect(fold).toMatch(/verdict\(s\) recorded in the ledger/);
+        expect(fold).toMatch(/verdict\(s\) enregistré\(s\) au registre/);
         expect(fold).not.toMatch(/✗/);
 
         // 4. Challenge the claims: the adversarial trial, applied with --prune.
