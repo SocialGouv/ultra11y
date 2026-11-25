@@ -111,6 +111,87 @@ describe("removed commands and flags fail loudly, naming the replacement", () =>
     expect(r.err).toContain(`${flag[0]} was removed`);
   });
 
+  // #194: RGAA 4.1.2 is the only standard ultra11y reports against. A WCAG report, grid or
+  // rate is no longer produced — asking for one fails loudly and names RGAA.
+  it.each([
+    ["audit", ".", "--standard", "wcag"],
+    ["report", "--in", join(FIX, "judge-audit.json"), "--standard", "wcag"],
+    ["pages", "--in", join(FIX, "judge-audit.json"), "--standard", "WCAG"],
+    ["check", "--report", "r.md", "--standard", "core"],
+    ["verify", "--report", "r.md", "--standard", "wcag"],
+    ["tickets", "--in", join(FIX, "judge-audit.json"), "--standard", "wcag"],
+    ["prd", "--in", join(FIX, "judge-audit.json"), "--standard", "wcag"],
+    ["criteria", "--standard", "Wcag"],
+  ])("`%s … --standard <wcag>` exits 2 and names RGAA (%#)", async (...argv) => {
+    const r = await run(argv);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain("RGAA 4.1.2");
+    expect(r.err).toContain("--standard rgaa");
+  });
+
+  it("a .ultra11yrc.json still declaring `standard: wcag` fails the same way", async () => {
+    const tmpd = mkdtempSync(join(tmpdir(), "u11y-rc-wcag-"));
+    const cwd = process.cwd();
+    try {
+      writeFileSync(join(tmpd, ".ultra11yrc.json"), JSON.stringify({ standard: "wcag" }));
+      process.chdir(tmpd);
+      const r = await run(["criteria", "8.3"]);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain("RGAA 4.1.2");
+    } finally {
+      process.chdir(cwd);
+      rmSync(tmpd, { recursive: true, force: true });
+    }
+  });
+
+  // A config pack must not be a back door to another standard: with `packs` registered, a
+  // `standard: "xx"` (or `--standard xx`) used to run a non-RGAA audit.
+  it.each([
+    [{ packs: ["./xx.json"], standard: "xx" }, []],
+    [{ packs: ["./xx.json"] }, ["--standard", "xx"]],
+    [{ packs: ["./xx.json"] }, []],
+    [{ standard: "section508" }, []],
+    [{}, ["--standard", "xx"]],
+  ])("a non-RGAA config %j / flags %j exits 2 naming RGAA", async (rc, flags) => {
+    const tmpd = mkdtempSync(join(tmpdir(), "u11y-rc-pack-"));
+    const cwd = process.cwd();
+    try {
+      const pack = JSON.parse(readFileSync(new URL("../src/data/standards/rgaa.json", import.meta.url), "utf8"));
+      writeFileSync(join(tmpd, "xx.json"), JSON.stringify({ ...pack, key: "xx", name: "XX" }));
+      writeFileSync(join(tmpd, ".ultra11yrc.json"), JSON.stringify(rc));
+      process.chdir(tmpd);
+      const r = await run(["audit", `${FIX}non-conforming/bad.html`, "--json", ...flags]);
+      expect(r.code).toBe(2);
+      expect(r.err).toContain("RGAA 4.1.2");
+      expect(r.out).toBe("");
+    } finally {
+      process.chdir(cwd);
+      rmSync(tmpd, { recursive: true, force: true });
+    }
+  });
+
+  it("the default standard is RGAA: audit, report and pages speak it with no flag", async () => {
+    const tmpd = mkdtempSync(join(tmpdir(), "u11y-rgaa-default-"));
+    try {
+      const a = await run(["audit", `${FIX}non-conforming/bad.html`, "--out", tmpd, "--json", "--lang", "en"]);
+      const doc = JSON.parse(a.out) as { standard: string; kind: string; criteria: unknown[] };
+      expect(doc).toMatchObject({ standard: "rgaa", kind: "pack-audit" });
+      expect(doc.criteria).toHaveLength(106);
+      const rep = await run(["report", "--in", join(tmpd, "audit-latest.json"), "--out", tmpd, "--lang", "en"]);
+      expect(rep.code).toBe(0);
+      expect(rep.out.trim()).toMatch(/rgaa-\d{4}-\d{2}-\d{2}\.md$/);
+      expect(readdirSync(tmpd).some((f) => f.startsWith("wcag-"))).toBe(false);
+      const pages = await run(["pages", "--in", join(tmpd, "audit-latest.json"), "--json"]);
+      expect(pages.out).not.toContain('"standard": "wcag"');
+      // An explicit --standard rgaa (iterion's rgaa-audit bot passes it) is the same thing.
+      const explicit = await run(["report", "--in", join(tmpd, "audit-latest.json"), "--out", tmpd, "--lang", "en", "--standard", "rgaa"]);
+      expect(explicit.code).toBe(0);
+      expect(explicit.out.trim()).toBe(rep.out.trim());
+    } finally {
+      rmSync(tmpd, { recursive: true, force: true });
+    }
+  });
+
   it("`report --format sarif` is refused rather than silently writing Markdown", async () => {
     const r = await run(["report", "--in", join(FIX, "judge-audit.json"), "--format", "sarif"]);
     expect(r.code).toBe(2);
@@ -262,21 +343,27 @@ describe("main — command wiring", () => {
   it("check without --report exits 2", async () => {
     expect((await run(["check"])).code).toBe(2);
   });
-  it("criteria --list returns the WCAG success criteria (English by default)", async () => {
+  it("criteria --list returns the RGAA themes (RGAA is the default standard, French by default)", async () => {
     const r = await run(["criteria", "--list"]);
     expect(r.code).toBe(0);
-    expect(r.out).toContain("55 success criteria");
+    expect(r.out).toContain("RGAA 4.1.2 — 13 thématiques, 106 critères");
   });
-  it("criteria --theme on the WCAG core exits 2 (themes are pack-scoped)", async () => {
-    expect((await run(["criteria", "--theme", "1"])).code).toBe(2);
+  it("criteria --theme lists an RGAA theme by default; an unknown RGAA criterion exits 2", async () => {
+    expect((await run(["criteria", "--theme", "1"])).code).toBe(0);
+    expect((await run(["criteria", "9.9"])).code).toBe(2);
+  });
+  it("criteria <WCAG SC> still answers: it prints the mapping target", async () => {
+    const r = await run(["criteria", "1.4.3", "--lang", "en"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("Contrast (Minimum)");
   });
   it("criteria --standard rgaa --theme lists a pack theme", async () => {
     const r = await run(["criteria", "--standard", "rgaa", "--theme", "1"]);
     expect(r.code).toBe(0);
   });
-  it("--lang fr switches the criteria list language", async () => {
-    const r = await run(["criteria", "--list", "--lang", "fr"]);
-    expect(r.out).toContain("critères de succès");
+  it("--lang en switches the criteria list language", async () => {
+    const r = await run(["criteria", "--list", "--lang", "en"]);
+    expect(r.out).toContain("13 themes, 106 criteria");
   });
 });
 
@@ -319,13 +406,13 @@ describe("resolveLang — --lang auto default (conversation-first, repo/standard
     }
   });
 
-  it("nothing (no --lang, no repo signal, core standard) resolves to English", async () => {
+  it("nothing (no --lang, no repo signal) resolves to RGAA's own locale, French", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "u11y-lang-default-"));
     try {
       await run(["audit", `${FIX}non-conforming/bad.html`, "--out", tmp, "--json"]); // bad.html has no <html lang>
       const r = await run(["report", "--in", join(tmp, "audit-latest.json"), "--out", tmp]);
       expect(r.code).toBe(0);
-      expect(readFileSync(r.out.trim(), "utf8")).toContain("Accessibility audit report");
+      expect(readFileSync(r.out.trim(), "utf8")).toContain("Rapport d'audit d'accessibilité — RGAA 4.1.2");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -552,7 +639,7 @@ describe("verify — fail-closed apply gate", () => {
     const page = join(dir, "page.html");
     writeFileSync(page, `<html><body>\n${Array.from({ length: n + 2 }, () => "<img>").join("\n")}\n</body></html>`);
     const bullets = Array.from({ length: n }, (_, i) => `- [ ] \`${page}:${i + 2}\` (\`img\`) — image without a text alternative`).join("\n");
-    const md = `# Report\n- **Rate** : 10%\n## 1. s\n## 2. NC\n**Success criterion** : 1.1.1 — Non-text Content\n${bullets}\n## 3. x\n## 4. NA\n## 5. manual\n`;
+    const md = `# Report\n- **Rate** : 10%\n## 1. s\n## 2. NC\n**Critère** : 1.1 — Chaque image porteuse d’information a-t-elle une alternative textuelle ?\n${bullets}\n## 3. x\n## 4. NA\n## 5. manual\n`;
     const report = join(dir, "report.md");
     writeFileSync(report, md);
     return { dir, page, report };
@@ -612,10 +699,10 @@ describe("check --semantic — the gate engages or fails, never green-but-inacti
     expect([0, 1]).toContain(audit.code);
     const rep = await run(["report", "--in", join(dir, "audit-latest.json"), "--out", dir, "--lang", "en"]);
     expect(rep.code).toBe(0);
-    const reportPath = readdirSync(dir).find((f) => f.startsWith("wcag-") && f.endsWith(".md"))!;
+    const reportPath = readdirSync(dir).find((f) => f.startsWith("rgaa-") && f.endsWith(".md"))!;
     const r = await run(["check", "--report", join(dir, reportPath), "--semantic"]);
     expect(r.code).toBe(1);
-    expect(r.err.toLowerCase()).toMatch(/semantic/);
+    expect(r.err.toLowerCase()).toMatch(/semantic|sémantique/);
   });
 });
 

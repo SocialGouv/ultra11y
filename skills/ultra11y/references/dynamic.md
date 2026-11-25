@@ -202,7 +202,7 @@ provenance (surfaced in the auditor ticket's *Pages / URLs impactées* and *Cont
 reproduction*), and `--merge`s them into the audit. `sample check` is an **advisory** lint —
 it reports which required page kinds the sample lacks (a malformed `sample` block is a hard
 error, exit 2; a merely-incomplete one is guidance, exit 0). See `references/audit.md`
-(sample concept) and `references/packs.md` (`sampleMethodology`).
+(sample concept) and `references/standards.md`.
 
 **It lints BOTH inventories.** A project running the E2E producer keeps two: `.ultra11yrc.json`,
 and the routes its tests actually snapshot. They drift — and a linter reading only the declared

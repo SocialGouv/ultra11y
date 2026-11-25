@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // DEV-ONLY (not in `bin`). The deterministic FAST-PATH scaffolder for the AI-assisted
-// pack ingestion workflow (see skills/ultra11y/references/packs.md). It reads a directory
+// guidance ingestion workflow (see skills/ultra11y/references/guidance.md). It reads a directory
 // of SocialGouv-style RGAA rule markdown files (frontmatter `title/impact/tags` + a
 // non-compliant ```html block + a compliant ```html block + a reference link to the
 // official criterion) and emits a DRAFT guidance dataset (src/data/guidance/<key>.json):
 // every machine-extractable field filled, and `criterionId` resolved from the rule's
 // reference link where unambiguous, else left null. It NEVER finalizes — the agent
-// resolves the remaining nulls / summaries, then `pack check --guidance` gates the result
+// resolves the remaining nulls / summaries, then the guidance gate (`runPackCheck` in
+// src/pack.ts, run by `pnpm test`) gates the result
 // (a null criterionId or a fabricated SC fails). This keeps the AI honest: it drafts, the
 // deterministic gate refuses fabrication.
 //
@@ -104,4 +105,4 @@ mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, JSON.stringify(dataset, null, 2) + "\n");
 console.log(`import-pack: ${entries.length} draft entries → ${outPath}`);
 console.log(`import-pack: ${unresolved} entr${unresolved === 1 ? "y" : "ies"} have an unresolved criterionId (null) — resolve them, then run:`);
-console.log(`  node scripts/ultra11y.mjs pack check ${packPath} --guidance ${outPath}`);
+console.log(`  pnpm test   # the guidance gate (src/pack.ts runPackCheck) over ${packPath} + ${outPath}`);

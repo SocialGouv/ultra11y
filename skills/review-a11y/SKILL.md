@@ -1,6 +1,6 @@
 ---
 name: review-a11y
-description: "Use to REVIEW changed frontend code for accessibility: staged files, a working diff, branch, or PR; prompts such as 'review a11y', 'is this accessible?', or 'anything to fix before merge?'; and hook or CI findings on a change. Run the bundled install-free engine with cross-file JSX/TSX analysis, then adjudicate candidates and return a severity-ranked WCAG 2.2 AA review with file:line fixes, residual rendering risks, and a verdict. Use `ultra11y` instead for whole-repo audits, dated conformance reports, country standards, PRD backlogs, or authoring accessible markup."
+description: "Use to REVIEW changed frontend code for accessibility: staged files, a working diff, branch, or PR; prompts such as 'review a11y', 'is this accessible?', or 'anything to fix before merge?'; and hook or CI findings on a change. Run the bundled install-free engine with cross-file JSX/TSX analysis, then adjudicate candidates and return a severity-ranked RGAA 4.1.2 review (by RGAA criterion, WCAG only as the mapping) with file:line fixes, residual rendering risks, and a verdict. Use `ultra11y` instead for whole-repo audits, dated conformance reports, PRD backlogs, or authoring accessible markup."
 license: MIT
 metadata:
   version: 8.5.1
@@ -12,7 +12,7 @@ The review counterpart of the `ultra11y` skill: where `ultra11y` produces full a
 compliance deliverables, **this skill reviews exactly the code under change** — a diff, a
 branch, a PR — and reports like a code reviewer. Same division of labour: the
 deterministic, install-free engine bundled with this skill does the *mechanical* work
-(machine-checkable WCAG 2.2 AA non-conformities, each tied to a success criterion, cited
+(machine-checkable RGAA 4.1.2 non-conformities, each tied to an RGAA criterion, cited
 `file:line`), and **the AI agent** *adjudicates the judgment* — refute false positives, decide
 alt relevance/link purpose/focus logic statically from the code, and route what needs a rendered
 DOM to `scan`. A human is at most optional oversight.
@@ -70,8 +70,8 @@ node scripts/ultra11y.mjs audit --since origin/main --graph --json     # the who
 
 ## 2. Judge — the engine's findings are candidates, not verdicts
 
-For each finding (`--json` gives `criteria`, `severity`, `file:line`, `message`,
-`remediation`):
+For each finding (`--json` gives the RGAA `criteriaId` / `criteriaIds`, its `wcag` mapping,
+`severity`, `file:line`, `message`, `remediation`):
 
 - **Confirm the occurrence**: open the cited line; the offending element must really be
   there in the change under review.
@@ -91,13 +91,15 @@ For each finding (`--json` gives `criteria`, `severity`, `file:line`, `message`,
 
 ## 3. Report — a review, not a compliance document
 
-Render in the conversation's language (Core rule 4), grouped by severity:
+Render in the conversation's language (Core rule 4), grouped by severity, each finding named
+by its **RGAA criterion** — WCAG only as the discreet mapping in parentheses, « RGAA 11.1
+(WCAG 3.3.2) », never on its own:
 
 ```
 ## Accessibility review — <scope, e.g. branch feat/x vs main, 12 files>
 
 ### 🔴 Blocking
-- `src/components/Form.tsx:42` — **3.3.2 Labels or Instructions** — input has no
+- `src/components/Form.tsx:42` — **RGAA 11.1** (WCAG 3.3.2) — input has no
   label and placeholder is its only hint → associate a real <label for>, keep the
   placeholder as an example only.
 
@@ -105,7 +107,7 @@ Render in the conversation's language (Core rule 4), grouped by severity:
 - …same shape…
 
 ### Residual risks (rendering-dependent — resolve in the rendered page via scan)
-- contrast of the new button variants (1.4.3), focus visibility on the custom menu (2.4.7)
+- contrast of the new button variants (RGAA 3.2), focus visibility on the custom menu (RGAA 10.7)
 
 ### Verdict
 1 blocking, 2 major to fix before merge; 2 provisional SFC findings to confirm on the
@@ -130,7 +132,7 @@ stop. Everything in §4 stays opt-in and belongs to the caller, not to you.
   to staged files and re-stages them) or `node scripts/ultra11y.mjs fix <files> --write`;
   dry-run without `--write`.
 - **Formal deliverables** (dated report, auditor conformance blocks, PRD backlog, GitHub
-  issues, RGAA/country-standard vocabulary): that is the `ultra11y` skill — same engine,
+  issues, the full RGAA grid): that is the `ultra11y` skill — same engine,
   same findings (`report`, `prd`, `check`/`verify` gates).
 - **Make it automatic**: installed as a **Claude Code, Codex or OpenCode plugin**, a hook on
   the shell tool stops a pending `git commit` / `git push` / `gh pr create` that carries

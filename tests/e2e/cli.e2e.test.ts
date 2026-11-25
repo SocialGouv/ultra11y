@@ -18,9 +18,11 @@ describe("e2e: audit", () => {
     expect(runCli(["audit", FIX.bad]).code).toBe(0);
   });
 
-  it("--json emits a well-formed payload keyed by WCAG criteria", () => {
+  it("--json emits a well-formed payload keyed by RGAA criteria (the default standard)", () => {
     const j = auditJson([FIX.bad]);
     expect(j.tool).toBe("ultra11y");
+    expect(j.standard).toBe("rgaa");
+    expect(j.criteria).toHaveLength(106);
     expect(j.scope.files).toBe(1);
     expect(Array.isArray(j.criteria)).toBe(true);
     expect(j.findings.length).toBeGreaterThan(0);
@@ -30,9 +32,16 @@ describe("e2e: audit", () => {
       expect(typeof f.severity).toBe("string");
     }
     const ruleIds = new Set(j.findings.map((f) => f.ruleId));
-    expect(ruleIds).toContain("html-lang-missing");
-    expect(ruleIds).toContain("img-alt-missing");
+    expect(ruleIds).toContain("iframe-title-missing");
     expect(ruleIds).toContain("title-missing-empty");
+    // RGAA ids first, WCAG only as the mapping each finding carries.
+    const title = j.findings.find((f) => f.ruleId === "title-missing-empty") as unknown as { criteriaId: string; wcag?: string };
+    expect(title.criteriaId).toBe("8.5");
+    expect(title.wcag).toBe("2.4.2");
+    // The WCAG-keyed engine result still travels inside, as internal plumbing.
+    const core = (j as unknown as { core: { standard: string; findings: { ruleId: string }[] } }).core;
+    expect(core.standard).toBe("wcag");
+    expect(core.findings.map((f) => f.ruleId)).toContain("html-lang-missing");
   });
 
   it("reads HTML from stdin (audit - )", () => {
@@ -115,20 +124,21 @@ describe("e2e: report", () => {
     return p;
   }
 
-  it("renders a dated WCAG markdown report into --out", () => {
+  it("renders a dated RGAA markdown report into --out by default", () => {
     const auditFile = auditToFile();
     const out = mkTmp();
     const r = runCli(["report", "--in", auditFile, "--out", out]);
     expect(r.code).toBe(0);
     const files = readdirSync(out) as string[];
-    const wcag = files.find((f) => /^wcag-\d{4}-\d{2}-\d{2}\.md$/.test(f));
-    expect(wcag).toBeTruthy();
-    const md = readFileSync(join(out, wcag!), "utf8");
+    expect(files.some((f) => /^wcag-/.test(f))).toBe(false);
+    const rgaa = files.find((f) => /^rgaa-\d{4}-\d{2}-\d{2}\.md$/.test(f));
+    expect(rgaa).toBeTruthy();
+    const md = readFileSync(join(out, rgaa!), "utf8");
     expect(md.length).toBeGreaterThan(500);
-    expect(md).toContain("WCAG");
+    expect(md).toContain("RGAA 4.1.2");
   });
 
-  it("derives a distinct RGAA view under --standard rgaa", () => {
+  it("accepts an explicit --standard rgaa (iterion's rgaa-audit bot passes it)", () => {
     const auditFile = auditToFile();
     const out = mkTmp();
     const r = runCli(["report", "--in", auditFile, "--standard", "rgaa", "--out", out]);
@@ -148,10 +158,20 @@ describe("e2e: report", () => {
     const auditFile = auditToFile();
     expect(runCli(["report", "--in", auditFile, "--standard", "nope"]).code).toBe(2);
   });
+
+  it("--standard wcag was removed: exit 2, naming RGAA", () => {
+    const auditFile = auditToFile();
+    for (const v of ["wcag", "WCAG", "core"]) {
+      const r = runCli(["report", "--in", auditFile, "--standard", v]);
+      expect(r.code, v).toBe(2);
+      expect(r.stderr, v).toContain("RGAA 4.1.2");
+    }
+  });
 });
 
 describe("e2e: criteria", () => {
-  it("looks up a WCAG success criterion offline", () => {
+  it("looks up an RGAA criterion offline, and a WCAG id as its mapping target", () => {
+    expect(runCli(["criteria", "8.3"]).stdout).toContain("8.3");
     const r = runCli(["criteria", "1.4.3"]);
     expect(r.code).toBe(0);
     expect(r.stdout).toContain("1.4.3");
@@ -162,9 +182,10 @@ describe("e2e: criteria", () => {
     expect(runCli(["criteria", "--list"]).code).toBe(0);
   });
 
-  it("rejects a nonexistent criterion and a core --theme with exit 2", () => {
+  it("rejects a nonexistent criterion and theme with exit 2", () => {
     expect(runCli(["criteria", "9.9.9"]).code).toBe(2);
-    expect(runCli(["criteria", "--theme", "1"]).code).toBe(2); // themes are RGAA-only
+    expect(runCli(["criteria", "--theme", "99"]).code).toBe(2);
+    expect(runCli(["criteria", "--theme", "1"]).code).toBe(0);
   });
 });
 
@@ -174,7 +195,7 @@ describe("e2e: check", () => {
     writeFileSync(auditFile, runCli(["audit", FIX.bad, "--json"]).stdout);
     const out = mkTmp();
     runCli(["report", "--in", auditFile, "--out", out]);
-    const wcag = (readdirSync(out) as string[]).find((f) => f.startsWith("wcag-"))!;
+    const wcag = (readdirSync(out) as string[]).find((f) => f.startsWith("rgaa-"))!;
     return join(out, wcag);
   }
 
@@ -184,7 +205,7 @@ describe("e2e: check", () => {
 
     // Beside the original: the report links its technical annex by a bare file name.
     const doctored = join(dirname(report), "doctored.md");
-    const body = readFileSync(report, "utf8") + "\n### 🔴 9.9.9 — Critère inventé\nQuelque chose de fabriqué.\n";
+    const body = readFileSync(report, "utf8") + "\n### 🔴 9.99 — Critère inventé\nQuelque chose de fabriqué.\n";
     writeFileSync(doctored, body);
     expect(runCli(["check", "--report", doctored]).code).toBe(1);
   });
@@ -205,7 +226,7 @@ describe("e2e: verify", () => {
     writeFileSync(auditFile, runCli(["audit", FIX.bad, "--json"]).stdout);
     const out = mkTmp();
     runCli(["report", "--in", auditFile, "--out", out]);
-    const wcag = (readdirSync(out) as string[]).find((f) => f.startsWith("wcag-"))!;
+    const wcag = (readdirSync(out) as string[]).find((f) => f.startsWith("rgaa-"))!;
     const r = runCli(["verify", "--report", join(out, wcag), "--out", out]);
     expect(r.code).toBe(0);
     const files = readdirSync(out) as string[];
@@ -231,7 +252,7 @@ describe("e2e: global flags", () => {
   });
 
   it("<cmd> --help prints help with no side effect and no crash", () => {
-    for (const cmd of ["audit", "report", "verify", "check", "fix", "init", "scan", "prd", "criteria", "pack", "render"]) {
+    for (const cmd of ["audit", "report", "verify", "check", "fix", "init", "scan", "prd", "criteria", "render"]) {
       const r = runCli([cmd, "--help"]);
       expect(r.code, `${cmd} --help`).toBe(0);
       expect(r.stdout.length, `${cmd} --help output`).toBeGreaterThan(0);

@@ -164,9 +164,9 @@ and hands over the adjudication protocol. What actually enforces anything on the
 is the repo's own gate — `ultra11y init --hook` (git pre-commit) — and, in CI, iterion's
 `rgaa-audit` bot.
 
-The criteria themselves are on the CLI on every harness: `criteria [--standard <pack>] <id>`
-prints a criterion's numbered tests, `criteria --standard <pack> --glossary <term>` the terms it
-defines, and `criteria --standard <pack> --plan` the work plan — so an agent reads them instead
+The criteria themselves are on the CLI on every harness: `criteria <id>`
+prints a criterion's numbered tests, `criteria --glossary <term>` the terms it
+defines, and `criteria --plan` the work plan — so an agent reads them instead
 of recalling them.
 
 On a harness with no skill system at all, **reading `SKILL.md` directly with the file-read

@@ -109,7 +109,7 @@ describe("pages --evidence", () => {
     await run(["pages", "--in", "out/audit-latest.json", "--format", "report", "--split", "page", "--evidence", "--out", "out/pages"], root);
     const md = readFileSync(join(root, "out", "pages", "page-accueil.md"), "utf8");
     // Indented, no checkbox — it illustrates the occurrence above it and never becomes one.
-    expect(md).toMatch(/^ {2,4}- !\[[^\]]+\]\(\.\/assets\/accueil\/[0-9a-f]+\.png\)$/m);
+    expect(md).toMatch(/^ {2,4}- !\[.+\]\(\.\/assets\/accueil\/[0-9a-f]+\.png\)$/m); // the alt may name a selector such as a[href=/a]
   });
 
   // The whole posture of this engine: nothing is cut in silence. An occurrence that has no
@@ -213,17 +213,17 @@ describe("--html", () => {
     expect(r.code).toBe(0);
     const files = readdirSync(join(root, "out", "audits"));
     expect(files).toContain("index.html");
-    expect(files.some((f) => /^ultra11y-wcag-\d{4}-\d{2}-\d{2}\.html$/.test(f))).toBe(true);
+    expect(files.some((f) => /^ultra11y-rgaa-\d{4}-\d{2}-\d{2}\.html$/.test(f))).toBe(true);
     // Stdout still carries ONE line, the Markdown path an orchestrator captures.
     expect(r.out.split("\n").filter(Boolean)).toHaveLength(1);
-    expect(r.out).toMatch(/wcag-.*\.md$/);
+    expect(r.out).toMatch(/rgaa-.*\.md$/);
   });
 
   it("carries the crops into the composite as data, and references them as files elsewhere", async () => {
     const root = await tmpProject();
     await run(["report", "--in", "out/audit-latest.json", "--html", "--evidence", "--out", "out/audits"], root);
     const dir = join(root, "out", "audits");
-    const composite = readdirSync(dir).find((f) => f.startsWith("ultra11y-wcag-"))!;
+    const composite = readdirSync(dir).find((f) => f.startsWith("ultra11y-rgaa-"))!;
     expect(readFileSync(join(dir, composite), "utf8")).toContain("data:image/png;base64,");
     expect(readFileSync(join(dir, "index.html"), "utf8")).not.toContain("data:image");
   });
@@ -276,10 +276,10 @@ describe("report --evidence", () => {
   it("illustrates the conformance report itself", async () => {
     const root = await tmpProject();
     await run(["report", "--in", "out/audit-latest.json", "--html", "--evidence", "--out", "out/audits"], root);
-    const md = readdirSync(join(root, "out", "audits")).find((f) => /^wcag-.*\.md$/.test(f))!;
+    const md = readdirSync(join(root, "out", "audits")).find((f) => /^rgaa-.*\.md$/.test(f))!;
     // `./assets/<page>/<hash>.png` — the NESTED path is a crop. `./assets/<page>.png` is the
     // page screenshot the report already carried, and matching that would prove nothing.
-    expect(readFileSync(join(root, "out", "audits", md), "utf8")).toMatch(/!\[[^\]]+\]\(\.\/assets\/[^/)]+\/[0-9a-f]+\.png\)/);
+    expect(readFileSync(join(root, "out", "audits", md), "utf8")).toMatch(/!\[.+\]\(\.\/assets\/[^/)]+\/[0-9a-f]+\.png\)/);
   });
 
   // The refusal this replaces said "--evidence only illustrates the HTML report". That was

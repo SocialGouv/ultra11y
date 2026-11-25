@@ -150,7 +150,7 @@ const L = {
     testsToRule: "tests à trancher",
     manualSummary: (criteria: number, tests: number) =>
       `**${criteria} critère(s) / ${tests} test(s) restent à trancher.** Leur statut et leur répartition S/R/J figurent dans la grille exhaustive (section E).`,
-    manualHowTo: "Worklist complète (énoncés des tests, notes techniques, glossaire) : `verify --manual --in <audit.json> --standard <pack> --out <dir>`.",
+    manualHowTo: "Worklist complète (énoncés des tests, notes techniques, glossaire) : `verify --manual --in <audit.json> --out <dir>`.",
     // These three justifications appear ONLY in a pack report (the core has no derivation to
     // explain), so they are worded in the pack's terms: they used to describe the engine's
     // internals — « mappé sur des SC hors WCAG 2.2 AA », « les CS WCAG auxquels il est
@@ -467,7 +467,7 @@ const L = {
     testsToRule: "tests to rule on",
     manualSummary: (criteria: number, tests: number) =>
       `**${criteria} criterion(ia) / ${tests} test(s) remain to be ruled on.** Their status and S/R/J split are in the exhaustive grid (section E).`,
-    manualHowTo: "Full worklist (test wording, technical notes, glossary): `verify --manual --in <audit.json> --standard <pack> --out <dir>`.",
+    manualHowTo: "Full worklist (test wording, technical notes, glossary): `verify --manual --in <audit.json> --out <dir>`.",
     outOfScope: "Outside what the engine can decide for this standard — manual verification.",
     scopedOut: "The failures found concern elements outside this criterion's scope — assess separately.",
     judgment: "The criterion asks more than the engine can establish — rule on it.",

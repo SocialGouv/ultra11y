@@ -46,8 +46,8 @@ non-conformity.
    ```
    node scripts/ultra11y.mjs report --in audit.json --out audits
    ```
-   → `audits/wcag-YYYY-MM-DD.md`, the report for every reader (level, what to fix, on which
-   pages and URLs, then 5 sections), and beside it `audits/annexe-technique-wcag-YYYY-MM-DD.md`,
+   → `audits/rgaa-YYYY-MM-DD.md`, the report for every reader (level, what to fix, on which
+   pages and URLs, then 5 sections), and beside it `audits/annexe-technique-rgaa-YYYY-MM-DD.md`,
    the technical annex (method, `file:line` occurrences, commands, exhaustive grid) — see
    `references/methodology.md`. The annex's section A renders one compact **auditor block**
    per NC criterion, grouped by severity — built from the SAME units `prd` and `tickets`
@@ -59,7 +59,7 @@ non-conformity.
    (`{path, conformancePct, date, standard}`) instead of just the path.
 6. **Check integrity:**
    ```
-   node scripts/ultra11y.mjs check --report audits/wcag-YYYY-MM-DD.md
+   node scripts/ultra11y.mjs check --report audits/rgaa-YYYY-MM-DD.md
    ```
    Fails if a section is missing, a cited criterion does not exist, or an `NA` is unjustified.
 7. **High assurance (optional)**: `references/verify.md` — prove every non-conformity is

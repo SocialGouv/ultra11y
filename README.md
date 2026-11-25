@@ -89,14 +89,14 @@ lancer elle-même, avec `npx ultra11y <commande>` (tout le reste : `npx ultra11y
 
 | Commande | Rôle |
 |---|---|
-| `audit <chemins> --standard rgaa --out audits --json` | passe le moteur statique sur le code |
+| `audit <chemins> --out audits --json` | passe le moteur statique sur le code |
 | `scan <url> --merge audits/audit-latest.json` | mesure une page dans un navigateur |
 | `journey run --all --keyboard --merge audits/audit-latest.json` | rejoue au clavier les parcours écrits par l’agent ([`journeys.md`](skills/ultra11y/references/journeys.md)) |
-| `report --in audits/audit-latest.json --standard rgaa --html` | écrit le rapport daté |
+| `report --in audits/audit-latest.json --html` | écrit le rapport daté |
 | `pages --in audits/audit-latest.json --format report --split page` | un dossier par page |
 | `check --report <rapport.md>` | contrôle l’intégrité d’un rapport |
 | `tickets --in audits/audit-latest.json --dry-run` | prépare les tickets GitHub, GitLab ou Jira |
-| `criteria --standard rgaa 8.3` | texte officiel d’un critère, ses tests, le glossaire |
+| `criteria 8.3` | texte officiel d’un critère, ses tests, le glossaire |
 | `install --all` · `status` | branche le hook dans les agents, dit ce qui est actif |
 
 ## Pourquoi s’y fier
@@ -116,11 +116,12 @@ lancer elle-même, avec `npx ultra11y <commande>` (tout le reste : `npx ultra11y
   [Fiabilité](https://socialgouv.github.io/ultra11y/fiabilite.html). Ce n’est pas une
   certification : avant une déclaration officielle, une personne compétente relit les verdicts.
 
-## Référentiels
+## Référentiel
 
-Le RGAA 4.1.2 est livré avec ultra11y (`--standard rgaa`, ou `{ "standard": "rgaa" }` dans
-`.ultra11yrc.json`) ; il repose sur les WCAG 2.2 AA, le socle interne du moteur. Un autre pays
-s’ajoute par un paquet JSON : [`references/packs.md`](skills/ultra11y/references/packs.md), [`CONTRIBUTING.md`](CONTRIBUTING.md).
+ultra11y audite selon le **RGAA 4.1.2**, et seulement lui : rapports, grilles, taux, tickets
+et PRD parlent RGAA, par défaut (`--standard rgaa` reste accepté). Les WCAG 2.2 AA sont le
+socle interne du moteur et n’apparaissent que comme la correspondance que cite chaque critère :
+« RGAA 1.1 (WCAG 1.1.1) ». `--standard wcag` a été retiré et sort en code 2.
 
 ## Développement
 

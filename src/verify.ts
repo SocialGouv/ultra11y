@@ -267,7 +267,7 @@ const T = {
       "- [ ] Aucune conformité inventée : un `C` réfuté ou non étayé retourne « à évaluer » — il ne devient PAS une non-conformité, car réfuter une conformité ne prouve rien contre le critère.",
     then: "Puis : `ultra11y verify --apply VERIFY.todo.json` (échoue si un verdict est refuted/unsupported).",
     understand: "Comprendre",
-    moreTests: (n: number, id: string) => `… +${n} autre(s) test(s) — voir \`criteria --standard <pack> ${id}\``,
+    moreTests: (n: number, id: string) => `… +${n} autre(s) test(s) — voir \`criteria ${id}\``,
     checklistTitle: "## Liste de contrôle avant clôture",
     checklist: [
       "- [ ] Chaque entrée porte un verdict (aucun `null`).",
@@ -300,7 +300,7 @@ const T = {
       "- [ ] No invented conformity: a refuted or unsupported `C` goes back to “to assess” — it does NOT become a non-conformity, because refuting a conformity proves nothing against the criterion.",
     then: "Then: `ultra11y verify --apply VERIFY.todo.json` (fails if any verdict is refuted/unsupported).",
     understand: "Understanding",
-    moreTests: (n: number, id: string) => `… +${n} more test(s) — see \`criteria --standard <pack> ${id}\``,
+    moreTests: (n: number, id: string) => `… +${n} more test(s) — see \`criteria ${id}\``,
     checklistTitle: "## Pre-completion checklist",
     checklist: [
       "- [ ] Every entry has a verdict (no `null`).",

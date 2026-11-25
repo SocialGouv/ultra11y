@@ -8,7 +8,7 @@ import { main } from "../src/cli.js";
 import type { AuditResult, CriterionResult, Finding } from "../src/types.js";
 
 const F = (over: Partial<Finding> = {}): Finding => ({
-  ruleId: "img-alt-missing",
+  ruleId: "input-image-alt-missing",
   criteriaId: "1.1.1",
   file: "src/a.html",
   line: 1,
@@ -35,7 +35,8 @@ function auditFile(dir: string, over: Partial<AuditResult> = {}): string {
     version: "3.0.0",
     schemaVersion: 2,
     date: "2026-08-12",
-    scope: { inputs: ["."], files: 1 },
+    // An English repo, so the RGAA output (French by default) speaks English here.
+    scope: { inputs: ["."], files: 1, langs: ["en"] },
     criteria: [C("1.1.1", "NC", [F()])],
     guidelines: [],
     findings: [F()],
@@ -140,8 +141,24 @@ describe("usage errors exit 2", () => {
 
 describe("the --max-tickets guard", () => {
   it("refuses rather than flooding a tracker, and names the escape hatch", async () => {
-    const findings = Array.from({ length: 4 }, (_, i) => F({ criteriaId: ["1.1.1", "1.3.1", "2.4.4", "4.1.2"][i] as string }));
-    const p = auditFile(dir, { findings, criteria: findings.map((f) => C(f.criteriaId, "NC", [f])) });
+    // Four findings on four distinct RGAA criteria (1.1, 2.1, 6.2, 7.1).
+    const rules: Array<[string, string]> = [
+      ["input-image-alt-missing", "1.1.1"],
+      ["iframe-title-missing", "4.1.2"],
+      ["link-empty-name", "2.4.4"],
+      ["button-empty-name", "4.1.2"],
+    ];
+    const findings = rules.map(([ruleId, criteriaId]) => F({ ruleId, criteriaId }));
+    const p = auditFile(dir, {
+      findings,
+      criteria: ["1.1.1", "4.1.2", "2.4.4"].map((id) =>
+        C(
+          id,
+          "NC",
+          findings.filter((f) => f.criteriaId === id),
+        ),
+      ),
+    });
     expect(await main(["tickets", "--in", p, "--max-tickets", "2"])).toBe(2);
     expect(err.join()).toContain("past the limit of 2");
     expect(err.join()).toContain("--max-tickets 4");
@@ -158,7 +175,7 @@ describe("--dry-run", () => {
     const calls = stubFetch([{ body: [] }]);
     expect(await main(["tickets", "--in", auditFile(dir), "--dry-run"])).toBe(0);
     expect(calls.every((c) => (c.init.method ?? "GET") === "GET")).toBe(true);
-    expect(out.join("\n")).toContain("+ [a11y] WCAG 1.1.1");
+    expect(out.join("\n")).toContain("+ [a11y] RGAA 1.1");
   });
 
   it("emits a machine-readable plan under --json, with the body included", async () => {
@@ -186,7 +203,7 @@ describe("--out writes the tracker-agnostic set", () => {
     const p = join(dir, "issues-2026-08-12.json");
     expect(existsSync(p)).toBe(true);
     const set = JSON.parse(readFileSync(p, "utf8"));
-    expect(set).toMatchObject({ tool: "ultra11y", kind: "issues", schemaVersion: 1, standard: "wcag", grain: "criterion", count: 1 });
+    expect(set).toMatchObject({ tool: "ultra11y", kind: "issues", schemaVersion: 1, standard: "rgaa", grain: "criterion", count: 1 });
     expect(calls.every((c) => (c.init.method ?? "GET") === "GET")).toBe(true);
   });
 
@@ -219,7 +236,7 @@ describe("pushing", () => {
   });
 
   it("skips a ticket whose exact title already exists", async () => {
-    stubFetch([{ body: [{ title: "[a11y] WCAG 1.1.1 — Non-text Content", number: 1 }] }]);
+    stubFetch([{ body: [{ title: "[a11y] RGAA 1.1 — Chaque image porteuse d’information a-t-elle une alternative textuelle\u00a0?", number: 1 }] }]);
     expect(await main(["tickets", "--in", auditFile(dir), "--lang", "en"])).toBe(0);
     expect(out.join("\n")).toContain("1 already there");
   });

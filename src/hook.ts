@@ -23,6 +23,8 @@ import { join } from "node:path";
 import { runAudit } from "./audit.js";
 import { findingId, findingsAtOrAbove, parseFailOn } from "./baseline.js";
 import { loadConfig } from "./config.js";
+import { packRefLabel } from "./standards/document.js";
+import { loadPack } from "./standards/registry.js";
 import type { AuditResult, Finding, Severity } from "./types.js";
 
 /** The publishing act a Bash command is about to perform. */
@@ -184,8 +186,11 @@ function firstSighting(key: string): boolean {
 const SEV_EN: Record<Severity, string> = { bloquant: "blocking", majeur: "major", mineur: "minor" };
 const MAX_DIGEST = 10;
 
+/** One line per finding, named by its RGAA 4.1.2 criterion — the only standard ultra11y
+ *  reports against — with the WCAG success criterion as the discreet mapping only. */
 function digestOf(findings: Finding[]): string {
-  const shown = findings.slice(0, MAX_DIGEST).map((f) => `- ${f.file}:${f.line} — ${f.criteriaId} (${SEV_EN[f.severity]}) — ${f.message}`);
+  const rgaa = loadPack("rgaa");
+  const shown = findings.slice(0, MAX_DIGEST).map((f) => `- ${f.file}:${f.line} — ${packRefLabel(rgaa, f)} (${SEV_EN[f.severity]}) — ${f.message}`);
   if (findings.length > MAX_DIGEST) shown.push(`- …and ${findings.length - MAX_DIGEST} more (the skill re-runs the engine and sees all of them).`);
   return shown.join("\n");
 }
@@ -274,7 +279,7 @@ export function decide(payload: PreToolUsePayload, deps: DecideDeps = {}): HookD
         "The engine already found:",
         digestOf(findings),
         "",
-        "Adjudicate each one against the cited code — refute false positives with evidence, apply the fixes the user agrees to.",
+        "Adjudicate each one against the cited code — refute false positives with evidence, apply the fixes the user agrees to — and report by RGAA criterion and severity.",
         "Then re-run the command: this gate does not fire twice for the same set of findings, so it will go through.",
       ].join("\n"),
     },

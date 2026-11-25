@@ -10,6 +10,7 @@ import { classifyRenderFailure, discoverRenderTargets, nextRoute, runRenderEngin
 import { parseCaptureProvenance } from "../src/capture.js";
 import { main } from "../src/cli.js";
 import type { AuditResult, RenderManifest, RenderUnit } from "../src/types.js";
+import { unwrapAudit } from "../src/standards/document.js";
 
 const FIXTURE = resolve("tests/fixtures/render-app");
 const require = createRequire(import.meta.url);
@@ -177,7 +178,7 @@ describe.skipIf(!REACT)("render engine — the CLI, then audit and report", () =
       process.chdir(root);
       out.length = 0;
       expect(await main(["audit", ".", "--out", "audits", "--json"])).toBe(0);
-      const audit = JSON.parse(readFileSync(join(root, "audits/audit-latest.json"), "utf8")) as AuditResult;
+      const audit = unwrapAudit(JSON.parse(readFileSync(join(root, "audits/audit-latest.json"), "utf8"))) as AuditResult;
       const fromCaptures = audit.findings.filter((f) => f.origin?.capture);
       const icon = fromCaptures.find((f) => f.origin?.capture.endsWith("src-components-IconButton__IconButton.html"));
       expect(icon?.origin).toMatchObject({ sourceFile: "src/components/IconButton.tsx", component: "IconButton" });
@@ -241,7 +242,7 @@ describe.skipIf(!REACT)("render engine — a run that renders nothing", () => {
 
       process.chdir(root);
       expect(await main(["audit", ".", "--out", "audits", "--json"])).toBe(0);
-      const audit = JSON.parse(readFileSync(join(root, "audits/audit-latest.json"), "utf8")) as AuditResult;
+      const audit = unwrapAudit(JSON.parse(readFileSync(join(root, "audits/audit-latest.json"), "utf8"))) as AuditResult;
       expect(audit.scope.renders).toMatchObject({ manifest: ".ultra11y/render.json", rendered: 0 });
       expect(audit.scope.renders?.units).toEqual(
         expect.arrayContaining([

@@ -577,7 +577,7 @@ async function main() {
   // file format nor its weight — the DSFR/RGAA auditor recommendation under criterion 6.1
   // (link explicitness, WCAG 2.4.4). ADVISORY: it surfaces as a recommendation in the RGAA
   // projection and NEVER makes 6.1 non-conformant. This proves a pack ships its OWN
-  // detection without forking the engine (see skills/ultra11y/references/packs.md).
+  // detection without forking the engine (see src/standards/pack-rules.ts).
   // Kept in step with the engine instead of retyped: two hand-maintained copies of a rule-id
 // list are two chances for the pack to claim an instrument the engine does not ship.
 const PRESENTATIONAL_RULE_IDS = ["presentational-element", "presentational-attribute", "presentational-spacing"];

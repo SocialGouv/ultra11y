@@ -283,6 +283,14 @@ function runPack(opts: CriteriaOpts): number {
   const pack = loadPack(opts.standard);
   if (opts.id) {
     const c = getPackCriterion(pack, opts.id);
+    // A WCAG success-criterion id is a MAPPING target, not a criterion of the standard: print
+    // the success criterion itself (it lists the pack criteria that cite it), so
+    // `criteria 1.4.3` keeps answering.
+    const sc = c ? undefined : getSC(opts.id);
+    if (sc) {
+      console.log(opts.json ? JSON.stringify(sc, null, 2) : formatSC(sc, opts.lang));
+      return 0;
+    }
     if (!c) {
       console.error(`ultra11y criteria: unknown ${pack.name} criterion "${opts.id}".`);
       return 2;
