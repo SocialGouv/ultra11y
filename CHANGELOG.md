@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [9.0.1](https://github.com/SocialGouv/ultra11y/compare/v9.0.0...v9.0.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **rgaa:** an image with no alt attribute is a non-conformity, never a mere candidate ([#203](https://github.com/SocialGouv/ultra11y/issues/203)) ([#205](https://github.com/SocialGouv/ultra11y/issues/205)) ([c0d1890](https://github.com/SocialGouv/ultra11y/commit/c0d18902f56e51fa2b2a2168feef9636696cb25b))
+
 # [9.0.0](https://github.com/SocialGouv/ultra11y/compare/v8.5.1...v9.0.0) (2026-11-25)
 
 
