@@ -509,7 +509,7 @@ function clearJourneySnapshots(root: string, name: string): void {
 
 /** Replay journeys, one browser for all, one context per journey. */
 export async function runJourneys(entries: { journey: Journey; file: string }[], opts: JourneyRunOptions): Promise<JourneyRunResult> {
-  const { chromium, axe } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd, opts.lang);
   const browser = await launchChromium(chromium, opts.cwd, undefined, { browserPath: opts.browserPath });
   const result: JourneyRunResult = { records: [], findings: [], unsnapshotted: [], snapshots: [], testedScs: [], scanned: [] };
   const tested = new Set<string>();

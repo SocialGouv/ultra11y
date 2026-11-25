@@ -886,9 +886,12 @@ function recordDocumentPages(file, url, pageIds) {
   writeFileSync(file.replace(/\.pdf$/i, ".json"), `${JSON.stringify({ kind: SIDECAR_KIND, v: SIDECAR_VERSION, url: prev?.url ?? url, pages }, null, 2)}
 `);
 }
+function documentDigest(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
 function storeDocument(root, url, bytes, pageIds) {
   const dir = join(root, DOCUMENTS_DIR);
-  const sha = createHash("sha256").update(bytes).digest("hex");
+  const sha = documentDigest(bytes);
   const file = join(dir, `${sha}.pdf`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, bytes);
@@ -956,6 +959,14 @@ function insideUltra11y(anchor) {
     dir = up;
   }
 }
+function axeFallbackNote(origin, version, path, lang) {
+  const fr = lang === "fr";
+  if (origin === "project")
+    return fr ? `ultra11y : l\u2019axe-core \xE9pingl\xE9 d\u2019ultra11y (${AXE_CORE_PIN}) n\u2019est pas r\xE9solvable ici \u2014 c\u2019est l\u2019axe-core du projet audit\xE9 qui tourne, en version ${version} (${path}). Cette version est consign\xE9e dans chaque r\xE9sultat et dans l\u2019annexe du rapport ; elle ne compte que si elle s\u2019\xE9carte de ${AXE_CORE_PIN} (r\xE8gles ajout\xE9es ou modifi\xE9es d\u2019une version \xE0 l\u2019autre). Quand la version \xE9pingl\xE9e est exig\xE9e, lancez l\u2019audit avec \`npx -y ultra11y\`, qui apporte ses d\xE9pendances.` : `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here \u2014 running the audited project's axe-core ${version} (${path}). That version is recorded with every result and in the report annex; it matters only when it drifts from ${AXE_CORE_PIN} (rules added or changed between versions). When the pinned version is required, run the audit with \`npx -y ultra11y\`, which brings its dependencies.`;
+  if (origin === "unpinned")
+    return fr ? `ultra11y : l\u2019axe-core r\xE9solu depuis le package d\u2019ultra11y est en version ${version}, pas la version \xE9pingl\xE9e ${AXE_CORE_PIN} (${path}). Cette version est consign\xE9e dans chaque r\xE9sultat ; r\xE9installez les d\xE9pendances d\u2019ultra11y pour ex\xE9cuter la version \xE9pingl\xE9e.` : `ultra11y: the axe-core resolved from ultra11y's own package is ${version}, not the pinned ${AXE_CORE_PIN} (${path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.`;
+  return void 0;
+}
 function resolveAxeEngine(opts) {
   const self = opts.self ?? import.meta.url;
   const project = join2(opts.cwd, "package.json");
@@ -972,7 +983,7 @@ function resolveAxeEngine(opts) {
     sourceCache.set(located.path, source);
   }
   const origin = own && insideUltra11y(self) ? located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned" : "project";
-  const note = origin === "project" ? `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here \u2014 running the audited project's axe-core ${located.version} (${located.path}). Results are recorded with that version; install ultra11y with its dependencies to run the pinned one.` : origin === "unpinned" ? `ultra11y: the axe-core resolved from ultra11y's own package is ${located.version}, not the pinned ${AXE_CORE_PIN} (${located.path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.` : void 0;
+  const note = axeFallbackNote(origin, located.version, located.path, opts.lang ?? "fr");
   return {
     AxeBuilder,
     source,

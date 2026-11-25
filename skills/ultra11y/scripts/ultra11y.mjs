@@ -35962,6 +35962,14 @@ function insideUltra11y(anchor) {
     dir = up;
   }
 }
+function axeFallbackNote(origin, version, path, lang) {
+  const fr2 = lang === "fr";
+  if (origin === "project")
+    return fr2 ? `ultra11y : l\u2019axe-core \xE9pingl\xE9 d\u2019ultra11y (${AXE_CORE_PIN}) n\u2019est pas r\xE9solvable ici \u2014 c\u2019est l\u2019axe-core du projet audit\xE9 qui tourne, en version ${version} (${path}). Cette version est consign\xE9e dans chaque r\xE9sultat et dans l\u2019annexe du rapport ; elle ne compte que si elle s\u2019\xE9carte de ${AXE_CORE_PIN} (r\xE8gles ajout\xE9es ou modifi\xE9es d\u2019une version \xE0 l\u2019autre). Quand la version \xE9pingl\xE9e est exig\xE9e, lancez l\u2019audit avec \`npx -y ultra11y\`, qui apporte ses d\xE9pendances.` : `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here \u2014 running the audited project's axe-core ${version} (${path}). That version is recorded with every result and in the report annex; it matters only when it drifts from ${AXE_CORE_PIN} (rules added or changed between versions). When the pinned version is required, run the audit with \`npx -y ultra11y\`, which brings its dependencies.`;
+  if (origin === "unpinned")
+    return fr2 ? `ultra11y : l\u2019axe-core r\xE9solu depuis le package d\u2019ultra11y est en version ${version}, pas la version \xE9pingl\xE9e ${AXE_CORE_PIN} (${path}). Cette version est consign\xE9e dans chaque r\xE9sultat ; r\xE9installez les d\xE9pendances d\u2019ultra11y pour ex\xE9cuter la version \xE9pingl\xE9e.` : `ultra11y: the axe-core resolved from ultra11y's own package is ${version}, not the pinned ${AXE_CORE_PIN} (${path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.`;
+  return void 0;
+}
 function resolveAxeEngine(opts) {
   const self = opts.self ?? import.meta.url;
   const project = join4(opts.cwd, "package.json");
@@ -35978,7 +35986,7 @@ function resolveAxeEngine(opts) {
     sourceCache.set(located.path, source);
   }
   const origin = own && insideUltra11y(self) ? located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned" : "project";
-  const note = origin === "project" ? `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here \u2014 running the audited project's axe-core ${located.version} (${located.path}). Results are recorded with that version; install ultra11y with its dependencies to run the pinned one.` : origin === "unpinned" ? `ultra11y: the axe-core resolved from ultra11y's own package is ${located.version}, not the pinned ${AXE_CORE_PIN} (${located.path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.` : void 0;
+  const note = axeFallbackNote(origin, located.version, located.path, opts.lang ?? "fr");
   return {
     AxeBuilder,
     source,
@@ -44690,9 +44698,12 @@ function recordDocumentPages(file, url, pageIds) {
   writeFileSync2(file.replace(/\.pdf$/i, ".json"), `${JSON.stringify({ kind: SIDECAR_KIND, v: SIDECAR_VERSION, url: prev?.url ?? url, pages }, null, 2)}
 `);
 }
+function documentDigest(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
 function storeDocument(root, url, bytes, pageIds) {
   const dir = join8(root, DOCUMENTS_DIR);
-  const sha = createHash("sha256").update(bytes).digest("hex");
+  const sha = documentDigest(bytes);
   const file = join8(dir, `${sha}.pdf`);
   mkdirSync2(dir, { recursive: true });
   writeFileSync2(file, bytes);
@@ -45777,6 +45788,23 @@ function walkStructure(doc, root) {
 }
 
 // src/documents.ts
+function isStoredDocument(file) {
+  return /(?:^|[\\/])\.ultra11y[\\/]documents[\\/][0-9a-f]{64}\.pdf$/i.test(file);
+}
+function mergeDocumentAudit(into, other) {
+  if (isStoredDocument(into.file) && !isStoredDocument(other.file)) {
+    into.copies = [...into.copies ?? [], into.file];
+    into.file = other.file;
+  }
+  const copies = [.../* @__PURE__ */ new Set([...into.copies ?? [], other.file, ...other.copies ?? []])].filter((f2) => f2 !== into.file).sort();
+  if (copies.length) into.copies = copies;
+  const pages = [.../* @__PURE__ */ new Set([...into.pages ?? [], ...other.pages ?? []])].sort();
+  if (pages.length) into.pages = pages;
+  const urls = [...new Set([into.url, ...into.urls ?? [], other.url, ...other.urls ?? []].filter((u2) => !!u2))];
+  if (!into.url && urls.length) into.url = urls[0];
+  if (urls.length > 1) into.urls = urls.sort();
+  if (!into.sha256 && other.sha256) into.sha256 = other.sha256;
+}
 function isPdfPath(file) {
   return /\.pdf$/i.test(file);
 }
@@ -45789,6 +45817,7 @@ function pdfDocFromBytes(bytes, file, origin) {
     lossy: false,
     kind: "pdf",
     pdf: facts,
+    ...bytes.length ? { digest: documentDigest(bytes) } : {},
     ...origin && (origin.url || origin.pages?.length) ? { document: origin } : {},
     roots: [],
     elements: [],
@@ -46205,7 +46234,8 @@ function newAccum() {
     allFindings: [],
     packFindings: [],
     documents: [],
-    documentFindings: [],
+    documentsByDigest: /* @__PURE__ */ new Map(),
+    duplicateDocuments: 0,
     fileCount: 0,
     opaqueLibs: /* @__PURE__ */ new Set(),
     opaqueFiles: 0,
@@ -46376,26 +46406,43 @@ function foldDoc(acc, doc, graph) {
   acc.fileCount++;
 }
 function foldDocument(acc, doc) {
-  const findings = runRules(doc);
   const pages = doc.document?.pages ?? [];
-  for (const f2 of findings) {
-    if (pages.length) for (const page of pages) acc.documentFindings.push({ ...f2, page });
-    else acc.documentFindings.push(f2);
-  }
-  acc.documents.push(documentAudit(doc, new Set(findings.map((f2) => f2.ruleId))));
   acc.subjectsSeen.add("downloadDocs");
   for (const page of pages) {
     const own = acc.pageSubjects.get(page) ?? /* @__PURE__ */ new Set();
     own.add("downloadDocs");
     acc.pageSubjects.set(page, own);
   }
+  const known = doc.digest ? acc.documentsByDigest.get(doc.digest) : void 0;
+  if (known) {
+    mergeDocumentAudit(known.audit, documentAudit(doc, /* @__PURE__ */ new Set()));
+    acc.duplicateDocuments++;
+    return;
+  }
+  const findings = runRules(doc);
+  const entry2 = { audit: documentAudit(doc, new Set(findings.map((f2) => f2.ruleId))), findings };
+  acc.documents.push(entry2);
+  if (doc.digest) acc.documentsByDigest.set(doc.digest, entry2);
   acc.fileCount++;
+}
+function documentFindingsOf(documents) {
+  const out = [];
+  for (const { audit, findings } of documents) {
+    const pages = audit.pages ?? [];
+    for (const raw of findings) {
+      const f2 = raw.file === audit.file ? raw : { ...raw, file: audit.file };
+      if (pages.length) for (const page of pages) out.push({ ...f2, page });
+      else out.push(f2);
+    }
+  }
+  return out;
 }
 function documentAudit(doc, fired) {
   const f2 = doc.pdf;
   const text = !f2?.readable || !f2.contentScanned ? "unknown" : f2.textOps > 0 ? "yes" : f2.fonts > 0 ? "unknown" : "no";
   return {
     file: doc.file,
+    ...doc.digest ? { sha256: doc.digest } : {},
     ...doc.document?.url ? { url: doc.document.url } : {},
     ...doc.document?.pages?.length ? { pages: doc.document.pages } : {},
     format: "pdf",
@@ -46569,6 +46616,7 @@ function axeFindings(violations, file, page) {
   return out;
 }
 function finalize(acc, inputs, extra = {}) {
+  const documentFindings = documentFindingsOf(acc.documents);
   const criteria = [];
   const residualRisks = [];
   for (const c of allSC()) {
@@ -46687,8 +46735,8 @@ function finalize(acc, inputs, extra = {}) {
     criteria,
     findings: acc.allFindings,
     ...acc.packFindings.length ? { packFindings: acc.packFindings } : {},
-    ...acc.documents.length ? { documents: acc.documents } : {},
-    ...acc.documentFindings.length ? { documentFindings: acc.documentFindings } : {},
+    ...acc.documents.length ? { documents: acc.documents.map((d2) => d2.audit) } : {},
+    ...documentFindings.length ? { documentFindings } : {},
     residualRisks,
     conformancePct
   };
@@ -46761,18 +46809,7 @@ function runAudit(opts) {
       let doc2;
       try {
         if (statSync4(file).size > PDF_MAX_BYTES) doc2 = loadPdfDoc(file);
-        else {
-          const bytes = readFileSync9(file);
-          if (dedupMode !== "off") {
-            const h3 = createHash2("sha1").update(bytes).digest("hex");
-            if (seen.has(h3)) {
-              duplicateFiles++;
-              continue;
-            }
-            seen.add(h3);
-          }
-          doc2 = pdfDocFromBytes(bytes, file, readDocumentOrigin(file));
-        }
+        else doc2 = pdfDocFromBytes(readFileSync9(file), file, readDocumentOrigin(file));
       } catch {
         continue;
       }
@@ -46809,6 +46846,7 @@ function runAudit(opts) {
     foldDoc(acc, doc, graph);
   }
   const canonicalFiles = acc.fileCount;
+  duplicateFiles += acc.duplicateDocuments;
   if (opts.inputs.includes("-") && opts.stdin !== void 0 && !(opts.maxFiles && opts.maxFiles > 0 && acc.fileCount >= opts.maxFiles)) {
     foldDoc(acc, parseSource(opts.stdin, "<stdin>", { forceJsx: opts.forceJsx }), graph);
   }
@@ -60137,24 +60175,46 @@ function mergeSnapshotAudit(base, snap) {
     }
     merged.packFindings = pack;
   }
+  let folded2 = false;
   if (snap.documents?.length) {
-    const docs = [...merged.documents ?? []];
-    const known = new Set(docs.map((d2) => d2.file));
-    for (const d2 of snap.documents) if (!known.has(d2.file)) docs.push(d2);
+    const docs = (merged.documents ?? []).map((d2) => ({ ...d2 }));
+    const key2 = (d2) => d2.sha256 ? `sha256:${d2.sha256}` : `file:${d2.file}`;
+    const byKey = new Map(docs.map((d2) => [key2(d2), d2]));
+    for (const d2 of snap.documents) {
+      const into = byKey.get(key2(d2)) ?? docs.find((x2) => x2.file === d2.file || x2.copies?.includes(d2.file));
+      if (into) {
+        mergeDocumentAudit(into, d2);
+        folded2 = true;
+      } else {
+        const copy = { ...d2 };
+        docs.push(copy);
+        byKey.set(key2(copy), copy);
+      }
+    }
     merged.documents = docs;
   }
-  if (snap.documentFindings?.length) {
+  if (snap.documentFindings?.length || folded2) {
+    const citeOn = /* @__PURE__ */ new Map();
+    for (const d2 of merged.documents ?? []) for (const c of d2.copies ?? []) citeOn.set(c, d2.file);
+    const cite = (f2) => {
+      const file = citeOn.get(f2.file);
+      return file ? { ...f2, file } : f2;
+    };
     const docId = (f2) => `${portableFindingId(f2)}|${f2.page ?? ""}|${f2.msg?.id ?? ""}|${JSON.stringify(f2.msg?.params ?? {})}`;
-    const list = [...merged.documentFindings ?? []];
-    const seenDoc = new Set(list.map(docId));
-    for (const finding of snap.documentFindings) {
+    const list = [];
+    const seenDoc = /* @__PURE__ */ new Set();
+    for (const raw of [...merged.documentFindings ?? [], ...snap.documentFindings ?? []]) {
+      const finding = cite(raw);
       const id = docId(finding);
       if (!seenDoc.has(id)) {
         seenDoc.add(id);
         list.push(finding);
       }
     }
-    merged.documentFindings = list;
+    const linked = new Set((merged.documents ?? []).filter((d2) => d2.pages?.length).map((d2) => d2.file));
+    const kept = list.filter((f2) => f2.page || !linked.has(f2.file));
+    if (kept.length) merged.documentFindings = kept;
+    else delete merged.documentFindings;
   }
   for (const c of merged.criteria) {
     if (!c.inapplicable) continue;
@@ -60507,13 +60567,13 @@ function localTierStatus(cwd, choice = {}) {
     return { ok: false, reason: `${PW_SPEC} failed to load: ${e.message.split("\n")[0]}` };
   }
 }
-function resolveLocalDeps(cwd) {
+function resolveLocalDeps(cwd, lang) {
   let chromium;
   let axe;
   try {
     const pw = requireRuntime(cwd, PW_SPEC);
     chromium = pw.chromium;
-    axe = resolveAxeEngine({ cwd });
+    axe = resolveAxeEngine({ cwd, ...lang ? { lang } : {} });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(
@@ -60966,7 +61026,7 @@ async function runScanLocal(opts) {
   const isFile = !isUrl && statSync8(opts.target).isFile();
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, axe } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd, lang);
   const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   try {
     const out = await runOnPage(browser, axe, opts.target, isFile, {
@@ -60990,7 +61050,7 @@ async function runScanLocal(opts) {
 async function runScanManyLocal(urls, opts) {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, axe } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd, lang);
   const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   const findings = [];
   const snapshots = [];
@@ -61055,7 +61115,7 @@ async function runScanManyLocal(urls, opts) {
 async function runSampleScanLocal(pages, opts) {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
-  const { chromium, axe } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd, lang);
   const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   const findings = [];
   const snapshots = [];
@@ -68783,7 +68843,7 @@ function clearJourneySnapshots(root, name) {
   }
 }
 async function runJourneys(entries, opts) {
-  const { chromium, axe } = resolveLocalDeps(opts.cwd);
+  const { chromium, axe } = resolveLocalDeps(opts.cwd, opts.lang);
   const browser = await launchChromium(chromium, opts.cwd, void 0, { browserPath: opts.browserPath });
   const result = { records: [], findings: [], unsnapshotted: [], snapshots: [], testedScs: [], scanned: [] };
   const tested = /* @__PURE__ */ new Set();

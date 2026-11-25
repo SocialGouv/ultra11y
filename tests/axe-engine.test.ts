@@ -69,10 +69,22 @@ describe("the pinned axe-core", () => {
   });
 
   it("falls back on the project's copy only when ultra11y's does not resolve — and says so", () => {
-    const e = withoutNodePath(() => resolveAxeEngine({ cwd: projectWithItsOwnAxe(), self: bareAnchor() }));
+    const e = withoutNodePath(() => resolveAxeEngine({ cwd: projectWithItsOwnAxe(), self: bareAnchor(), lang: "en" }));
     expect(e.origin).toBe("project");
     expect(e.version).toBe("9.9.9-project");
     expect(e.note).toMatch(/audited project's axe-core 9\.9\.9-project/);
+    // Issue #225: the note says what the run means and the one way to the pin that works from
+    // the install-free bundle — never « reinstall ultra11y with its dependencies ».
+    expect(e.note).toContain("recorded with every result");
+    expect(e.note).toContain("npx -y ultra11y");
+    expect(e.note).not.toMatch(/install ultra11y with its dependencies/);
+  });
+
+  it("says it in French by default (the CLI's default language)", () => {
+    const e = withoutNodePath(() => resolveAxeEngine({ cwd: projectWithItsOwnAxe(), self: bareAnchor() }));
+    expect(e.note).toContain("c’est l’axe-core du projet audité qui tourne, en version 9.9.9-project");
+    expect(e.note).toContain("consignée dans chaque résultat");
+    expect(e.note).toContain("npx -y ultra11y");
   });
 
   it("bakes the pinned version into the source, in lockstep with package.json", () => {
@@ -86,7 +98,7 @@ describe("the pinned axe-core", () => {
       for (const version of [AXE_CORE_PIN, "4.10.0"]) {
         const project = projectWithItsOwnAxe(version);
         const self = join(project, dir, "skills", "ultra11y", "scripts", "ultra11y.mjs");
-        const e = withoutNodePath(() => resolveAxeEngine({ cwd: project, self }));
+        const e = withoutNodePath(() => resolveAxeEngine({ cwd: project, self, lang: "en" }));
         expect(e.origin).toBe("project");
         expect(e.version).toBe(version);
         expect(e.note).toContain(`audited project's axe-core ${version}`);
@@ -101,7 +113,7 @@ describe("the pinned axe-core", () => {
     expect(atPin.note).toBeUndefined();
 
     const drifted = projectWithItsOwnAxe("4.10.0", "ultra11y");
-    const off = withoutNodePath(() => resolveAxeEngine({ cwd: projectWithItsOwnAxe(), self: join(drifted, "dist", "playwright.mjs") }));
+    const off = withoutNodePath(() => resolveAxeEngine({ cwd: projectWithItsOwnAxe(), self: join(drifted, "dist", "playwright.mjs"), lang: "en" }));
     expect(off).toMatchObject({ origin: "unpinned", version: "4.10.0" });
     expect(off.note).toContain(`is 4.10.0, not the pinned ${AXE_CORE_PIN}`);
   });

@@ -23,7 +23,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AxeEngineInfo } from "./types.js";
+import type { AxeEngineInfo, Lang } from "./types.js";
 
 export type { AxeEngineInfo };
 
@@ -135,6 +135,26 @@ export interface ResolveAxeOptions {
   /** ultra11y's own anchor. Defaults to this module; a test passes another to simulate a
    *  bundle with no node_modules beside it. */
   self?: string;
+  /** The language of the fallback note (default French, the CLI's default). */
+  lang?: Lang;
+}
+
+/** The note printed when the axe that runs is not ultra11y's pinned copy. It says what the run
+ *  means, not a fix the caller may be unable to apply: the install-free skill bundle has no
+ *  node_modules of its own, so there the audited project's axe-core is the expected engine. The
+ *  version is recorded either way, it matters only when it drifts from the pin, and `npx -y
+ *  ultra11y` (which brings its dependencies) is the way to the pinned one when that is required. */
+export function axeFallbackNote(origin: AxeOrigin, version: string, path: string, lang: Lang): string | undefined {
+  const fr = lang === "fr";
+  if (origin === "project")
+    return fr
+      ? `ultra11y : l’axe-core épinglé d’ultra11y (${AXE_CORE_PIN}) n’est pas résolvable ici — c’est l’axe-core du projet audité qui tourne, en version ${version} (${path}). Cette version est consignée dans chaque résultat et dans l’annexe du rapport ; elle ne compte que si elle s’écarte de ${AXE_CORE_PIN} (règles ajoutées ou modifiées d’une version à l’autre). Quand la version épinglée est exigée, lancez l’audit avec \`npx -y ultra11y\`, qui apporte ses dépendances.`
+      : `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here — running the audited project's axe-core ${version} (${path}). That version is recorded with every result and in the report annex; it matters only when it drifts from ${AXE_CORE_PIN} (rules added or changed between versions). When the pinned version is required, run the audit with \`npx -y ultra11y\`, which brings its dependencies.`;
+  if (origin === "unpinned")
+    return fr
+      ? `ultra11y : l’axe-core résolu depuis le package d’ultra11y est en version ${version}, pas la version épinglée ${AXE_CORE_PIN} (${path}). Cette version est consignée dans chaque résultat ; réinstallez les dépendances d’ultra11y pour exécuter la version épinglée.`
+      : `ultra11y: the axe-core resolved from ultra11y's own package is ${version}, not the pinned ${AXE_CORE_PIN} (${path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.`;
+  return undefined;
 }
 
 /** Resolve the axe run ultra11y controls: ultra11y's own `@axe-core/playwright` and `axe-core`
@@ -158,12 +178,7 @@ export function resolveAxeEngine(opts: ResolveAxeOptions): AxeEngine {
   // package, AND it is the version ultra11y pins. Resolving from this module's URL is not enough
   // — from a skills directory inside a project it reaches the project's node_modules.
   const origin: AxeOrigin = own && insideUltra11y(self) ? (located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned") : "project";
-  const note =
-    origin === "project"
-      ? `ultra11y: its own axe-core ${AXE_CORE_PIN} is not resolvable here — running the audited project's axe-core ${located.version} (${located.path}). Results are recorded with that version; install ultra11y with its dependencies to run the pinned one.`
-      : origin === "unpinned"
-        ? `ultra11y: the axe-core resolved from ultra11y's own package is ${located.version}, not the pinned ${AXE_CORE_PIN} (${located.path}). Results are recorded with that version; reinstall ultra11y's dependencies to run the pinned one.`
-        : undefined;
+  const note = axeFallbackNote(origin, located.version, located.path, opts.lang ?? "fr");
   return {
     AxeBuilder,
     source,
