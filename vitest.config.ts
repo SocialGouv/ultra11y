@@ -32,12 +32,18 @@ export default defineConfig({
       // The journey replay (`journey run`) drives a real browser too: same job, same command.
       "tests/journey.e2e.test.ts",
       "tests/full-audit.e2e.test.ts",
+      // The render engine's visual snapshot pass opens its captures in Chromium.
+      "tests/render-snapshot.e2e.test.ts",
       "tests/opencode-smoke.e2e.test.ts",
       "tests/codex-smoke.e2e.test.ts",
     ],
     // An installed veraPDF adds its result to the 13.3 brief (src/verapdf.ts). Off for the suite,
     // so a brief renders the same on a machine that has it and on CI that does not; the tests
     // that exercise it name the executable themselves.
-    env: { ULTRA11Y_VERAPDF: "off" },
+    //
+    // `render` opens its captures in Chromium when one is installed (src/render-snapshot.ts).
+    // Off here for the same reason: the suite must behave the same with and without a browser.
+    // The snapshot pass has its own tests in the browser tier.
+    env: { ULTRA11Y_VERAPDF: "off", ULTRA11Y_RENDER_SNAPSHOTS: "off" },
   },
 });

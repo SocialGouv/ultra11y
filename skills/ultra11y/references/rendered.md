@@ -30,7 +30,7 @@ ultra11y renders the components itself. It does **not** read or run the project'
 purpose, and they go stale.
 
 ```
-node scripts/ultra11y.mjs render .      # components, pages, stories → .ultra11y/captures + .ultra11y/render.json
+node scripts/ultra11y.mjs render .      # components, pages, stories → .ultra11y/captures + .ultra11y/render.json (+ render-snapshots/ when a browser is there)
 node scripts/ultra11y.mjs audit .       # ingests .ultra11y/captures; findings name the source component
 ```
 
@@ -75,6 +75,24 @@ node scripts/ultra11y.mjs audit .       # ingests .ultra11y/captures; findings n
   `scan`.
 - **React only.** Vue, Svelte and Astro components are listed as not attempted; audit their
   rendered output through a static build or `scan`.
+- **Visual snapshots.** After rendering, `render` opens each capture in Chromium (Playwright,
+  served from a loopback server, no network) for a screenshot and an axe pass, written to
+  `.ultra11y/render-snapshots/<id>.png` and `.ultra11y/render-snapshots/index.json` (the
+  machine-readable list). It loads the project's **global** CSS when it finds it: plain `.css`
+  imported by the root entry points (`app/layout`, `pages/_app`, `src/main`, `src/index` —
+  relative, tsconfig alias or package such as the DSFR), stylesheets linked from a root document
+  into `public/`, and a build's compiled CSS (`.next/static/css`, `dist/assets`,
+  `build/static/css`) only to stand in for an uncompiled Tailwind or Sass source it had to leave
+  out. CSS modules are never loaded. The index says `styles.status`: `project`, `partial` or
+  `none` — a screenshot without CSS is labelled as such. Every observation is an **isolated
+  component render** (`context: "isolated-component"`): whole-page axe rules (landmarks,
+  heading order, title, lang…) are set aside, style-dependent rules (contrast, target size…)
+  too unless the CSS is `project`, and **no snapshot observation decides a criterion**, credits
+  one as conforming, or joins the audit's axe coverage. `audit` carries the index into
+  `scope.renders.snapshots`; the annex (under section G) and the HTML composite show the
+  pictures. Without Playwright or a browser the pass writes an index that says why and the
+  static captures stand; `--no-snapshots` (or `ULTRA11Y_RENDER_SNAPSHOTS=off`) skips it,
+  `--browser-path` picks the browser.
 
 `render --coverage` lists which components have a capture and which are still
 opaque-source-only blind spots; `audit --require-captures` fails while one remains.

@@ -30,6 +30,7 @@ import { conformanceRate, type ConformanceRate, formatPageRate, pageCriterionRow
 export { conformanceRate, type ConformanceRate };
 import { mdLink, mdText } from "./md.js";
 import { isLinkableUrl } from "./util.js";
+import { renderSnapshotAnnex } from "./render-snapshot-report.js";
 import {
   type StandardId,
   CORE,
@@ -2106,6 +2107,8 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   if (r.scope.routes?.length) ax.push("", ...renderRoutes(r.scope.routes, lang));
   // G. every unit ultra11y's render engine found, and what it did with it — none omitted.
   if (r.scope.renders?.units.length) ax.push("", ...renderRenderUnits(r.scope.renders, lang));
+  // …and what those renders look like in a browser (src/render-snapshot-report.ts).
+  if (r.scope.renders?.units.length && r.scope.renders.snapshots) ax.push(...renderSnapshotAnnex(r.scope.renders.snapshots, lang, opts.outDir));
   // H. every journey the agent wrote and every step of it: done, failed with the reason, or not run.
   if (r.scope.journeys?.journeys.length) ax.push("", ...renderJourneys(r.scope.journeys, lang));
 

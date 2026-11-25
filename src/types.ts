@@ -1086,6 +1086,85 @@ export interface RenderScope {
   skipped: number;
   notAttempted: number;
   units: RenderUnit[];
+  /** The visual snapshot pass over the captures (src/render-snapshot.ts), when its index is
+   *  there. Paths are relative to the directory the audit ran from. Evidence for the reader,
+   *  never a verdict: see RenderSnapshotIndex. */
+  snapshots?: RenderSnapshotIndex;
+}
+
+/** Where the stylesheets a snapshot was rendered with came from, and how complete they are.
+ *  `project`: every global stylesheet found was loaded; `partial`: some were found, others
+ *  could not be used (uncompiled Tailwind or Sass source, an unresolvable import); `none`:
+ *  no stylesheet was found and the capture was shown with the browser's default styles. */
+export type RenderSnapshotStylesStatus = "project" | "partial" | "none";
+
+export interface RenderSnapshotStyles {
+  status: RenderSnapshotStylesStatus;
+  /** Stylesheets loaded, project-relative posix paths (or absolute when outside the project). */
+  files: { file: string; via: "import" | "link" | "build" }[];
+  /** Stylesheets found and NOT loaded, with the reason. */
+  skipped: { file: string; reason: "tailwind-source" | "preprocessor" | "unresolved" | "unreadable" }[];
+}
+
+/** Why an axe violation seen on an isolated component render is set aside (not counted):
+ *  `page-context` — the rule judges a whole page (landmarks, heading order, title, lang…),
+ *  which a component rendered alone cannot satisfy; `styles` — the rule depends on the
+ *  computed styles (contrast, target size…) and the project's CSS was not fully loaded. */
+export type RenderSnapshotSetAside = "page-context" | "styles";
+
+/** One axe violation on one isolated component render. */
+export interface RenderSnapshotViolation {
+  rule: string;
+  /** The WCAG success criterion it maps to (src/axe-map.ts `scForAxe`). */
+  criteriaId: string;
+  impact?: string;
+  help: string;
+  nodes: number;
+  /** The first node: selector and outerHTML (truncated). */
+  target?: string;
+  html?: string;
+  /** A best-practice rule (src/axe-map.ts `isAxeAdvisory`). */
+  advisory?: boolean;
+  /** Shown as an observation to confirm on the real page. False when set aside. */
+  counted: boolean;
+  setAside?: RenderSnapshotSetAside;
+}
+
+/** One capture opened in the browser. */
+export interface RenderSnapshotUnit {
+  /** The render unit's id (RenderUnit.id), also the PNG's file stem. */
+  id: string;
+  file: string;
+  export: string;
+  component: string;
+  kind: RenderUnit["kind"];
+  capture: string;
+  status: "snapshotted" | "failed";
+  /** Path of the PNG (project-relative in the index, audit-cwd-relative in `scope.renders`). */
+  screenshot?: string;
+  width?: number;
+  height?: number;
+  error?: string;
+  violations: RenderSnapshotViolation[];
+}
+
+/** `.ultra11y/render-snapshots/index.json`, written by `render` after the captures.
+ *
+ *  Every observation in it comes from an ISOLATED COMPONENT RENDER — the server markup of one
+ *  component, with no props, no provider, no page around it — never from the real page. It is
+ *  evidence a reader looks at, and a signal to confirm; it never decides a criterion, never
+ *  credits one as conforming, and is not counted in the audit's axe coverage. */
+export interface RenderSnapshotIndex {
+  v: 1;
+  context: "isolated-component";
+  date: string;
+  /** Set when no snapshot could be taken at all (no Playwright, no browser): the reason. */
+  unavailable?: string;
+  /** The browser version that took the snapshots. */
+  browser?: string;
+  axe?: AxeEngineInfo;
+  styles: RenderSnapshotStyles;
+  units: RenderSnapshotUnit[];
 }
 
 /** How one journey step ended. `not-run`: a step after a failed one, or a journey never replayed. */

@@ -169,13 +169,13 @@ export function resolveRenderer(root: string): ResolvedTool | undefined {
   return { ...server, name: "react-dom/server" };
 }
 
-interface PathAlias {
+export interface PathAlias {
   pattern: string;
   targets: string[];
 }
 
 /** tsconfig/jsconfig `paths` (+ `baseUrl`) as absolute targets, for the runner's resolver. */
-function aliasesOf(root: string): { paths: PathAlias[]; baseUrl?: string; jsxImportSource?: string } {
+export function aliasesOf(root: string): { paths: PathAlias[]; baseUrl?: string; jsxImportSource?: string } {
   for (const name of ["tsconfig.json", "jsconfig.json"]) {
     if (!existsSync(join(root, name))) continue;
     try {
