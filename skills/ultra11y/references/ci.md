@@ -1,70 +1,80 @@
-# CI: run iterion's `rgaa-audit` bot
+# CI : lancer le bot `rgaa-audit` d’iterion
 
-ultra11y is a skill and an engine. It ships **no CI integration of its own** — no GitHub
-Action, no GitLab template. An accessibility audit in CI runs through
-[SocialGouv/iterion](https://github.com/SocialGouv/iterion)'s **`rgaa-audit` bot**:
+ultra11y est une skill et un moteur. Il ne livre **aucune intégration CI qui lui soit propre** —
+ni GitHub Action, ni template GitLab. Un audit d’accessibilité en CI passe par le
+**bot `rgaa-audit`** de [SocialGouv/iterion](https://github.com/SocialGouv/iterion) :
 [`bots/rgaa-audit`](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit).
 
-That bot is the harness the engine needs to produce a real audit, not a wrapper around it:
+Ce bot est le harness dont le moteur a besoin pour produire un vrai audit, pas une surcouche
+autour de lui :
 
-- it installs this engine from npm, **pinned by version and by the sha256** of its entry file,
-  and refuses to run anything that does not carry the fingerprint;
-- the engine finds: the static audit, the rendered page sample, the committed ledger replay;
-- **read-only agents judge** the criteria a static pass cannot decide — under RGAA,
-  **104 of 106** still need adjudication to earn C — one batch per theme, from the evidence the
-  engine harvested;
-- a **second reader puts every claim on trial**, conformities included, before the report is
-  written; an optional human gate approves or declares criteria undecidable;
-- the engine refuses: its fold rejects an unjustified verdict, an uncited conformity or an
-  ungroundable non-conformity, and `check` rejects a report citing what does not resolve;
-- it files one board issue per non-conforming criterion, with no model in the loop.
+- il installe ce moteur depuis npm, **épinglé par version et par le sha256** de son fichier
+  d’entrée, et refuse d’exécuter tout ce qui ne porte pas cette empreinte ;
+- le moteur trouve : l’audit statique, l’échantillon de pages rendues, le rejeu du registre
+  commité ;
+- **des agents en lecture seule jugent** les critères qu’une passe statique ne peut pas décider
+  — sous le RGAA, **104 sur 106** demandent encore un arbitrage pour obtenir C — un lot par
+  thème, à partir des preuves que le moteur a récoltées ;
+- un **second lecteur met chaque affirmation à l’épreuve**, conformités comprises, avant que le
+  rapport soit écrit ; un contrôle humain optionnel approuve des critères ou les déclare
+  indécidables ;
+- le moteur refuse : son repli rejette un verdict non justifié, une conformité sans citation ou
+  une non-conformité non ancrable, et `check` rejette un rapport qui cite ce qui ne se résout
+  pas ;
+- il ouvre une issue sur le tableau par critère non conforme, sans modèle dans la boucle.
 
-How to run it, its variables (`scope_globs`, `rendered`, `serve_command`, `ledger_path`,
-`human_review`, `require_complete`, `post_to_board`…) and its budget are documented in the
-[bot's README](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit#readme). Read
-that, not this page, to set up CI.
+La façon de le lancer, ses variables (`scope_globs`, `rendered`, `serve_command`,
+`ledger_path`, `human_review`, `require_complete`, `post_to_board`…) et son budget sont
+documentés dans le
+[README du bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit#readme). Lisez
+celui-ci, pas cette page, pour mettre en place la CI.
 
-A bare engine run in a CI shell is not an audit: nobody rules on the judgment criteria, nobody
-refutes, and the grid stays mostly « à évaluer ». Inside a coding agent the session is the
-auditor (`references/full-audit.md`); in CI, the bot is.
+Une exécution nue du moteur dans un shell de CI n’est pas un audit : personne ne tranche les
+critères de jugement, personne ne réfute, et la grille reste en grande partie « à évaluer ».
+Dans un agent de code, la session est l’auditeur (`references/full-audit.md`) ; en CI, c’est le
+bot.
 
-## The engine CLI is the stable contract
+## La CLI du moteur est le contrat stable
 
-iterion drives the engine through its CLI and nothing else, so the CLI — its commands, flags,
-exit codes and JSON documents — is the contract a release must keep. The bot relies on:
+iterion pilote le moteur par sa CLI et rien d’autre, si bien que la CLI — ses commandes, ses
+flags, ses codes de sortie et ses documents JSON — est le contrat qu’une release doit tenir. Le
+bot s’appuie sur :
 
-| Command | What the bot uses it for |
+| Commande | Ce à quoi le bot l’utilise |
 |---|---|
-| `status --browser` | whether the rendered tier resolves on the runner |
-| `audit --standard rgaa --json` (+ `--graph`, `--jsx`, `--exclude`, `--max-files`, `--staged` / `--changed` / `--since <ref>`) | THE finding set, written to `audits/audit-latest.json` |
-| `sample check` | lint the `.ultra11yrc.json` page sample against the standard's required page kinds |
-| `scan --sample --merge <audit.json>` | render, snapshot and fold the page sample (`--storage-state` for pages behind a login) |
-| `verify --apply <ledger>` | replay the committed verdict ledger (`.ultra11y/verdicts/<standard>.json`) — a re-verification against fresh evidence, never a cache hit |
-| `verify --manual` | the adjudication worklist for the criteria still « à évaluer » |
-| `verify --apply <adjudication.json> --ledger <file>` | the fail-closed fold, recording the accepted verdicts |
-| `verify --report …` · `verify --apply <VERIFY.todo.json> --prune` | the refutation: every written claim on trial, refuted ones withdrawn |
-| `report` · `report --html` | the dated conformance report, and its printable HTML |
-| `check --report <md>` | the integrity gate: every cited criterion resolves, every NA is justified |
-| `check --in … --require-decided=pages [--allow-undecided <file>] [--require-rendered]` | the completeness gates |
-| `pages --in … --json --out <dir>` | the per-page criterion grid (`pages.json`) |
-| `tickets --in … --dry-run --transport rest` | the issue plan, one per non-conforming criterion |
+| `status --browser` | savoir si le niveau « rendu » se résout sur le runner |
+| `audit --standard rgaa --json` (+ `--graph`, `--jsx`, `--exclude`, `--max-files`, `--staged` / `--changed` / `--since <ref>`) | L’ensemble des constats, écrit dans `audits/audit-latest.json` |
+| `sample check` | vérifier l’échantillon de pages de `.ultra11yrc.json` au regard des types de pages requis par le référentiel |
+| `scan --sample --merge <audit.json>` | rendre, capturer en instantané et replier l’échantillon de pages (`--storage-state` pour les pages derrière une connexion) |
+| `verify --apply <ledger>` | rejouer le registre des verdicts commité (`.ultra11y/verdicts/<standard>.json`) — une re-vérification sur des preuves fraîches, jamais un simple hit de cache |
+| `verify --manual` | la liste de travail d’arbitrage pour les critères encore « à évaluer » |
+| `verify --apply <adjudication.json> --ledger <file>` | le repli fail-closed, qui enregistre les verdicts acceptés |
+| `verify --report …` · `verify --apply <VERIFY.todo.json> --prune` | la contre-vérification : chaque affirmation écrite mise à l’épreuve, les réfutées retirées |
+| `report` · `report --html` | le rapport de conformité daté, et son HTML imprimable |
+| `check --report <md>` | le contrôle d’intégrité : chaque critère cité se résout, chaque NA est justifié |
+| `check --in … --require-decided=pages [--allow-undecided <file>] [--require-rendered]` | les contrôles d’exhaustivité |
+| `pages --in … --json --out <dir>` | la grille des critères par page (`pages.json`) |
+| `tickets --in … --dry-run --transport rest` | le plan d’issues, une par critère non conforme |
 
-A change to any of these is a breaking change for the bot. `orchestrate --manifest` describes the
-same loop as data for any orchestrator; see `references/orchestrators.md`.
+Toute modification de l’une de ces commandes est un changement cassant pour le bot.
+`orchestrate --manifest` décrit la même boucle sous forme de données pour n’importe quel
+orchestrateur ; voir `references/orchestrators.md`.
 
-The engine emits no CI-specific rendering (no SARIF, no workflow annotations, no pull-request
-comment): the bot reads the JSON documents above and posts what it decides to post.
+Le moteur n’émet aucun rendu propre à la CI (pas de SARIF, pas d’annotations de workflow, pas
+de commentaire de pull request) : le bot lit les documents JSON ci-dessus et publie ce qu’il
+décide de publier.
 
-## How this repo publishes itself (npm trusted publishing)
+## Comment ce dépôt se publie lui-même (npm trusted publishing)
 
-This repository's own release workflow holds **no npm token**. It publishes by OIDC: the job
-asks GitHub for a short-lived id-token (`permissions: id-token: write`) and exchanges it with
-registry.npmjs.org for a credential scoped to this package. It depends on a **trusted
-publisher** configured on npmjs.com naming this repository and `release.yml`, and on **npm >=
-11.5.1** on the runner (Node 24 ships an older 11.x, so the workflow upgrades it). The package
-had to exist first, so the **first** publish was manual; every release since is tokenless. If
-the exchange fails, `@semantic-release/npm` falls back to demanding a token — it never publishes
-unauthenticated.
+Le workflow de release de ce dépôt ne détient **aucun token npm**. Il publie par OIDC : le job
+demande à GitHub un id-token de courte durée (`permissions: id-token: write`) et l’échange
+auprès de registry.npmjs.org contre un identifiant limité à ce paquet. Cela dépend d’un
+**trusted publisher** configuré sur npmjs.com qui nomme ce dépôt et `release.yml`, et de **npm
+>= 11.5.1** sur le runner (Node 24 livre une version 11.x plus ancienne, donc le workflow la
+met à jour). Le paquet devait d’abord exister, si bien que la **première** publication a été
+manuelle ; chaque release depuis se fait sans token. Si l’échange échoue,
+`@semantic-release/npm` se rabat sur l’exigence d’un token — il ne publie jamais sans
+authentification.
 
-Every release is the version the bot pins: `ultra11y.pin` in the bot directory holds it with
-the fingerprint of its entry file.
+Chaque release est la version que le bot épingle : `ultra11y.pin` dans le répertoire du bot la
+contient avec l’empreinte de son fichier d’entrée.

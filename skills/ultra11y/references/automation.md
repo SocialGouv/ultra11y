@@ -1,7 +1,7 @@
-# Automate in the repo — `init` (hook)
+# Automatiser dans le dépôt — `init` (hook)
 
-ultra11y can stay an **on-demand** skill, or become a **gate** that runs on its own.
-`init` wires it (zero-dependency, no husky):
+ultra11y peut rester une skill **à la demande**, ou devenir un **garde-fou** qui s’exécute de
+lui-même. `init` le branche (zéro dépendance, pas de husky) :
 
 ```
 node scripts/ultra11y.mjs init --hook          # .git/hooks/pre-commit — strict STAGED gate (default)
@@ -9,131 +9,143 @@ node scripts/ultra11y.mjs init                 # same as --hook
 node scripts/ultra11y.mjs init --fail-on major # the same gate, at another threshold
 ```
 
-## Three gates, three different jobs
+## Trois garde-fous, trois rôles différents
 
-| | what runs | when | who decides |
+| | ce qui s’exécute | quand | qui tranche |
 |---|---|---|---|
-| `init --hook` | the engine, mechanically | every `git commit` | the engine's `--fail-on` |
-| iterion's `rgaa-audit` bot | the engine + read-only agents, in CI | when the workflow runs it | its agents, adjudicating and refuting, then the engine's gates |
-| the **agent-harness hook** | the `review-a11y` **skill** | a pending commit / push / PR, inside an agent session | the AI agent, adjudicating |
+| `init --hook` | le moteur, mécaniquement | à chaque `git commit` | le `--fail-on` du moteur |
+| le bot `rgaa-audit` d’iterion | le moteur + des agents en lecture seule, en CI | quand le workflow le lance | ses agents, qui arbitrent et réfutent, puis les garde-fous du moteur |
+| le **hook du harness d’agent** | la **skill** `review-a11y` | un commit / push / pull request en attente, dans une session d’agent | l’agent IA, qui arbitre |
 
-The first blocks on what a machine can decide. The other two exist because most of WCAG is
-*judgment* — is this `alt` relevant, is this link's purpose clear — which no exit code
-settles. See below.
+Le premier bloque sur ce qu’une machine peut trancher. Les deux autres existent parce que
+l’essentiel des WCAG relève du *jugement* — cet `alt` est-il pertinent, la fonction de ce lien
+est-elle claire — ce qu’aucun code de sortie ne règle. Voir ci-dessous.
 
-`init` writes no CI workflow: the adjudicated, refuted audit in CI is
-iterion's [`rgaa-audit` bot](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit)
+`init` n’écrit aucun workflow de CI : l’audit arbitré et contre-vérifié en CI est
+le [bot `rgaa-audit`](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit) d’iterion
 (`references/ci.md`).
 
-## The agent-harness hook — the agent review, unprompted
+## Le hook du harness d’agent — la revue par l’agent, sans qu’on la demande
 
-Shipped by the plugin (`hooks/hooks.json` → `hooks/pre-tool-use.mjs` → `ultra11y hook
---claude-code`), not by `init`. **No** harness has a git event, so it listens on `PreToolUse`
-for the shell tool and recognises the commands that **publish** work — `git commit` (scoped
-to `--staged`), `git push` and `gh pr create` (scoped to `--since <default branch>`). When
-the change carries findings at or above the threshold it returns `permissionDecision:
-"deny"` with the findings attached, and the agent invokes `review-a11y` to adjudicate them.
+Livré par le plugin (`hooks/hooks.json` → `hooks/pre-tool-use.mjs` → `ultra11y hook
+--claude-code`), pas par `init`. **Aucun** harness n’a d’événement git, donc il écoute
+`PreToolUse` pour l’outil shell et reconnaît les commandes qui **publient** du travail —
+`git commit` (limité à `--staged`), `git push` et `gh pr create` (limités à `--since <default branch>`).
+Quand la modification porte des constats au niveau du seuil ou au-dessus, il renvoie
+`permissionDecision:
+"deny"` avec les constats joints, et l’agent invoque `review-a11y` pour les arbitrer.
 
-The same file serves Claude Code and Codex (Codex exports `${CLAUDE_PLUGIN_ROOT}` and reads
-the same envelope); OpenCode has no decision channel, so there the gate throws and the
-findings arrive as the tool error. Per-harness install, deltas and off-switches:
-**`references/harnesses.md`**.
+Le même fichier sert Claude Code et Codex (Codex exporte `${CLAUDE_PLUGIN_ROOT}` et lit la même
+enveloppe) ; OpenCode n’a pas de canal de décision, donc là le garde-fou lève une exception et
+les constats arrivent comme erreur de l’outil. Installation par harness, différences et moyens
+de désactivation : **`references/harnesses.md`**.
 
-Two invariants make it liveable:
+Deux invariants le rendent vivable :
 
-- **It never fires twice for the same findings.** The finding set is fingerprinted per
-  session, so the retry after a review always goes through — a review that refutes
-  everything still lets the commit land.
-- **It never breaks a git flow.** Git's own `no-verify` bypass, a dry run, a cwd outside a
-  repository, an unresolvable base ref, an engine error or a timeout all resolve to silence,
-  never to an error the user has to work around.
+- **Il ne se déclenche jamais deux fois pour les mêmes constats.** L’ensemble des constats
+  reçoit une empreinte par session, donc la nouvelle tentative après une revue passe toujours —
+  une revue qui réfute tout laisse quand même le commit aboutir.
+- **Il ne casse jamais un flux git.** Le contournement `no-verify` propre à git, une exécution à
+  blanc, un répertoire courant hors d’un dépôt, une référence de base introuvable, une erreur du
+  moteur ou un dépassement de délai se résolvent tous en silence, jamais en une erreur que
+  l’utilisateur doit contourner.
 
-Threshold and off-switches: `ULTRA11Y_HOOK_FAIL_ON=blocking|major|minor|off` (env, wins),
-then `"hook": { "failOn": … }` in `.ultra11yrc.json`, else `blocking`. `SKIP_A11Y=1` (the
-same bypass as the pre-commit hook) and `ULTRA11Y_HOOK=off` disable it outright.
+Seuil et moyens de désactivation : `ULTRA11Y_HOOK_FAIL_ON=blocking|major|minor|off` (variable
+d’environnement, prioritaire), puis `"hook": { "failOn": … }` dans `.ultra11yrc.json`, sinon
+`blocking`. `SKIP_A11Y=1` (le même contournement que pour le hook pre-commit) et
+`ULTRA11Y_HOOK=off` le désactivent complètement.
 
-A hook **cannot force** a skill invocation — it blocks and hands over the reason, the agent
-invokes. And a plugin's hooks are enabled by enabling the plugin, not by the install alone.
+Un hook **ne peut pas forcer** l’invocation d’une skill — il bloque et transmet la raison,
+l’agent invoque. Et les hooks d’un plugin s’activent en activant le plugin, pas par la seule
+installation.
 
-## Default: strict staged snapshot + safe auto-fix
+## Par défaut : instantané indexé strict + correction automatique sûre
 
-The default pre-commit hook operates on **exactly what is about to be committed** — the
-**staged index blobs**, read with `git show :./<path>`, *not* the working-tree copy.
-It runs (fix first, then gate — so safe fixes are always applied, and only the judgment
-issues that remain can block):
+Le hook pre-commit par défaut opère sur **exactement ce qui est sur le point d’être commité** —
+les **blobs de l’index (staged)**, lus avec `git show :./<path>`, *pas* la copie de l’arbre de
+travail. Il exécute (correction d’abord, puis garde-fou — ainsi les corrections sûres sont
+toujours appliquées, et seuls les problèmes de jugement restants peuvent bloquer) :
 
 ```
 node scripts/ultra11y.mjs fix   --staged --write --safe            # auto-apply SAFE fixes to the staged snapshot, re-stage
 node scripts/ultra11y.mjs audit --staged --fail-on blocking        # gate: block only if issues remain (need judgment)
 ```
 
-Why fix-first: every auto-fixable rule (positive `tabindex`, redundant `role`,
-zoom-blocking viewport) is `major`/`minor`, while the `blocking` findings (missing `alt`,
-missing label) are exactly the ones a codemod must **not** guess. So the safe pass cleans
-up and re-stages what it can, and the gate blocks only on the judgment remainder for the AI
-agent to adjudicate.
+Pourquoi corriger d’abord : chaque règle corrigeable automatiquement (`tabindex` positif,
+`role` redondant, viewport qui bloque le zoom) est `major`/`minor`, alors que les constats
+`blocking` (`alt` manquant, étiquette manquante) sont précisément ceux qu’un codemod ne doit
+**pas** deviner. La passe sûre nettoie donc et réindexe ce qu’elle peut, et le garde-fou ne
+bloque que sur le reliquat de jugement, que l’agent IA arbitre.
 
-- **`--staged`** scopes to staged adds/mods only (not untracked, not unstaged-only edits)
-  and audits the exact bytes a commit would record — including `.gitattributes` clean
-  filters. `--staged` wins over `--changed`/`--since`.
-- **`--safe`** applies only genuinely-**automatic** codemods. Placeholder inserts
-  (`alt="TODO"`, `lang="und"`, `title="TODO"`) are **not** applied: a stub would clear the
-  finding mechanically while still needing a real value, so those (and judgment proposals)
-  are left in place and keep the gate blocking.
-- **Auto-fix + re-stage** happens only for **fully-staged** files (working tree == index).
-  A **partially-staged** file (unstaged edits present) is left untouched — writing
-  index-derived output over it and `git add`-ing would silently stage those edits — so its
-  findings keep the gate blocking with a message to stage/fix it manually.
-- The commit proceeds only when no blocking issue remains after the safe pass. One-off
-  bypass: `SKIP_A11Y=1 git commit …`. Engine path override: `ULTRA11Y=/path/to/ultra11y.mjs`.
+- **`--staged`** se limite aux ajouts/modifications indexés (pas les fichiers non suivis, pas
+  les modifications seulement non indexées) et audite les octets exacts qu’un commit
+  enregistrerait — y compris les filtres clean de `.gitattributes`. `--staged` l’emporte sur
+  `--changed`/`--since`.
+- **`--safe`** n’applique que les codemods réellement **automatiques**. Les insertions
+  d’espaces réservés (`alt="TODO"`, `lang="und"`, `title="TODO"`) ne sont **pas** appliquées :
+  un bouche-trou ferait disparaître le constat mécaniquement alors qu’une vraie valeur reste
+  nécessaire, donc ceux-ci (et les propositions de jugement) sont laissés en place et
+  maintiennent le blocage du garde-fou.
+- **Correction automatique + réindexation** n’ont lieu que pour les fichiers **entièrement
+  indexés** (arbre de travail == index). Un fichier **partiellement indexé** (modifications non
+  indexées présentes) n’est pas touché — écrire par-dessus une sortie dérivée de l’index puis
+  faire `git add` indexerait ces modifications en silence — donc ses constats maintiennent le
+  blocage du garde-fou, avec un message invitant à l’indexer/le corriger à la main.
+- Le commit ne passe que lorsqu’il ne reste plus aucun problème bloquant après la passe sûre.
+  Contournement ponctuel : `SKIP_A11Y=1 git commit …`. Chemin du moteur à surcharger :
+  `ULTRA11Y=/path/to/ultra11y.mjs`.
 
-**When the hook blocks on judgment issues** (alt relevance, link purpose, labels,
-heading structure) the agent should: open the cited **staged** code, apply the *real*
-fix (not a placeholder), `git add` the file, and re-commit — or run `fix --staged
---write` to lay down placeholders and then fill them in.
+**Quand le hook bloque sur des problèmes de jugement** (pertinence de l’alternative, fonction du
+lien, étiquettes, structure des titres), l’agent doit : ouvrir le code **indexé** cité, appliquer
+la *vraie* correction (pas un espace réservé), faire `git add` sur le fichier, puis commiter à
+nouveau — ou lancer `fix --staged
+--write` pour poser des espaces réservés, puis les remplir.
 
-## MUST: the FINAL, rendered semantic HTML has to be correct
+## OBLIGATOIRE : le HTML sémantique FINAL, rendu, doit être correct
 
-The static engine only sees **source**. When markup comes from a **component library**
-(DSFR, MUI, Chakra…) or a `.vue`/`.svelte`/`.astro` SFC, the real **semantic HTML** only
-exists **after rendering** — the source `<Button/>` tells you nothing about the `<button>`
-(or `<div role>`) it emits. A green staged gate on opaque component source is **not**
-proof of an accessible result.
+Le moteur statique ne voit que la **source**. Quand le balisage provient d’une **bibliothèque
+de composants** (DSFR, MUI, Chakra…) ou d’un SFC `.vue`/`.svelte`/`.astro`, le vrai **HTML
+sémantique** n’existe **qu’après le rendu** — le `<Button/>` de la source ne dit rien du
+`<button>` (ou du `<div role>`) qu’il émet. Un garde-fou vert sur une source de composants
+opaque n’est **pas** la preuve d’un résultat accessible.
 
-**So make the produced semantic HTML the thing you gate — with rendered CAPTURES.** A
-capture is the *rendered* DOM serialized to `.html` and committed, so the gate audits the
-true markup, not the component call. ultra11y's render engine produces them, without
-reading or running your tests (`references/rendered.md`):
+**Faites donc du HTML sémantique produit l’objet du garde-fou — avec des CAPTURES rendues.** Une
+capture est le DOM *rendu*, sérialisé en `.html` et commité, de sorte que le garde-fou audite le
+vrai balisage, pas l’appel du composant. Le moteur de rendu d’ultra11y les produit, sans lire ni
+exécuter vos tests (`references/rendered.md`) :
 
 ```
 node scripts/ultra11y.mjs render .                    # every component, page and story → .ultra11y/captures/*.html (provenance-tagged)
 node scripts/ultra11y.mjs audit --require-captures    # gate: every opaque/control component must have a capture
 ```
 
-- **Attribution + coverage.** A finding on a capture is reported against the SOURCE
-  component (via its `<!-- ultra11y:capture … -->` provenance), not the capture file.
-  `render --coverage` shows covered vs blind-spot components; `--require-captures` turns any
-  remaining blind spot into a failure. `.vue`/`.svelte`/`.astro` components now count in this
-  coverage too, so a previously-green gate can newly report blind spots on an SFC-heavy repo —
-  intended (a named blind spot beats invisibility); capture those components or scope the gate.
-- **The gate sees the captures for the diffed components automatically.** In
-  `--changed`/`--staged`/`--since` mode the audit pulls in the committed captures whose
-  provenance points at a diffed source file (a capture is rarely itself part of the diff —
-  the SOURCE changed, its capture usually didn't), so the pre-commit gate audits the real
-  `<button>`/`<nav>`/heading structure/labels for every touched component, catching
-  regressions the opaque source hides. After a component change, re-run `render` so its
-  capture refreshes, and stage the refreshed capture with the source. `fix` never rewrites
-  captures (generated output). Storybook/build HTML also
-  work — anything under `.ultra11y/captures`, or point `--captures <dir>` (`--no-captures`
-  opts out entirely).
-- In CI, audit the **built** output (`audit "dist/**/*.html"`), and use `scan` for the
-  computed rendering criteria (contrast, focus, zoom). See `references/rendered.md`.
+- **Attribution + couverture.** Un constat sur une capture est rapporté au composant SOURCE (via
+  sa provenance `<!-- ultra11y:capture … -->`), pas au fichier de capture.
+  `render --coverage` montre les composants couverts et les angles morts ; `--require-captures`
+  transforme tout angle mort restant en échec. Les composants `.vue`/`.svelte`/`.astro` comptent
+  désormais aussi dans cette couverture, donc un garde-fou jusque-là vert peut signaler de
+  nouveaux angles morts dans un dépôt riche en SFC — c’est voulu (un angle mort nommé vaut mieux
+  que l’invisibilité) ; capturez ces composants ou restreignez le périmètre du garde-fou.
+- **Le garde-fou voit automatiquement les captures des composants du diff.** En mode
+  `--changed`/`--staged`/`--since`, l’audit intègre les captures commitées dont la provenance
+  pointe vers un fichier source du diff (une capture fait rarement elle-même partie du diff —
+  c’est la SOURCE qui a changé, sa capture généralement pas), de sorte que le garde-fou
+  pre-commit audite les vrais `<button>`/`<nav>`/structure de titres/étiquettes de chaque
+  composant touché, et attrape les régressions que la source opaque cache. Après une
+  modification de composant, relancez `render` pour rafraîchir sa capture, et indexez la capture
+  rafraîchie avec la source. `fix` ne réécrit jamais les captures (sortie générée). Le HTML de
+  Storybook ou de build fonctionne
+  aussi — tout ce qui se trouve sous `.ultra11y/captures`, ou pointez `--captures <dir>`
+  (`--no-captures` désactive entièrement).
+- En CI, auditez la sortie **construite** (`audit "dist/**/*.html"`), et utilisez `scan` pour
+  les critères de rendu calculés (contraste, focus, zoom). Voir `references/rendered.md`.
 
-Treat this as a hard rule: **do not sign off on a component/SFC change from the source
-audit alone — verify the rendered semantic HTML, and prefer committed captures so the
-gate keeps verifying it.**
+Traitez ceci comme une règle stricte : **ne validez pas une modification de composant/SFC sur la
+seule base de l’audit de la source — vérifiez le HTML sémantique rendu, et préférez des captures
+commitées pour que le garde-fou continue de le vérifier.**
 
-> The pre-commit gate relies on the **static** engine. The **rendering** (contrast, focus, zoom) criteria
-> go to `scan` and the **judgment** criteria are adjudicated by the AI agent (`verify --manual`,
-> gated) in the full audit — the gate stops mechanical regressions, it is not the full audit
-> (a human is at most optional oversight).
+> Le garde-fou pre-commit repose sur le moteur **statique**. Les critères de **rendu** (contraste,
+> focus, zoom) vont vers `scan` et les critères de **jugement** sont arbitrés par l’agent IA
+> (`verify --manual`, sous garde-fou) dans l’audit complet — le garde-fou arrête les régressions
+> mécaniques, ce n’est pas l’audit complet (un humain n’est au plus qu’une supervision
+> facultative).

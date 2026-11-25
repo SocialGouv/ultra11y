@@ -1,108 +1,115 @@
-# Implementation guidance — concrete before/after rules attached to criteria
+# Guide d’implémentation — règles concrètes avant/après rattachées aux critères
 
-A standards pack says *what* a criterion requires; **guidance** says *how to implement
-it*. It is the layer of concrete, how-to-implement rules — the RGAA SocialGouv/etalab
-good/bad code patterns — keyed to a pack criterion and the WCAG success criteria it maps
-onto. It enriches output without ever changing the verdict.
+Un pack de référentiel dit *ce que* un critère exige ; le **guide** (guidance) dit *comment
+l’implémenter*. C’est la couche des règles concrètes de mise en œuvre — les motifs de code
+bon/mauvais RGAA de SocialGouv/etalab — indexée sur un critère du pack et sur les critères de
+succès WCAG auxquels il correspond. Elle enrichit la sortie sans jamais changer le verdict.
 
-## Where it shows up
+## Où il apparaît
 
-Guidance is looked up at **render time** by criterion / WCAG SC, so the canonical
-`audit` JSON stays untouched (no schema change, no new finding). It surfaces in:
+Le guide est recherché **au moment du rendu**, par critère / critère de succès WCAG, de sorte que
+le JSON canonique d’`audit` reste intact (aucun changement de schéma, aucun nouveau constat). Il
+apparaît dans :
 
-- **`prd`** — each backlog item gains a before/after example and an effort estimate; the
-  `--format doc` PRD weaves it into the user stories and acceptance criteria.
-- **the auditor block** of `report`, `prd`, `tickets` and the per-page sheets — the
-  « Changement attendu » example.
+- **`prd`** — chaque élément du backlog reçoit un exemple avant/après et une estimation de
+  l’effort ; le PRD `--format doc` l’intègre aux user stories et aux critères d’acceptation.
+- **le bloc auditeur** de `report`, `prd`, `tickets` et des fiches par page — l’exemple
+  « Changement attendu ».
 
-Because attachment is presentation-only, guidance never marks anything conforming and
-never invents a non-conformity — it is illustration, not detection.
+Comme le rattachement relève uniquement de la présentation, le guide ne marque jamais rien comme
+conforme et n’invente jamais de non-conformité — c’est de l’illustration, pas de la détection.
 
-## Dataset shape
+## Forme du jeu de données
 
-A guidance dataset is JSON: `{ pack, source, license, attribution, entries[] }`, where
-each entry is `{ id, criterionId, wcag[], title, summary, impact?, examples[], reference }`
-and an example is `{ lang: "html"|"jsx"|"css", bad?, good?, note? }`. Two ship built in:
-`src/data/guidance/rgaa.json` (93 entries, ids mirroring the SocialGouv rule files) and
-`src/data/guidance/wcag.json` (the WCAG-keyed set, reached through each RGAA criterion's
-WCAG mapping). A `.ultra11yrc.json` `guidance` list adds project guidance; the same gate
-(`src/pack.ts`) validates that every entry resolves to a real RGAA criterion, maps to
-recognized WCAG SCs, and that every example parses.
+Un jeu de données de guide est du JSON : `{ pack, source, license, attribution, entries[] }`, où
+chaque entrée est `{ id, criterionId, wcag[], title, summary, impact?, examples[], reference }`
+et un exemple est `{ lang: "html"|"jsx"|"css", bad?, good?, note? }`. Deux sont livrés en
+standard : `src/data/guidance/rgaa.json` (93 entrées, ids calqués sur les fichiers de règles de
+SocialGouv) et `src/data/guidance/wcag.json` (l’ensemble indexé sur les WCAG, atteint par la
+correspondance WCAG de chaque critère RGAA). Une liste `guidance` dans `.ultra11yrc.json` ajoute
+un guide propre au projet ; le même garde-fou (`src/pack.ts`) valide que chaque entrée se résout
+vers un vrai critère RGAA, correspond à des critères de succès WCAG reconnus, et que chaque
+exemple s’analyse.
 
-## Inheritance — guidance through the WCAG mapping
+## Héritage — le guide via la correspondance WCAG
 
-Every entry declares the WCAG success criteria it implements, and a lookup walks **every**
-registered dataset. So an RGAA criterion with no RGAA entry of its own still gets examples,
-through the WCAG criteria it maps onto.
+Chaque entrée déclare les critères de succès WCAG qu’elle met en œuvre, et une recherche parcourt
+**chaque** jeu de données enregistré. Ainsi, un critère RGAA sans entrée RGAA propre reçoit tout
+de même des exemples, via les critères WCAG auxquels il correspond.
 
-Resolution order (first wins, deduped by entry id):
+Ordre de résolution (le premier l’emporte, dédoublonné par id d’entrée) :
 
-1. the RGAA entry for that criterion → `via: "pack"`, `inherited: false`
-2. every entry keyed to each WCAG SC the criterion maps to, in the pack's own SC order →
+1. l’entrée RGAA de ce critère → `via: "pack"`, `inherited: false`
+2. chaque entrée indexée sur chacun des critères de succès WCAG auxquels le critère correspond,
+   dans l’ordre des critères de succès propre au pack →
    `via: "wcag:<sc>"`, `inherited: true`
 
-**The marking is the point.** An inherited example is not the national standard's own
-doctrine, and a report that presented it as one would be making a claim nobody wrote. Every
-surface carries `inherited` / `via`, and each entry also carries `languagesAvailable` — the
-RGAA dataset is French-first, so an English caller must be told when an entry has no English
-text rather than handed French silently.
+**Le marquage est l’essentiel.** Un exemple hérité n’est pas la doctrine propre du référentiel
+national, et un rapport qui le présenterait comme tel avancerait une affirmation que personne n’a
+écrite. Chaque surface porte `inherited` / `via`, et chaque entrée porte aussi
+`languagesAvailable` — le jeu de données RGAA est d’abord en français, donc un appelant
+anglophone doit être averti quand une entrée n’a pas de texte anglais, plutôt que de recevoir du
+français en silence.
 
-`src/data/guidance/wcag.json` covers **all 55 AA success criteria**, so no criterion is
-without reachable guidance for any pack — including the ten RGAA 4.1.2 never covered, six of
-them added in WCAG 2.2 after RGAA (`wcagVersion: 2.1`) froze.
+`src/data/guidance/wcag.json` couvre **les 55 critères de succès AA**, de sorte qu’aucun critère
+n’est privé d’un guide accessible, quel que soit le pack — y compris les dix que le RGAA 4.1.2 n’a
+jamais couverts, dont six ajoutés dans les WCAG 2.2 après le gel du RGAA (`wcagVersion: 2.1`).
 
-**It is generated, never hand-written** — `scripts/build-guidance-wcag.mjs`, from the W3C's
-own documents:
+**Il est généré, jamais écrit à la main** — `scripts/build-guidance-wcag.mjs`, à partir des
+documents propres du W3C :
 
-| Field | Comes from |
+| Champ | Provient de |
 |---|---|
-| which techniques apply | `understanding/understanding.11tydata.js`, the W3C's machine-readable association map |
-| `summary` | the Understanding document's "In brief" block (Goal / What to do / Why), verbatim |
-| `good` | the first HTML or CSS code sample in a **sufficient technique** |
-| `bad` | the first one in a documented **failure** |
-| `note` | the technique's own title and id, so a reader can trace the sample upstream |
+| quelles techniques s’appliquent | `understanding/understanding.11tydata.js`, la table d’association lisible par machine du W3C |
+| `summary` | le bloc "In brief" du document Understanding (Goal / What to do / Why), mot pour mot |
+| `good` | le premier exemple de code HTML ou CSS d’une **technique suffisante** |
+| `bad` | le premier d’un **échec** documenté |
+| `note` | le titre et l’id propres de la technique, pour qu’un lecteur puisse remonter l’exemple à sa source |
 
-Selection is one uniform rule, not a per-criterion choice: technologies are taken in a fixed
-order (html, css, aria, script, general) and within a technology the W3C's own listing order
-decides. Preferring HTML matters — for 1.1.1 the first technique listed with a sample is
-ARIA6, whose example is a navigation landmark; H2's `alt=""` on an image link actually
-illustrates a text alternative.
+La sélection suit une règle uniforme, pas un choix par critère : les technologies sont prises
+dans un ordre fixe (html, css, aria, script, general) et, au sein d’une technologie, c’est l’ordre
+de la liste du W3C qui décide. Préférer le HTML compte — pour le 1.1.1, la première technique
+listée avec un exemple est ARIA6, dont l’exemple est un repère de navigation ; le `alt=""` de H2
+sur un lien image illustre réellement une alternative textuelle.
 
-Two consequences worth knowing:
+Deux conséquences à connaître :
 
-- **15 criteria carry a summary and no code sample.** 2.4.5 Multiple Ways and 2.5.7 Dragging
-  Movements are site-structure and behavioural matters the W3C documents in prose. An
-  invented snippet there would read as authoritative guidance nobody wrote.
-- **The summary is English-only.** Titles are bilingual (the authorized French translation
-  covers them) but the Understanding documents are not translated, and `languagesAvailable`
-  says so rather than shipping a French rendering nobody authorized.
+- **15 critères portent un résumé et aucun exemple de code.** 2.4.5 Accès multiples et 2.5.7
+  Mouvements de glissement relèvent de la structure du site et du comportement, que le W3C
+  documente en prose. Un extrait inventé à cet endroit se lirait comme un guide faisant autorité
+  que personne n’a écrit.
+- **Le résumé est uniquement en anglais.** Les titres sont bilingues (la traduction française
+  autorisée les couvre) mais les documents Understanding ne sont pas traduits, et
+  `languagesAvailable` le dit plutôt que de livrer une version française que personne n’a
+  autorisée.
 
-`pnpm run check:guidance:wcag` fails if the committed dataset does not reproduce from the
-vendored snapshot, and the daily `standards-refresh` workflow re-fetches the W3C source, so
-it cannot drift from the techniques it claims to reproduce.
+`pnpm run check:guidance:wcag` échoue si le jeu de données commité ne se reproduit pas à partir de
+l’instantané vendorisé, et le workflow quotidien `standards-refresh` récupère à nouveau la source
+du W3C, de sorte qu’il ne peut pas diverger des techniques qu’il prétend reproduire.
 
-## Honesty rule — guidance is NOT a free detector
+## Règle d’honnêteté — le guide n’est PAS un détecteur gratuit
 
-A pattern earns a **WCAG-core detector** only when it is both statically decidable **and**
-maps to a success criterion present in the WCAG 2.2 **AA** core. Everything else lives
-here as guidance (and, where the country standard covers it, in the pack), never as a
-silent "conforming".
+Un motif ne mérite un **détecteur du cœur WCAG** que s’il est à la fois décidable statiquement
+**et** correspond à un critère de succès présent dans le cœur **AA** des WCAG 2.2. Tout le reste
+vit ici comme guide (et, quand le référentiel national le couvre, dans le pack), jamais comme un
+« conforme » silencieux.
 
-The headline example: **opening a new window** (`target="_blank"` without warning). Its
-only clean WCAG home is **3.2.5 Change on Request — which is AAA, absent from the AA
-core** (the dataset jumps 3.2.4 → 3.2.6). So ultra11y does **not** ship a WCAG-core
-detector for it — no static rule flags `target="_blank"` under any standard. It ships as
-RGAA guidance (criterion 13.2 → WCAG 3.2.1): look it up with `criteria 13.2`,
-and it attaches to the relevant `prd`/`report` entry — it is never raised as an audit
-non-conformity, and never force-mapped onto a wrong AA criterion. (`--standard` is a
-`report`/`prd`/`criteria` flag, not an `audit` one.) Judgment- and
-rendering-dependent rules (alt relevance, computed contrast, reading order) stay guidance
-+ residual risk for the same reason.
+L’exemple phare : **l’ouverture d’une nouvelle fenêtre** (`target="_blank"` sans avertissement).
+Son seul rattachement WCAG propre est le **3.2.5 Changement à la demande — qui est AAA, absent du
+cœur AA** (le jeu de données saute de 3.2.4 à 3.2.6). ultra11y ne livre donc **pas** de détecteur
+du cœur WCAG pour ce cas — aucune règle statique ne signale `target="_blank"`, quel que soit le
+référentiel. Il est livré comme guide RGAA (critère 13.2 → WCAG 3.2.1) : consultez-le avec
+`criteria 13.2`, et il se rattache à l’entrée `prd`/`report` concernée — il n’est jamais soulevé
+comme non-conformité d’audit, et jamais rattaché de force à un mauvais critère AA. (`--standard`
+est un flag de `report`/`prd`/`criteria`, pas d’`audit`.) Les règles qui dépendent du jugement et
+du rendu (pertinence de l’alternative, contraste calculé, ordre de lecture) restent du guide
++ risque résiduel pour la même raison.
 
 ## Attribution
 
-RGAA 4.1.2 © DINUM — Licence Ouverte / Etalab 2.0. The before/after implementation
-patterns are adapted from SocialGouv/skills (`rgaa-html-css`) and the official RGAA
-méthode; the dataset stores short derived summaries + minimal examples, not verbatim prose
-(see `NOTICE`). When ingesting another source, record its license and attribution in the
-dataset header and `NOTICE` before redistributing any text.
+RGAA 4.1.2 © DINUM — Licence Ouverte / Etalab 2.0. Les motifs d’implémentation avant/après sont
+adaptés de SocialGouv/skills (`rgaa-html-css`) et de la méthode RGAA officielle ; le jeu de
+données stocke de courts résumés dérivés + des exemples minimaux, pas de la prose reprise mot
+pour mot (voir `NOTICE`). Lors de l’ingestion d’une autre source, consignez sa licence et son
+attribution dans l’en-tête du jeu de données et dans `NOTICE` avant de redistribuer le moindre
+texte.

@@ -1,27 +1,30 @@
-# The standard — RGAA 4.1.2, with WCAG as its mapping
+# Le référentiel — RGAA 4.1.2, avec WCAG comme correspondance
 
-ultra11y audits against **RGAA 4.1.2**, the French State's accessibility standard (13
-thématiques, 106 critères, © DINUM, Licence Ouverte / Etalab 2.0). It is the default and the
-only standard: every report, grid, rate, ticket and PRD speaks RGAA. `--standard rgaa` is
-accepted for scripts that pass it; `--standard wcag` was removed and exits 2.
+ultra11y audite au regard du **RGAA 4.1.2**, le référentiel d’accessibilité de l’État français (13
+thématiques, 106 critères, © DINUM, Licence Ouverte / Etalab 2.0). C’est le référentiel par
+défaut et le seul : chaque rapport, grille, taux, ticket et PRD parle RGAA. `--standard rgaa` est
+accepté pour les scripts qui le passent ; `--standard wcag` a été supprimé et sort avec le code 2.
 
-## Model
+## Modèle
 
-- **RGAA is what a reader sees.** Each RGAA criterion cites the WCAG success criteria it maps
-  onto, and that is the only place WCAG appears in an output: « RGAA 1.1 (WCAG 1.1.1) ».
-- **WCAG 2.2 AA is internal plumbing.** The engine's rules are keyed by WCAG success criterion
-  (55 SC, Level A + AA, derived from the W3C source), `adjudication.json` is WCAG-keyed, and
-  `derivePackResults` projects those results onto the RGAA criteria with the NC-dominates rule
-  and each criterion's own `appliesTo` scoping. The audit JSON carries that core under `core`,
-  where no rendering looks.
-- **French WCAG titles are the official W3C AUTHORIZED translation**
-  (https://www.w3.org/Translations/WCAG22-fr/, vendored at `scripts/vendor/wcag-2.2-fr.json`),
-  so even the mapping cites normative wording, never a machine translation.
-- **Out-of-core mappings are explicit.** An RGAA criterion whose mapping is entirely outside the
-  AA core derives as **out of engine scope** — status `manual` with a dedicated justification,
-  never a silent NA. Shipped example: **RGAA 8.1** (doctype → the removed WCAG 4.1.1).
+- **Le RGAA est ce que voit le lecteur.** Chaque critère RGAA cite les critères de succès WCAG
+  auxquels il correspond, et c’est le seul endroit où WCAG apparaît dans une sortie :
+  « RGAA 1.1 (WCAG 1.1.1) ».
+- **WCAG 2.2 AA est la tuyauterie interne.** Les règles du moteur sont indexées par critère de
+  succès WCAG (55 critères de succès, niveaux A + AA, dérivés de la source du W3C),
+  `adjudication.json` est indexé par WCAG, et `derivePackResults` projette ces résultats sur les
+  critères RGAA avec la règle « NC l’emporte » et le périmètre `appliesTo` propre à chaque
+  critère. Le JSON d’audit porte ce cœur sous `core`, là où aucun rendu ne regarde.
+- **Les titres WCAG en français sont la traduction officielle AUTORISÉE du W3C**
+  (https://www.w3.org/Translations/WCAG22-fr/, embarquée dans `scripts/vendor/wcag-2.2-fr.json`),
+  si bien que même la correspondance cite une formulation normative, jamais une traduction
+  automatique.
+- **Les correspondances hors du cœur sont explicites.** Un critère RGAA dont la correspondance
+  est entièrement hors du cœur AA est dérivé comme **hors du périmètre du moteur** — statut
+  `manual` avec une justification dédiée, jamais un NA silencieux. Exemple livré : **RGAA 8.1**
+  (doctype → le WCAG 4.1.1 supprimé).
 
-## Reference lookup
+## Consultation du référentiel
 
 ```
 node scripts/ultra11y.mjs criteria --theme 1          # an RGAA thématique
@@ -31,14 +34,16 @@ node scripts/ultra11y.mjs criteria 1.4.3              # a WCAG mapping target, w
 node scripts/ultra11y.mjs criteria --plan             # the work plan per evidence tier
 ```
 
-`criteria --plan` gives, for each evidence tier (source, cross-file, rendered page, browser,
-judgment, out of scope), how many RGAA criteria it is the cheapest tier to prove conformant —
-read from the engine's own rule applicability, not from the wording. 104 of 106 need more than
-source to earn C. `--json` gives the same plan as data.
+`criteria --plan` donne, pour chaque niveau de preuve (source, inter-fichiers, page rendue,
+navigateur, jugement, hors périmètre), le nombre de critères RGAA pour lesquels c’est le niveau
+le moins coûteux pour prouver la conformité — lu depuis l’applicabilité des règles du moteur
+lui-même, pas depuis la formulation. 104 critères sur 106 demandent plus que la source pour
+obtenir C. `--json` donne le même plan sous forme de données.
 
-## Auditor vocabulary
+## Vocabulaire de l’auditeur
 
-The `prd` **auditor block** and the **tickets** speak RGAA's own nouns: Thématique, Critère,
-Test, Conforme (C), Non conforme (NC), Non applicable (NA), « Critère d'accessibilité ».
-`--lang fr|en` picks the locale; resolution lives in `src/standards/vocabulary.ts` and the RGAA
-terms are set in `scripts/build-pack-rgaa.mjs`.
+Le **bloc auditeur** du `prd` et les **tickets** parlent avec les noms propres au RGAA :
+Thématique, Critère, Test, Conforme (C), Non conforme (NC), Non applicable (NA), « Critère
+d'accessibilité ». `--lang fr|en` choisit la locale ; la résolution se trouve dans
+`src/standards/vocabulary.ts` et les termes RGAA sont définis dans
+`scripts/build-pack-rgaa.mjs`.

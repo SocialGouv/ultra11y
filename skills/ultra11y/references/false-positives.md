@@ -1,81 +1,91 @@
-# Known false-positive traps — what to scrutinise before trusting a finding
+# Pièges connus de faux positifs — ce qu’il faut examiner avant de se fier à un constat
 
-The static engine reads SOURCE, not the rendered DOM. On component-based code that
-creates a few predictable false-positive (FP) classes. The engine now **auto-suppresses**
-most of them; this page tells you (the agent) where it still cannot be sure, so you can
-**confirm or refute** instead of trusting blindly. Run the refutation loop:
-`verify --report <md> [--semantic]` → rule each item against the cited `file:line` →
-`verify --apply <verdicts.json>` (refuted/unsupported entries fail the gate).
+Le moteur statique lit la SOURCE, pas le DOM rendu. Sur du code à base de composants, cela crée
+quelques classes prévisibles de faux positifs (FP). Le moteur **supprime désormais
+automatiquement** la plupart d’entre eux ; cette page vous indique (à vous, l’agent) où il ne peut
+toujours pas être sûr, afin que vous puissiez **confirmer ou réfuter** au lieu de faire
+aveuglément confiance. Lancez la boucle de contre-vérification :
+`verify --report <md> [--semantic]` → tranchez chaque élément au regard du `file:line` cité →
+`verify --apply <verdicts.json>` (les entrées refuted/unsupported font échouer le garde-fou).
 
-## How the engine already protects you
+## Comment le moteur vous protège déjà
 
-- **Components are skipped.** A PascalCase tag (`<Button>`, `<HistoryEntry>`) keeps its
-  case in JSX **and** in `.vue/.svelte/.astro` (parsed with case preserved). Single-file
-  rules only fire on intrinsic HTML tags, so a component child of `<ul>`, a `<Select>`,
-  or a `role` prop on `<UChatMessage>` is no longer mis-flagged.
-- **Injected content is not "empty".** A `<slot>`, `{@render children()}`, `{children}`,
-  or a child component means the name/content/options may be supplied at runtime —
-  `empty-heading`, `button-empty-name`, `link-empty-name`, `select-has-option`,
-  `list-structure`, `data-table-no-headers` and `h1-missing` all bail instead of asserting.
-- **Dynamic bindings/values count as present, never invalid.** `:aria-label`,
-  `v-bind:aria-label`, `bind:value`, `:alt`, `:scope` (Vue/Svelte/Alpine) are read as
-  "present, value unknown"; a dynamic `role={…}` is skipped (not parsed as a bogus role);
-  a `v-bind="…"` / `{...rest}` / `{shorthand}` spread suppresses missing-name/label/alt.
-- **Cross-file references resolve under `--graph`.** An `aria-controls`/`for`/heading
-  target defined in another file (including a `const X = "id"; id={X}`) is proven to exist
-  and the finding is suppressed; an icon-only component whose definition supplies its own
-  `aria-label` is not flagged "unnamed". **Always run component code with `--graph`.**
-- **Conditional branches & interleaved components aren't crossed.** Headings in different
-  arms of `{cond ? … : …}` are mutually exclusive, and a child component between two
-  headings may inject an intermediate one — so `heading-order-skip` won't compare across them.
-- **Framework shell templates are recognized.** A SPA mount shell (`<div id="app"></div>`)
-  or a build placeholder (`%sveltekit.body%`/`%sveltekit.head%`, `{{ }}`, `<%= %>`) means
-  the real content/title is injected later — `h1-missing`/`title-missing-empty` don't fire.
-- **Slot-projected required content is not "missing".** A `<slot>`/`{@render children()}`
-  passthrough suppresses `fieldset-legend-missing` and `aria-required-children`; `<th>` in a
-  `<thead>` carries implicit column scope.
-- **Test/story markup is out of scope by default.** `*.test.*`, `*.spec.*`, `*.stories.*`
-  and `__tests__/` are excluded (bad-by-design fixtures). Re-include with
-  `--no-default-excludes` or by naming the file.
+- **Les composants sont ignorés.** Une balise en PascalCase (`<Button>`, `<HistoryEntry>`) garde
+  sa casse en JSX **et** dans les `.vue/.svelte/.astro` (analysés en conservant la casse). Les
+  règles par fichier ne se déclenchent que sur les balises HTML intrinsèques, donc un composant
+  enfant de `<ul>`, un `<Select>` ou une prop `role` sur `<UChatMessage>` n’est plus signalé à
+  tort.
+- **Le contenu injecté n’est pas « vide ».** Un `<slot>`, `{@render children()}`, `{children}`
+  ou un composant enfant signifie que le nom/le contenu/les options peuvent être fournis à
+  l’exécution — `empty-heading`, `button-empty-name`, `link-empty-name`, `select-has-option`,
+  `list-structure`, `data-table-no-headers` et `h1-missing` renoncent tous au lieu d’affirmer.
+- **Les liaisons/valeurs dynamiques comptent comme présentes, jamais comme invalides.**
+  `:aria-label`, `v-bind:aria-label`, `bind:value`, `:alt`, `:scope` (Vue/Svelte/Alpine) sont lus
+  comme « présent, valeur inconnue » ; un `role={…}` dynamique est ignoré (pas analysé comme un
+  rôle bidon) ; une propagation `v-bind="…"` / `{...rest}` / `{shorthand}` supprime les
+  nom/étiquette/alternative manquants.
+- **Les références inter-fichiers se résolvent sous `--graph`.** Une cible
+  `aria-controls`/`for`/de titre définie dans un autre fichier (y compris un
+  `const X = "id"; id={X}`) est prouvée exister et le constat est supprimé ; un composant composé
+  uniquement d’une icône dont la définition fournit son propre `aria-label` n’est pas signalé
+  « sans nom ». **Lancez toujours le code de composants avec `--graph`.**
+- **Les branches conditionnelles et les composants intercalés ne sont pas traversés.** Des titres
+  situés dans des bras différents de `{cond ? … : …}` s’excluent mutuellement, et un composant
+  enfant entre deux titres peut en injecter un intermédiaire — donc `heading-order-skip` ne
+  compare pas à travers eux.
+- **Les gabarits d’enveloppe des frameworks sont reconnus.** Une enveloppe de montage de SPA
+  (`<div id="app"></div>`) ou un espace réservé de build (`%sveltekit.body%`/`%sveltekit.head%`,
+  `{{ }}`, `<%= %>`) signifie que le vrai contenu/titre est injecté plus tard —
+  `h1-missing`/`title-missing-empty` ne se déclenchent pas.
+- **Le contenu requis projeté par un slot n’est pas « manquant ».** Un passe-plat
+  `<slot>`/`{@render children()}` supprime `fieldset-legend-missing` et `aria-required-children` ;
+  un `<th>` dans un `<thead>` porte une portée de colonne implicite.
+- **Le balisage de test/story est hors périmètre par défaut.** `*.test.*`, `*.spec.*`,
+  `*.stories.*` et `__tests__/` sont exclus (fixtures mauvaises à dessein). Réincluez-les avec
+  `--no-default-excludes` ou en nommant le fichier.
 
-## Where the AI agent must still adjudicate
+## Là où l’agent IA doit encore arbitrer
 
-A finding's `preliminary: true` (in `--json`) and a `scope.sourceTemplate` / `scope.rendered`
-caveat in the report mean **the verdict is provisional** — the AI agent confirms it against the
-rendered output (rendering criteria go to `scan`), recording a verdict either way.
+Un `preliminary: true` sur un constat (dans `--json`) et une réserve `scope.sourceTemplate` /
+`scope.rendered` dans le rapport signifient que **le verdict est provisoire** — l’agent IA le
+confirme au regard de la sortie rendue (les critères de rendu vont vers `scan`), et consigne un
+verdict dans un sens comme dans l’autre.
 
-| Rule / situation | Why it may still be wrong | How to confirm or refute |
+| Règle / situation | Pourquoi elle peut encore se tromper | Comment confirmer ou réfuter |
 |---|---|---|
-| Any finding on `.vue/.svelte/.astro` SOURCE | Slots, snippets, `{#if}`, `v-for`, scoped logic and provide/inject are invisible to the template parser | Audit the **rendered** HTML (Storybook/build output) or `scan` a live page; refute the source finding if the rendered DOM is conformant |
-| Any finding on library-rendered JSX (DSFR/MUI…) | The component's produced HTML lives in `node_modules` | `render` → build/SSR → `audit` the output, or `scan` |
-| `control-label-missing` in an SFC | The label may be wired via provide/inject or a sibling `<Label>` component the parser can't link | Read the form component + its field wrapper; refute if a programmatic label exists at render |
-| `heading-order-skip` via `{#if}`/`v-if` in SFCs (no AST) | SFC conditionals are opaque text, so arms can't be separated like in JSX | Reason about each render path; flag only a skip that occurs in a single path |
-| `contrast` (1.4.3), focus, zoom, reflow | Needs computed styles | `scan` (browser tier) — never decide from source |
-| `aria-*` referencing a runtime-built id (`id={`\`x-${i}\``}`) | The id is dynamic; cross-file resolution only handles `const` string ids | Read the component; refute if the id is generated and wired correctly |
+| Tout constat sur une SOURCE `.vue/.svelte/.astro` | Slots, snippets, `{#if}`, `v-for`, logique scopée et provide/inject sont invisibles pour le parseur de gabarits | Auditez le HTML **rendu** (sortie Storybook/build) ou faites un `scan` d’une page en ligne ; réfutez le constat sur la source si le DOM rendu est conforme |
+| Tout constat sur du JSX rendu par une bibliothèque (DSFR/MUI…) | Le HTML produit par le composant vit dans `node_modules` | `render` → build/SSR → `audit` de la sortie, ou `scan` |
+| `control-label-missing` dans un SFC | L’étiquette peut être reliée via provide/inject ou un composant `<Label>` voisin que le parseur ne sait pas lier | Lisez le composant de formulaire + son wrapper de champ ; réfutez si une étiquette programmatique existe au rendu |
+| `heading-order-skip` via `{#if}`/`v-if` dans les SFC (pas d’AST) | Les conditions des SFC sont du texte opaque, donc les bras ne peuvent pas être séparés comme en JSX | Raisonnez sur chaque chemin de rendu ; ne signalez qu’un saut qui se produit dans un seul chemin |
+| `contrast` (1.4.3), focus, zoom, redistribution | Nécessite les styles calculés | `scan` (niveau navigateur) — ne tranchez jamais à partir de la source |
+| `aria-*` qui référence un id construit à l’exécution (`id={`\`x-${i}\``}`) | L’id est dynamique ; la résolution inter-fichiers ne gère que les ids de type chaîne `const` | Lisez le composant ; réfutez si l’id est généré et relié correctement |
 
-## Normativity false positives — a "problem" with no failing normative test
+## Faux positifs de normativité — un « problème » sans test normatif en échec
 
-A finding can cite a real element yet still not be a **non-conformity**, because no test of
-the active standard actually fails. These were the professional-auditor + official-Ara
-corrections against ultra11y's own RGAA audit of egapro; each is now handled as a
-**recommendation (non-normative)** or suppressed outright — never a normative NC.
+Un constat peut citer un élément réel sans pour autant être une **non-conformité**, parce
+qu’aucun test du référentiel actif n’échoue réellement. Ce sont les corrections d’un auditeur
+professionnel + de l’Ara officiel apportées à l’audit RGAA d’egapro réalisé par ultra11y
+lui-même ; chacune est désormais traitée comme une **recommandation (non normative)** ou
+supprimée purement et simplement — jamais comme une NC normative.
 
-| Case | Why it is NOT an NC | Current handling |
+| Cas | Pourquoi ce n’est PAS une NC | Traitement actuel |
 |---|---|---|
-| An **empty `<th>`** (layout/spacer header cell) | No RGAA/WCAG test says every `<th>` must have content; a best-practice-only axe `empty-table-header` violation carries no `wcag*` tag | merges as **advisory**, attaches to no criterion as NC |
-| A **download link** (`…report.pdf`) whose text doesn't name the format/weight | Good practice (DSFR), but no failing normative test under 6.1/2.4.4 | the RGAA `download-link-format` pack rule is **`advisory: true`** → « Recommandation (non normative) », never flips 6.1 |
-| **Two `<h1>`** on a page / a page **starting at `<h2>`** | "one `<h1>` per page" is not a rule in HTML, a11y, or SEO; no heading-order skip occurs | `h1-multiple` / `h1-missing` are **advisory** (no normative NC) |
-| A **lorem-ipsum tooltip** | Content-quality (UX), not accessibility | emits **no finding** |
+| Un **`<th>` vide** (cellule d’en-tête de mise en page/d’espacement) | Aucun test RGAA/WCAG ne dit que chaque `<th>` doit avoir un contenu ; une violation axe `empty-table-header` relevant uniquement des bonnes pratiques ne porte aucune étiquette `wcag*` | fusionnée comme **consultative**, rattachée à aucun critère comme NC |
+| Un **lien de téléchargement** (`…report.pdf`) dont le texte n’indique pas le format/le poids | Bonne pratique (DSFR), mais aucun test normatif en échec sous 6.1/2.4.4 | la règle de pack RGAA `download-link-format` est **`advisory: true`** → « Recommandation (non normative) », ne fait jamais basculer le 6.1 |
+| **Deux `<h1>`** sur une page / une page **qui commence à `<h2>`** | « un seul `<h1>` par page » n’est une règle ni en HTML, ni en accessibilité, ni en SEO ; aucun saut dans l’ordre des titres ne se produit | `h1-multiple` / `h1-missing` sont **consultatives** (pas de NC normative) |
+| Une **infobulle en lorem ipsum** | Qualité du contenu (UX), pas accessibilité | n’émet **aucun constat** |
 
-The distinction is the same one you apply in the judgment phase (`references/judgment.md`):
-an **NC needs a `normativeRef`** citing the precise failed test of the active standard; a
-good practice without one is a `recommendations[]` entry, and a pure UX concern is neither.
-When you adjudicate, don't "promote" a recommendation to an NC to look thorough.
+La distinction est la même que celle que vous appliquez dans la phase de jugement
+(`references/judgment.md`) : une **NC a besoin d’un `normativeRef`** qui cite le test précis en
+échec du référentiel actif ; une bonne pratique sans lui est une entrée de
+`recommendations[]`, et une pure préoccupation UX n’est ni l’un ni l’autre. Quand vous arbitrez,
+ne « promouvez » pas une recommandation en NC pour paraître exhaustif.
 
-## The rule of thumb
+## La règle empirique
 
-The engine raises **confirmed candidates**, never silent conformance. When a finding is
-`preliminary`, or sits on SFC/library source, treat it as "verify, don't trust": open the
-`file:line`, check whether the missing thing is injected/rendered elsewhere, and record a
-`supported`/`refuted` verdict via `verify --apply`. A refuted finding is dropped — that is
-the anti-hallucination contract working as intended.
+Le moteur soulève des **candidats confirmés**, jamais une conformité silencieuse. Quand un
+constat est `preliminary`, ou porte sur une source de SFC/de bibliothèque, traitez-le selon le
+principe « vérifier, ne pas faire confiance » : ouvrez le `file:line`, vérifiez si l’élément
+manquant est injecté/rendu ailleurs, et consignez un verdict `supported`/`refuted` via
+`verify --apply`. Un constat réfuté est abandonné — c’est le contrat anti-hallucination qui
+fonctionne comme prévu.

@@ -1,27 +1,27 @@
-# Where this runs — Claude Code, Codex CLI, OpenCode, and everything else
+# Où cela s’exécute — Claude Code, Codex CLI, OpenCode, et tout le reste
 
-The skills speak in **actions** — run the engine, invoke the review skill, adjudicate the
-findings. On each harness those resolve as below. Only the **deltas** are listed; anything
-not mentioned here is identical everywhere, because the engine is one zero-dependency
-bundle and the CLI it exposes is the same on all of them.
+Les skills parlent en **actions** — lancer le moteur, invoquer la skill de revue, arbitrer les
+constats. Sur chaque harness, elles se résolvent comme ci-dessous. Seules les **différences** sont
+listées ; tout ce qui n’est pas mentionné ici est identique partout, parce que le moteur est un seul
+bundle sans dépendance et que la CLI qu’il expose est la même sur tous.
 
-Three things are worth knowing before the table:
+Trois choses sont bonnes à savoir avant le tableau :
 
-- **The full audit is the same everywhere.** A requested full or detailed audit follows
-  `references/full-audit.md` on every harness: the active session is the auditor, rules on the
-  worklists directly (or fans them out to subagents where the harness has them, see
-  `references/orchestration.md`), then publishes the evidenced Markdown, HTML and per-page
-  dossiers and passes the `check` gates. The engine runs no model of its own; in CI the
-  unattended caller is iterion's `rgaa-audit` bot (`references/ci.md`). Only the engine's path
-  differs (below).
+- **L’audit complet est le même partout.** Un audit complet ou détaillé demandé suit
+  `references/full-audit.md` sur chaque harness : la session active est l’auditeur, statue directement
+  sur les listes de travail (ou les distribue à des sous-agents là où le harness en dispose, voir
+  `references/orchestration.md`), puis publie le Markdown, le HTML et les dossiers par page étayés de
+  preuves, et passe les garde-fous `check`. Le moteur n’exécute aucun modèle qui lui soit propre ; en
+  CI, l’appelant sans surveillance est le bot `rgaa-audit` d’iterion (`references/ci.md`). Seul le
+  chemin du moteur diffère (ci-dessous).
 
-- **No harness has a git event.** None of them can hook "about to commit". So the automatic
-  review rides the *shell tool* on every one of them, recognising the commands that publish
-  work — `git commit`, `git push`, `gh pr create`. That is a deliberate design constraint,
-  not a Claude Code quirk.
-- **A hook cannot force a skill to be invoked.** It blocks the command and hands over the
-  reason and the findings; the agent is what invokes `review-a11y`. In practice a motivated
-  block is enough — it is not a guarantee, on any harness.
+- **Aucun harness n’a d’événement git.** Aucun ne peut se brancher sur « sur le point de commiter ».
+  La revue automatique s’appuie donc sur l’*outil shell* de chacun d’eux, en reconnaissant les
+  commandes qui publient du travail — `git commit`, `git push`, `gh pr create`. C’est une contrainte de
+  conception délibérée, pas une bizarrerie de Claude Code.
+- **Un hook ne peut pas forcer l’invocation d’une skill.** Il bloque la commande et transmet le motif
+  et les constats ; c’est l’agent qui invoque `review-a11y`. En pratique, un blocage motivé suffit — ce
+  n’est une garantie sur aucun harness.
 
 ## Claude Code
 
@@ -30,18 +30,18 @@ Three things are worth knowing before the table:
 /plugin install ultra11y@ultra11y
 ```
 
-The plugin carries both skills *and* the hook. `hooks/hooks.json` → `hooks/pre-tool-use.mjs`
-→ `ultra11y hook --claude-code`. The engine resolves from `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
-Claude Code's own fan-out tools are the Agent tool and, where available, the Workflow tool
-that runs the `orchestrate`-emitted `*.workflow.mjs` scripts (Claude Code only). Every harness,
-Claude Code included, can instead hand the per-batch prompt files `orchestrate` writes to its
-own subagents (`references/orchestration.md`).
+Le plugin embarque les deux skills *et* le hook. `hooks/hooks.json` → `hooks/pre-tool-use.mjs`
+→ `ultra11y hook --claude-code`. Le moteur se résout depuis `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
+Les outils de distribution propres à Claude Code sont l’outil Agent et, là où il est disponible,
+l’outil Workflow qui exécute les scripts `*.workflow.mjs` émis par `orchestrate` (Claude Code
+uniquement). Chaque harness, Claude Code compris, peut à la place transmettre à ses propres
+sous-agents les fichiers de prompt par lot qu’écrit `orchestrate` (`references/orchestration.md`).
 
-The review arrives as `permissionDecision: "deny"` on the pending command, with the findings
-in `additionalContext`.
+La revue arrive sous la forme d’un `permissionDecision: "deny"` sur la commande en attente, avec les
+constats dans `additionalContext`.
 
-Skills only, no hook: `npx skills add SocialGouv/ultra11y`. Gate only, for an npm install:
-`ultra11y install --claude-code`.
+Skills seules, sans hook : `npx skills add SocialGouv/ultra11y`. Garde-fou seul, pour une installation
+npm : `ultra11y install --claude-code`.
 
 ## OpenAI Codex CLI
 
@@ -50,144 +50,148 @@ codex plugin marketplace add SocialGouv/ultra11y
 codex plugin add ultra11y@ultra11y
 ```
 
-Codex's hook engine is a near-clone of Claude Code's — same events, same payload fields,
-same `hookSpecificOutput` envelope — and it exports `${CLAUDE_PLUGIN_ROOT}` alongside its own
-`${PLUGIN_ROOT}`, so **`hooks/hooks.json` is shared verbatim** between the two.
+Le moteur de hooks de Codex est un quasi-clone de celui de Claude Code — mêmes événements, mêmes
+champs de payload, même enveloppe `hookSpecificOutput` — et il exporte `${CLAUDE_PLUGIN_ROOT}` à côté
+de son propre `${PLUGIN_ROOT}`, donc **`hooks/hooks.json` est partagé tel quel** entre les deux.
 
-The deltas that actually matter:
+Les différences qui comptent vraiment :
 
-- Its shell tool varies by build. Codex 0.172 offers the model `exec_command` and hands the
-  hook `tool_name: "Bash"` with a string `command`, exactly as Claude Code does. Older builds
-  used **`shell`** with an **argv array** (`["bash","-lc","git commit -m x"]`). `commandOf`
-  in `src/hook.ts` extracts the script argument rather than joining the array, because
-  joining would put `git` off a command position and the gate would silently never fire.
-  The matcher in `hooks/hooks.json` covers every one of these names.
-- On `PreToolUse` Codex accepts **only** `permissionDecision: "deny"`, with a non-empty
-  reason. That is exactly and only what this engine emits, so the envelope needs no branch.
-- `.codex-plugin/plugin.json` must not declare `hooks` — Codex's manifest validator rejects
-  any key outside its allowlist. `hooks/hooks.json` is found by convention at the plugin root.
-- Hooks sit behind a feature flag: **`[features] hooks = true`** in `~/.codex/config.toml`.
-  Codex 0.172 lists `hooks` as stable and on by default (`codex features list`), and older
-  builds still need the line.
-- Codex asks you to **trust** a hook command the first time it fires. Accept it, or review
-  it with `/hooks`. An untrusted hook does not run, and nothing says so: `codex exec` runs the
-  command as if no hook existed. Headless automation that already vets its hooks passes
-  `codex exec --dangerously-bypass-hook-trust`, which is what the `codex-smoke` CI job does.
-- A local marketplace (`codex plugin marketplace add ./path`) is installed from that
-  repository's **git HEAD**, not its working tree. Commit a change to `hooks/` before
-  reinstalling it to try it out.
+- Son outil shell varie selon la version. Codex 0.172 propose au modèle `exec_command` et transmet au
+  hook `tool_name: "Bash"` avec une `command` sous forme de chaîne, exactement comme Claude Code. Les
+  versions plus anciennes utilisaient **`shell`** avec un **tableau argv**
+  (`["bash","-lc","git commit -m x"]`). `commandOf` dans `src/hook.ts` extrait l’argument du script
+  plutôt que de joindre le tableau, parce que la jointure placerait `git` hors d’une position de
+  commande et que le garde-fou ne se déclencherait silencieusement jamais. Le matcher de
+  `hooks/hooks.json` couvre chacun de ces noms.
+- Sur `PreToolUse`, Codex n’accepte **que** `permissionDecision: "deny"`, avec un motif non vide.
+  C’est exactement et uniquement ce qu’émet ce moteur, donc l’enveloppe n’a besoin d’aucune branche.
+- `.codex-plugin/plugin.json` ne doit pas déclarer `hooks` — le validateur de manifeste de Codex
+  rejette toute clé hors de sa liste autorisée. `hooks/hooks.json` est trouvé par convention à la
+  racine du plugin.
+- Les hooks sont derrière un feature flag : **`[features] hooks = true`** dans `~/.codex/config.toml`.
+  Codex 0.172 liste `hooks` comme stable et activé par défaut (`codex features list`), et les versions
+  plus anciennes ont toujours besoin de la ligne.
+- Codex vous demande de **faire confiance** à une commande de hook la première fois qu’elle se
+  déclenche. Acceptez-la, ou relisez-la avec `/hooks`. Un hook non approuvé ne s’exécute pas, et rien
+  ne le signale : `codex exec` exécute la commande comme si aucun hook n’existait. L’automatisation
+  headless qui contrôle déjà ses hooks passe `codex exec --dangerously-bypass-hook-trust`, ce que fait
+  le job de CI `codex-smoke`.
+- Une marketplace locale (`codex plugin marketplace add ./path`) est installée depuis le **HEAD git**
+  de ce dépôt, pas depuis son arbre de travail. Commitez une modification de `hooks/` avant de la
+  réinstaller pour l’essayer.
 
-Gate only, without the marketplace: `ultra11y install --codex` (it sets the feature flag and
-copies both skills into `~/.codex/skills/`, or `$CODEX_HOME/skills/`). The engine then resolves
-from the installed skill directory's `scripts/ultra11y.mjs` — the plugin's copy, or
-`~/.codex/skills/ultra11y/scripts/ultra11y.mjs` after `install --codex`.
+Garde-fou seul, sans la marketplace : `ultra11y install --codex` (il active le feature flag et copie
+les deux skills dans `~/.codex/skills/`, ou `$CODEX_HOME/skills/`). Le moteur se résout alors depuis le
+`scripts/ultra11y.mjs` du répertoire de skill installé — la copie du plugin, ou
+`~/.codex/skills/ultra11y/scripts/ultra11y.mjs` après `install --codex`.
 
-CI checks both routes in a real Codex (`tests/codex-smoke.e2e.test.ts`, `pnpm test:codex`). It
-installs a pinned Codex CLI into a throwaway `CODEX_HOME`, then has `codex exec` run `git commit`
-on a staged blocking finding against a local mock of the Responses API, with no login and no
-model. The test checks that the hook resolves `${CLAUDE_PLUGIN_ROOT}` to the installed plugin,
-that it denies the commit and that no commit lands. It also checks that the retry in the same
-session (`codex exec resume`) goes through.
+La CI vérifie les deux voies dans un vrai Codex (`tests/codex-smoke.e2e.test.ts`, `pnpm test:codex`).
+Elle installe une Codex CLI épinglée dans un `CODEX_HOME` jetable, puis fait exécuter par `codex exec`
+un `git commit` sur un constat bloquant indexé, contre un mock local de l’API Responses, sans
+connexion ni modèle. Le test vérifie que le hook résout `${CLAUDE_PLUGIN_ROOT}` vers le plugin
+installé, qu’il refuse le commit et qu’aucun commit n’atterrit. Il vérifie aussi que la nouvelle
+tentative dans la même session (`codex exec resume`) passe.
 
-### The browser tier under the Codex sandbox
+### Le niveau navigateur sous le sandbox de Codex
 
-`scan` launches Chromium and loads the pages it audits. Here is what was measured with Codex
-CLI 0.172.0 on macOS (Seatbelt), scanning a page served on `127.0.0.1`:
+`scan` lance Chromium et charge les pages qu’il audite. Voici ce qui a été mesuré avec Codex
+CLI 0.172.0 sur macOS (Seatbelt), en scannant une page servie sur `127.0.0.1` :
 
-| how the command ran | result |
+| comment la commande a été lancée | résultat |
 |---|---|
-| `--sandbox workspace-write` (the default for an agent that may edit) | **fails**: Chromium does not launch |
-| `--sandbox workspace-write -c sandbox_workspace_write.network_access=true` | **fails**, the same way |
-| `--sandbox danger-full-access` | runs |
+| `--sandbox workspace-write` (le défaut pour un agent qui peut modifier) | **échoue** : Chromium ne se lance pas |
+| `--sandbox workspace-write -c sandbox_workspace_write.network_access=true` | **échoue**, de la même façon |
+| `--sandbox danger-full-access` | fonctionne |
 
-Turning on network access does not help, because the sandbox stops Chromium before any page
-loads. `codex sandbox --log-denials -- node …/ultra11y.mjs scan <url>` shows why: Seatbelt
-refuses `mach-register org.chromium.Chromium.MachPortRendezvousServer.*` and the macOS
-services the browser looks up. The engine reports this as a browser it cannot launch ("…is not
-installed, and no installed Google Chrome was found either"). Under the sandbox that message
-does **not** mean anything is missing. So run the browser tier **outside the sandbox**:
+Activer l’accès réseau n’aide pas, parce que le sandbox arrête Chromium avant le chargement de toute
+page. `codex sandbox --log-denials -- node …/ultra11y.mjs scan <url>` montre pourquoi : Seatbelt
+refuse `mach-register org.chromium.Chromium.MachPortRendezvousServer.*` et les services macOS que le
+navigateur recherche. Le moteur le rapporte comme un navigateur qu’il ne peut pas lancer (« …is not
+installed, and no installed Google Chrome was found either »). Sous le sandbox, ce message ne signifie
+**pas** que quoi que ce soit manque. Lancez donc le niveau navigateur **hors du sandbox** :
 
-- start the session that scans with `codex --sandbox danger-full-access` (or set
-  `sandbox_mode = "danger-full-access"` in `~/.codex/config.toml`); or
-- keep `workspace-write`, start with `--ask-for-approval on-request`, and approve the
-  escalation when Codex asks to rerun `scan` outside the sandbox; or
-- run `scan` yourself in a terminal, then hand the agent the merged `audit-latest.json`.
+- démarrez la session qui scanne avec `codex --sandbox danger-full-access` (ou réglez
+  `sandbox_mode = "danger-full-access"` dans `~/.codex/config.toml`) ; ou
+- gardez `workspace-write`, démarrez avec `--ask-for-approval on-request`, et approuvez l’escalade
+  quand Codex demande de relancer `scan` hors du sandbox ; ou
+- lancez `scan` vous-même dans un terminal, puis transmettez à l’agent le `audit-latest.json` fusionné.
 
-`[sandbox_workspace_write] network_access = true` is still what a sandboxed command needs to
-reach the network at all, but it is not enough for Chromium. `render` and `report --evidence`
-launch the same Chromium; only `scan` was measured. Codex's Linux sandbox (bubblewrap and
-Landlock) was not measured. Treat it as unverified, and use the same workaround if `scan`
-reports that it cannot launch a browser.
+`[sandbox_workspace_write] network_access = true` reste ce dont une commande sandboxée a besoin pour
+atteindre le réseau tout court, mais cela ne suffit pas pour Chromium. `render` et `report --evidence`
+lancent le même Chromium ; seul `scan` a été mesuré. Le sandbox Linux de Codex (bubblewrap et
+Landlock) n’a pas été mesuré. Considérez-le comme non vérifié, et utilisez le même contournement si
+`scan` signale qu’il ne peut pas lancer de navigateur.
 
-## OpenCode (1.x and 2.x)
+## OpenCode (1.x et 2.x)
 
 ```
 ultra11y install --opencode                      # the major is asked of `opencode --version`
 ultra11y install --opencode --opencode-version 2 # …or stated
 ```
 
-OpenCode 2 replaced the plugin API, and V1 plugins do not run on it. ultra11y ships **one
-plugin file that both majors load**: OpenCode 2 reads its default export's `{ id, setup }`,
-OpenCode 1 (≥ 1.18.28) calls the `server()` on that same object, and older V1 releases call
-the named `Ultra11yPlugin`. The gate runs once per shell call on every one of them.
+OpenCode 2 a remplacé l’API de plugins, et les plugins V1 ne s’y exécutent pas. ultra11y livre **un
+seul fichier de plugin que les deux versions majeures chargent** : OpenCode 2 lit les `{ id, setup }`
+de son export par défaut, OpenCode 1 (≥ 1.18.28) appelle le `server()` de ce même objet, et les
+versions V1 plus anciennes appellent l’export nommé `Ultra11yPlugin`. Le garde-fou s’exécute une fois
+par appel shell sur chacune d’elles.
 
 | | OpenCode 1 | OpenCode 2 |
 |---|---|---|
-| `install --opencode` writes | `~/.config/opencode/plugin/ultra11y.js` | `~/.config/opencode/plugins/ultra11y.js` |
-| …or pin it in `opencode.json` | `"plugin": ["ultra11y@latest"]` | `"plugins": ["ultra11y@latest"]` |
-| the gate hooks | `tool.execute.before` on `bash` | `ctx.tool.hook("execute.before")` on `shell` |
-| the two skills are registered by | `config.skills.paths` | `ctx.skill.transform` |
+| `install --opencode` écrit | `~/.config/opencode/plugin/ultra11y.js` | `~/.config/opencode/plugins/ultra11y.js` |
+| …ou épinglez-le dans `opencode.json` | `"plugin": ["ultra11y@latest"]` | `"plugins": ["ultra11y@latest"]` |
+| le garde-fou se branche sur | `tool.execute.before` sur `bash` | `ctx.tool.hook("execute.before")` sur `shell` |
+| les deux skills sont enregistrées par | `config.skills.paths` | `ctx.skill.transform` |
 
-When no `opencode` is on PATH, the installer writes `plugin/`, which both majors read; an
-earlier copy of ours in the other directory is removed so the gate never loads twice. A pin
-in `opencode.json` and the file together would load it twice — the installer says so.
+Quand aucun `opencode` n’est sur le PATH, l’installateur écrit `plugin/`, que les deux versions
+majeures lisent ; une copie antérieure du nôtre dans l’autre répertoire est supprimée pour que le
+garde-fou ne se charge jamais deux fois. Un épinglage dans `opencode.json` et le fichier ensemble le
+chargeraient deux fois — l’installateur le signale.
 
-The delta: OpenCode has **no permission-decision channel**. Its plugin blocks a tool call by
-throwing, so the review arrives as a **failed shell call whose error message carries the
-findings**. Same content, different envelope — read the error, do not retry blindly.
+La différence : OpenCode n’a **aucun canal de décision de permission**. Son plugin bloque un appel
+d’outil en levant une exception, donc la revue arrive sous la forme d’un **appel shell en échec dont
+le message d’erreur porte les constats**. Même contenu, enveloppe différente — lisez l’erreur, ne
+réessayez pas à l’aveugle.
 
-The engine runs on the `node` from PATH (OpenCode itself is a Bun binary); with no Node
-there the gate is silent rather than broken. Skills also live under
-`~/.config/opencode/skills/` (honouring `$XDG_CONFIG_HOME`) once `install --opencode` has copied
-them there, and the engine resolves from that skill directory's `scripts/ultra11y.mjs` — or from
-the npm package's `skills/ultra11y/` when the plugin is pinned in `opencode.json`.
+Le moteur s’exécute sur le `node` du PATH (OpenCode lui-même est un binaire Bun) ; sans Node, le
+garde-fou est silencieux plutôt que cassé. Les skills vivent aussi sous `~/.config/opencode/skills/`
+(en respectant `$XDG_CONFIG_HOME`) une fois que `install --opencode` les y a copiées, et le moteur se
+résout depuis le `scripts/ultra11y.mjs` de ce répertoire de skill — ou depuis le
+`skills/ultra11y/` du paquet npm quand le plugin est épinglé dans `opencode.json`.
 
-## Everything else (Cursor, Amp, Zed, Gemini CLI, Windsurf, aider…)
+## Tout le reste (Cursor, Amp, Zed, Gemini CLI, Windsurf, aider…)
 
 ```
 ultra11y install --agents-md
 ```
 
-Writes a managed block into the repository's `AGENTS.md`. Be clear-eyed about what that is:
-there is no hook API, so **nothing is automatic**. The block makes the engine discoverable
-and hands over the adjudication protocol. What actually enforces anything on these harnesses
-is the repo's own gate — `ultra11y init --hook` (git pre-commit) — and, in CI, iterion's
-`rgaa-audit` bot.
+Écrit un bloc géré dans le `AGENTS.md` du dépôt. Soyez lucide sur ce que c’est : il n’y a pas d’API
+de hooks, donc **rien n’est automatique**. Le bloc rend le moteur découvrable et transmet le protocole
+d’arbitrage. Ce qui fait réellement respecter quoi que ce soit sur ces harness, c’est le garde-fou
+propre au dépôt — `ultra11y init --hook` (pre-commit git) — et, en CI, le bot `rgaa-audit` d’iterion.
 
-The criteria themselves are on the CLI on every harness: `criteria <id>`
-prints a criterion's numbered tests, `criteria --glossary <term>` the terms it
-defines, and `criteria --plan` the work plan — so an agent reads them instead
-of recalling them.
+Les critères eux-mêmes sont sur la CLI sur chaque harness : `criteria <id>` imprime les tests
+numérotés d’un critère, `criteria --glossary <term>` les termes qu’il définit, et `criteria --plan` le
+plan de travail — de sorte qu’un agent les lit au lieu de se les remémorer.
 
-On a harness with no skill system at all, **reading `SKILL.md` directly with the file-read
-tool is the blessed path**, not a workaround. Discover what exists by listing
-`skills/*/SKILL.md` and reading the frontmatter.
+Sur un harness sans aucun système de skills, **lire `SKILL.md` directement avec l’outil de lecture de
+fichiers est la voie officielle**, pas un contournement. Découvrez ce qui existe en listant
+`skills/*/SKILL.md` et en lisant le frontmatter.
 
-## The matrix
+## La matrice
 
-| | skills | automatic review | how it blocks | repo gate |
+| | skills | revue automatique | comment il bloque | garde-fou du dépôt |
 |---|---|---|---|---|
-| Claude Code | plugin / `skills add` | yes | `permissionDecision: "deny"` | yes |
-| Codex CLI | plugin / `skills add` | yes | `permissionDecision: "deny"` | yes |
-| OpenCode 1.x · 2.x | plugin / `skills add` | yes | thrown tool error | yes |
-| Cursor, Amp, Zed, Gemini… | AGENTS.md | **no** | — | yes |
+| Claude Code | plugin / `skills add` | oui | `permissionDecision: "deny"` | oui |
+| Codex CLI | plugin / `skills add` | oui | `permissionDecision: "deny"` | oui |
+| OpenCode 1.x · 2.x | plugin / `skills add` | oui | erreur d’outil levée | oui |
+| Cursor, Amp, Zed, Gemini… | AGENTS.md | **non** | — | oui |
 
-`ultra11y status` reports which of these are actually wired on this machine — including the
-one silent failure worth naming, a Codex hook sitting behind a disabled feature flag.
+`ultra11y status` indique lesquels sont réellement branchés sur cette machine — y compris le seul
+échec silencieux qui mérite d’être nommé, un hook Codex resté derrière un feature flag désactivé.
 
-## Off-switches (identical everywhere)
+## Interrupteurs (identiques partout)
 
-They live in the engine, not in any harness, so one answer covers all of them:
-`ULTRA11Y_HOOK_FAIL_ON=blocking|major|minor|off` (env, wins), then
-`"hook": { "failOn": … }` in `.ultra11yrc.json`, else `blocking`. `SKIP_A11Y=1` bypasses
-once; `ULTRA11Y_HOOK=off` disables the gate for the session.
+Ils vivent dans le moteur, pas dans un harness, donc une seule réponse les couvre tous :
+`ULTRA11Y_HOOK_FAIL_ON=blocking|major|minor|off` (env, prioritaire), puis
+`"hook": { "failOn": … }` dans `.ultra11yrc.json`, sinon `blocking`. `SKIP_A11Y=1` contourne une
+fois ; `ULTRA11Y_HOOK=off` désactive le garde-fou pour la session.

@@ -1,335 +1,363 @@
 ---
 name: ultra11y
-description: "Use to AUDIT a site, repository, or page against RGAA 4.1.2, the French State's accessibility standard (référentiel de l'État), the only standard it reports against (WCAG appears only as the mapping each RGAA criterion cites); produce a dated conformance report, criterion grid, PRD backlog, or tickets; AUTHOR accessible markup; fix accessibility; or wire a repo gate and rendered-DOM capture pipeline. The bundled install-free engine runs 103 static checks tied to RGAA criteria, while the agent adjudicates judgment criteria and routes rendering criteria to browser scans; check/verify reject invented non-conformities and never declare conforming what was not verified. Use `review-a11y` instead for a review scoped only to a diff, branch, or PR."
+description: "À utiliser pour AUDITER un site, un dépôt ou une page selon le RGAA 4.1.2, le référentiel d’accessibilité de l’État, seul référentiel des rapports (le WCAG n’apparaît que comme la correspondance que cite chaque critère RGAA) ; produire un rapport de conformité daté, une grille par critère, un backlog PRD ou des tickets ; ÉCRIRE du balisage accessible ; corriger l’accessibilité ; ou brancher un garde-fou de dépôt et une chaîne de capture du DOM rendu. Le moteur embarqué, sans installation, exécute 103 vérifications statiques rattachées aux critères RGAA, tandis que l’agent arbitre les critères qui demandent un jugement et envoie les critères de rendu aux scans navigateur ; check/verify rejettent les non-conformités inventées et ne déclarent jamais conforme ce qui n’a pas été vérifié. Utiliser plutôt `review-a11y` pour une revue limitée à un diff, une branche ou une pull request."
 license: MIT
 metadata:
   version: 9.4.0
 ---
 
-# ultra11y — audit RGAA 4.1.2 and write accessible markup
+# ultra11y — auditer selon le RGAA 4.1.2 et écrire du balisage accessible
 
-On accessibility, an automated tool only sees part of the problem. `ultra11y` owns
-that with a **division of labour**: the deterministic, install-free engine
-(`node scripts/ultra11y.mjs <command>` — no `npm install`, no key; the JSX/TSX parser
-is embedded in the bundle) does the *mechanical* work — detect the machine-checkable
-non-conformities and tie each to the right **RGAA criterion** — and **the active coding
-agent** *adjudicates the judgment criteria itself* — alt relevance, link
-purpose in context, reading order — statically, from the evidence the engine harvests
-(`verify --manual`), each verdict gated by `verify`/`check`. Only the truly **rendered-DOM**
-criteria (computed contrast, visible focus, zoom/reflow, content-on-hover) fall to the `scan`
-tier (axe-core in a real browser); a human is at most optional oversight. Gates stop any
-hallucinated non-conformity from surviving, and nothing is ever silently "conforming".
+En accessibilité, un outil automatique ne voit qu’une partie du problème. `ultra11y` l’assume
+par une **répartition du travail** : le moteur déterministe et sans installation
+(`node scripts/ultra11y.mjs <command>` — pas de `npm install`, pas de clé ; le parseur JSX/TSX
+est embarqué dans le bundle) fait le travail *mécanique* — détecter les non-conformités
+vérifiables par la machine et rattacher chacune au bon **critère RGAA** — et **l’agent de code
+actif** *arbitre lui-même les critères qui demandent un jugement* — pertinence des alternatives,
+intitulé des liens en contexte, ordre de lecture — statiquement, à partir des preuves que le
+moteur récolte (`verify --manual`), chaque verdict passant par le contrôle de `verify`/`check`.
+Seuls les critères qui relèvent vraiment du **DOM rendu** (contraste calculé, focus visible,
+zoom/reflow, contenu au survol) reviennent au niveau `scan` (axe-core dans un vrai navigateur) ;
+un humain n’est tout au plus qu’une supervision facultative. Les garde-fous empêchent toute
+non-conformité hallucinée de survivre, et rien n’est jamais « conforme » en silence.
 
-**Running the engine.** Every command in this skill and its references is written
-`node scripts/ultra11y.mjs …`, where `scripts/ultra11y.mjs` lives **next to this SKILL.md**.
-Run it with the audited project as the working directory, and resolve the path per harness:
+**Lancer le moteur.** Chaque commande de cette skill et de ses références s’écrit
+`node scripts/ultra11y.mjs …`, où `scripts/ultra11y.mjs` se trouve **à côté de ce SKILL.md**.
+Lancez-le avec le projet audité comme répertoire de travail, et résolvez le chemin selon le
+harness :
 
-- **Claude Code**: `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
-- **Codex**: the installed skill directory's `scripts/ultra11y.mjs` — the plugin's copy, or
-  `~/.codex/skills/ultra11y/scripts/ultra11y.mjs` (under `$CODEX_HOME` when set) after
-  `ultra11y install --codex`.
-- **OpenCode**: the installed skill directory's `scripts/ultra11y.mjs` —
-  `~/.config/opencode/skills/ultra11y/scripts/ultra11y.mjs` (under `$XDG_CONFIG_HOME` when
-  set) after `ultra11y install --opencode`, or the npm package's `skills/ultra11y/` when the
-  plugin is pinned in `opencode.json`.
-- **Anywhere else**, or when no skill directory resolves: `npx -y ultra11y <command>` is the
-  same engine. In the ultra11y repository itself, the root `scripts/ultra11y.mjs` is the same file.
+- **Claude Code** : `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
+- **Codex** : le `scripts/ultra11y.mjs` du répertoire de la skill installée — la copie du
+  plugin, ou `~/.codex/skills/ultra11y/scripts/ultra11y.mjs` (sous `$CODEX_HOME` s’il est
+  défini) après `ultra11y install --codex`.
+- **OpenCode** : le `scripts/ultra11y.mjs` du répertoire de la skill installée —
+  `~/.config/opencode/skills/ultra11y/scripts/ultra11y.mjs` (sous `$XDG_CONFIG_HOME` s’il est
+  défini) après `ultra11y install --opencode`, ou le `skills/ultra11y/` du paquet npm quand le
+  plugin est épinglé dans `opencode.json`.
+- **Partout ailleurs**, ou quand aucun répertoire de skill ne se résout : `npx -y ultra11y <command>`
+  est le même moteur. Dans le dépôt ultra11y lui-même, le `scripts/ultra11y.mjs` racine est le
+  même fichier.
 
-Per-harness deltas (hooks, install, how a block arrives): `references/harnesses.md`.
+Écarts propres à chaque harness (hooks, installation, manière dont arrive un blocage) :
+`references/harnesses.md`.
 
-**Do not confuse rules with criteria.** The bundle ships 103 static checks and RGAA has 106
-criteria. Several rules may evidence one criterion, one rule may contribute to several
-criteria, and most criteria remain open until a scan or
-an adjudication. The only honest run-level coverage is the grid's live provenance tally
-(`moteur + scan + agent`, plus any named undecidable residue), never a fixed promise such as
-“48 agent criteria”. GitHub summaries therefore show `decided/total`, not a percentage over
-the small decided subset.
+**Ne confondez pas règles et critères.** Le bundle livre 103 vérifications statiques et le RGAA
+compte 106 critères. Plusieurs règles peuvent servir de preuve à un même critère, une règle peut
+contribuer à plusieurs critères, et la plupart des critères restent ouverts jusqu’à un scan ou
+un arbitrage. La seule couverture honnête à l’échelle d’un run est le décompte de provenance
+réel de la grille (`moteur + scan + agent`, plus tout reliquat indécidable nommé), jamais une
+promesse figée comme « 48 critères agent ». Les résumés GitHub affichent donc `decided/total`,
+pas un pourcentage calculé sur le petit sous-ensemble décidé.
 
-**RGAA 4.1.2 is the only standard.** Every command and every output — `audit` included,
-findings and all — speaks RGAA: criteria, thématiques, rates, tickets, PRD. WCAG 2.2 AA stays
-the engine's internal keying (each RGAA criterion cites the WCAG criteria it maps onto) and
-reaches a reader only as that discreet mapping: « RGAA 1.1 (WCAG 1.1.1) ». `--standard rgaa`
-is the default; `--standard wcag` was removed and exits 2. See `references/standards.md`,
-and `references/guidance.md` for the concrete good/bad implementation patterns.
+**Le RGAA 4.1.2 est le seul référentiel.** Chaque commande et chaque sortie — `audit` compris,
+constats inclus — parle RGAA : critères, thématiques, taux, tickets, PRD. Le WCAG 2.2 AA reste
+la clé interne du moteur (chaque critère RGAA cite les critères WCAG auxquels il correspond) et
+n’atteint un lecteur que sous la forme de cette correspondance discrète : « RGAA 1.1 (WCAG 1.1.1) ».
+`--standard rgaa` est la valeur par défaut ; `--standard wcag` a été supprimé et sort avec le
+code 2. Voir `references/standards.md`, et `references/guidance.md` pour les exemples concrets
+de bonnes et de mauvaises implémentations.
 
-**Most of the work is yours.** Of the 106 RGAA criteria, **104** need more than source —
-a rendered page (`scan`) or a judgment call the agent adjudicates — to earn C
-(`criteria --plan`). So the engine's clean run is a starting point, never a verdict — and
-`references/adjudication.md` is the page you actually work from.
+**L’essentiel du travail vous revient.** Sur les 106 critères RGAA, **104** demandent plus que
+le source — une page rendue (`scan`) ou une décision de jugement que l’agent arbitre — pour
+obtenir C (`criteria --plan`). Un run propre du moteur est donc un point de départ, jamais un
+verdict — et `references/adjudication.md` est la page à partir de laquelle vous travaillez
+vraiment.
 
-> **Core rules:**
-> 1. **Never invent a non-conformity**: every `NC` cites a real, resolvable element (`check` verifies it).
-> 2. **Native HTML first, ARIA last**; never duplicate implicit semantics.
-> 3. **Never invent a conformity either**: a `C` is cited exactly like an `NC` — it names in
->    `citations[]` the harvested evidence it cleared, each anchor resolvable and drawn from
->    the evidence that criterion was actually shown. A criterion presented with *no* evidence
->    cannot be `C` at all; it stays `manual`. Neither can one whose reading was INCOMPLETE
->    (`evidenceComplete: false`): a criterion you were shown part of can still fail on what
->    you saw, but it can never be cleared over what you did not. And an adjudicated `C` is
->    never merged with an engine-decided one: reports list it separately and keep it out of
->    the automatic pass rate.
-> 3b. **What you are shown is the whole population, said once per distinct thing.** Evidence
->    is one representative per CONTENT CLASS, carrying `occurrences`, the other anchors in
->    `alsoAt`, and the `pages` it appears on — 887 links across 38 captured pages are 97
->    distinct (text, href) pairs. Ruling on the representative rules on all of them, which is
->    what makes an honest `C` reachable; and a citation naming ANY occurrence of a class the
->    criterion carries is accepted, so cite the one you actually opened.
-> 4. **Residual is explicit, never silently conforming**: the AI agent *adjudicates* every
->    *judgment* criterion itself (`verify --manual`, gated), and the *rendering* criteria go to
->    `scan`. **A clean scan never concludes `C`**: RGAA's automation contract marks those rules as *candidate* evidence (RGAA 3.2, 3.3, 10.4,
->    10.11, 10.12, 12.9…), so the scan can prove a non-conformity but its silence only yields
->    signals, and the criterion stays « à évaluer » for you to adjudicate — or to declare
->    undecidable, with its reason, when its brief carries no citable evidence (a `C` with
->    nothing to cite is refused). Any criterion still unproven stays "to assess manually" —
->    no status without a recorded, justified verdict. To make that a gate rather than a hope,
->    `check --in <audit.json> --require-decided` fails while anything is still to assess, and
->    `--allow-undecided <file>` takes the criteria you genuinely cannot decide, each with its
->    reason (a named list, never a threshold). `--require-decided=pages` holds EVERY page's own
->    grid to the same bar: a criterion failing on one route is settled for the run and may still
->    be nobody's verdict on the routes it never fired on, which is what a per-page deliverable is
->    actually judged on.
->    **The emitted worklist is authoritative.** It may deliberately contain a criterion whose
->    run-wide status is already `NC`, because that failure did not decide the criterion on the
->    other pages. Such an item is not redundant: return one grounded verdict for it (or an
->    explicit `manual` reason), never leave it blank because the global tally looks decided.
-> 5. **Look the criterion up; never recall it.** `criteria <id>` returns
->    the criterion's own wording, its **numbered tests** and their methodology, and
->    `criteria --glossary <term>` the definitions those tests cite. RGAA 8.3 is not "the page needs a
->    `lang` attribute"; it is test `8.3.1` with two alternative conditions, and the glossary
->    decides what its terms mean. An auditor block that cites `8.3.1` after reading it is
->    grounded; one that cites it from memory is a guess wearing a reference. Before auditing,
->    run the plan (`criteria --plan`): it tells you how many criteria need more than source —
->    adjudication, a rendered page or a browser — to earn C: **104 of 106**. See `references/standards.md`.
-> 6. **The FINAL rendered semantic HTML must be correct.** The engine sees only source; a
->    component library (DSFR/MUI…) or `.vue`/`.svelte`/`.astro` SFC hides the real markup, so
->    a green source audit is not proof. Verify the produced semantic HTML — run ultra11y's
->    own render engine (`render`), which renders every component, page and story with the
->    project's react-dom/server into `.ultra11y/captures` (never reading its tests), with
->    `audit --require-captures` gating the blind spots. See `references/rendered.md`.
-> 7. **Language**: ALWAYS pass `--lang` matching the language of your conversation with
->    the user; ask the user when ambiguous. Without the flag the CLI auto-detects (repo
->    `<html lang>` → the active standard's default locale → English) — a scripted/CI
->    fallback, not a substitute for passing `--lang` yourself.
-> 8. **Technical tokens stay in English, even in French prose.** In any French deliverable
->    you write (report commentary, PRD, tracker tickets, judgment verdicts), attribute/
->    element/role names and their values are code, not prose — never translate them:
->    `aria-live` stays `aria-live` (never « région live »), same for `tabindex`, `alt`,
->    `role="alert"`, landmark role names. The engine's own fr catalog follows this; match
->    it. Normative standard vocabulary (RGAA wording such as « lien d'évitement ») keeps
->    its official French.
+> **Règles fondamentales :**
+> 1. **N’inventez jamais une non-conformité** : chaque `NC` cite un élément réel et résolvable (`check` le vérifie).
+> 2. **HTML natif d’abord, ARIA en dernier** ; ne dupliquez jamais une sémantique implicite.
+> 3. **N’inventez pas non plus une conformité** : un `C` se cite exactement comme un `NC` — il
+>    nomme dans `citations[]` les preuves récoltées qu’il a validées, chaque ancre étant
+>    résolvable et tirée des preuves effectivement montrées pour ce critère. Un critère présenté
+>    *sans* preuve ne peut pas du tout être `C` ; il reste `manual`. Pas davantage un critère dont
+>    la lecture était INCOMPLÈTE (`evidenceComplete: false`) : un critère dont on vous a montré une
+>    partie peut encore échouer sur ce que vous avez vu, mais ne peut jamais être validé sur ce
+>    que vous n’avez pas vu. Et un `C` arbitré n’est jamais fusionné avec un `C` décidé par le
+>    moteur : les rapports le listent à part et le tiennent hors du taux de réussite automatique.
+> 3b. **Ce qu’on vous montre est la population entière, dite une fois par chose distincte.** Les
+>    preuves sont un représentant par CLASSE DE CONTENU, portant `occurrences`, les autres ancres
+>    dans `alsoAt`, et les `pages` où il apparaît — 887 liens sur 38 pages capturées font 97
+>    paires (texte, href) distinctes. Statuer sur le représentant, c’est statuer sur tous, et
+>    c’est ce qui rend un `C` honnête atteignable ; une citation qui nomme N’IMPORTE QUELLE
+>    occurrence d’une classe que porte le critère est acceptée, alors citez celle que vous avez
+>    réellement ouverte.
+> 4. **Le reliquat est explicite, jamais conforme en silence** : l’agent IA *arbitre* lui-même
+>    chaque critère *de jugement* (`verify --manual`, sous contrôle), et les critères *de rendu*
+>    vont à `scan`. **Un scan propre ne conclut jamais `C`** : le contrat d’automatisation du RGAA marque ces règles comme preuves *candidates* (RGAA 3.2, 3.3, 10.4,
+>    10.11, 10.12, 12.9…), si bien que le scan peut prouver une non-conformité mais que son
+>    silence ne produit que des signaux, et le critère reste « à évaluer » pour que vous
+>    l’arbitriez — ou que vous le déclariez indécidable, avec sa raison, quand son brief ne porte
+>    aucune preuve citable (un `C` sans rien à citer est refusé). Tout critère encore non prouvé
+>    reste « à évaluer manuellement » — aucun statut sans un verdict enregistré et justifié. Pour
+>    en faire un garde-fou plutôt qu’un espoir, `check --in <audit.json> --require-decided` échoue
+>    tant que quelque chose reste à évaluer, et `--allow-undecided <file>` prend les critères que
+>    vous ne pouvez réellement pas décider, chacun avec sa raison (une liste nommée, jamais un
+>    seuil). `--require-decided=pages` impose la même exigence à la grille propre de CHAQUE
+>    page : un critère en échec sur une route est tranché pour le run et peut pourtant n’être le
+>    verdict de personne sur les routes où il ne s’est jamais déclenché, et c’est précisément
+>    là-dessus qu’un livrable par page est jugé.
+>    **La liste de travail émise fait foi.** Elle peut contenir délibérément un critère dont le
+>    statut à l’échelle du run est déjà `NC`, parce que cet échec n’a pas décidé le critère sur
+>    les autres pages. Un tel élément n’est pas redondant : renvoyez pour lui un verdict fondé
+>    (ou une raison `manual` explicite), ne le laissez jamais vide parce que le décompte global
+>    semble décidé.
+> 5. **Consultez le critère ; ne le citez jamais de mémoire.** `criteria <id>` renvoie
+>    la formulation propre du critère, ses **tests numérotés** et leur méthodologie, et
+>    `criteria --glossary <term>` les définitions que ces tests citent. Le RGAA 8.3 n’est pas « la
+>    page a besoin d’un attribut `lang` » ; c’est le test `8.3.1` avec deux conditions
+>    alternatives, et le glossaire décide du sens de ses termes. Un bloc d’auditeur qui cite
+>    `8.3.1` après l’avoir lu est fondé ; un bloc qui le cite de mémoire est une supposition
+>    déguisée en référence. Avant d’auditer, lancez le plan (`criteria --plan`) : il vous dit
+>    combien de critères demandent plus que le source — un arbitrage, une page rendue ou un
+>    navigateur — pour obtenir C : **104 sur 106**. Voir `references/standards.md`.
+> 6. **Le HTML sémantique FINAL rendu doit être correct.** Le moteur ne voit que le source ; une
+>    bibliothèque de composants (DSFR/MUI…) ou un SFC `.vue`/`.svelte`/`.astro` cache le vrai
+>    balisage, donc un audit du source au vert n’est pas une preuve. Vérifiez le HTML sémantique
+>    produit — lancez le moteur de rendu d’ultra11y (`render`), qui rend chaque composant, page et
+>    story avec le react-dom/server du projet dans `.ultra11y/captures` (sans jamais lire ses
+>    tests), `audit --require-captures` servant de garde-fou sur les angles morts. Voir
+>    `references/rendered.md`.
+> 7. **Langue** : passez TOUJOURS `--lang` correspondant à la langue de votre conversation avec
+>    l’utilisateur ; demandez-lui en cas d’ambiguïté. Sans le flag, la CLI détecte
+>    automatiquement (`<html lang>` du dépôt → la locale par défaut du référentiel actif →
+>    anglais) — un repli pour les scripts et la CI, pas un substitut au fait de passer `--lang`
+>    vous-même.
+> 8. **Les jetons techniques restent en anglais, même dans une prose française.** Dans tout
+>    livrable en français que vous écrivez (commentaire de rapport, PRD, tickets de suivi,
+>    verdicts de jugement), les noms d’attributs, d’éléments et de rôles et leurs valeurs sont du
+>    code, pas de la prose — ne les traduisez jamais : `aria-live` reste `aria-live` (jamais
+>    « région live »), de même pour `tabindex`, `alt`, `role="alert"` et les noms de rôles de
+>    landmarks. Le catalogue fr du moteur suit cette règle ; alignez-vous dessus. Le vocabulaire
+>    normatif du référentiel (formulations RGAA comme « lien d'évitement ») garde son français
+>    officiel.
 
-## The reference library
+## La bibliothèque de références
 
-Domain knowledge first, then the tooling. Read the one that matches the question in front of you.
+Le savoir du domaine d’abord, puis l’outillage. Lisez celle qui correspond à la question posée.
 
-| Accessibility knowledge | |
+| Savoir en accessibilité | |
 |---|---|
-| `references/adjudication.md` | How to decide each of the 52 criteria the engine hands you — the decision rule, when NA is legitimate, the questions |
-| `references/naming.md` | Accessible-name computation, 2.5.3 label-in-name, visually-hidden CSS, naming images/SVG/figures |
-| `references/widgets.md` | ARIA APG composite patterns, keyboard contracts, focus management, SPA route changes, live regions |
-| `references/forms-and-errors.md` | Labels and instructions, the `autocomplete` token list, error identification/suggestion/prevention, redundant entry, accessible authentication |
-| `references/structure.md` | Headings, landmarks, lists and `dl`, simple and complex tables, meaningful sequence |
-| `references/media-and-motion.md` | Captions/audio description/transcripts, pointer gestures, target size, orientation, reflow, reduced motion |
-| `references/forbidden-patterns.md` | 15 anti-patterns: bad → why → native fix → criterion |
-| `references/focus-and-logic.md` | The focus/keyboard criteria you own, and how to reason about them |
-| `references/criteria.md` | The WCAG mapping table: each WCAG criterion's automatability class, engine rules and the RGAA criteria citing it (generated) |
-| `references/rgaa-automation.md` | RGAA 4.1.2: generated 106-criterion / 258-test matrix, decisive rules, candidate signals and silence policy |
-| `references/rgaa-review.md` | RGAA 4.1.2 criterion by criterion: what the engine can be trusted for, what was fixed against the golden grids, and the known limits |
-| `references/act.md` | What the engine is measured to catch — and what it demonstrably does not (generated) |
+| `references/adjudication.md` | Comment décider chacun des 52 critères que le moteur vous remet — la règle de décision, quand NA est légitime, les questions |
+| `references/naming.md` | Calcul du nom accessible, 2.5.3 étiquette dans le nom, CSS de masquage visuel, nommer les images/SVG/figures |
+| `references/widgets.md` | Motifs composites de l’ARIA APG, contrats clavier, gestion du focus, changements de route en SPA, régions live |
+| `references/forms-and-errors.md` | Étiquettes et instructions, la liste des jetons `autocomplete`, identification/suggestion/prévention des erreurs, saisie redondante, authentification accessible |
+| `references/structure.md` | Titres, landmarks, listes et `dl`, tableaux simples et complexes, ordre logique |
+| `references/media-and-motion.md` | Sous-titres/audiodescription/transcriptions, gestes de pointeur, taille des cibles, orientation, reflow, réduction des animations |
+| `references/forbidden-patterns.md` | 15 anti-motifs : mauvais → pourquoi → correctif natif → critère |
+| `references/focus-and-logic.md` | Les critères de focus/clavier qui vous reviennent, et comment raisonner dessus |
+| `references/criteria.md` | La table de correspondance WCAG : la classe d’automatisabilité de chaque critère WCAG, les règles du moteur et les critères RGAA qui le citent (générée) |
+| `references/rgaa-automation.md` | RGAA 4.1.2 : matrice générée de 106 critères / 258 tests, règles décisives, signaux candidats et politique du silence |
+| `references/rgaa-review.md` | RGAA 4.1.2 critère par critère : ce pour quoi on peut se fier au moteur, ce qui a été corrigé par rapport aux grilles de référence, et les limites connues |
+| `references/act.md` | Ce que le moteur, mesures à l’appui, détecte — et ce qu’il ne détecte manifestement pas (générée) |
 
-| Running the tool | |
+| Utiliser l’outil | |
 |---|---|
-| `references/runbook.md` | **The reliable run**: the one recipe, the transport to use and why, and what a pass costs. Read this before paying for an adjudication |
-| `references/full-audit.md` | **The full audit, on every harness**: rendered scope, adjudication (direct or fanned out), adversarial verification, ledger, Markdown + HTML + per-page evidence, `check` gates |
-| `references/audit.md` | The quick audit (static pass → report → `check`), the normative page sample and PDF documents |
-| `references/judgment.md` | The adjudication + refutation worklists, verdict vocabulary, fail-closed fold |
-| `references/verify.md` | The `check`/`verify` gates |
-| `references/false-positives.md` | Where a finding may still be wrong, and how to refute it |
-| `references/rendered.md` · `references/automation.md` | Auditing produced HTML, captures, hooks and CI |
-| `references/harnesses.md` | Where this runs: Claude Code, Codex CLI, OpenCode 1.x and 2.x, and the AGENTS.md fallback |
-| `references/orchestrators.md` | Driving the engine from a workflow engine / non-GitHub CI: pinning, the six-step pipeline, exit codes, the ticket set as JSON for any tracker |
-| `references/ci.md` | CI: run iterion's `rgaa-audit` bot; the CLI contract it relies on |
-| `references/pages.md` | Page snapshots + the per-page criterion grid (`pages`), its honesty rules, and `serve` (the results site, its history, its static export) |
-| `references/e2e.md` | `ultra11y/playwright` · `ultra11y/cypress`: auditing a page during your E2E run |
-| `references/dynamic.md` | The `scan` tier: runtimes, probes, authenticated pages |
-| `references/journeys.md` | Journeys you write (`.ultra11y/journeys/`), replayed by `journey run` with axe and keyboard checks |
-| `references/scale.md` | Focusing an audit on a large repository |
-| `references/fix.md` · `references/correction.md` | Applying fixes, by priority, without regressions |
-| `references/prd.md` | The auditor block as a backlog (markdown) |
-| `references/tickets.md` | Filing that backlog as tickets: GitHub, GitLab, Jira, and at which granularity |
-| `references/standards.md` · `references/guidance.md` | RGAA and its WCAG mapping, implementation guidance |
-| `references/methodology.md` | Statuses, pass rate, severities, report format |
-| `references/cross-file.md` | `--graph`: imports and cross-file rules |
-| `references/orchestration.md` | Fanning the judgment phases out across subagents |
+| `references/runbook.md` | **Le run fiable** : l’unique recette, le transport à utiliser et pourquoi, et ce que coûte un passage. À lire avant de payer un arbitrage |
+| `references/full-audit.md` | **L’audit complet, sur chaque harness** : périmètre rendu, arbitrage (direct ou réparti), vérification contradictoire, registre, Markdown + HTML + preuves par page, garde-fous `check` |
+| `references/audit.md` | L’audit rapide (passage statique → rapport → `check`), l’échantillon de pages normatif et les documents PDF |
+| `references/judgment.md` | Les listes de travail d’arbitrage + de contre-vérification, le vocabulaire des verdicts, le repli fail-closed |
+| `references/verify.md` | Les garde-fous `check`/`verify` |
+| `references/false-positives.md` | Où un constat peut encore être faux, et comment le réfuter |
+| `references/rendered.md` · `references/automation.md` | Auditer le HTML produit, captures, hooks et CI |
+| `references/harnesses.md` | Où cela tourne : Claude Code, Codex CLI, OpenCode 1.x et 2.x, et le repli AGENTS.md |
+| `references/orchestrators.md` | Piloter le moteur depuis un moteur de workflow / une CI non GitHub : épinglage, le pipeline en six étapes, codes de sortie, le jeu de tickets en JSON pour n’importe quel outil de suivi |
+| `references/ci.md` | CI : lancer le bot `rgaa-audit` d’iterion ; le contrat de CLI sur lequel il s’appuie |
+| `references/pages.md` | Instantanés de page + la grille des critères par page (`pages`), ses règles d’honnêteté, et `serve` (le site des résultats, son historique, son export statique) |
+| `references/e2e.md` | `ultra11y/playwright` · `ultra11y/cypress` : auditer une page pendant votre run E2E |
+| `references/dynamic.md` | Le niveau `scan` : runtimes, sondes, pages authentifiées |
+| `references/journeys.md` | Les parcours que vous écrivez (`.ultra11y/journeys/`), rejoués par `journey run` avec axe et des vérifications clavier |
+| `references/scale.md` | Cibler un audit sur un gros dépôt |
+| `references/fix.md` · `references/correction.md` | Appliquer les correctifs, par priorité, sans régression |
+| `references/prd.md` | Le bloc d’auditeur sous forme de backlog (markdown) |
+| `references/tickets.md` | Déposer ce backlog en tickets : GitHub, GitLab, Jira, et à quelle granularité |
+| `references/standards.md` · `references/guidance.md` | Le RGAA et sa correspondance WCAG, recommandations d’implémentation |
+| `references/methodology.md` | Statuts, taux de réussite, sévérités, format du rapport |
+| `references/cross-file.md` | `--graph` : imports et règles inter-fichiers |
+| `references/orchestration.md` | Répartir les phases de jugement entre des sous-agents |
 
-## Choose by situation
+## Choisir selon la situation
 
-- **"Full / detailed audit", "compliance or conformance report", "RGAA audit"** — on any
-  harness (Claude Code, Codex, OpenCode or another) → the active session is the auditor:
-  scope, scan, adjudicate (directly, or fanned out to subagents), challenge its claims, fold
-  them into the ledger, then publish the dated Markdown report, printable HTML and evidenced
-  per-page dossiers and pass the `check` gates (`--require-decided=pages` included). Read
-  **`references/full-audit.md`** and finish with its full deliverable set. **When in doubt
-  between this and the quick path, take this one.** In CI, the same audit is iterion's
-  `rgaa-audit` bot (branch below).
-- **"Quick audit / first look / what does the engine find"** → `node scripts/ultra11y.mjs
-  audit … --json`, then `report` (synthesis table + one **auditor conformance block** per NC
-  criterion — same block `prd` and `tickets` use), then `check`; read
-  **`references/audit.md`**. Use it only when the user explicitly wants a quick or static-only
-  pass: it has no ledger, no refutation, no per-page dossiers and no completeness gate, so say
-  so and never present it as a conformance report.
-- **"Code rendered by a library (DSFR, MUI…) or a `.vue`/`.svelte`/`.astro` SFC / avoid
-  false negatives"** → audit the **produced HTML**, not the source template. Run `render`:
-  ultra11y's engine renders every component, page and story with the project's own
-  react-dom/server into `.ultra11y/captures` (auto-ingested, findings attributed to the source
-  component; every unit it could not render is listed with the reason; `render --coverage`
-  and `audit --require-captures` track blind spots). It never reads the project's tests or
-  snapshots. Or `render --detect` (build→audit recipe) then `audit` on the output, and `scan`
-  for computed rendering. SFC-source findings are flagged `preliminary` (a
-  `scope.sourceTemplate` caveat); read **`references/rendered.md`**.
-- **"A finding looks wrong / false positive on a component"** → the engine auto-suppresses
-  most component false positives (slot/prop-injected names, component children, dynamic
-  bindings, conditional headings) and marks SFC/library-source findings `preliminary`;
-  confirm or refute the rest with `verify --apply`; read **`references/false-positives.md`**.
-- **"Large repo / audit smartly"** → focus: `--changed` (git diff), template
-  prioritization, dedup, `--max-files`; read **`references/scale.md`**.
-- **"Cross-file analysis (tree + dependencies), JSX/TSX as a real AST"** →
-  `audit --graph` resolves imports and applies cross-file rules (an icon-only component
-  used without a name, an anchor target in another file…), no browser; read
-  **`references/cross-file.md`**.
-- **"Generate the fix markdown / PRDs"** → `prd` (the SAME auditor
-  conformance block `report`'s NC section renders — thématique/critère/test/WCAG mapping/
-  finding/expected/verification in RGAA's vocabulary — as a backlog);
-  `--split criterion`, `--format doc` for a product-requirements doc). It writes markdown
-  only; read
+- **"Audit complet / détaillé", "rapport de conformité", "audit RGAA"** — quel que soit le
+  harness (Claude Code, Codex, OpenCode ou un autre) → la session active est l’auditeur :
+  cadrer le périmètre, scanner, arbitrer (directement, ou en répartissant sur des sous-agents),
+  contester ses propres affirmations, les verser au registre, puis publier le rapport Markdown
+  daté, le HTML imprimable et les dossiers par page avec preuves, et passer les garde-fous
+  `check` (`--require-decided=pages` compris). Lisez **`references/full-audit.md`** et terminez
+  avec son jeu complet de livrables. **En cas de doute entre ce parcours et le parcours rapide,
+  prenez celui-ci.** En CI, le même audit est le bot `rgaa-audit` d’iterion (branche plus bas).
+- **"Audit rapide / premier aperçu / ce que trouve le moteur"** → `node scripts/ultra11y.mjs
+  audit … --json`, puis `report` (tableau de synthèse + un **bloc de conformité d’auditeur** par
+  critère NC — le même bloc qu’utilisent `prd` et `tickets`), puis `check` ; lisez
+  **`references/audit.md`**. Ne l’utilisez que lorsque l’utilisateur veut explicitement un
+  passage rapide ou purement statique : il n’a ni registre, ni contre-vérification, ni dossiers
+  par page, ni garde-fou de complétude, alors dites-le et ne le présentez jamais comme un
+  rapport de conformité.
+- **"Code rendu par une bibliothèque (DSFR, MUI…) ou un SFC `.vue`/`.svelte`/`.astro` / éviter
+  les faux négatifs"** → auditez le **HTML produit**, pas le gabarit source. Lancez `render` :
+  le moteur d’ultra11y rend chaque composant, page et story avec le react-dom/server du projet
+  lui-même dans `.ultra11y/captures` (ingéré automatiquement, constats attribués au composant
+  source ; chaque unité qu’il n’a pas pu rendre est listée avec la raison ; `render --coverage`
+  et `audit --require-captures` suivent les angles morts). Il ne lit jamais les tests ni les
+  snapshots du projet. Ou bien `render --detect` (recette build→audit) puis `audit` sur la
+  sortie, et `scan` pour le rendu calculé. Les constats sur source SFC sont marqués
+  `preliminary` (une réserve `scope.sourceTemplate`) ; lisez **`references/rendered.md`**.
+- **"Un constat semble faux / faux positif sur un composant"** → le moteur supprime
+  automatiquement la plupart des faux positifs de composants (noms injectés par slot/prop,
+  enfants de composants, liaisons dynamiques, titres conditionnels) et marque `preliminary` les
+  constats sur source SFC/bibliothèque ; confirmez ou réfutez le reste avec `verify --apply` ;
+  lisez **`references/false-positives.md`**.
+- **"Gros dépôt / auditer intelligemment"** → ciblez : `--changed` (git diff), priorisation
+  des gabarits, déduplication, `--max-files` ; lisez **`references/scale.md`**.
+- **"Analyse inter-fichiers (arbre + dépendances), JSX/TSX comme un vrai AST"** →
+  `audit --graph` résout les imports et applique les règles inter-fichiers (un composant
+  icône seule utilisé sans nom, une cible d’ancre dans un autre fichier…), sans navigateur ;
+  lisez **`references/cross-file.md`**.
+- **"Générer le markdown des correctifs / les PRD"** → `prd` (le MÊME bloc de conformité
+  d’auditeur que rend la section NC de `report` — thématique/critère/test/correspondance WCAG/
+  constat/attendu/vérification dans le vocabulaire du RGAA — sous forme de backlog) ;
+  `--split criterion`, `--format doc` pour un document d’exigences produit). Il n’écrit que du
+  markdown ; lisez
   **`references/prd.md`**.
-- **"Open tickets / issues for this (GitHub · GitLab · Jira)"** → `tickets`, a separate
-  command that reads the audit and files it, writing no markdown. `--grain` picks what one
-  ticket is: per criterion (default), per page, per page+criterion, per file, or one
-  consolidated. De-dupe is by exact title, so re-running never duplicates. Always
-  `--dry-run` first; read **`references/tickets.md`**.
-- **"Adjudicate the judgment criteria (judgment phase)"** → `verify --manual --in audit.json`
-  emits an ADJUDICATION worklist (`ADJUDICATE.todo.json` + `ADJUDICATE.md`), one item per
-  residual criterion, pre-loaded with the engine's harvested evidence (every alt, link text +
-  context, literal colour pairs, control labels, heading outline, ARIA state, tabindex,
-  lang-of-parts); the AI agent fills each `verdict` — `C`/`NA` (with a `justification`), `NC`
-  (with a groundable finding), or `manual` (with a `reason`) — then `verify --apply … --in
-  audit.json` folds them back FAIL-CLOSED; read **`references/judgment.md`**.
-- **"Many items to adjudicate/verify (fan the judgment out to subagents)"** →
-  `orchestrate --run <dir>` emits, from the run's CURRENT worklists, per ready phase a
-  `<phase>.batches.json` + one self-contained prompt per batch (any harness's subagents) +
-  the Claude Code workflow rendered from them + the `agents/<role>.md` dispatch contracts +
-  a sequential `RUNBOOK.md` — the default execution path on a subagent-capable harness;
-  see **Orchestration — route by harness** below.
-- **"Focus, keyboard & interaction logic (the interaction-logic part)"** → the engine marks
-  focus order/visible/trap and on-focus/on-input criteria as residual risks; the AI agent reads
-  the full component source and adjudicates the keyboard/focus behaviour (visible-focus and the
-  other rendered criteria go to `scan`); read **`references/focus-and-logic.md`**.
-- **"Put the fixes in place"** → `fix` (dry-run by default, `--write` applies the safe
-  codemods, proposes the rest without inventing anything); read **`references/fix.md`**.
-- **"Fix by priority, no regressions (correction phase)"** → `fix` (`--write`,
-  `--iterate`) + the `prd` backlog, blocking→major→minor; read **`references/correction.md`**.
-- **"Automatic repo gate (hook / CI)"** → `init --hook` writes a git pre-commit gate over
-  the **strict staged snapshot** (audits the exact index blobs, auto-applies safe fixes and
-  re-stages them, blocks only on judgment issues); CI is iterion's `rgaa-audit` bot (below).
-  Installed as a **Claude Code, Codex or OpenCode
-  plugin**, a third gate runs the `review-a11y` *skill* (not just the engine) on a pending
-  commit/push/PR — that one is shipped by the plugin (or `ultra11y install`), not by `init`. For library/SFC code, commit rendered
-  **captures** (`render`) and stage them so the real semantic HTML is what's
-  checked (`audit --require-captures`); read **`references/automation.md`**.
-- **"Check a page during our E2E tests"** → the `ultra11y/playwright` and `ultra11y/cypress`
-  package exports audit the page **as your test left it** (logged in, form filled, modal open) — state a
-  separate `scan` run does not have — and persist each checked page as a snapshot. `failOn`
-  gates the test; `failOn: false` records without failing, which is how you adopt it on an
-  existing backlog; read **`references/e2e.md`**.
-- **"Audit the real PAGE, not the component"** → a **page snapshot**
-  (`.ultra11y/pages/<id>/`) is the whole rendered document plus the browser-only signals
-  (computed styles, boxes, a11y tree, screenshot), ingested by `audit` automatically. Because
-  it is a FULL document, the page-scoped rules run on it — that is where RGAA 8.3 (lang),
-  8.5/8.6 (title) and 12.6 become decidable at all; read **`references/pages.md`**.
-- **"Decide the rendering criteria without a browser in CI"** → once a page snapshot exists,
-  the **rendered tier** runs inside the ordinary `audit`: computed-style contrast
-  (RGAA 3.2/10.5), screenshot-measured contrast for text over a gradient/image (the CSSOM
-  blind spot axe-core shares), and colour-only link identification (**RGAA 10.6**, previously
-  undecidable). Each leaves the criterion `manual` when it cannot measure — never a guess;
-  read **`references/pages.md`**.
-- **"Give me the RGAA grid, page by page"** → `pages --in audits/audit-latest.json` (also embedded in `report`): one row per criterion, one column per page **URL**, rebuilt from
-  the committed audit.json alone. Two rules hold: a finding is attributed to a page only when
-  something SAYS so (else it is reported as unattributed, never spread), and `C` by silence is
-  earned only by a page whose real DOM was audited — a source-only page keeps its undecided
-  criteria « à évaluer »; read **`references/pages.md`**.
-- **"I want a report PER PAGE, not a matrix"** → `pages --in audits/audit-latest.json
-  --format report --split page --out audits/pages`: one dossier per page —
-  identity, its screenshot, its rate, EVERY criterion of the standard with its status on that
-  page, then each non-conformity as the ordinary auditor block. Nothing is re-decided (the
-  same projection as the grid) and no format is invented (the same auditor block as the
-  report), so a page sheet and the compliance report cannot disagree. `check` gates it against
-  invented criteria like any other report; read **`references/pages.md`**.
-- **"Which pages should I even audit?"** → `pages discover --crawl http://localhost:3000
-  --propose --write` (or `--sitemap <url>`, or `--from-snapshots`) writes a **deterministic**
-  `sample.pages` block: the required page kinds matched by keyword on the sorted URLs and
-  titles, the search page with a fixed query, then one page per template cluster, bounded by
-  `--sample-size` (default 20). The same site gives the same sample whatever model runs it, so
-  **do not pick the pages yourself: run the proposal and keep it.** Edit it only with a recorded
-  reason — a page you add carries its reason in `notes`, a required kind you take out gets
-  `sample.absent: [{ "kind", "reason" }]`; `sample check` flags a kind dropped without one.
-  Auth/storageState/sources/notes already declared are kept. Then `sample check` lints the
-  coverage and `scan --sample` scans and snapshots it.
-  A client-rendered SPA exposes no routes in its served HTML — use a sitemap there; read
-  **`references/dynamic.md`**.
-- **"Audit in CI" / "audit these URLs page by page, in CI"** → ultra11y ships no CI
-  integration of its own: run iterion's **`rgaa-audit` bot**
-  (https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit). It installs this engine
-  pinned, renders the page sample, adjudicates and refutes with read-only agents, gates with
-  `check` and files one issue per non-conforming criterion. Read **`references/ci.md`**.
-- **"Make this code accessible / review it"** → audit the snippet
-  (`audit - < component.html`) native-first; read **`references/authoring.md`** and
+- **"Ouvrir des tickets / issues pour ça (GitHub · GitLab · Jira)"** → `tickets`, une commande
+  distincte qui lit l’audit et le dépose, sans écrire de markdown. `--grain` choisit ce que
+  représente un ticket : par critère (par défaut), par page, par page+critère, par fichier, ou
+  un seul consolidé. La déduplication se fait sur le titre exact, donc relancer ne crée jamais de
+  doublon. Toujours `--dry-run` d’abord ; lisez **`references/tickets.md`**.
+- **"Arbitrer les critères de jugement (phase de jugement)"** → `verify --manual --in audit.json`
+  émet une liste de travail d’ARBITRAGE (`ADJUDICATE.todo.json` + `ADJUDICATE.md`), un élément
+  par critère résiduel, préchargé avec les preuves récoltées par le moteur (chaque alt, texte de
+  lien + contexte, paires de couleurs littérales, étiquettes de contrôles, plan des titres, état
+  ARIA, tabindex, langue des passages) ; l’agent IA remplit chaque `verdict` — `C`/`NA` (avec
+  une `justification`), `NC` (avec un constat fondé), ou `manual` (avec une `reason`) — puis
+  `verify --apply … --in audit.json` les réintègre en FAIL-CLOSED (en cas de doute, refuser) ;
+  lisez **`references/judgment.md`**.
+- **"Beaucoup d’éléments à arbitrer/vérifier (répartir le jugement sur des sous-agents)"** →
+  `orchestrate --run <dir>` émet, à partir des listes de travail ACTUELLES du run, pour chaque
+  phase prête un `<phase>.batches.json` + un prompt autonome par lot (pour les sous-agents de
+  n’importe quel harness) + le workflow Claude Code rendu à partir d’eux + les contrats de
+  dispatch `agents/<role>.md` + un `RUNBOOK.md` séquentiel — le chemin d’exécution par défaut
+  sur un harness capable de lancer des sous-agents ; voir **Orchestration — router selon le
+  harness** plus bas.
+- **"Focus, clavier et logique d’interaction (la partie logique d’interaction)"** → le moteur
+  marque l’ordre, la visibilité et le piégeage du focus ainsi que les critères au focus / à la
+  saisie comme risques résiduels ; l’agent IA lit le source complet du composant et arbitre le
+  comportement clavier/focus (le focus visible et les autres critères de rendu vont à `scan`) ;
+  lisez **`references/focus-and-logic.md`**.
+- **"Mettre les correctifs en place"** → `fix` (dry-run par défaut, `--write` applique les
+  codemods sûrs et propose le reste sans rien inventer) ; lisez **`references/fix.md`**.
+- **"Corriger par priorité, sans régression (phase de correction)"** → `fix` (`--write`,
+  `--iterate`) + le backlog `prd`, bloquant→majeur→mineur ; lisez **`references/correction.md`**.
+- **"Garde-fou automatique du dépôt (hook / CI)"** → `init --hook` écrit un garde-fou git
+  pre-commit sur le **snapshot strict de l’index** (il audite exactement les blobs de l’index,
+  applique automatiquement les correctifs sûrs et les remet dans l’index, ne bloque que sur les
+  problèmes de jugement) ; la CI est le bot `rgaa-audit` d’iterion (plus bas).
+  Installé comme **plugin Claude Code, Codex ou OpenCode**, un troisième garde-fou lance la
+  *skill* `review-a11y` (pas seulement le moteur) sur un commit/push/PR en attente — celui-là est
+  livré par le plugin (ou `ultra11y install`), pas par `init`. Pour le code de bibliothèque/SFC,
+  commitez les **captures** rendues (`render`) et ajoutez-les à l’index pour que ce soit le vrai
+  HTML sémantique qui soit vérifié (`audit --require-captures`) ; lisez
+  **`references/automation.md`**.
+- **"Vérifier une page pendant nos tests E2E"** → les exports de paquet `ultra11y/playwright` et
+  `ultra11y/cypress` auditent la page **dans l’état où votre test l’a laissée** (session
+  connectée, formulaire rempli, modale ouverte) — un état qu’un run `scan` séparé n’a pas — et
+  enregistrent chaque page vérifiée comme instantané de page. `failOn` fait échouer le test ;
+  `failOn: false` enregistre sans échouer, c’est ainsi qu’on l’adopte sur un backlog existant ;
+  lisez **`references/e2e.md`**.
+- **"Auditer la vraie PAGE, pas le composant"** → un **instantané de page**
+  (`.ultra11y/pages/<id>/`) est le document rendu complet plus les signaux propres au navigateur
+  (styles calculés, boîtes, arbre d’accessibilité, capture d’écran), ingéré automatiquement par
+  `audit`. Comme c’est un document COMPLET, les règles à portée de page s’y appliquent — c’est là
+  que le RGAA 8.3 (langue), 8.5/8.6 (titre) et 12.6 deviennent tout simplement décidables ;
+  lisez **`references/pages.md`**.
+- **"Décider les critères de rendu sans navigateur en CI"** → dès qu’un instantané de page
+  existe, le **niveau rendu** tourne dans l’`audit` ordinaire : contraste sur styles calculés
+  (RGAA 3.2/10.5), contraste mesuré sur la capture d’écran pour le texte sur un dégradé ou une
+  image (l’angle mort du CSSOM que partage axe-core), et identification des liens par la seule
+  couleur (**RGAA 10.6**, auparavant indécidable). Chacun laisse le critère `manual` quand il ne
+  peut pas mesurer — jamais une supposition ; lisez **`references/pages.md`**.
+- **"Donne-moi la grille RGAA, page par page"** → `pages --in audits/audit-latest.json` (aussi intégré à `report`) : une ligne par critère, une colonne par **URL** de page, reconstruite à
+  partir du seul audit.json commité. Deux règles tiennent : un constat n’est attribué à une page
+  que lorsque quelque chose le DIT (sinon il est signalé comme non attribué, jamais réparti), et
+  un `C` par silence n’est obtenu que par une page dont le vrai DOM a été audité — une page
+  source seule garde ses critères non décidés « à évaluer » ; lisez **`references/pages.md`**.
+- **"Je veux un rapport PAR PAGE, pas une matrice"** → `pages --in audits/audit-latest.json
+  --format report --split page --out audits` : un dossier par page —
+  identité, sa capture d’écran, son taux, CHAQUE critère du référentiel avec son statut sur
+  cette page, puis chaque non-conformité sous forme du bloc d’auditeur ordinaire. Rien n’est
+  redécidé (la même projection que la grille) et aucun format n’est inventé (le même bloc
+  d’auditeur que le rapport), donc une fiche de page et le rapport de conformité ne peuvent pas
+  se contredire. `check` la contrôle contre les critères inventés comme tout autre rapport ;
+  lisez **`references/pages.md`**.
+- **"Quelles pages dois-je seulement auditer ?"** → `pages discover --crawl http://localhost:3000
+  --propose --write` (ou `--sitemap <url>`, ou `--from-snapshots`) écrit un bloc `sample.pages`
+  **déterministe** : les types de pages obligatoires reconnus par mot-clé sur les URL et titres
+  triés, la page de recherche avec une requête fixe, puis une page par groupe de gabarits, dans la
+  limite de `--sample-size` (20 par défaut). Le même site donne le même échantillon quel que soit
+  le modèle qui le lance, donc **ne choisissez pas les pages vous-même : lancez la proposition et
+  gardez-la.** Ne la modifiez qu’avec une raison enregistrée — une page que vous ajoutez porte sa
+  raison dans `notes`, un type obligatoire que vous retirez reçoit
+  `sample.absent: [{ "kind", "reason" }]` ; `sample check` signale un type retiré sans raison.
+  Les auth/storageState/sources/notes déjà déclarés sont conservés. Ensuite `sample check`
+  vérifie la couverture et `scan --sample` scanne l’échantillon et en prend les instantanés.
+  Une SPA rendue côté client n’expose aucune route dans son HTML servi — utilisez-y un sitemap ;
+  lisez **`references/dynamic.md`**.
+- **"Auditer en CI" / "auditer ces URL page par page, en CI"** → ultra11y ne livre aucune
+  intégration CI propre : lancez le **bot `rgaa-audit`** d’iterion
+  (https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit). Il installe ce moteur
+  épinglé, rend l’échantillon de pages, arbitre et réfute avec des agents en lecture seule,
+  contrôle avec `check` et ouvre une issue par critère non conforme. Lisez
+  **`references/ci.md`**.
+- **"Rends ce code accessible / relis-le"** → auditez l’extrait
+  (`audit - < component.html`) en privilégiant le natif ; lisez **`references/authoring.md`** et
   **`references/forbidden-patterns.md`**.
-- **"What does criterion X mean"** → `criteria` (e.g. `criteria 8.3`; a WCAG id such as
-  `criteria 1.4.3` prints that mapping target); see **`references/criteria.md`**.
-- **"How trustworthy is a given check / what does the engine NOT catch"** → the engine is
-  scored against the **W3C ACT-Rules test corpus** (~1 100 third-party examples): which
-  checks are consistent, where recall is partial, which deviations are deliberate, and
-  which statically-decidable rules are still missing — read **`references/act.md`**. Use it
-  to calibrate how much of a criterion the engine really settles before you adjudicate.
-- **"RGAA audit"** → see **`references/standards.md`** and
-  **`references/methodology.md`**. **PROPOSE the scan by
-  default**: an RGAA audit is normatively defined over a declared page **sample**, and an
-  un-scanned report is marked **partial** — say so rather than implying
-  full coverage. The sample workflow (`sample check`, `scan --sample`, `--merge`) is in
-  **`references/audit.md`**.
-- **"High-assurance audit"** → `verify --report … --semantic`; see **`references/verify.md`**.
-- **"Check contrast / rendering (dynamic tier)"** → `scan <url> --merge …` runs axe-core in a
-  headless browser and, on the local runtime, probes focus visibility, 200% zoom, text
-  spacing and content-on-hover, with bounded stateful interactions and authenticated pages;
-  read **`references/dynamic.md`**.
-- **"Close the criteria that came back `needs-rendered-dom`"** → they did not need a better
-  model, they needed a browser. `scan` persists WHAT IT MEASURED beside each snapshot
-  (`probes.json`, `axe.json`). **A clean scan does not close them**: 3.2/3.3/10.4/10.11/10.12 carry only *candidate* scan rules, so a clean scan
-  leaves them « à évaluer » — the scan can still raise their non-conformities, and 10.1/12.8
-  become adjudicable from the captured DOM. Rule on them in `verify --manual`; where a brief
-  shows no harvested evidence, a `C` is refused, so record `manual` (`undecidable`) with the
-  reason and list it under `--allow-undecided`. `verify --manual` warns
-  before you spend a pass, `check --require-rendered` refuses, and the crawl is **unbounded by
-  default** (`--max 0` / `--depth 0`), announcing every page it reaches. Read
-  **`references/dynamic.md`** and **`references/pages.md`**.
+- **"Que signifie le critère X"** → `criteria` (par ex. `criteria 8.3` ; un identifiant WCAG
+  comme `criteria 1.4.3` affiche cette cible de correspondance) ; voir
+  **`references/criteria.md`**.
+- **"Quelle confiance accorder à une vérification / qu’est-ce que le moteur ne détecte PAS"** →
+  le moteur est évalué sur le **corpus de tests W3C ACT-Rules** (~1 100 exemples tiers) : quelles
+  vérifications sont cohérentes, où le rappel est partiel, quels écarts sont délibérés, et quelles
+  règles décidables statiquement manquent encore — lisez **`references/act.md`**. Servez-vous-en
+  pour calibrer quelle part d’un critère le moteur tranche réellement avant d’arbitrer.
+- **"Audit RGAA"** → voir **`references/standards.md`** et
+  **`references/methodology.md`**. **PROPOSEZ le scan par
+  défaut** : un audit RGAA est défini normativement sur un **échantillon** de pages déclaré, et
+  un rapport non scanné est marqué **partiel** — dites-le plutôt que de laisser entendre une
+  couverture complète. Le workflow d’échantillon (`sample check`, `scan --sample`, `--merge`) se
+  trouve dans **`references/audit.md`**.
+- **"Audit à haut niveau d’assurance"** → `verify --report … --semantic` ; voir
+  **`references/verify.md`**.
+- **"Vérifier le contraste / le rendu (niveau dynamique)"** → `scan <url> --merge …` lance
+  axe-core dans un navigateur headless et, sur le runtime local, sonde la visibilité du focus,
+  le zoom à 200 %, l’espacement du texte et le contenu au survol, avec des interactions à état
+  bornées et des pages authentifiées ; lisez **`references/dynamic.md`**.
+- **"Fermer les critères revenus en `needs-rendered-dom`"** → il ne leur fallait pas un meilleur
+  modèle, il leur fallait un navigateur. `scan` enregistre CE QU’IL A MESURÉ à côté de chaque
+  instantané (`probes.json`, `axe.json`). **Un scan propre ne les ferme pas** : 3.2/3.3/10.4/10.11/10.12 ne portent que des règles de scan *candidates*, donc un scan
+  propre les laisse « à évaluer » — le scan peut encore lever leurs non-conformités, et 10.1/12.8
+  deviennent arbitrables à partir du DOM capturé. Statuez sur eux dans `verify --manual` ; là où
+  un brief ne montre aucune preuve récoltée, un `C` est refusé, donc enregistrez `manual`
+  (`undecidable`) avec la raison et listez-le sous `--allow-undecided`. `verify --manual`
+  avertit avant que vous ne dépensiez un passage, `check --require-rendered` refuse, et le crawl
+  est **non borné par défaut** (`--max 0` / `--depth 0`), annonçant chaque page qu’il atteint.
+  Lisez **`references/dynamic.md`** et **`references/pages.md`**.
 
-## Orchestration — route by harness
+## Orchestration — router selon le harness
 
-The judgment phases fan out: `ADJUDICATE.todo.json` (one item per residual criterion) and
-`VERIFY.todo.json` (one entry per claim on trial — each non-conformity, and each agent
-`C`/`NA`) are independent per-item worklists, and
-`orchestrate --run <dir>` emits harness-neutral batches (one prompt file per batch, handed
-verbatim to a Claude Code, Codex or OpenCode subagent), the Claude Code workflow rendered from
-them, per-role dispatch contracts and a sequential RUNBOOK from whichever worklists currently
-exist. Fan-out is an optimization,
-never a requirement: the gates are harness-independent, every phase has a sequential
-fallback with identical artifacts, and the fail-closed `verify --apply` fold always stays
-with you. Read **`references/orchestration.md`** for the routing table and the rules.
+Les phases de jugement se répartissent : `ADJUDICATE.todo.json` (un élément par critère
+résiduel) et `VERIFY.todo.json` (une entrée par affirmation mise à l’épreuve — chaque
+non-conformité, et chaque `C`/`NA` de l’agent) sont des listes de travail indépendantes élément
+par élément, et
+`orchestrate --run <dir>` émet des lots neutres vis-à-vis du harness (un fichier de prompt par
+lot, transmis tel quel à un sous-agent Claude Code, Codex ou OpenCode), le workflow Claude Code
+rendu à partir d’eux, des contrats de dispatch par rôle et un RUNBOOK séquentiel, à partir des
+listes de travail qui existent à ce moment-là. La répartition est une optimisation,
+jamais une exigence : les garde-fous sont indépendants du harness, chaque phase a un repli
+séquentiel aux artefacts identiques, et le repli fail-closed `verify --apply` reste toujours de
+votre ressort. Lisez **`references/orchestration.md`** pour la table de routage et les règles.
 
-## Command cheat sheet
+## Aide-mémoire des commandes
 
-The full surface is in `--help`; these are the lines you reach for.
+La surface complète est dans `--help` ; voici les lignes dont vous avez besoin.
 
 ```
 node scripts/ultra11y.mjs audit "src/**/*.tsx" --graph --out audits --json   # the default audit (AST + cross-file, persisted)
@@ -356,162 +384,175 @@ node scripts/ultra11y.mjs criteria --plan                                    # t
 node scripts/ultra11y.mjs fix "src/**/*.html" --write --iterate               # apply the safe codemods to a fixpoint
 node scripts/ultra11y.mjs init --hook                                        # pre-commit gate over the staged snapshot
 ```
-**Everything speaks RGAA, by default.** `audit` prints an RGAA-titled summary tabulated by
-thématique with findings tagged `[8.4]`, in French unless `--lang en`; `--json` and `--out`
-write the RGAA document (106 criteria, 13 thématiques — each finding carries its `wcag`
-mapping) with the WCAG core inside `core` for the pipeline; and the report, the PRD, the
-tickets and the per-page sheets name RGAA criteria, WCAG only as the mapping. The engine still
-keys on success criteria internally, because an RGAA criterion is DEFINED as a projection of
-them; that is plumbing. `--standard rgaa` is accepted (iterion's `rgaa-audit` bot passes it);
-`--standard wcag` exits 2. `--json` anywhere for machine output.
-`--lang` follows the conversation (pass it explicitly — Core rule 7).
+**Tout parle RGAA, par défaut.** `audit` affiche un résumé titré RGAA, tabulé par
+thématique, avec des constats étiquetés `[8.4]`, en français sauf avec `--lang en` ; `--json` et
+`--out` écrivent le document RGAA (106 critères, 13 thématiques — chaque constat porte sa
+correspondance `wcag`) avec le noyau WCAG dans `core` pour le pipeline ; et le rapport, le PRD,
+les tickets et les fiches par page nomment des critères RGAA, le WCAG seulement comme
+correspondance. En interne, le moteur reste indexé sur les critères de succès, parce qu’un
+critère RGAA est DÉFINI comme une projection de ceux-ci ; c’est de la plomberie.
+`--standard rgaa` est accepté (le bot `rgaa-audit` d’iterion le passe) ; `--standard wcag` sort
+avec le code 2. `--json` partout pour une sortie machine.
+`--lang` suit la conversation (passez-le explicitement — règle fondamentale 7).
 
-## The loop: audit → render → adjudicate → fix → re-audit
+## La boucle : auditer → rendre → arbitrer → corriger → réauditer
 
-To converge on conformance (not a single pass), chain the steps, letting the agent
-drive the judgment and content stages:
+Pour converger vers la conformité (et non faire un seul passage), enchaînez les étapes, en
+laissant l’agent piloter les étapes de jugement et de contenu :
 
-1. **Audit** the source (`audit … --graph`) for a first map; on library-rendered code,
-   **audit the render** (`render` → build/SSR → `audit`) for reliable verdicts (otherwise
-   the scope-risk note reminds you).
-1b. **RENDER BEFORE YOU ADJUDICATE — this step is not optional when a rendering criterion is
-   open.** `scan <url|file> --merge audits/audit-latest.json --out audits`
-   (or `scan --sample`) drives a real browser, persists each page to `.ultra11y/pages/<id>/`
-   **with what it measured** (`probes.json`, `axe.json`), and folds it in. Skipping it does not
-   leave those criteria merely open — it makes them *undecidable by anyone*: no reading of the
-   source settles computed contrast, 200 % zoom, 320 px reflow or text spacing, so every
-   adjudication pass over them costs a model and returns `needs-rendered-dom`. Measured on one
-   RGAA run over a two-file fixture: **80 criteria to adjudicate from source alone, 41 once a
-   single page was scanned**. Under RGAA the scan does not close a rendering criterion by
-   itself (its rules are *candidate* evidence there, see above), but without it you have no
-   rendered DOM to rule on. `verify --manual` now says so before you spend anything, and
-   `check --in <audit.json> --require-rendered` makes it a gate.
-2. **Adjudicate & refute** with `verify`, two worklists. (a) `verify --manual --in audit.json`
-   emits `ADJUDICATE.todo.json` — one item per residual *judgment* criterion, pre-loaded with the
-   engine's harvested evidence — which the AI agent rules on (`C`/`NC`/`NA`, or `manual` with a
-   `reason` when it truly `needs-rendered-dom`), each verdict carrying a `justification` or a
-   groundable finding; `verify --apply … --in audit.json` folds them back FAIL-CLOSED (agent NCs
-   become real `agent:<sc>` findings that re-render in §2). (b) `verify --report … [--semantic]`
-   builds `VERIFY.todo.json`, which attacks **both directions**. It refutes any
-   `preliminary`/SFC/library-source **non-conformity** the rendered DOM disproves, and — by
-   default — it also puts the agent-adjudicated
-   **conformities and « non applicable »** of `--in`'s audit (else the ledger) on trial, one
-   item per claim with its full citation set, question inverted: *does this evidence
-   establish the criterion, or only show that its subject exists?* Nothing used to challenge a
-   `C`, so a criterion cleared because its subject was PRESENT rather than RIGHT shipped as a
-   conformance claim. Same verdicts (`supported`/`partial`/`refuted`/`unsupported`);
-   `verify --apply` drops the refuted/unsupported non-conformities and sends a refuted
-   conformity's criterion back to « à évaluer » — never to NC, because refuting a conformity
-   proves nothing against the criterion; with `--prune` it writes that outcome back to the
-   audit, and a conformity the verdicts file never ruled on goes back to « à évaluer » too.
-   `verify --summary --verdicts <file> --report <md> --in <audit> [--pruned <audit>]` writes the
-   read-only bilan (`TRIAL.md`): confirmed, withdrawn and applied, contested engine decisions
-   (unresolved), never tried, foreign, and the semantic gate apart from the application.
-   The conformity half is **never capped by default** (`--max-verify` bounds the
-   non-conformities only, default 40); pass `--max-verify 0` to put every claim on trial in
-   one worklist, and treat any « left out of the trial » warning as an incomplete run.
-   `--no-conformities` opts out. This
-   includes **focus & interaction logic** (read the full component source: keyboard
-   operability, focus order/visibility, traps, on-focus/on-input changes; see
-   `references/focus-and-logic.md`) and the per-rule traps in `references/false-positives.md`.
-   Both worklists fan out (`orchestrate --run <dir> --phase adjudicate|verify-report` —
-   see **Orchestration — route by harness**); the `--apply` fold always stays with you.
-   **Rule each criterion against its OWN text, not your memory of it.** `verify --manual` also
-   writes one small brief per criterion (`adjudicate/<criteriaId>.md`) carrying the criterion's
-   official RGAA wording, its numbered tests and its
-   **test methodology** (RGAA publishes one for all 258 of its tests), plus its glossary terms,
-   technical note and particular cases. Read that brief; it is RGAA
-   that decides, never the WCAG success criterion behind it. Each brief also cites the
-   criterion's official page: if a wording stays ambiguous and you have a web tool you may go
-   read it — never to contradict the vendored text, and a web page is never an acceptable
-   `normativeRef` (`--no-web` drops the offer; CI drops it by default).
-3. **Fix** by priority: `fix --write --iterate` for the mechanical part (anti-regression
-   gate), then hand-apply the judgment/content fixes (alt, labels, structure) guided by
-   `references/correction.md`.
-4. **Re-audit** (on the render where relevant) and repeat.
-5. **Deliver the auditor block.** `report` (compliance doc: synthesis + one auditor
-   conformance block — thématique/critère/test/WCAG mapping/finding/expected/verification —
-   per NC criterion) and `prd` (the same blocks as an actionable backlog; `tickets`
-   filing one GitHub issue per criterion with that identical block) are two views of the
-   ONE building block, in the language of this conversation (pass `--lang` explicitly —
-   Core rule 7).
+1. **Auditez** le source (`audit … --graph`) pour une première carte ; sur du code rendu par une
+   bibliothèque, **auditez le rendu** (`render` → build/SSR → `audit`) pour des verdicts fiables
+   (sinon la note de risque de périmètre vous le rappelle).
+1b. **RENDEZ AVANT D’ARBITRER — cette étape n’est pas facultative quand un critère de rendu est
+   ouvert.** `scan <url|file> --merge audits/audit-latest.json --out audits`
+   (ou `scan --sample`) pilote un vrai navigateur, enregistre chaque page dans
+   `.ultra11y/pages/<id>/` **avec ce qu’il a mesuré** (`probes.json`, `axe.json`), et l’intègre.
+   La sauter ne laisse pas seulement ces critères ouverts — elle les rend *indécidables par
+   quiconque* : aucune lecture du source ne tranche le contraste calculé, le zoom à 200 %, le
+   reflow à 320 px ou l’espacement du texte, donc chaque passage d’arbitrage sur eux coûte un
+   modèle et renvoie `needs-rendered-dom`. Mesuré sur un run RGAA sur un fixture de deux
+   fichiers : **80 critères à arbitrer à partir du seul source, 41 dès qu’une seule page a été
+   scannée**. Sous le RGAA, le scan ne ferme pas à lui seul un critère de rendu (ses règles y
+   sont des preuves *candidates*, voir plus haut), mais sans lui vous n’avez aucun DOM rendu sur
+   lequel statuer. `verify --manual` le dit désormais avant que vous ne dépensiez quoi que ce
+   soit, et `check --in <audit.json> --require-rendered` en fait un garde-fou.
+2. **Arbitrez et réfutez** avec `verify`, deux listes de travail. (a) `verify --manual --in audit.json`
+   émet `ADJUDICATE.todo.json` — un élément par critère résiduel *de jugement*, préchargé avec
+   les preuves récoltées par le moteur — sur lequel l’agent IA statue (`C`/`NC`/`NA`, ou `manual`
+   avec une `reason` quand il relève vraiment de `needs-rendered-dom`), chaque verdict portant une
+   `justification` ou un constat fondé ; `verify --apply … --in audit.json` les réintègre en
+   FAIL-CLOSED (les NC de l’agent deviennent de vrais constats `agent:<sc>` qui réapparaissent au
+   §2). (b) `verify --report … [--semantic]`
+   construit `VERIFY.todo.json`, qui attaque **dans les deux sens**. Il réfute toute
+   **non-conformité** `preliminary`/SFC/source de bibliothèque que le DOM rendu dément, et — par
+   défaut — il met aussi à l’épreuve les
+   **conformités et « non applicable »** arbitrées par l’agent dans l’audit de `--in` (sinon le
+   registre), un élément par affirmation avec son jeu complet de citations, la question
+   inversée : *ces preuves établissent-elles le critère, ou montrent-elles seulement que son
+   sujet existe ?* Rien ne contestait auparavant un `C`, si bien qu’un critère validé parce que
+   son sujet était PRÉSENT plutôt que CORRECT partait comme une affirmation de conformité. Mêmes
+   verdicts (`supported`/`partial`/`refuted`/`unsupported`) ;
+   `verify --apply` écarte les non-conformités réfutées/non étayées et renvoie le critère d’une
+   conformité réfutée à « à évaluer » — jamais à NC, car réfuter une conformité ne prouve rien
+   contre le critère ; avec `--prune`, il réécrit ce résultat dans l’audit, et une conformité sur
+   laquelle le fichier de verdicts n’a jamais statué repart elle aussi « à évaluer ».
+   `verify --summary --verdicts <file> --report <md> --in <audit> [--pruned <audit>]` écrit le
+   bilan en lecture seule (`TRIAL.md`) : confirmées, retirées et appliquées, décisions du moteur
+   contestées (non résolues), jamais mises à l’épreuve, étrangères, et le garde-fou sémantique
+   à part de l’application.
+   La moitié « conformités » n’est **jamais plafonnée par défaut** (`--max-verify` ne borne que les
+   non-conformités, 40 par défaut) ; passez `--max-verify 0` pour mettre chaque affirmation à
+   l’épreuve dans une seule liste de travail, et traitez tout avertissement « left out of the
+   trial » comme un run incomplet.
+   `--no-conformities` permet de s’en dispenser. Cela
+   inclut la **logique de focus et d’interaction** (lire le source complet du composant :
+   opérabilité au clavier, ordre/visibilité du focus, pièges, changements au focus / à la saisie ;
+   voir `references/focus-and-logic.md`) et les pièges propres à chaque règle dans
+   `references/false-positives.md`.
+   Les deux listes de travail se répartissent (`orchestrate --run <dir> --phase adjudicate|verify-report` —
+   voir **Orchestration — router selon le harness**) ; le repli `--apply` reste toujours de votre
+   ressort.
+   **Statuez sur chaque critère d’après SON PROPRE texte, pas d’après votre souvenir.**
+   `verify --manual` écrit aussi un petit brief par critère (`adjudicate/<criteriaId>.md`) portant
+   la formulation officielle du critère dans le RGAA, ses tests numérotés et sa
+   **méthodologie de test** (le RGAA en publie une pour chacun de ses 258 tests), plus ses termes
+   du glossaire, sa note technique et ses cas particuliers. Lisez ce brief ; c’est le RGAA
+   qui décide, jamais le critère de succès WCAG qui est derrière. Chaque brief cite aussi la
+   page officielle du critère : si une formulation reste ambiguë et que vous disposez d’un outil
+   web, vous pouvez aller la lire — jamais pour contredire le texte embarqué, et une page web
+   n’est jamais une `normativeRef` acceptable (`--no-web` retire cette proposition ; la CI la
+   retire par défaut).
+3. **Corrigez** par priorité : `fix --write --iterate` pour la partie mécanique (garde-fou
+   anti-régression), puis appliquez à la main les correctifs de jugement/contenu (alt,
+   étiquettes, structure) en suivant `references/correction.md`.
+4. **Réauditez** (sur le rendu le cas échéant) et recommencez.
+5. **Livrez le bloc d’auditeur.** `report` (document de conformité : synthèse + un bloc de
+   conformité d’auditeur — thématique/critère/test/correspondance WCAG/constat/attendu/vérification —
+   par critère NC) et `prd` (les mêmes blocs sous forme de backlog actionnable ; `tickets`
+   ouvrant une issue GitHub par critère avec ce bloc identique) sont deux vues de
+   l’UNIQUE brique de base, dans la langue de cette conversation (passez `--lang` explicitement —
+   règle fondamentale 7).
 
-6. **Hand the change over to `review-a11y`, in a subagent.** Once the deliverable is out,
-   the code you just fixed still has to be reviewed as a *change*, and that is the other
-   skill's job — see **Handing over to `review-a11y`** below.
+6. **Passez le changement à `review-a11y`, dans un sous-agent.** Une fois le livrable publié,
+   le code que vous venez de corriger doit encore être relu en tant que *changement*, et c’est le
+   travail de l’autre skill — voir **Passer la main à `review-a11y`** plus bas.
 
-**Stop** when `check` and `verify --apply` are green again and only explicitly-named
-residual risks remain. (To automate the outer cadence, the harness `/loop` command can
-re-run this cycle.)
+**Arrêtez-vous** quand `check` et `verify --apply` sont de nouveau au vert et qu’il ne reste que
+des risques résiduels explicitement nommés. (Pour automatiser la cadence externe, la commande
+`/loop` du harness peut relancer ce cycle.)
 
-## Handing over to `review-a11y`
+## Passer la main à `review-a11y`
 
-This skill does the analysis end to end: audit, render, adjudicate, fix, re-audit, deliver.
-When it has produced fixes, **dispatch `review-a11y` on the code under change as a subagent**,
-and report what it returns.
+Cette skill fait l’analyse de bout en bout : auditer, rendre, arbitrer, corriger, réauditer,
+livrer. Quand elle a produit des correctifs, **lancez `review-a11y` sur le code en cours de
+changement dans un sous-agent**, et rapportez ce qu’il renvoie.
 
-Use the host's native subagent capability: Codex dispatches a subagent with the prompt below,
-OpenCode its Task tool, Claude Code its Agent tool (`Agent(...)`). If the host has no subagents,
-follow the sequential route below.
+Utilisez la capacité native de l’hôte à lancer des sous-agents : Codex lance un sous-agent avec
+le prompt ci-dessous, OpenCode son outil Task, Claude Code son outil Agent (`Agent(...)`). Si
+l’hôte n’a pas de sous-agents, suivez la voie séquentielle ci-dessous.
 
 ```
 Use the review-a11y skill on the working diff. Return its report verbatim.
 ```
 
-Two skills, two scopes, and the split is not cosmetic:
+Deux skills, deux périmètres, et la séparation n’est pas cosmétique :
 
-| | scope | asks |
+| | périmètre | question |
 |---|---|---|
-| `ultra11y` (this one) | the repository, a page sample, a standard | *does this product conform, and where is the proof?* |
-| `review-a11y` | exactly the code under change (staged, diff, or branch vs merge-base) | *is this change safe to merge?* |
+| `ultra11y` (celle-ci) | le dépôt, un échantillon de pages, un référentiel | *ce produit est-il conforme, et où est la preuve ?* |
+| `review-a11y` | exactement le code en cours de changement (index, diff, ou branche vs merge-base) | *ce changement peut-il être mergé sans risque ?* |
 
-**Why a subagent rather than an inline pass.** A full audit fills a context with a 3 MB
-engine's output, dozens of reference files and a page sample; a review has to read the diff
-closely with none of that in the way. Handing it over keeps the review's judgment
-independent of the audit that just ran — the same reason `verify` refutes findings instead
-of trusting them. If the harness has no subagent tool, invoke `review-a11y` directly: the
-routing table in `references/orchestration.md` names the fallbacks, and the review is
-identical either way.
+**Pourquoi un sous-agent plutôt qu’un passage en ligne.** Un audit complet remplit un contexte
+avec la sortie d’un moteur de 3 Mo, des dizaines de fichiers de référence et un échantillon de
+pages ; une revue doit lire le diff de près sans rien de tout cela en travers. Passer la main
+garde le jugement de la revue indépendant de l’audit qui vient de tourner — pour la même raison
+que `verify` réfute les constats au lieu de leur faire confiance. Si le harness n’a aucun outil de
+sous-agent, invoquez directement `review-a11y` : la table de routage de
+`references/orchestration.md` nomme les replis, et la revue est identique dans les deux cas.
 
-**Do not paraphrase its verdict.** It returns a severity-ranked review with `file:line` and a
-one-line verdict; that is the deliverable, not a summary of it.
+**Ne paraphrasez pas son verdict.** Elle renvoie une revue classée par sévérité avec `file:line`
+et un verdict en une ligne ; c’est cela le livrable, pas un résumé de celui-ci.
 
-## Combining engine, judgment and residual risk
+## Combiner moteur, jugement et risque résiduel
 
-`audit` classes each criterion `C`/`NC`/`NA` for the static subset and `manual` for the rest,
-each carrying an `automatability` class that says WHY it is manual and how to close it:
-**`static`** (the engine decides), **`needs-rendering`** (`scan`), **`judgment`** (you, from
-the harvested evidence and the decision protocol). Engine `NC`s are confirmed candidates
-with a cited `file:line`; a `preliminary: true` finding (SFC/library source) is provisional —
-confirm it against the render or refute it. A criterion is never silently marked conforming:
-the report is complete only when every applicable criterion is a justified `C`/`NC`/`NA` and
-every residual risk is named. See **`references/methodology.md`**.
+`audit` classe chaque critère `C`/`NC`/`NA` pour le sous-ensemble statique et `manual` pour le
+reste, chacun portant une classe `automatability` qui dit POURQUOI il est manuel et comment le
+fermer : **`static`** (le moteur décide), **`needs-rendering`** (`scan`), **`judgment`** (vous, à
+partir des preuves récoltées et du protocole de décision). Les `NC` du moteur sont des candidats
+confirmés avec un `file:line` cité ; un constat `preliminary: true` (source SFC/bibliothèque) est
+provisoire — confirmez-le sur le rendu ou réfutez-le. Un critère n’est jamais marqué conforme en
+silence : le rapport n’est complet que lorsque chaque critère applicable est un `C`/`NC`/`NA`
+justifié et que chaque risque résiduel est nommé. Voir **`references/methodology.md`**.
 
-**Advisory recommendations are a distinct class.** A good-practice signal with NO failing
-normative test renders under a dedicated section and can never flip a criterion to `NC` nor
-enter `conformancePct`. An `NC` needs a `normativeRef`; a recommendation does not. Do not
-promote one to the other — see **`references/false-positives.md`**.
+**Les recommandations consultatives forment une classe à part.** Un signal de bonne pratique
+SANS test normatif en échec s’affiche dans une section dédiée et ne peut jamais faire basculer un
+critère en `NC` ni entrer dans `conformancePct`. Un `NC` exige une `normativeRef` ; une
+recommandation non. Ne promouvez pas l’une en l’autre — voir **`references/false-positives.md`**.
 
-## Do not
+## À ne pas faire
 
-- Invent a non-conformity the engine did not find and you cannot see (contrast on
-  **inline literal colours** is decided statically; **computed** contrast — external CSS,
-  variables — goes through `scan` (browser tier) or is verified at render before being declared).
-- Add ARIA that duplicates native semantics.
-- Mark a rendering/judgment criterion "conforming" without a recorded, gated justification
-  (agent adjudication via `verify --manual`, or `scan` evidence).
-- Hand-edit `references/criteria.md` (generated from the WCAG dataset via `criteria --generate`).
+- Inventer une non-conformité que le moteur n’a pas trouvée et que vous ne pouvez pas voir (le
+  contraste sur des **couleurs littérales en ligne** se décide statiquement ; le contraste
+  **calculé** — CSS externe, variables — passe par `scan` (niveau navigateur) ou se vérifie sur le
+  rendu avant d’être déclaré).
+- Ajouter de l’ARIA qui duplique la sémantique native.
+- Marquer un critère de rendu/jugement « conforme » sans justification enregistrée et contrôlée
+  (arbitrage de l’agent via `verify --manual`, ou preuve issue de `scan`).
+- Modifier à la main `references/criteria.md` (généré à partir du jeu de données WCAG via
+  `criteria --generate`).
 
-## Scope
+## Périmètre
 
-Static engine: offline, deterministic, install-free; inputs are HTML + JSX/TSX (real AST,
-cross-file analysis via `--graph`) + stdin. The **rendering** criteria (computed contrast,
-reflow) are covered by the optional `scan` tier (axe-core on the local Playwright).
-It additionally **probes** focus visibility (2.4.7), 200% text zoom (1.4.4),
-text spacing (1.4.12) and content-on-hover (1.4.13) — observed in the rendered page, raised
-as NC only when the failure is seen (a clean probe leaves the SC `manual`, never silently
-conforming); reading order and alt relevance are the AI agent's judgment, adjudicated from the
-harvested evidence and gated (`verify --manual`).
-Data: WCAG 2.2 ©
-W3C (W3C Document License); the RGAA pack is RGAA 4.1.2 © DINUM, Licence Ouverte / Etalab
-2.0 (see `NOTICE`).
+Moteur statique : hors ligne, déterministe, sans installation ; les entrées sont du HTML + du
+JSX/TSX (vrai AST, analyse inter-fichiers via `--graph`) + stdin. Les critères **de rendu**
+(contraste calculé, reflow) sont couverts par le niveau facultatif `scan` (axe-core sur le
+Playwright local).
+Il **sonde** en outre la visibilité du focus (2.4.7), le zoom du texte à 200 % (1.4.4),
+l’espacement du texte (1.4.12) et le contenu au survol (1.4.13) — observés dans la page rendue,
+levés en NC seulement quand l’échec est constaté (une sonde propre laisse le critère de succès
+`manual`, jamais conforme en silence) ; l’ordre de lecture et la pertinence des alternatives
+relèvent du jugement de l’agent IA, arbitrés à partir des preuves récoltées et contrôlés
+(`verify --manual`).
+Données : WCAG 2.2 ©
+W3C (W3C Document License) ; le pack RGAA est le RGAA 4.1.2 © DINUM, Licence Ouverte / Etalab
+2.0 (voir `NOTICE`).

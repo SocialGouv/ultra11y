@@ -1,38 +1,40 @@
-# Composite widgets — keyboard contracts, ARIA state, focus management
+# Widgets composites — contrats clavier, états ARIA, gestion du focus
 
-The engine sees structure; it cannot press Tab. When a component is not a native element,
-its accessibility IS its keyboard contract, and that contract is what you adjudicate under
-2.1.1, 2.4.3, 4.1.2 and 4.1.3. This page is the reference for what each pattern owes,
-following the ARIA Authoring Practices Guide (APG).
+Le moteur voit la structure ; il ne peut pas appuyer sur Tab. Quand un composant n’est pas un
+élément natif, son accessibilité EST son contrat clavier, et c’est ce contrat que vous
+arbitrez au titre des 2.1.1, 2.4.3, 4.1.2 et 4.1.3. Cette page est la référence de ce que
+chaque motif doit fournir, d’après l’ARIA Authoring Practices Guide (APG).
 
-**The rule that precedes all of them: use the native element.** `<button>`, `<select>`,
-`<details>`, `<dialog>`, `<input type="checkbox">` ship every behaviour below for free and
-cannot drift out of sync. Reach for ARIA only when no native element fits.
+**La règle qui les précède toutes : utilisez l’élément natif.** `<button>`, `<select>`,
+`<details>`, `<dialog>`, `<input type="checkbox">` fournissent gratuitement chacun des
+comportements ci-dessous et ne peuvent pas se désynchroniser. Ne recourez à ARIA que lorsque
+aucun élément natif ne convient.
 
-## Keyboard contracts
+## Contrats clavier
 
-| Pattern | Roles | Keys it must handle | State it must keep in sync |
+| Motif | Rôles | Touches à gérer | État à garder synchronisé |
 |---|---|---|---|
-| **Disclosure** (show/hide) | `button` + controlled region | `Enter`, `Space` | `aria-expanded` on the button, `aria-controls` → region id |
-| **Accordion** | `button` inside a heading, per panel | `Enter`/`Space`; `↑`/`↓` between headers (optional) | `aria-expanded` per header |
-| **Tabs** | `tablist` > `tab`, plus `tabpanel` | `←`/`→` (or `↑`/`↓` if vertical) move between tabs, `Home`/`End`; `Tab` leaves the tablist | `aria-selected` on the active tab, `aria-controls` → panel, roving `tabindex` |
-| **Menu / menubar** | `menu`/`menubar` > `menuitem` | `↑`/`↓` within, `←`/`→` across a menubar, `Enter` activates, `Esc` closes and returns focus, `Home`/`End` | `aria-expanded` on the trigger, roving `tabindex` |
-| **Listbox** | `listbox` > `option` | `↑`/`↓`, `Home`/`End`, type-ahead; `Space` toggles in a multi-select | `aria-selected` per option, `aria-multiselectable` |
-| **Combobox** | `combobox` + popup `listbox` | `↓` opens and moves into the list, `Esc` closes, `Enter` commits, `Alt+↓`/`Alt+↑` | `aria-expanded`, `aria-controls`, `aria-activedescendant` → the focused option |
-| **Dialog / modal** | `dialog` (+ `aria-modal="true"`) | `Esc` closes; `Tab` cycles WITHIN the dialog | A name (`aria-label`/`aria-labelledby`); background made `inert` |
-| **Tooltip** | `tooltip` | `Esc` dismisses without moving focus | `aria-describedby` on the trigger; shown on focus AND hover |
-| **Tree** | `tree` > `treeitem` (+ `group`) | `↑`/`↓` between visible nodes, `→` expands, `←` collapses/goes to parent | `aria-expanded` per branch, `aria-selected`, roving `tabindex` |
-| **Slider** | `slider` | `←`/`→`/`↑`/`↓` step, `Home`/`End`, `PageUp`/`PageDown` | `aria-valuenow`/`valuemin`/`valuemax`, `aria-valuetext` when the number needs words |
-| **Grid / data grid** | `grid` > `row` > `gridcell` | Arrow keys move by cell, `Home`/`End` per row, `Ctrl+Home`/`Ctrl+End` | `aria-rowcount`/`colcount` when virtualised, `aria-sort` on sortable headers |
-| **Carousel** | group of slides + controls | Controls reachable by `Tab`; a pause control when it auto-rotates (2.2.2) | `aria-live="off"` while auto-rotating, `polite` once paused |
+| **Disclosure** (afficher/masquer) | `button` + région contrôlée | `Enter`, `Space` | `aria-expanded` sur le bouton, `aria-controls` → id de la région |
+| **Accordéon** | `button` dans un titre, par panneau | `Enter`/`Space` ; `↑`/`↓` entre les en-têtes (facultatif) | `aria-expanded` par en-tête |
+| **Onglets** | `tablist` > `tab`, plus `tabpanel` | `←`/`→` (ou `↑`/`↓` si vertical) passent d’un onglet à l’autre, `Home`/`End` ; `Tab` quitte la tablist | `aria-selected` sur l’onglet actif, `aria-controls` → panneau, `tabindex` itinérant |
+| **Menu / barre de menus** | `menu`/`menubar` > `menuitem` | `↑`/`↓` à l’intérieur, `←`/`→` le long d’une barre de menus, `Enter` active, `Esc` ferme et rend le focus, `Home`/`End` | `aria-expanded` sur le déclencheur, `tabindex` itinérant |
+| **Listbox** | `listbox` > `option` | `↑`/`↓`, `Home`/`End`, saisie anticipée ; `Space` bascule en sélection multiple | `aria-selected` par option, `aria-multiselectable` |
+| **Combobox** | `combobox` + `listbox` en popup | `↓` ouvre et entre dans la liste, `Esc` ferme, `Enter` valide, `Alt+↓`/`Alt+↑` | `aria-expanded`, `aria-controls`, `aria-activedescendant` → l’option qui a le focus |
+| **Dialogue / modale** | `dialog` (+ `aria-modal="true"`) | `Esc` ferme ; `Tab` circule À L’INTÉRIEUR du dialogue | Un nom (`aria-label`/`aria-labelledby`) ; arrière-plan rendu `inert` |
+| **Infobulle** | `tooltip` | `Esc` la ferme sans déplacer le focus | `aria-describedby` sur le déclencheur ; affichée au focus ET au survol |
+| **Arborescence** | `tree` > `treeitem` (+ `group`) | `↑`/`↓` entre les nœuds visibles, `→` déplie, `←` replie/remonte au parent | `aria-expanded` par branche, `aria-selected`, `tabindex` itinérant |
+| **Curseur** | `slider` | `←`/`→`/`↑`/`↓` par pas, `Home`/`End`, `PageUp`/`PageDown` | `aria-valuenow`/`valuemin`/`valuemax`, `aria-valuetext` quand le nombre a besoin de mots |
+| **Grille / grille de données** | `grid` > `row` > `gridcell` | Les flèches déplacent de cellule en cellule, `Home`/`End` par ligne, `Ctrl+Home`/`Ctrl+End` | `aria-rowcount`/`colcount` en cas de virtualisation, `aria-sort` sur les en-têtes triables |
+| **Carrousel** | groupe de diapositives + contrôles | Contrôles atteignables avec `Tab` ; un contrôle de pause quand il défile automatiquement (2.2.2) | `aria-live="off"` pendant le défilement automatique, `polite` une fois en pause |
 
-**Roving tabindex** means exactly one element in the widget is `tabindex="0"` and the rest
-are `tabindex="-1"`; the arrow keys move both the DOM focus and that `0`. It is what makes a
-30-item menu one `Tab` stop instead of thirty. The alternative — `aria-activedescendant` —
-keeps DOM focus on the container and points at the active child by id; use it for
-combobox/listbox, where focus must stay in the text input.
+Le **tabindex itinérant** (roving tabindex) signifie qu’exactement un élément du widget est en
+`tabindex="0"` et que les autres sont en `tabindex="-1"` ; les flèches déplacent à la fois le
+focus du DOM et ce `0`. C’est ce qui fait d’un menu de 30 éléments un seul arrêt de `Tab` au
+lieu de trente. L’alternative — `aria-activedescendant` — garde le focus du DOM sur le
+conteneur et désigne l’enfant actif par son id ; utilisez-la pour combobox/listbox, où le
+focus doit rester dans le champ de saisie.
 
-## Focus management recipes
+## Recettes de gestion du focus
 
 ```js
 // Dialog: move focus IN, trap it, and give it back on close.
@@ -50,19 +52,20 @@ function closeDialog(dialog) {
 }
 ```
 
-`inert` is the correct tool for "everything behind the modal": it removes the subtree from
-the focus order AND the accessibility tree in one attribute. Hiding the background with
-`aria-hidden="true"` alone leaves it tabbable — the very defect `aria-hidden-focusable`
-reports. Native `<dialog>.showModal()` does all of this for you.
+`inert` est le bon outil pour « tout ce qui est derrière la modale » : il retire le sous-arbre
+de l’ordre de focus ET de l’arbre d’accessibilité en un seul attribut. Masquer l’arrière-plan
+avec `aria-hidden="true"` seul le laisse atteignable à la tabulation — précisément le défaut
+que signale `aria-hidden-focusable`. Le `<dialog>.showModal()` natif fait tout cela pour vous.
 
-**Never leave focus nowhere.** Removing the focused element (closing a panel, deleting a
-row) drops focus to `<body>` and the user loses their place. Move focus deliberately: to the
-next row, or to the container with `tabindex="-1"`.
+**Ne laissez jamais le focus nulle part.** Supprimer l’élément qui a le focus (fermer un
+panneau, supprimer une ligne) fait retomber le focus sur `<body>` et l’utilisateur perd sa
+place. Déplacez le focus délibérément : vers la ligne suivante, ou vers le conteneur avec
+`tabindex="-1"`.
 
-## SPA route changes — the defect class no static rule can see
+## Changements de route en SPA — la classe de défauts qu’aucune règle statique ne voit
 
-A client-side navigation replaces the content without a page load. Nothing is announced,
-focus stays where it was, and the title still describes the previous page.
+Une navigation côté client remplace le contenu sans chargement de page. Rien n’est annoncé,
+le focus reste où il était, et le titre décrit encore la page précédente.
 
 ```js
 router.afterEach((to) => {
@@ -73,10 +76,10 @@ router.afterEach((to) => {
 });
 ```
 
-Do not focus `<body>` (announces nothing) and do not scroll without moving focus (sighted
-keyboard users end up typing into the old page).
+Ne donnez pas le focus à `<body>` (n’annonce rien) et ne faites pas défiler sans déplacer le
+focus (les utilisateurs voyants au clavier finissent par saisir dans l’ancienne page).
 
-## Live regions — 4.1.3 Status Messages
+## Régions live — 4.1.3 Messages d’état
 
 ```html
 <!-- Present in the DOM from the start, EMPTY. A region created together with its -->
@@ -85,22 +88,26 @@ keyboard users end up typing into the old page).
 <div id="errors" role="alert"></div>   <!-- assertive: interrupts, for blocking errors only -->
 ```
 
-| Situation | Politeness |
+| Situation | Niveau de politesse |
 |---|---|
-| Search results count, "Saved", progress | `role="status"` / `aria-live="polite"` |
-| Form submission blocked, session expiring | `role="alert"` (implies assertive) |
-| A message that also takes focus (a dialog) | No live region — focus already announces it |
+| Nombre de résultats de recherche, « Enregistré », progression | `role="status"` / `aria-live="polite"` |
+| Envoi de formulaire bloqué, session qui expire | `role="alert"` (implique assertive) |
+| Un message qui prend aussi le focus (un dialogue) | Pas de région live — le focus l’annonce déjà |
 
-Common failures: a region injected with its text in the same tick; `aria-live` on a wrapper
-that gets replaced wholesale rather than updated; `assertive` on everything, which trains
-users to ignore it. Engine rules: `live-region-conflict`, `status-message-not-assertive`.
+Échecs courants : une région injectée avec son texte dans le même tick ; `aria-live` sur un
+conteneur qui est remplacé en bloc plutôt que mis à jour ; `assertive` partout, ce qui
+apprend aux utilisateurs à l’ignorer. Règles du moteur : `live-region-conflict`,
+`status-message-not-assertive`.
 
-## Adjudicating a widget
+## Arbitrer un widget
 
-1. **Read the whole component**, not the flagged line — handlers, effects, state.
-2. Check the **role** against the table above: does it match the actual behaviour?
-3. Check the **keyboard contract**, key by key. A missing `Esc` is a real 2.1.1 failure.
-4. Check **state sync**: does `aria-expanded` change when the panel opens, every time?
-5. Check **focus**: where does it go on open, on close, on delete?
-6. What needs the rendered page (visible focus, target size) goes to `scan` — see
-   `references/dynamic.md`. Record every verdict; never leave a criterion silently green.
+1. **Lisez le composant entier**, pas la ligne signalée — gestionnaires, effets, état.
+2. Vérifiez le **rôle** au regard du tableau ci-dessus : correspond-il au comportement réel ?
+3. Vérifiez le **contrat clavier**, touche par touche. Un `Esc` manquant est un vrai échec
+   au 2.1.1.
+4. Vérifiez la **synchronisation de l’état** : `aria-expanded` change-t-il quand le panneau
+   s’ouvre, à chaque fois ?
+5. Vérifiez le **focus** : où va-t-il à l’ouverture, à la fermeture, à la suppression ?
+6. Ce qui nécessite la page rendue (focus visible, taille de cible) part vers `scan` — voir
+   `references/dynamic.md`. Consignez chaque verdict ; ne laissez jamais un critère au vert
+   en silence.

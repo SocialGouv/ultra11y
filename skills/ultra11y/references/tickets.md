@@ -1,9 +1,9 @@
-# Tracker tickets (`tickets`) — GitHub · GitLab · Jira
+# Tickets de tracker (`tickets`) — GitHub · GitLab · Jira
 
-`tickets` reads an `AuditResult` and **files it into a tracker**. It writes no Markdown.
-`prd` and `report` write Markdown and file nothing. That split is deliberate: you could
-previously not push without also producing a document, nor produce a document without
-risking a push.
+`tickets` lit un `AuditResult` et **le dépose dans un tracker**. Il n’écrit aucun Markdown.
+`prd` et `report` écrivent du Markdown et ne déposent rien. Cette séparation est voulue :
+auparavant, on ne pouvait pas pousser sans produire aussi un document, ni produire un
+document sans risquer un push.
 
 ```
 node scripts/ultra11y.mjs audit "src/**/*.tsx" --graph --out audit.json
@@ -20,122 +20,138 @@ node scripts/ultra11y.mjs tickets --in audit.json --json                        
 node scripts/ultra11y.mjs tickets --in audit.json --out ./run                     # the ticket SET as JSON, for any other board
 ```
 
-## Filing on a tracker ultra11y does not speak
+## Déposer sur un tracker qu’ultra11y ne parle pas
 
-`--out <dir>` writes the tracker-agnostic set to `<dir>/issues-<date>.json` — a stable path a
-workflow engine can read without parsing a payload that also carries prose. It works at every
-grain, carries `occurrences[]` so a board with inline anchors needs nothing else, and writing
-it **files nothing**. `schemaVersion` is what lets a consumer pin. See
+`--out <dir>` écrit l’ensemble indépendant du tracker dans `<dir>/issues-<date>.json` — un
+chemin stable qu’un moteur de workflow peut lire sans analyser une charge utile qui porte
+aussi de la prose. Il fonctionne à tous les grains, porte `occurrences[]` pour qu’un tableau
+avec ancres en ligne n’ait besoin de rien d’autre, et l’écrire **ne dépose rien**.
+`schemaVersion` est ce qui permet à un consommateur de figer une version. Voir
 `references/orchestrators.md`.
 
-The ticket **body** is the same auditor block `report` §2 and the `prd` backlog render
-(`src/auditor.ts`). There is one audit truth; the tracker sees exactly what the document says.
+Le **corps** du ticket est le même bloc auditeur que celui que rendent le §2 de `report` et
+le backlog `prd` (`src/auditor.ts`). Il n’y a qu’une seule vérité d’audit ; le tracker voit
+exactement ce que dit le document.
 
-## Granularity (`--grain`)
+## Granularité (`--grain`)
 
-What counts as ONE ticket. Default `criterion`.
+Ce qui compte comme UN ticket. Par défaut `criterion`.
 
-| Grain | One ticket is | Title |
+| Grain | Un ticket correspond à | Titre |
 |---|---|---|
-| `criterion` | a criterion, across the whole scope | `[a11y] WCAG 1.1.1 — Non-text Content` |
-| `single` | the entire audit | `[a11y] WCAG — Accessibility audit` |
-| `page` | a page and every non-conformity on it | `[a11y] WCAG [page:accueil] — Accessibility audit` |
-| `page-criterion` | a criterion **on** a page | `[a11y] WCAG [page:accueil] 1.1.1 — Non-text Content` |
-| `file` | a source file | `[a11y] WCAG [file:src/Button.tsx] — Accessibility audit` |
+| `criterion` | un critère, sur tout le périmètre | `[a11y] WCAG 1.1.1 — Non-text Content` |
+| `single` | l’audit entier | `[a11y] WCAG — Accessibility audit` |
+| `page` | une page et chaque non-conformité qu’elle porte | `[a11y] WCAG [page:accueil] — Accessibility audit` |
+| `page-criterion` | un critère **sur** une page | `[a11y] WCAG [page:accueil] 1.1.1 — Non-text Content` |
+| `file` | un fichier source | `[a11y] WCAG [file:src/Button.tsx] — Accessibility audit` |
 
-`WCAG` becomes the pack name under `--standard` (`[a11y] RGAA 1.1 — …`). A non-normative
-recommendation gets the ` (recommendation)` suffix and the `recommendation` label, so it is
-never triaged as a non-conformity.
+`WCAG` devient le nom du pack avec `--standard` (`[a11y] RGAA 1.1 — …`). Une recommandation
+non normative reçoit le suffixe ` (recommendation)` et l’étiquette `recommendation`, pour
+qu’elle ne soit jamais triée comme une non-conformité.
 
-Pick by who does the work: `criterion` suits one person fixing one rule everywhere,
-`page`/`page-criterion` suit a team that owns pages, `file` suits a component owner,
-`single` suits "one tracking ticket, we'll work from the report".
+Choisissez selon qui fait le travail : `criterion` convient à une personne qui corrige une
+règle partout, `page`/`page-criterion` à une équipe propriétaire de pages, `file` au
+propriétaire d’un composant, `single` à « un ticket de suivi, on travaillera à partir du
+rapport ».
 
-### The page grains keep the page honesty rules
+### Les grains par page conservent les règles d’honnêteté des pages
 
-- A page whose real rendered DOM was audited (`basis: snapshot`) can be conforming. A page
-  assembled only by **source attribution** (`basis: attributed`) cannot: its ticket carries
-  the warning that absence of a finding is not conformity. See `references/pages.md`.
-- Findings **no page can claim** (shared components, files outside any route) get their OWN
-  ticket, `[a11y] WCAG [unattributed] — Accessibility audit`. They are never dropped and
-  never spread across pages — spreading would invent non-conformities.
-- With **no page in scope**, `--grain page` exits `1` and tells you to capture snapshots
-  (`ultra11y/playwright` · `ultra11y/cypress`) or scan a sample (`scan --sample`). It never files zero tickets in silence.
+- Une page dont le vrai DOM rendu a été audité (`basis: snapshot`) peut être conforme. Une
+  page assemblée uniquement par **attribution de source** (`basis: attributed`) ne le peut
+  pas : son ticket porte l’avertissement que l’absence de constat n’est pas une conformité.
+  Voir `references/pages.md`.
+- Les constats qu’**aucune page ne peut revendiquer** (composants partagés, fichiers hors de
+  toute route) reçoivent leur PROPRE ticket, `[a11y] WCAG [unattributed] — Accessibility audit`.
+  Ils ne sont jamais abandonnés ni répartis entre les pages — les répartir inventerait des
+  non-conformités.
+- Sans **aucune page dans le périmètre**, `--grain page` sort en `1` et vous dit de capturer
+  des instantanés de page (`ultra11y/playwright` · `ultra11y/cypress`) ou de scanner un
+  échantillon (`scan --sample`). Il ne dépose jamais zéro ticket en silence.
 
-A `file` ticket carries no conformance rate: a file is not a page.
+Un ticket `file` ne porte aucun taux de conformité : un fichier n’est pas une page.
 
-## De-duplication — the title IS the key
+## Dédoublonnage — le titre EST la clé
 
-There is no hidden marker, no state file, no id map. The **exact title** is the identity,
-compared client-side. That is the only key that survives all three trackers without
-persisting anything, and it means re-running never creates duplicates.
+Il n’y a ni marqueur caché, ni fichier d’état, ni table d’identifiants. Le **titre exact**
+est l’identité, comparé côté client. C’est la seule clé qui survit aux trois trackers sans
+rien persister, et cela signifie que relancer ne crée jamais de doublons.
 
-Two consequences worth knowing before the first run:
+Deux conséquences à connaître avant la première exécution :
 
-- **Upgrading from `--gh-issues` costs nothing.** The `criterion` and `single` titles are
-  byte-identical to the pre-v3 ones, so tickets already filed are recognised and skipped.
-- **`--lang` forks the title** for grains carrying a criterion wording (`[a11y] WCAG 1.4.3 —
-  Contrast (Minimum)` vs `— Contraste (minimum)`). Keep `--lang` consistent across runs
-  against the same tracker. The FRAME is never localized: "Accessibility audit" stays English
-  at `--lang fr`, precisely so it cannot fork.
-- Renaming a snapshot directory changes the page id, hence the title. Same caveat.
+- **Migrer depuis `--gh-issues` ne coûte rien.** Les titres `criterion` et `single` sont
+  identiques à l’octet près à ceux d’avant la v3, donc les tickets déjà déposés sont reconnus
+  et sautés.
+- **`--lang` fait bifurquer le titre** pour les grains qui portent un intitulé de critère
+  (`[a11y] WCAG 1.4.3 —
+  Contrast (Minimum)` contre `— Contraste (minimum)`). Gardez `--lang` constant d’une
+  exécution à l’autre sur un même tracker. Le CADRE n’est jamais localisé : "Accessibility
+  audit" reste en anglais avec `--lang fr`, précisément pour qu’il ne puisse pas bifurquer.
+- Renommer un répertoire d’instantanés change l’id de la page, donc le titre. Même réserve.
 
-If the tracker cannot be listed (permissions, rate limit), the run degrades to **create**
-rather than dropping the backlog, and says the skip count is unverified.
+Si le tracker ne peut pas être listé (permissions, limite de débit), l’exécution se replie
+sur la **création** plutôt que d’abandonner le backlog, et indique que le nombre de tickets
+sautés n’est pas vérifié.
 
-## Providers and transports
+## Fournisseurs et transports
 
-`--provider auto` (default) reads `ULTRA11Y_TICKET_PROVIDER`, then `.ultra11yrc.json`, then
-the `origin` git remote. **Jira is never auto-detected** — it owns no git remote — so name it.
+`--provider auto` (par défaut) lit `ULTRA11Y_TICKET_PROVIDER`, puis `.ultra11yrc.json`, puis
+le remote git `origin`. **Jira n’est jamais détecté automatiquement** — il ne possède aucun
+remote git — nommez-le donc.
 
-`--transport auto` (default) prefers the CLI, which owns its own auth so ultra11y never holds
-a token; it falls back to REST when only a token is available, and says what BOTH were
-missing when neither works.
+`--transport auto` (par défaut) préfère la CLI, qui gère sa propre authentification pour
+qu’ultra11y ne détienne jamais de token ; il se replie sur REST quand seul un token est
+disponible, et dit ce qui manquait aux DEUX quand aucun ne fonctionne.
 
-**REST is not redundant with the CLI.** `gh` ships on GitHub-*hosted* runners only: container
-jobs, self-hosted runners and every non-GitHub CI have a token and no binary. GHES works
-through `GITHUB_API_URL`, which Actions sets for you.
+**REST ne fait pas doublon avec la CLI.** `gh` n’est fourni que sur les runners *hébergés*
+par GitHub : les jobs en conteneur, les runners auto-hébergés et toute CI non GitHub ont un
+token et pas de binaire. GHES fonctionne via `GITHUB_API_URL`, qu’Actions définit pour vous.
 
 | | GitHub | GitLab | Jira |
 |---|---|---|---|
-| CLI | `gh` | `glab` | — (REST only) |
-| token | `GH_TOKEN` → `GITHUB_TOKEN` | `GITLAB_TOKEN` | `JIRA_EMAIL`+`JIRA_API_TOKEN` (Cloud) or `JIRA_TOKEN` (Server/DC) |
-| target | `GITHUB_REPOSITORY` → `ULTRA11Y_GITHUB_REPO` → git remote | `CI_PROJECT_ID` → `ULTRA11Y_GITLAB_PROJECT` → git remote | `ULTRA11Y_JIRA_PROJECT` (the project KEY) |
-| API base | `GITHUB_API_URL` | `CI_API_V4_URL` | `ULTRA11Y_JIRA_URL` |
+| CLI | `gh` | `glab` | — (REST uniquement) |
+| token | `GH_TOKEN` → `GITHUB_TOKEN` | `GITLAB_TOKEN` | `JIRA_EMAIL`+`JIRA_API_TOKEN` (Cloud) ou `JIRA_TOKEN` (Server/DC) |
+| cible | `GITHUB_REPOSITORY` → `ULTRA11Y_GITHUB_REPO` → remote git | `CI_PROJECT_ID` → `ULTRA11Y_GITLAB_PROJECT` → remote git | `ULTRA11Y_JIRA_PROJECT` (la CLÉ du projet) |
+| base de l’API | `GITHUB_API_URL` | `CI_API_V4_URL` | `ULTRA11Y_JIRA_URL` |
 
-Also for Jira: `ULTRA11Y_JIRA_ISSUE_TYPE` (default `Task`) and `ULTRA11Y_JIRA_API` (`2`|`3`).
+Également pour Jira : `ULTRA11Y_JIRA_ISSUE_TYPE` (par défaut `Task`) et `ULTRA11Y_JIRA_API`
+(`2`|`3`).
 
-**Credentials live in the environment only.** A `token` / `apiToken` / `password` / `secret`
-key anywhere in the config's `tickets` block is a hard error (exit 2) — `.ultra11yrc.json` is
-committed, so a token in it is a leaked token.
+**Les identifiants vivent uniquement dans l’environnement.** Une clé `token` / `apiToken` /
+`password` / `secret` n’importe où dans le bloc `tickets` de la configuration est une erreur
+bloquante (exit 2) — `.ultra11yrc.json` est commité, donc un token qui s’y trouve est un
+token divulgué.
 
-### Per-tracker specifics
+### Particularités de chaque tracker
 
-- **GitHub** — the issues endpoint also returns pull requests; they are filtered out, so a PR
-  title can never suppress a real ticket. A `422` on labels retries unlabelled rather than
-  losing the ticket. Bodies are clamped to 65 536 characters with a pointer to the PRD.
-- **GitLab** — `CI_JOB_TOKEN` **cannot create issues**; when that is the token in play, the
-  failure says so instead of returning a bare 403. Missing labels are auto-created by GitLab.
-- **Jira** — API v3 requires ADF, not Markdown, so the body is rendered as one ADF paragraph
-  per line: the text is faithful, the formatting is not. Set `ULTRA11Y_JIRA_API=2` for the v2
-  endpoint (plain string) on Server/DC. Severity maps to priority (Highest/High/Low); a
-  project that has not configured `priority` or `labels` gets a retry without them. Every
-  ticket carries a constant `ultra11y` label so the de-dupe JQL can bound its search — the
-  JQL only narrows candidates, the exact title match still decides.
+- **GitHub** — l’endpoint des issues renvoie aussi les pull requests ; elles sont filtrées,
+  si bien que le titre d’une PR ne peut jamais masquer un vrai ticket. Un `422` sur les
+  étiquettes relance sans étiquettes plutôt que de perdre le ticket. Les corps sont tronqués
+  à 65 536 caractères avec un renvoi vers le PRD.
+- **GitLab** — `CI_JOB_TOKEN` **ne peut pas créer d’issues** ; quand c’est le token en jeu,
+  l’échec le dit au lieu de renvoyer un simple 403. Les étiquettes manquantes sont créées
+  automatiquement par GitLab.
+- **Jira** — l’API v3 exige de l’ADF, pas du Markdown, donc le corps est rendu sous la forme
+  d’un paragraphe ADF par ligne : le texte est fidèle, la mise en forme ne l’est pas.
+  Définissez `ULTRA11Y_JIRA_API=2` pour l’endpoint v2 (chaîne simple) sur Server/DC. La
+  sévérité correspond à la priorité (Highest/High/Low) ; un projet qui n’a pas configuré
+  `priority` ou `labels` obtient une nouvelle tentative sans eux. Chaque ticket porte une
+  étiquette constante `ultra11y` pour que la JQL de dédoublonnage puisse borner sa recherche
+  — la JQL ne fait que restreindre les candidats, c’est toujours la correspondance exacte du
+  titre qui décide.
 
-## Guards
+## Garde-fous
 
-- **`--max-tickets`** (default 200) — `page-criterion` on a large RGAA audit runs to the
-  hundreds, and a creation is hard to undo. Past the limit the command **refuses** and names
-  the escape hatch. It never truncates silently.
-- **`--dry-run`** — resolves the transport, lists what exists, prints create-vs-skip, creates
-  nothing, exits 0. Run it first, every time.
-- **Exit codes** — `0` filed/skipped/nothing to file · `1` at least one creation failed, the
-  provider is unusable, or `--grain page*` with no page in scope · `2` usage, config, or the
-  `--max-tickets` guard.
+- **`--max-tickets`** (200 par défaut) — `page-criterion` sur un gros audit RGAA monte à
+  plusieurs centaines, et une création est difficile à annuler. Au-delà de la limite, la
+  commande **refuse** et nomme l’échappatoire. Elle ne tronque jamais en silence.
+- **`--dry-run`** — résout le transport, liste ce qui existe, affiche créer-ou-sauter, ne
+  crée rien, sort en 0. Lancez-le d’abord, à chaque fois.
+- **Codes de sortie** — `0` déposé/sauté/rien à déposer · `1` au moins une création a échoué,
+  le fournisseur est inutilisable, ou `--grain page*` sans aucune page dans le périmètre ·
+  `2` usage, configuration, ou le garde-fou `--max-tickets`.
 
-An unusable provider exits **1**, not 0. A push command that files nothing and reports green
-is a silent failure.
+Un fournisseur inutilisable sort en **1**, pas en 0. Une commande de push qui ne dépose rien
+et rapporte du vert est un échec silencieux.
 
 ## Configuration
 
@@ -144,13 +160,13 @@ is a silent failure.
 { "tickets": { "provider": "gitlab", "grain": "page", "maxTickets": 100 } }
 ```
 
-## Migrating from `prd --gh-issues`
+## Migrer depuis `prd --gh-issues`
 
-| Before | Now |
+| Avant | Maintenant |
 |---|---|
 | `prd --in a.json --gh-issues` | `tickets --in a.json --provider github --grain criterion` |
 | `prd --in a.json --gh-single` | `tickets --in a.json --provider github --grain single` |
 | `prd --in a.json --out d --issues-json` | `tickets --in a.json --out d --grain criterion` |
 
-All three old flags now exit `2` and print the replacement. `prd` still writes the same Markdown;
-its `--json` payload no longer carries a `gh` key.
+Les trois anciens flags sortent désormais en `2` et affichent leur remplacement. `prd` écrit
+toujours le même Markdown ; sa charge utile `--json` ne porte plus de clé `gh`.

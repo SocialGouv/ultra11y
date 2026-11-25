@@ -27,10 +27,10 @@ describe("site/ is generated from the code, never hand-edited", () => {
   it("routes each criterion exactly like references/rgaa-automation.md", () => {
     const md = readFileSync(new URL("../skills/ultra11y/references/rgaa-automation.md", import.meta.url), "utf8");
     const routing: Record<string, string> = {
-      deterministic: "det",
-      "deterministic NC + AI residual": "nc",
-      "AI + signals": "hint",
-      AI: "llm",
+      déterministe: "det",
+      "NC déterministe + résidu IA": "nc",
+      "IA + signaux": "hint",
+      IA: "llm",
     };
     const expected = Object.fromEntries([...md.matchAll(/^\| (\d+\.\d+) \|[^|]+\|[^|]+\|[^|]+\| ([^|]+?) \|$/gm)].map((m) => [m[1], routing[m[2] as string]]));
     expect(Object.keys(expected)).toHaveLength(data.rgaa.criteria);

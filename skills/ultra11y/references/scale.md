@@ -1,49 +1,54 @@
-# Audit at scale — focus smartly
+# Auditer à grande échelle — cibler intelligemment
 
-You never audit "all" of a huge repo. The engine reads only the **markup** (HTML/JSX/Vue/
-Svelte/Astro), streams it (bounded memory, one file at a time, the `Doc` is dropped after use),
-and you **focus** it. Recommended loop:
+On n’audite jamais « tout » d’un dépôt immense. Le moteur ne lit que le **balisage**
+(HTML/JSX/Vue/Svelte/Astro), le traite en flux (mémoire bornée, un fichier à la fois, le `Doc`
+est libéré après usage), et c’est vous qui le **ciblez**. Boucle recommandée :
 
-## The loop
+## La boucle
 
-1. **Map without loading everything.** The engine ignores `node_modules`, `.git`, `dist`,
-   `build`, `.next`, `out`, `coverage`, `audits` by default, and skips **test/spec/story
-   markup** (`*.test.*`, `*.spec.*`, `*.stories.*`, `__tests__/`, `__mocks__/`,
-   `.storybook/`) — bad-by-design fixtures, never shipped UI (the drop count is logged).
-   Pass `--no-default-excludes` to include them, or name a file / `--include` it directly to
-   re-admit. Narrow further:
+1. **Cartographier sans tout charger.** Par défaut, le moteur ignore `node_modules`, `.git`,
+   `dist`, `build`, `.next`, `out`, `coverage`, `audits`, et écarte le **balisage de
+   test/spec/story** (`*.test.*`, `*.spec.*`, `*.stories.*`, `__tests__/`, `__mocks__/`,
+   `.storybook/`) — des fixtures mauvaises à dessein, jamais une interface livrée (le nombre de
+   fichiers écartés est journalisé). Passez `--no-default-excludes` pour les inclure, ou nommez
+   un fichier / ajoutez-le directement avec `--include` pour le réadmettre. Pour restreindre
+   davantage :
    ```
    node scripts/ultra11y.mjs audit "apps/web/**/*.{html,tsx}" --json > audit.json
    ```
-2. **Pick the slice that matters.** Three levers, most targeted to broadest:
-   - **The diff** (hooks/CI, PR review): `--changed` (vs `HEAD`) or `--since <ref>` — audits
-     only the changed markup files (via `git diff`, no tree walk).
-   - **Shared templates/components first**: the engine **prioritizes** layouts, templates,
-     entry pages, then `components/`, `shared/`, `ui/`, `design-system/`, then leaves. A partial
-     run therefore covers the highest-impact markup first.
-   - **An explicit cap**: `--max-files <n>` bounds the number of files audited (highest-priority
-     first); truncation is **always logged** (never a silent drop) and recorded in the report.
-3. **De-duplicate the repetitive.** An identical component repeated N times is audited **once**
-   (`--dedup exact` by default; `normalized` ignores inter-tag whitespace; `off` disables). The
-   report cites the canonical file.
-4. **Audit → fix → re-audit → widen.** On the chosen slice: read the `AuditResult`, complete the
-   judgment, apply the fixes (`references/fix.md`), re-audit to prove no regression, then widen
-   the scope.
+2. **Choisir la tranche qui compte.** Trois leviers, du plus ciblé au plus large :
+   - **Le diff** (hooks/CI, revue de pull request) : `--changed` (par rapport à `HEAD`) ou
+     `--since <ref>` — n’audite que les fichiers de balisage modifiés (via `git diff`, sans
+     parcours de l’arborescence).
+   - **Les gabarits/composants partagés d’abord** : le moteur **priorise** les layouts, les
+     gabarits, les pages d’entrée, puis `components/`, `shared/`, `ui/`, `design-system/`, puis
+     les feuilles. Une exécution partielle couvre donc en premier le balisage au plus fort
+     impact.
+   - **Un plafond explicite** : `--max-files <n>` borne le nombre de fichiers audités (les plus
+     prioritaires d’abord) ; la troncature est **toujours journalisée** (jamais d’abandon
+     silencieux) et consignée dans le rapport.
+3. **Dédupliquer ce qui se répète.** Un composant identique répété N fois n’est audité
+   **qu’une fois** (`--dedup exact` par défaut ; `normalized` ignore les espaces entre balises ;
+   `off` désactive). Le rapport cite le fichier canonique.
+4. **Auditer → corriger → ré-auditer → élargir.** Sur la tranche choisie : lisez
+   l’`AuditResult`, complétez le jugement, appliquez les correctifs (`references/fix.md`),
+   ré-auditez pour prouver l’absence de régression, puis élargissez le périmètre.
 
-## Why it is safe at scale
+## Pourquoi c’est sûr à grande échelle
 
-- **Bounded memory**: file-by-file stream; only the finding count (not source size) stays in
-  memory.
-- **Deterministic**: stable order (priority then path) → reproducible audits, stable canonical
-  file choice, `check:build` holds.
-- **Incremental**: `--changed`/`--since` make the audit proportional to the diff, not the repo —
-  what makes hooks/CI viable (see `references/automation.md`). Honest caveat: the diff modes
-  pay a **fixed cost of a few `git` invocations** before auditing anything, so on a small repo
-  a full scan can actually be the faster of the two. The win starts around a few hundred
-  markup files and grows from there.
-- **One pass over the tree**: `--graph` discovers markup and the `.ts/.js` modules it resolves
-  through, but walks the tree once and parses each markup file once — the graph pass hands its
-  parsed documents to the audit pass instead of every file being read and parsed twice.
+- **Mémoire bornée** : flux fichier par fichier ; seul le nombre de constats (pas la taille des
+  sources) reste en mémoire.
+- **Déterministe** : ordre stable (priorité puis chemin) → audits reproductibles, choix stable
+  du fichier canonique, `check:build` tient.
+- **Incrémental** : `--changed`/`--since` rendent l’audit proportionnel au diff, pas au dépôt —
+  ce qui rend les hooks/la CI viables (voir `references/automation.md`). Réserve honnête : les
+  modes diff paient un **coût fixe de quelques appels `git`** avant d’auditer quoi que ce soit,
+  donc sur un petit dépôt un scan complet peut en réalité être le plus rapide des deux. Le gain
+  commence autour de quelques centaines de fichiers de balisage et croît à partir de là.
+- **Un seul passage sur l’arborescence** : `--graph` découvre le balisage et les modules
+  `.ts/.js` à travers lesquels il se résout, mais parcourt l’arborescence une seule fois et
+  analyse chaque fichier de balisage une seule fois — le passage du graphe transmet ses
+  documents analysés au passage d’audit au lieu que chaque fichier soit lu et analysé deux fois.
 
-> In `--changed` mode, de-duplication is disabled: a changed file is always audited, never
-> merged with a file that was not read.
+> En mode `--changed`, la déduplication est désactivée : un fichier modifié est toujours audité,
+> jamais fusionné avec un fichier qui n’a pas été lu.

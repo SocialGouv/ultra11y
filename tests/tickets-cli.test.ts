@@ -100,7 +100,7 @@ function stubFetch(responses: Array<{ ok?: boolean; status?: number; body?: unkn
 describe("usage errors exit 2", () => {
   it("requires --in", async () => {
     expect(await main(["tickets"])).toBe(2);
-    expect(err.join()).toContain("--in <audit.json> is required");
+    expect(err.join()).toContain("--in <audit.json> est obligatoire"); // French by default (#214)
   });
 
   it("rejects input that is not an AuditResult", async () => {

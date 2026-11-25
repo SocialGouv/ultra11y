@@ -3,6 +3,7 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { failingFindings, formatFailure, buildPayload, slugify, gate, type FindingLike } from "../src/integrations/payload.js";
+import { localizedMessage } from "../src/integrations/core.js";
 import { slugifyPageId } from "../src/snapshot.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -68,7 +69,43 @@ describe("severity gating", () => {
       "X",
       Array.from({ length: 25 }, () => f("bloquant")),
     );
-    expect(msg).toContain("… and 5 more.");
+    expect(msg).toContain("… et 5 de plus.");
+    expect(
+      formatFailure(
+        "X",
+        Array.from({ length: 25 }, () => f("bloquant")),
+        "en",
+      ),
+    ).toContain("… and 5 more.");
+  });
+
+  // French by default (#214), like the CLI: the caller's `lang`, else the language the page
+  // declares, else French.
+  it("speaks French unless the caller or the page says otherwise", () => {
+    const failing = { findings: [f("bloquant")] };
+    const thrown = (result: object, lang?: "fr" | "en"): string => {
+      try {
+        gate(result, "Accueil", "blocking", lang);
+      } catch (e) {
+        return (e as Error).message;
+      }
+      return "";
+    };
+    expect(thrown(failing)).toContain("non-conformité(s) d'accessibilité sur « Accueil »");
+    expect(thrown({ ...failing, scope: { langs: ["en"] } })).toContain('accessibility non-conformity(ies) on "Accueil"');
+    expect(thrown({ ...failing, scope: { langs: ["en"] } }, "fr")).toContain("Détail complet");
+  });
+
+  it("renders each finding's message in the check's language when it carries a localized one", () => {
+    const loc: FindingLike = { ...f("bloquant"), message: "English bake", i18n: { message: { fr: "Version française" } } };
+    expect(formatFailure("X", [loc], "fr")).toContain("Version française");
+    expect(formatFailure("X", [loc], "en")).toContain("English bake");
+  });
+
+  it("re-renders an engine finding from its catalog key on the Node side", () => {
+    const img: FindingLike = { ...f("bloquant"), message: "<img> has no alt attribute", msg: { id: "img-alt-missing", params: { tag: "img" } } };
+    expect(formatFailure("X", [img], "fr", localizedMessage)).toContain("sans attribut alt");
+    expect(formatFailure("X", [img], "en", localizedMessage)).toContain("has no alt attribute");
   });
 });
 

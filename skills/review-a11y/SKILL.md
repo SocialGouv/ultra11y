@@ -1,61 +1,65 @@
 ---
 name: review-a11y
-description: "Use to REVIEW changed frontend code for accessibility: staged files, a working diff, branch, or PR; prompts such as 'review a11y', 'is this accessible?', or 'anything to fix before merge?'; and hook or CI findings on a change. Run the bundled install-free engine with cross-file JSX/TSX analysis, render only the pages the diff reaches (Playwright + axe, blocking only on non-conformities new vs the base), then adjudicate candidates and return a severity-ranked RGAA 4.1.2 review (by RGAA criterion, WCAG only as the mapping) with file:line fixes, residual rendering risks, and a verdict. Use `ultra11y` instead for whole-repo audits, dated conformance reports, PRD backlogs, or authoring accessible markup."
+description: "À utiliser pour la REVUE d’accessibilité d’un code frontend modifié : fichiers indexés (staged), diff de travail, branche ou pull request ; des demandes comme « revue a11y », « est-ce accessible ? » ou « quelque chose à corriger avant le merge ? » ('review a11y', 'is this accessible?', 'anything to fix before merge?') ; et les constats d’un hook ou de la CI sur un changement. Lance le moteur embarqué sans installation avec analyse JSX/TSX inter-fichiers, ne rend que les pages qu’atteint le diff (Playwright + axe, ne bloquant que sur les non-conformités nouvelles par rapport à la base), puis arbitre les candidats et renvoie une revue RGAA 4.1.2 classée par sévérité (par critère RGAA, le WCAG seulement comme correspondance) avec correctifs file:line, risques résiduels de rendu et un verdict. Utiliser plutôt `ultra11y` pour les audits du dépôt entier, les rapports de conformité datés, les backlogs PRD ou l’écriture de balisage accessible."
 license: MIT
 metadata:
   version: 9.4.0
 ---
 
-# review-a11y — accessibility review of changed code
+# review-a11y — revue d’accessibilité du code modifié
 
-The review counterpart of the `ultra11y` skill: where `ultra11y` produces full audits and
-compliance deliverables, **this skill reviews exactly the code under change** — a diff, a
-branch, a PR — and reports like a code reviewer. Same division of labour: the
-deterministic, install-free engine bundled with this skill does the *mechanical* work
-(machine-checkable RGAA 4.1.2 non-conformities, each tied to an RGAA criterion, cited
-`file:line`), and **the AI agent** *adjudicates the judgment* — refute false positives, decide
-alt relevance/link purpose/focus logic statically from the code, and route what needs a rendered
-DOM to `scan`. A human is at most optional oversight.
+Le pendant « revue » de la skill `ultra11y` : là où `ultra11y` produit des audits complets et
+des livrables de conformité, **cette skill relit exactement le code en cours de changement** —
+un diff, une branche, une PR — et rend compte comme un relecteur de code. Même répartition du
+travail : le moteur déterministe et sans installation embarqué avec cette skill fait le travail
+*mécanique* (non-conformités RGAA 4.1.2 vérifiables par la machine, chacune rattachée à un
+critère RGAA, avec son `file:line` cité), et **l’agent IA** *arbitre ce qui relève du jugement* —
+réfuter les faux positifs, décider statiquement à partir du code la pertinence des alternatives,
+l’intitulé des liens et la logique de focus, et envoyer à `scan` ce qui demande un DOM rendu. Un
+humain n’est tout au plus qu’une supervision facultative.
 
-A review runs in **two passes**: the static engine on the diff (§1), then — when the change has
-a deployment to look at — a Playwright + axe render of **only the pages the diff reaches**,
-compared with the base branch so that only **new** non-conformities block (§1b). That second
-gate is mechanical: no model is involved in deciding what blocks.
+Une revue se fait en **deux passages** : le moteur statique sur le diff (§1), puis — quand le
+changement a un déploiement à examiner — un rendu Playwright + axe de **seulement les pages
+qu’atteint le diff**, comparé à la branche de base pour que seules les non-conformités
+**nouvelles** bloquent (§1b). Ce second garde-fou est mécanique : aucun modèle n’intervient pour
+décider de ce qui bloque.
 
-**Engine resolution:** every command below is `node scripts/ultra11y.mjs …` where
-`scripts/ultra11y.mjs` lives **next to this SKILL.md** (the engine ships inside the skill;
-no install, no key). Run it with the reviewed project as the working directory. In the
-ultra11y repository itself, the repo root's `scripts/ultra11y.mjs` is the same file.
-Resolve that path per harness:
-- **Claude Code**: `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
-- **Codex**: the installed skill directory — the plugin's copy, or
-  `~/.codex/skills/review-a11y/scripts/ultra11y.mjs` (under `$CODEX_HOME` when set) after
+**Résolution du moteur :** chaque commande ci-dessous est `node scripts/ultra11y.mjs …` où
+`scripts/ultra11y.mjs` se trouve **à côté de ce SKILL.md** (le moteur est livré dans la skill ;
+pas d’installation, pas de clé). Lancez-le avec le projet relu comme répertoire de travail. Dans
+le dépôt ultra11y lui-même, le `scripts/ultra11y.mjs` de la racine du dépôt est le même fichier.
+Résolvez ce chemin selon le harness :
+- **Claude Code** : `${CLAUDE_SKILL_DIR}/scripts/ultra11y.mjs`.
+- **Codex** : le répertoire de la skill installée — la copie du plugin, ou
+  `~/.codex/skills/review-a11y/scripts/ultra11y.mjs` (sous `$CODEX_HOME` s’il est défini) après
   `ultra11y install --codex`.
-- **OpenCode**: `~/.config/opencode/skills/review-a11y/scripts/ultra11y.mjs` (under
-  `$XDG_CONFIG_HOME` when set) after `ultra11y install --opencode`, or the npm package's
-  `skills/review-a11y/` when the plugin is pinned in `opencode.json`.
-- **Anywhere else**, or when no skill directory resolves: `npx -y ultra11y <command>` is the
-  same engine.
+- **OpenCode** : `~/.config/opencode/skills/review-a11y/scripts/ultra11y.mjs` (sous
+  `$XDG_CONFIG_HOME` s’il est défini) après `ultra11y install --opencode`, ou le
+  `skills/review-a11y/` du paquet npm quand le plugin est épinglé dans `opencode.json`.
+- **Partout ailleurs**, ou quand aucun répertoire de skill ne se résout : `npx -y ultra11y <command>`
+  est le même moteur.
 
-Per-harness deltas: `references/harnesses.md` in the `ultra11y` skill.
+Écarts propres à chaque harness : `references/harnesses.md` dans la skill `ultra11y`.
 
-> **Core rules** (shared with `ultra11y`):
-> 1. **Never invent a non-conformity**: report only what the engine found or what you can
->    see and cite in the code under review.
-> 2. **Review the change, not the world**: findings outside the reviewed scope are noted in
->    one line at most ("pre-existing, out of scope"), never mixed into the verdict.
-> 3. **Residual is explicit, never silently conforming**: the *rendering* criteria (contrast,
->    focus visibility, zoom/reflow, content-on-hover) are named as residual risks for the changed
->    components — never asserted from source, resolved in the rendered page (`scan`). The
->    *judgment* criteria (alt relevance, link purpose, reading order) the AI agent adjudicates
->    from the code itself, recording a reason — no status without a justified verdict.
-> 4. **Language**: write the review in the conversation's language, but technical tokens
->    stay in English even in French prose — `aria-live` stays `aria-live` (never
->    « région live »), same for `tabindex`, `alt`, `role="alert"`, landmark role names.
+> **Règles fondamentales** (partagées avec `ultra11y`) :
+> 1. **N’inventez jamais une non-conformité** : ne signalez que ce que le moteur a trouvé ou ce
+>    que vous pouvez voir et citer dans le code relu.
+> 2. **Relisez le changement, pas le monde entier** : les constats hors du périmètre relu sont
+>    notés en une ligne au plus (« préexistant, hors périmètre »), jamais mêlés au verdict.
+> 3. **Le reliquat est explicite, jamais conforme en silence** : les critères *de rendu*
+>    (contraste, visibilité du focus, zoom/reflow, contenu au survol) sont nommés comme risques
+>    résiduels pour les composants modifiés — jamais affirmés à partir du source, tranchés dans la
+>    page rendue (`scan`). Les critères *de jugement* (pertinence des alternatives, intitulé des
+>    liens, ordre de lecture), l’agent IA les arbitre à partir du code lui-même, en consignant une
+>    raison — aucun statut sans un verdict justifié.
+> 4. **Langue** : rédigez la revue dans la langue de la conversation, mais les jetons techniques
+>    restent en anglais même dans une prose française — `aria-live` reste `aria-live` (jamais
+>    « région live »), de même pour `tabindex`, `alt`, `role="alert"` et les noms de rôles de
+>    landmarks.
 
-## 1. Scope — review what changed
+## 1. Périmètre — relire ce qui a changé
 
-Pick the FIRST that applies (ask only when genuinely ambiguous):
+Prenez le PREMIER cas qui s’applique (ne demandez que si c’est réellement ambigu) :
 
 ```
 node scripts/ultra11y.mjs audit <files the user named> --jsx --json     # explicit files
@@ -64,20 +68,22 @@ node scripts/ultra11y.mjs audit --changed --graph --json                # workin
 node scripts/ultra11y.mjs audit --since origin/main --graph --json     # the whole branch (PR review) — use the repo's default branch
 ```
 
-- Always pass `--graph` for JSX/TSX (real AST + cross-file rules: icon-only component used
-  without a name, anchor target defined in another file…); it also suppresses a class of
-  single-file false positives.
-- Pass `--lang` matching the conversation so the engine's message/remediation strings are
-  in the review's language (unset, the CLI auto-detects — a fallback, not a substitute).
-- Whole-repo review is an **audit**, not a review — offer the `ultra11y` skill instead.
-- Test/story markup (`*.test.*`, `*.stories.*`, `__tests__/`) is excluded by default; name
-  such a file explicitly to include it, or pass `--no-default-excludes`.
+- Passez toujours `--graph` pour le JSX/TSX (vrai AST + règles inter-fichiers : composant icône
+  seule utilisé sans nom, cible d’ancre définie dans un autre fichier…) ; il supprime aussi une
+  catégorie de faux positifs propres à l’analyse fichier par fichier.
+- Passez `--lang` correspondant à la conversation pour que les messages et les textes de
+  remédiation du moteur soient dans la langue de la revue (sans lui, la CLI détecte
+  automatiquement — un repli, pas un substitut).
+- La revue du dépôt entier est un **audit**, pas une revue — proposez plutôt la skill `ultra11y`.
+- Le balisage de tests/stories (`*.test.*`, `*.stories.*`, `__tests__/`) est exclu par défaut ;
+  nommez explicitement un tel fichier pour l’inclure, ou passez `--no-default-excludes`.
 
-## 1b. Render the pages the change touches (branch / PR review)
+## 1b. Rendre les pages que touche le changement (revue de branche / de PR)
 
-When the branch has a deployment (a PR preview, a local `next start`) **and** the base branch
-has one too (production, staging, or the same app built from the base), render only the pages
-the diff can reach and gate on what is new:
+Quand la branche a un déploiement (une préversion de PR, un `next start` local) **et** que la
+branche de base en a un aussi (production, recette, ou la même application construite depuis la
+base), ne rendez que les pages que le diff peut atteindre et ne bloquez que sur ce qui est
+nouveau :
 
 ```
 node scripts/ultra11y.mjs affected --since origin/main --json                       # which pages, and why (read-only)
@@ -85,54 +91,59 @@ node scripts/ultra11y.mjs scan --since origin/main --base-url <base deployment> 
 node scripts/ultra11y.mjs scan --since origin/main --base-url <PR deployment> --baseline base-scan.json --no-snapshot --json
 ```
 
-- **Which pages**: `affected` walks the reverse import graph from every file changed since the
-  merge-base (`<base>...HEAD`, plus uncommitted and untracked files) up to the route files —
-  in a Next.js project only (a `next.config.*` or `next` in package.json), `app/**/page.*` and
-  `pages/**` at the router root (or under `src/`); a `layout`/`template` (or `_app`) selects
-  every page below it — and to the files `.ultra11yrc.json` `sample.pages[].sources` declare. Dynamic
-  routes (`[id]`, `[...slug]`) resolve against the route inventory (`.ultra11y/routes.json`,
-  from `pages discover --routes-only`) and the sample. The base URL is the user's to give (ask
-  for it when unknown); both scans render the **same paths**, since the selection depends on
-  the diff, not on the host.
-- **What blocks**: with `--baseline`, `scan` exits 1 only on rendered findings the baseline does
-  not hold (identity = axe rule, criterion, route path, selector — host-free). A page new to
-  the baseline is new, all of it. Advisory (best-practice) findings never block. `--fail-on`
-  narrows the gate (default: any severity). A reached page that cannot be rendered (HTTP error,
-  redirect to a login, browser crash) measured nothing and **blocks** too, unless the same path
-  was already unrenderable in the baseline. The `gate.new` and `gate.notMeasured` arrays of the
-  `--json` output are the blocking list; `gate.known` / `gate.knownNotMeasured` count the
-  pre-existing ones (Core rule 2: one line, out of the verdict).
-- **What it cannot see**: a changed file reaching no page is listed as unmapped, a dynamic
-  route no known URL resolves as unresolved — name both in the report as **not rendered**,
-  never as clean. No deployment available → skip §1b and keep the rendering criteria as
-  residual risks (Core rule 3).
+- **Quelles pages** : `affected` remonte le graphe d’imports inversé depuis chaque fichier
+  modifié depuis la merge-base (`<base>...HEAD`, plus les fichiers non commités et non suivis)
+  jusqu’aux fichiers de route — dans un projet Next.js uniquement (un `next.config.*` ou `next`
+  dans package.json), `app/**/page.*` et `pages/**` à la racine du routeur (ou sous `src/`) ; un
+  `layout`/`template` (ou `_app`) sélectionne toutes les pages en dessous de lui — et jusqu’aux
+  fichiers que déclarent les `sample.pages[].sources` de `.ultra11yrc.json`. Les routes
+  dynamiques (`[id]`, `[...slug]`) se résolvent d’après l’inventaire des routes
+  (`.ultra11y/routes.json`, issu de `pages discover --routes-only`) et l’échantillon. L’URL de
+  base est à fournir par l’utilisateur (demandez-la quand elle est inconnue) ; les deux scans
+  rendent les **mêmes chemins**, puisque la sélection dépend du diff, pas de l’hôte.
+- **Ce qui bloque** : avec `--baseline`, `scan` ne sort avec le code 1 que sur les constats rendus
+  que la baseline ne contient pas (identité = règle axe, critère, chemin de route, sélecteur —
+  indépendante de l’hôte). Une page absente de la baseline est nouvelle, en totalité. Les
+  constats consultatifs (bonnes pratiques) ne bloquent jamais. `--fail-on` resserre le garde-fou
+  (par défaut : toute sévérité). Une page atteinte qui ne peut pas être rendue (erreur HTTP,
+  redirection vers une connexion, plantage du navigateur) n’a rien mesuré et **bloque** aussi,
+  sauf si le même chemin était déjà impossible à rendre dans la baseline. Les tableaux `gate.new`
+  et `gate.notMeasured` de la sortie `--json` sont la liste bloquante ; `gate.known` /
+  `gate.knownNotMeasured` comptent les constats préexistants (règle fondamentale 2 : une ligne,
+  hors du verdict).
+- **Ce qu’il ne peut pas voir** : un fichier modifié qui n’atteint aucune page est listé comme
+  non rattaché, une route dynamique qu’aucune URL connue ne résout comme non résolue — nommez les
+  deux dans le rapport comme **non rendus**, jamais comme propres. Aucun déploiement disponible →
+  sautez le §1b et gardez les critères de rendu comme risques résiduels (règle fondamentale 3).
 
-## 2. Judge — the engine's findings are candidates, not verdicts
+## 2. Juger — les constats du moteur sont des candidats, pas des verdicts
 
-For each finding (`--json` gives the RGAA `criteriaId` / `criteriaIds`, its `wcag` mapping,
-`severity`, `file:line`, `message`, `remediation`):
+Pour chaque constat (`--json` donne le `criteriaId` / `criteriaIds` RGAA, sa correspondance
+`wcag`, `severity`, `file:line`, `message`, `remediation`) :
 
-- **Confirm the occurrence**: open the cited line; the offending element must really be
-  there in the change under review.
-- **`preliminary: true` findings** (`.vue`/`.svelte`/`.astro` source, library components):
-  the template parser cannot see slots, conditionals or provide/inject wiring. Confirm
-  against the rendered DOM if captures exist (`.ultra11y/captures`, from the `ultra11y`
-  skill's render engine, `render`), otherwise report them as **provisional** with that
-  caveat — or refute them with evidence from the code.
-- **Library-rendered JSX (DSFR, MUI…)**: a clean source review can still ship broken HTML
-  (false negatives) — say so explicitly when the change touches such components, and
-  recommend a rendered-DOM check (`scan`, or the `ultra11y` capture pipeline).
-- **The judgment criteria are the AI agent's to adjudicate**: alt text relevance, link purpose
-  in context, visible label vs accessible name, keyboard/focus logic of the changed component
-  (read the full component source, not just the flagged line), recording a reason for each call.
-- Refuting a finding requires **cited evidence** (the code that disproves it); silently
-  dropping findings is forbidden.
+- **Confirmez l’occurrence** : ouvrez la ligne citée ; l’élément fautif doit réellement s’y
+  trouver dans le changement relu.
+- **Constats `preliminary: true`** (source `.vue`/`.svelte`/`.astro`, composants de
+  bibliothèque) : le parseur de gabarits ne voit ni les slots, ni les conditions, ni le câblage
+  provide/inject. Confirmez-les sur le DOM rendu si des captures existent (`.ultra11y/captures`,
+  issues du moteur de rendu de la skill `ultra11y`, `render`), sinon signalez-les comme
+  **provisoires** avec cette réserve — ou réfutez-les avec des preuves tirées du code.
+- **JSX rendu par une bibliothèque (DSFR, MUI…)** : une revue propre du source peut quand même
+  livrer du HTML cassé (faux négatifs) — dites-le explicitement quand le changement touche de tels
+  composants, et recommandez une vérification sur le DOM rendu (`scan`, ou la chaîne de capture
+  d’`ultra11y`).
+- **Les critères de jugement sont à arbitrer par l’agent IA** : pertinence du texte des
+  alternatives, intitulé des liens en contexte, étiquette visible vs nom accessible, logique
+  clavier/focus du composant modifié (lisez le source complet du composant, pas seulement la
+  ligne signalée), en consignant une raison pour chaque décision.
+- Réfuter un constat exige une **preuve citée** (le code qui le dément) ; écarter des constats en
+  silence est interdit.
 
-## 3. Report — a review, not a compliance document
+## 3. Rapport — une revue, pas un document de conformité
 
-Render in the conversation's language (Core rule 4), grouped by severity, each finding named
-by its **RGAA criterion** — WCAG only as the discreet mapping in parentheses, « RGAA 11.1
-(WCAG 3.3.2) », never on its own:
+Rédigez dans la langue de la conversation (règle fondamentale 4), groupé par sévérité, chaque
+constat nommé par son **critère RGAA** — le WCAG seulement comme correspondance discrète entre
+parenthèses, « RGAA 11.1 (WCAG 3.3.2) », jamais seul :
 
 ```
 ## Accessibility review — <scope, e.g. branch feat/x vs main, 12 files>
@@ -158,40 +169,42 @@ by its **RGAA criterion** — WCAG only as the discreet mapping in parentheses, 
 rendered DOM; residual risks listed above.
 ```
 
-- Keep the engine's `remediation` text as the base of each fix — it is already localized
-  and criterion-grounded.
-- Pre-existing issues spotted in passing go in ONE final line, out of the verdict.
+- Gardez le texte `remediation` du moteur comme base de chaque correctif — il est déjà localisé
+  et fondé sur le critère.
+- Les problèmes préexistants repérés au passage tiennent en UNE ligne finale, hors du verdict.
 
-**Running as a subagent.** This skill is often dispatched rather than typed: by the plugin
-hook on a pending `git commit` / `git push` / `gh pr create`, or by the `ultra11y` skill once
-its audit has produced fixes. When it is, the report above **is** the return value — it
-becomes a tool result for the caller, not a message to a human. So return it whole and
-nothing else: no preamble, no "I ran the engine and found…", no offer to fix. A caller that
-receives a summary has to guess at the findings, which is the one thing this skill exists to
-stop. Everything in §4 stays opt-in and belongs to the caller, not to you.
+**Exécution en tant que sous-agent.** Cette skill est souvent lancée plutôt que tapée : par le
+hook du plugin sur un `git commit` / `git push` / `gh pr create` en attente, ou par la skill
+`ultra11y` une fois que son audit a produit des correctifs. Dans ce cas, le rapport ci-dessus
+**est** la valeur de retour — il devient un résultat d’outil pour l’appelant, pas un message à un
+humain. Renvoyez-le donc en entier et rien d’autre : pas de préambule, pas de « j’ai lancé le
+moteur et trouvé… », pas de proposition de corriger. Un appelant qui reçoit un résumé doit
+deviner les constats, ce qui est précisément la seule chose que cette skill existe pour
+empêcher. Tout ce qui figure au §4 reste à la demande et appartient à l’appelant, pas à vous.
 
-## 4. After the review (opt-in)
+## 4. Après la revue (à la demande)
 
-- **Safe mechanical fixes**: `fix --staged --write --safe` (auto-applies the safe codemods
-  to staged files and re-stages them) or `node scripts/ultra11y.mjs fix <files> --write`;
-  dry-run without `--write`.
-- **Formal deliverables** (dated report, auditor conformance blocks, PRD backlog, GitHub
-  issues, the full RGAA grid): that is the `ultra11y` skill — same engine,
-  same findings (`report`, `prd`, `check`/`verify` gates).
-- **Make it automatic**: installed as a **Claude Code, Codex or OpenCode plugin**, a hook on
-  the shell tool stops a pending `git commit` / `git push` / `gh pr create` that carries
-  findings and hands them over — a `PreToolUse` deny on Claude Code and Codex, a failed shell
-  call carrying the findings on OpenCode — and that is what invokes this skill without anyone
-  asking. It never fires twice for the
-  same findings, so a retry lands. For a gate that does not need an agent at all, the
-  `ultra11y` skill's `init --hook` installs a mechanical pre-commit run of this same staged
-  audit.
+- **Correctifs mécaniques sûrs** : `fix --staged --write --safe` (applique automatiquement les
+  codemods sûrs aux fichiers indexés et les remet dans l’index) ou
+  `node scripts/ultra11y.mjs fix <files> --write` ; dry-run sans `--write`.
+- **Livrables formels** (rapport daté, blocs de conformité d’auditeur, backlog PRD, issues
+  GitHub, la grille RGAA complète) : c’est la skill `ultra11y` — même moteur,
+  mêmes constats (`report`, `prd`, garde-fous `check`/`verify`).
+- **Rendre cela automatique** : installé comme **plugin Claude Code, Codex ou OpenCode**, un hook
+  sur l’outil shell arrête un `git commit` / `git push` / `gh pr create` en attente qui porte des
+  constats et les transmet — un refus `PreToolUse` sur Claude Code et Codex, un appel shell en
+  échec portant les constats sur OpenCode — et c’est ce qui invoque cette skill sans que personne
+  ne le demande. Il ne se déclenche jamais deux fois pour les
+  mêmes constats, donc une nouvelle tentative passe. Pour un garde-fou qui n’a pas du tout besoin
+  d’agent, le `init --hook` de la skill `ultra11y` installe un passage pre-commit mécanique de ce
+  même audit de l’index.
 
-## Do not
+## À ne pas faire
 
-- Invent a non-conformity the engine did not find and you cannot cite.
-- Assert contrast/focus/zoom from source — they are residual risks until rendered (resolve via `scan`).
-- Block on a rendered finding the baseline already holds, or call a page the selection did not
-  render clean.
-- Mix pre-existing repo issues into the verdict on the change.
-- Translate technical tokens in French prose (`aria-live`, never « région live »).
+- Inventer une non-conformité que le moteur n’a pas trouvée et que vous ne pouvez pas citer.
+- Affirmer le contraste/focus/zoom à partir du source — ce sont des risques résiduels tant qu’ils
+  ne sont pas rendus (tranchez via `scan`).
+- Bloquer sur un constat rendu que la baseline contient déjà, ou déclarer propre une page que la
+  sélection n’a pas rendue.
+- Mêler des problèmes préexistants du dépôt au verdict sur le changement.
+- Traduire les jetons techniques dans une prose française (`aria-live`, jamais « région live »).

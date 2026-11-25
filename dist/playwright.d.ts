@@ -1,4 +1,4 @@
-import { C as CheckOptions, A as AuditLike } from './payload-Dh8zlYiV.js';
+import { a as CheckOptions, A as AuditLike } from './payload-92OwFKBr.js';
 
 /** The axe-core build a result was measured with (src/axe-engine.ts). */
 interface AxeEngineInfo {

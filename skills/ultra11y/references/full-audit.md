@@ -1,102 +1,109 @@
-# The full audit — one route on every harness
+# L’audit complet — une seule route sur chaque harness
 
-Use this route whenever the user asks for a full or detailed audit, a compliance or
-conformance report, or an RGAA audit — on Claude Code, Codex, OpenCode or any other harness.
-Every step is a plain engine CLI call, so the same request produces the same deliverables
-everywhere. The active agent session is the auditor: it reads the criterion briefs and writes
-the verdicts itself.
+Suivez cette route chaque fois que l’utilisateur demande un audit complet ou détaillé, un
+rapport de conformité, ou un audit RGAA — sur Claude Code, Codex, OpenCode ou tout autre
+harness. Chaque étape est un simple appel CLI au moteur, si bien que la même demande produit les
+mêmes livrables partout. La session d’agent active est l’auditeur : elle lit les briefs de
+critère et écrit elle-même les verdicts.
 
-`node scripts/ultra11y.mjs` below is the engine that ships inside this skill (see
-**Running the engine** in `SKILL.md` for its path on each harness); `npx -y ultra11y` is the
-same engine where no skill directory resolves.
+`node scripts/ultra11y.mjs` ci-dessous est le moteur livré dans cette skill (voir
+**Lancer le moteur** dans `SKILL.md` pour son chemin sur chaque harness) ; `npx -y ultra11y`
+est le même moteur là où aucun répertoire de skill n’est résolu.
 
-`references/audit.md` is the quick path — a static audit, a report and the integrity `check`,
-with no ledger, no refutation, no per-page dossiers and no completeness gate. Use it only for a
-first look; never hand its output over as a conformance deliverable.
+`references/audit.md` est le chemin rapide — un audit statique, un rapport et le `check`
+d’intégrité, sans registre, sans contre-vérification, sans dossiers par page et sans contrôle
+d’exhaustivité. Ne l’utilisez que pour un premier aperçu ; ne livrez jamais sa sortie comme
+livrable de conformité.
 
-The completion criterion is a **defensible deliverable**, not merely a clean static scan:
+Le critère d’achèvement est un **livrable défendable**, pas simplement un scan statique propre :
 
-- every declared page was captured, or the missing page is named;
-- every discovered route is captured, scanned, or listed as not reached in the annex;
-- every criterion on every captured page is `C`, `NC`, `NA`, or explicitly undecidable;
-- every `NC` has a resolvable occurrence and every `C`/`NA` has grounded justification;
-- the conformance report and per-page dossiers pass `check`;
-- the user receives the paths to the Markdown report, HTML entry point, printable single file,
-  page index and machine-readable grid.
+- chaque page déclarée a été capturée, ou la page manquante est nommée ;
+- chaque route découverte est capturée, scannée, ou listée comme non atteinte dans l’annexe ;
+- chaque critère de chaque page capturée est `C`, `NC`, `NA`, ou explicitement indécidable ;
+- chaque `NC` a une occurrence résolvable et chaque `C`/`NA` a une justification fondée ;
+- le rapport de conformité et les dossiers par page passent `check` ;
+- l’utilisateur reçoit les chemins du rapport Markdown, du point d’entrée HTML, du fichier
+  unique imprimable, de l’index des pages et de la grille lisible par machine.
 
-## 1. Establish the scope
+## 1. Établir le périmètre
 
-Read `.ultra11yrc.json` when present. Confirm the language and page sample (the standard is
-always RGAA 4.1.2). Prefer `sample check` plus `scan --sample`; otherwise crawl without a hidden
-cap (`--max 0`). A source-only report is partial and must say so. The `sample`
-block of `.ultra11yrc.json` and the PDF document checks are described in `references/audit.md`.
+Lisez `.ultra11yrc.json` s’il existe. Confirmez la langue et l’échantillon de pages (le
+référentiel est toujours le RGAA 4.1.2). Préférez `sample check` plus `scan --sample` ; sinon
+explorez (crawl) sans plafond caché (`--max 0`). Un rapport fondé sur les seules sources est
+partiel et doit le dire. Le bloc `sample` de `.ultra11yrc.json` et les vérifications des
+documents PDF sont décrits dans `references/audit.md`.
 
-**Start from the application's routes, not only the sample.** Record the route inventory
-(`.ultra11y/routes.json`) from every source the project has: the sitemap, a crawl, and the
-pages the E2E suite already captured.
+**Partez des routes de l’application, pas seulement de l’échantillon.** Enregistrez
+l’inventaire des routes (`.ultra11y/routes.json`) à partir de toutes les sources dont dispose le
+projet : le sitemap, une exploration (crawl), et les pages que la suite E2E a déjà capturées.
 
 ```sh
 node scripts/ultra11y.mjs pages discover --sitemap <url> --routes-only   # or --crawl <url> --max 0
 node scripts/ultra11y.mjs pages discover --from-snapshots --routes-only  # routes the E2E run reached
 ```
 
-`--routes-only` leaves the chosen RGAA sample untouched; `--write` merges the routes into the
-sample as well.
+`--routes-only` laisse intact l’échantillon RGAA choisi ; `--write` fusionne en plus les routes
+dans l’échantillon.
 
-**Then build the RGAA sample from the proposal, never by hand.** Two runs that hand-pick pages
-audit different pages, and their verdicts cannot be compared:
+**Construisez ensuite l’échantillon RGAA à partir de la proposition, jamais à la main.** Deux
+exécutions qui choisissent leurs pages à la main auditent des pages différentes, et leurs
+verdicts ne peuvent pas être comparés :
 
 ```sh
 node scripts/ultra11y.mjs pages discover --sitemap <url> --propose --write   # or --crawl <url> / --from-snapshots
 node scripts/ultra11y.mjs sample check --standard rgaa
 ```
 
-The proposal is deterministic: the required kinds (accueil, contact, mentions légales,
-accessibilité, plan du site, aide, authentification, recherche, documents) matched by keyword
-on the sorted URLs and titles, the search page with the fixed query `information`
-(`--search-query` to change it), then one page per template cluster — URL pattern with ids,
-slugs and dates normalized, or the DOM skeleton when a snapshot exists — largest first, ties
-broken by URL, bounded by `--sample-size` (default 20). Each pick records its reason in
-`notes`; a kind with no page is written to `sample.absent` with the reason. **Keep it.** Edit
-it only with a recorded reason: a page you add carries its `notes`, a kind you remove gets a
-`sample.absent` entry. `sample check` reports a kind dropped without a reason as missing.
+La proposition est déterministe : les types requis (accueil, contact, mentions légales,
+accessibilité, plan du site, aide, authentification, recherche, documents) appariés par mot-clé
+sur les URL et titres triés, la page de recherche avec la requête fixe `information`
+(`--search-query` pour la changer), puis une page par groupe de gabarits — motif d’URL avec
+identifiants, slugs et dates normalisés, ou squelette du DOM quand un instantané de page existe
+— du plus grand au plus petit, les égalités départagées par l’URL, dans la limite de
+`--sample-size` (20 par défaut). Chaque choix enregistre sa raison dans `notes` ; un type sans
+page est écrit dans `sample.absent` avec la raison. **Conservez-la.** Ne la modifiez qu’avec
+une raison enregistrée : une page que vous ajoutez porte ses `notes`, un type que vous retirez
+reçoit une entrée `sample.absent`. `sample check` signale comme manquant un type retiré sans
+raison.
 
-Once an inventory exists, every `audit` and `scan --merge` lists each route in
-the annex (section F): captured by the E2E tests, scanned, source code only, or not reached.
-None is left out. A client-rendered SPA exposes no links in its served HTML, so give it a
-sitemap or let its E2E captures supply the routes.
+Dès qu’un inventaire existe, chaque `audit` et chaque `scan --merge` liste chaque route dans
+l’annexe (section F) : capturée par les tests E2E, scannée, code source seulement, ou non
+atteinte. Aucune n’est omise. Une SPA rendue côté client n’expose aucun lien dans le HTML
+servi : fournissez-lui un sitemap ou laissez ses captures E2E fournir les routes.
 
-## 2. Audit source and rendered pages
+## 2. Auditer les sources et les pages rendues
 
-Use every render source — each sees what the others cannot. **Playwright comes first** for
-real pages: when the project has Playwright tests, wire `ultra11y/playwright` into them
-(`checkA11y`, or `sweepSample` for the sample, `references/e2e.md`), or reuse the
-`.ultra11y/pages` captures they already wrote, before you fall back on the crawler. Those
-captures carry the state the tests built (a session, a filled form, an open dialog), and
-`scan --all-routes` never rescans a route they hold.
+Utilisez toutes les sources de rendu — chacune voit ce que les autres ne voient pas.
+**Playwright passe en premier** pour les vraies pages : quand le projet a des tests Playwright,
+branchez-y `ultra11y/playwright` (`checkA11y`, ou `sweepSample` pour l’échantillon,
+`references/e2e.md`), ou réutilisez les captures `.ultra11y/pages` qu’ils ont déjà écrites,
+avant de vous replier sur le crawler. Ces captures portent l’état construit par les tests (une
+session, un formulaire rempli, une boîte de dialogue ouverte), et `scan --all-routes` ne
+rescanne jamais une route qu’elles contiennent.
 
-- **Pages**: E2E captures (`.ultra11y/pages/`, from `ultra11y/playwright`/`ultra11y/cypress`)
-  — run the E2E suite to refresh them — then the browser pass on the sample and the rest of
-  the inventory (`scan --sample --all-routes`, below).
-- **Components**: ultra11y's own render engine. It finds the exported components, the
-  framework pages and the Storybook stories, renders each with the project's own
-  `react-dom/server` in a throwaway harness, and writes `.ultra11y/captures/` plus the
-  manifest `.ultra11y/render.json` (`references/rendered.md`). It never reads or runs the
-  project's tests or snapshots.
+- **Pages** : captures E2E (`.ultra11y/pages/`, issues de `ultra11y/playwright`/`ultra11y/cypress`)
+  — lancez la suite E2E pour les rafraîchir — puis la passe navigateur sur l’échantillon et le
+  reste de l’inventaire (`scan --sample --all-routes`, ci-dessous).
+- **Composants** : le moteur de rendu propre à ultra11y. Il trouve les composants exportés, les
+  pages du framework et les stories Storybook, rend chacun avec le `react-dom/server` du projet
+  dans un harness jetable, et écrit `.ultra11y/captures/` ainsi que le manifeste
+  `.ultra11y/render.json` (`references/rendered.md`). Il ne lit ni n’exécute jamais les tests
+  ou les snapshots du projet.
 
 ```sh
 node scripts/ultra11y.mjs render .        # components, pages and stories → .ultra11y/captures
 ```
 
-Do not read the project's test files, `__snapshots__` or inline snapshots to find markup: they
-hold what a test author wrote, sometimes broken on purpose, and go stale. Run `render` before
-`audit`: the annex (section G) then lists every unit the engine rendered, skipped (with the
-reason: missing provider, props, browser-only API, data fetching, transpile error, timeout) or
-did not attempt. A component that takes props is rendered through its stories, or not at all:
-cover the ones the annex lists with a story or the page that shows them. Component renders
-have no computed style (`styles="none"`): they decide markup criteria on components, never
-page-level or rendering criteria. Name in the coverage annex any source you could not run, and
-why.
+Ne lisez pas les fichiers de test du projet, ses `__snapshots__` ni ses snapshots inline pour
+trouver du balisage : ils contiennent ce qu’un auteur de test a écrit, parfois cassé exprès, et
+se périment. Lancez `render` avant `audit` : l’annexe (section G) liste alors chaque unité que
+le moteur a rendue, ignorée (avec la raison : provider manquant, props, API propre au
+navigateur, récupération de données, erreur de transpilation, délai dépassé) ou pas tentée. Un
+composant qui prend des props est rendu via ses stories, ou pas du tout : couvrez ceux que
+l’annexe liste par une story ou par la page qui les affiche. Les rendus de composants n’ont pas
+de style calculé (`styles="none"`) : ils décident des critères de balisage sur les composants,
+jamais des critères de niveau page ni des critères de rendu. Nommez dans l’annexe de couverture
+toute source que vous n’avez pas pu exécuter, et pourquoi.
 
 ```sh
 node scripts/ultra11y.mjs audit <paths> --graph --standard <standard> --lang <lang> --out audits --json
@@ -104,74 +111,82 @@ node scripts/ultra11y.mjs scan --sample --all-routes --cwd . \
   --standard <standard> --merge audits/audit-latest.json --out audits
 ```
 
-`--all-routes` scans the sample, then every inventory route the sample does not hold, bounded
-by `--max-routes` (default 50). A route the bound leaves out is listed as not reached, with
-the reason. Use `--crawl <url> --max 0` instead when the project has neither a sample nor an
-inventory. A rendering criterion stays undecidable when no browser measurement exists; source
-inspection does not replace the scan.
+`--all-routes` scanne l’échantillon, puis chaque route de l’inventaire que l’échantillon ne
+contient pas, dans la limite de `--max-routes` (50 par défaut). Une route que la limite laisse
+de côté est listée comme non atteinte, avec la raison. Utilisez plutôt `--crawl <url> --max 0`
+quand le projet n’a ni échantillon ni inventaire. Un critère de rendu reste indécidable tant
+qu’aucune mesure navigateur n’existe ; l’inspection des sources ne remplace pas le scan.
 
-**Then write and replay the journeys.** The scan never logs in, submits or opens a funnel. Read
-the application (its routes, forms and interactive components) and write in
-`.ultra11y/journeys/` the journeys that matter: authentication, the main form including an
-invalid submit, search, every modal, menu or disclosure, and the multi-step funnel if there is
-one. Format and examples are in `references/journeys.md`. Replay them with the keyboard alone:
+**Écrivez et rejouez ensuite les parcours.** Le scan ne se connecte jamais, ne soumet rien et
+n’ouvre aucun tunnel. Lisez l’application (ses routes, ses formulaires et ses composants
+interactifs) et écrivez dans `.ultra11y/journeys/` les parcours qui comptent :
+l’authentification, le formulaire principal y compris une soumission invalide, la recherche,
+chaque modale, menu ou bouton de divulgation, et le tunnel multi-étapes s’il y en a un. Le
+format et des exemples sont dans `references/journeys.md`. Rejouez-les au clavier seul :
 
 ```sh
 node scripts/ultra11y.mjs journey run --all --keyboard --base-url <url> \
   --standard <standard> --merge audits/audit-latest.json --out audits
 ```
 
-Each step becomes an audited page state. The replay also records keyboard reachability and
-traps, focus into and out of dialogs, errors not tied to their field and unannounced status
-messages. A failing step stops its journey with the reason, and annex H lists every step.
-Fix the journey and run it again. Do not drop it.
+Chaque étape devient un état de page audité. Le rejeu enregistre aussi l’accessibilité au
+clavier et les pièges clavier, le focus à l’entrée et à la sortie des boîtes de dialogue, les
+erreurs non reliées à leur champ et les messages de statut non annoncés. Une étape en échec
+arrête son parcours avec la raison, et l’annexe H liste chaque étape. Corrigez le parcours et
+relancez-le. Ne l’abandonnez pas.
 
-Every page `scan` opens and every journey state also records its accessibility tree and, from
-it, what a screen reader would announce there (`sr.json`): the evidence 7.1, 7.3, 7.5 and the
-form criteria are ruled on, state by state — the disclosure « collapsed » before the click and
-« expanded » after, the field « invalid » once the form refused it. `scan` records the media
-inventory and a short viewport recording measured for flashes (`media.json`), the evidence of
-theme 4 and 13.7. Annex I, the application map, puts the routes, the page states, the rendered
-units and the criteria each evidence source can reach side by side; `criteria --plan` prints the
-same matrix, and no criterion of the standard is without a path.
+Chaque page que `scan` ouvre et chaque état de parcours enregistre aussi son arbre
+d’accessibilité et, à partir de lui, ce qu’un lecteur d’écran y annoncerait (`sr.json`) : la
+preuve sur laquelle 7.1, 7.3, 7.5 et les critères de formulaire sont tranchés, état par état —
+le bouton de divulgation « collapsed » avant le clic et « expanded » après, le champ
+« invalid » une fois que le formulaire l’a refusé. `scan` enregistre l’inventaire des médias
+et un court enregistrement du viewport mesuré pour les flashs (`media.json`), la preuve du
+thème 4 et de 13.7. L’annexe I, la carte de l’application, met côte à côte les routes, les
+états de page, les unités rendues et les critères que chaque source de preuve peut atteindre ;
+`criteria --plan` affiche la même matrice, et aucun critère du référentiel n’est sans chemin.
 
-`scan` and `ultra11y/playwright` run the same axe: ultra11y's own pinned `axe-core` and rule
-tags, whatever version the project installs. The annex names the version that ran. If it says
-« copie du projet audité », ultra11y's own copy could not be resolved; reinstall ultra11y with
-its dependencies before you publish.
+`scan` et `ultra11y/playwright` exécutent le même axe : le `axe-core` épinglé propre à
+ultra11y et ses tags de règles, quelle que soit la version installée par le projet. L’annexe
+nomme la version qui a tourné. Si elle indique « copie du projet audité », la copie propre à
+ultra11y n’a pas pu être résolue ; réinstallez ultra11y avec ses dépendances avant de publier.
 
-**A clean scan never concludes `C` on a rendering criterion**: 3.2, 3.3, 10.4,
-10.11, 10.12, 12.9 and the other rendering criteria carry only *candidate* scan rules, so the
-scan can raise their non-conformities but a clean run leaves them « à évaluer » — they come to
-you in step 3, and `check --require-decided` counts 0 « mesure (scan) » for them. That is
-expected, not a failed scan.
+**Un scan propre ne conclut jamais `C` sur un critère de rendu** : 3.2, 3.3, 10.4, 10.11,
+10.12, 12.9 et les autres critères de rendu ne portent que des règles de scan *candidates*, si
+bien que le scan peut lever leurs non-conformités mais qu’une exécution propre les laisse « à
+évaluer » — ils vous reviennent à l’étape 3, et `check --require-decided` compte 0 « mesure
+(scan) » pour eux. C’est attendu, ce n’est pas un scan raté.
 
-If the scan cannot start a browser, it falls back on Playwright's full Chromium build and then
-on an installed Google Chrome; the error, when none starts, names the Playwright install that
-was resolved and the command that installs its browser.
+Si le scan ne parvient pas à démarrer un navigateur, il se replie sur le build Chromium complet
+de Playwright puis sur un Google Chrome installé ; quand aucun ne démarre, l’erreur nomme
+l’installation de Playwright qui a été résolue et la commande qui installe son navigateur.
 
-## 3. Adjudicate
+## 3. Arbitrer
 
-Generate the judgment worklist with `verify --manual`, then rule on it in one of two ways —
-the verdicts pass the same fail-closed fold whichever you pick:
+Générez la liste de travail de jugement avec `verify --manual`, puis tranchez-la de l’une des
+deux façons — les verdicts passent par le même repli « fail-closed » (en cas de doute, refuser)
+quelle que soit celle que vous choisissez :
 
-- **adjudicate directly** in this session (the default for an interactive request);
-- **fan out to subagents** when the worklist is large — `orchestrate --run audits --phase
-  adjudicate` emits the batches and the per-role contracts, and any harness with subagents
-  can dispatch them (Claude Code's Agent or Workflow tool, Codex subagents, OpenCode's Task
-  tool); see `references/orchestration.md`. Subagents return verdicts; you fold them.
+- **arbitrer directement** dans cette session (le choix par défaut pour une demande
+  interactive) ;
+- **répartir entre des sous-agents** quand la liste de travail est longue — `orchestrate --run
+  audits --phase adjudicate` émet les lots et les contrats par rôle, et tout harness doté de
+  sous-agents peut les dispatcher (l’outil Agent ou Workflow de Claude Code, les sous-agents de
+  Codex, l’outil Task d’OpenCode) ; voir `references/orchestration.md`. Les sous-agents
+  renvoient des verdicts ; c’est vous qui les repliez.
 
-When nobody is in the loop (CI), the caller is iterion's `rgaa-audit` bot, which rules the same
-worklist through the same gate; see `references/ci.md`.
+Quand personne n’est dans la boucle (CI), l’appelant est le bot `rgaa-audit` d’iterion, qui
+tranche la même liste de travail à travers le même garde-fou ; voir `references/ci.md`.
 
-Ruling directly: read each small
-`audits/adjudicate/<criterion>.md` brief, decide against its official tests, fill the verdicts
-in **`audits/ADJUDICATE.todo.json`** — the one file to write in a session with a shell (its
-items carry the evidence and the `citations[]` slots; `ADJUDICATE.verdicts.json` is the
-evidence-free twin for an adjudicator without a shell, and `verify --apply` accepts either, but
-fill one, not both) — then fold it with `verify --apply … --ledger`. The ledger records every
-accepted verdict, so the trial in step 4 can repair it and a later run can replay it. However
-the verdicts were produced, the final fold stays in the parent session.
+Pour trancher directement : lisez chaque petit brief
+`audits/adjudicate/<criterion>.md`, décidez au regard de ses tests officiels, remplissez les
+verdicts dans **`audits/ADJUDICATE.todo.json`** — le seul fichier à écrire dans une session qui
+a un shell (ses items portent les preuves et les emplacements `citations[]` ;
+`ADJUDICATE.verdicts.json` est le jumeau sans preuves destiné à un arbitre sans shell, et
+`verify --apply` accepte l’un ou l’autre, mais remplissez-en un, pas les deux) — puis repliez-le
+avec `verify --apply … --ledger`. Le registre enregistre chaque verdict accepté, pour que la
+contre-vérification de l’étape 4 puisse le réparer et qu’une exécution ultérieure puisse le
+rejouer. Quelle que soit la façon dont les verdicts ont été produits, le repli final reste dans
+la session parente.
 
 ```sh
 node scripts/ultra11y.mjs report --in audits/audit-latest.json \
@@ -182,21 +197,23 @@ node scripts/ultra11y.mjs verify --apply audits/ADJUDICATE.todo.json \
   --in audits/audit-latest.json --standard <standard> --out audits --ledger
 ```
 
-A rendering criterion whose brief says no evidence was harvested cannot be `C` (the fold
-refuses it): record `manual` with reason `undecidable` and a justification saying what you
-checked, and name it in the `--allow-undecided` file of step 6.
+Un critère de rendu dont le brief indique qu’aucune preuve n’a été récoltée ne peut pas être
+`C` (le repli le refuse) : enregistrez `manual` avec la raison `undecidable` et une
+justification qui dit ce que vous avez vérifié, et nommez-le dans le fichier `--allow-undecided`
+de l’étape 6.
 
-The first report is a draft, not the final deliverable. Follow `references/judgment.md` for
-the verdict schema (including the `citations[]` shape) and fail-closed fold.
+Le premier rapport est un brouillon, pas le livrable final. Suivez `references/judgment.md`
+pour le schéma des verdicts (y compris la forme de `citations[]`) et le repli fail-closed.
 
-## 4. Challenge the claims
+## 4. Mettre les affirmations à l’épreuve
 
-Render the report, generate the adversarial `VERIFY.todo.json`, adjudicate every claim, apply
-the verdicts with `--prune --ledger`, then render again. This trial covers both alleged
-non-conformities and agent-declared conformities **and** « non applicable » — on a small site
-that is easily 70+ claims. Rule on the trial the same two ways as step 3: directly, or by
-fanning out (`orchestrate --run audits --phase verify-report`) — the refuter has to open the
-cited files.
+Rendez le rapport, générez le `VERIFY.todo.json` contradictoire, arbitrez chaque affirmation,
+appliquez les verdicts avec `--prune --ledger`, puis rendez à nouveau. Cette
+contre-vérification couvre à la fois les non-conformités alléguées et les conformités
+déclarées par l’agent **et** les « non applicable » — sur un petit site, cela fait facilement
+plus de 70 affirmations. Tranchez la contre-vérification des deux mêmes façons qu’à l’étape 3 :
+directement, ou en répartissant (`orchestrate --run audits --phase verify-report`) — celui qui
+réfute doit ouvrir les fichiers cités.
 
 ```sh
 node scripts/ultra11y.mjs report --in audits/audit-latest.json \
@@ -208,19 +225,20 @@ node scripts/ultra11y.mjs verify --apply audits/VERIFY.todo.json \
   --standard <standard> --out audits --prune --ledger
 ```
 
-`--max-verify 0` puts every claim in one worklist. Without it the non-conformities are capped at
-40 (the conformity half is never capped unless `--max-verify` is set); whatever a cap leaves
-out is named on stderr, fails the apply as « missing », and under `--prune` a conformity that
-was never tried goes back to « à évaluer » — so a capped trial costs you verdicts, it never
-lets an untried claim through. If no ledger exists yet, `--prune --ledger` creates one and says
-so.
+`--max-verify 0` met toutes les affirmations dans une seule liste de travail. Sans lui, les
+non-conformités sont plafonnées à 40 (la moitié « conformités » n’est jamais plafonnée sauf si
+`--max-verify` est fixé) ; tout ce qu’un plafond laisse de côté est nommé sur stderr, fait
+échouer l’application comme « missing », et sous `--prune` une conformité qui n’a jamais été
+éprouvée retourne à « à évaluer » — une contre-vérification plafonnée vous coûte donc des verdicts, il
+ne laisse jamais passer une affirmation non éprouvée. Si aucun registre n’existe encore,
+`--prune --ledger` en crée un et le signale.
 
-`VERIFY.todo.json` is a bare JSON array of items (`n`, `criteriaId`, `kind`, `file`, `line`,
-`selector`, `claim`, `verdict`, `note`, and `citations[]` on a conformity), whereas
-`ADJUDICATE.todo.json` is an object with its items under `items` — fill `verdict` and `note` in
-place in each entry.
+`VERIFY.todo.json` est un simple tableau JSON d’items (`n`, `criteriaId`, `kind`, `file`,
+`line`, `selector`, `claim`, `verdict`, `note`, et `citations[]` sur une conformité), alors que
+`ADJUDICATE.todo.json` est un objet dont les items sont sous `items` — remplissez `verdict` et
+`note` sur place dans chaque entrée.
 
-## 5. Publish the detailed deliverable
+## 5. Publier le livrable détaillé
 
 ```sh
 node scripts/ultra11y.mjs report --in audits/audit-latest.json \
@@ -232,12 +250,13 @@ node scripts/ultra11y.mjs pages --in audits/audit-latest.json \
   --html --evidence --out audits/pages
 ```
 
-This produces the dated Markdown conformance report, `audits/index.html`, the printable
-single-file HTML report, `audits/pages.json`, and the navigable per-page Markdown/HTML dossiers
-with screenshots and annotated evidence when snapshots support them. It is a conformance
-deliverable; generate a PRD, remediation backlog or tickets only when the user asks for fixes.
+Cela produit le rapport de conformité Markdown daté, `audits/index.html`, le rapport HTML
+imprimable en un seul fichier, `audits/pages.json`, et les dossiers navigables par page en
+Markdown/HTML avec captures d’écran et preuves annotées quand les instantanés de page le
+permettent. C’est un livrable de conformité ; ne générez un PRD, un backlog de remédiation ou
+des tickets que lorsque l’utilisateur demande des corrections.
 
-## 6. Gate and hand over
+## 6. Contrôler et remettre
 
 ```sh
 node scripts/ultra11y.mjs check --report audits/<standard>-<date>.md \
@@ -250,23 +269,26 @@ node scripts/ultra11y.mjs check --report audits/pages/index.md \
   --standard <standard>
 ```
 
-Append `--allow-undecided .ultra11y/undecidable-<standard>.json` to the completeness gate only
-when the project records named exceptions with reasons. Report the scope, page count, criterion
-count, provenance tally, remaining named exceptions and every deliverable path. A failed gate
-is part of the result and must not be summarized as a complete report.
+N’ajoutez `--allow-undecided .ultra11y/undecidable-<standard>.json` au contrôle d’exhaustivité
+que lorsque le projet enregistre des exceptions nommées avec leurs raisons. Indiquez le
+périmètre, le nombre de pages, le nombre de critères, le décompte des provenances, les
+exceptions nommées restantes et chaque chemin de livrable. Un contrôle en échec fait partie du
+résultat et ne doit pas être résumé comme un rapport complet.
 
-## The reference run
+## L’exécution de référence
 
-`tests/full-audit.e2e.test.ts` in the ultra11y repository is this route, run as written: every
-command above, in this order, on `tests/fixtures/full-audit-app` (eleven served routes, a React
-component directory, downloadable PDFs, two journeys replayed with `journey run --all
---keyboard --merge` — a menu disclosure and the contact form sent with an invalid address — and
-a unit test with a snapshot and a Playwright spec that must never be read). The only thing it does not run is a model: a committed script fills
-`ADJUDICATE.todo.json` and `VERIFY.todo.json`, copying every citation from the evidence the
-engine harvested, so the run costs nothing and gives the same deliverable every time. It
-asserts that every deliverable exists, that every `check` above passes (with an
-`--allow-undecided` file naming what a human still has to rule), that the annex lists every
-route, rendered component and journey step (sections F, G and H), that each journey state is a
-page of the grid carrying its own findings, that pages with different findings get different rates, and that
-no test file reaches the output. CI runs it in the `browser-tier` job. When this page and that
-test disagree, one of them is wrong: change both together.
+`tests/full-audit.e2e.test.ts` dans le dépôt ultra11y est cette route, exécutée telle
+qu’écrite : chaque commande ci-dessus, dans cet ordre, sur `tests/fixtures/full-audit-app`
+(onze routes servies, un répertoire de composants React, des PDF téléchargeables, deux parcours
+rejoués avec `journey run --all --keyboard --merge` — un bouton de divulgation de menu et le
+formulaire de contact envoyé avec une adresse invalide — et un test unitaire avec un snapshot
+et une spec Playwright qui ne doivent jamais être lus). La seule chose qu’il n’exécute pas est
+un modèle : un script commité remplit `ADJUDICATE.todo.json` et `VERIFY.todo.json`, en copiant
+chaque citation depuis les preuves que le moteur a récoltées, si bien que l’exécution ne coûte
+rien et donne le même livrable à chaque fois. Il vérifie que chaque livrable existe, que chaque
+`check` ci-dessus passe (avec un fichier `--allow-undecided` nommant ce qu’un humain doit encore
+trancher), que l’annexe liste chaque route, composant rendu et étape de parcours (sections F, G
+et H), que chaque état de parcours est une page de la grille portant ses propres constats, que
+des pages aux constats différents obtiennent des taux différents, et qu’aucun fichier de test
+n’atteint la sortie. La CI l’exécute dans le job `browser-tier`. Quand cette page et ce test
+divergent, l’un des deux a tort : changez les deux ensemble.

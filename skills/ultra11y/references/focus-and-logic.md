@@ -1,64 +1,76 @@
-# Focus & interaction logic — the agent reads the source and adjudicates the interaction logic
+# Focus et logique d’interaction — l’agent lit la source et arbitre la logique d’interaction
 
-A static engine sees *structure*. It cannot see what happens when a user **tabs, types, or
-opens a dialog** — focus visibility, focus order, focus traps, what changes on focus/input,
-whether a mouse interaction has a keyboard equivalent. ultra11y therefore marks every such
-criterion **`manual` / residual risk** (never silently "conforming") and hands it to **the AI
-agent**, which adjudicates it via `verify --manual` (gated). This is the interaction-logic half
-of the division of labour, and it is where reading the *actual source* matters most.
+Un moteur statique voit la *structure*. Il ne voit pas ce qui se passe quand un utilisateur
+**navigue à la tabulation, saisit du texte ou ouvre une boîte de dialogue** — visibilité du
+focus, ordre du focus, pièges à focus, ce qui change au focus/à la saisie, existence d’un
+équivalent clavier pour une interaction à la souris. ultra11y marque donc chacun de ces
+critères **`manual` / risque résiduel** (jamais « conforme » en silence) et le confie à
+**l’agent IA**, qui l’arbitre via `verify --manual` (soumis au garde-fou). C’est la moitié
+« logique d’interaction » de la répartition du travail, et c’est là que lire la *source réelle*
+compte le plus.
 
-> **Read the whole component, not just the report.** The audit parses every element in scope
-> (`audit --graph` resolves imports across files), but a focus/logic verdict requires reading
-> the real source of each interactive component — the JSX, the event handlers, the effects,
-> the state — and reasoning about what a keyboard/screen-reader user experiences.
+> **Lisez le composant entier, pas seulement le rapport.** L’audit analyse chaque élément du
+> périmètre (`audit --graph` résout les imports entre fichiers), mais un verdict de
+> focus/logique exige de lire la vraie source de chaque composant interactif — le JSX, les
+> gestionnaires d’événements, les effets, l’état — et de raisonner sur ce que vit un
+> utilisateur au clavier ou au lecteur d’écran.
 
-## The criteria you own (surfaced as residual risks)
+## Les critères qui vous reviennent (remontés comme risques résiduels)
 
-| SC | What to reason about, reading the source |
+| CS | Sur quoi raisonner, en lisant la source |
 |---|---|
-| **2.1.1 Keyboard** | Every action reachable by mouse is reachable by keyboard. Mouse-only handlers (`onMouseEnter`/`onMouseLeave`/`onClick` on a non-interactive element) need a focus/key equivalent (`onFocus`/`onKeyDown`) or a native interactive element. |
-| **2.1.2 No keyboard trap** | Focus can leave every widget (modals, menus, date pickers, embeds). Trace the trap logic and the Escape/return path. |
-| **2.4.3 Focus order** | Tab order follows meaning. Watch DOM order vs visual order, portals/modals, and `tabIndex` (positive is already flagged; reason about roving `tabIndex` in menus/tabs/grids). |
-| **2.4.7 Focus visible** | A visible focus indicator on every focusable element — check CSS (`:focus`/`:focus-visible`, never a bare `outline: none`) at render. |
-| **2.4.11 Focus not obscured** | The focused element isn't hidden behind sticky headers/footers/overlays. |
-| **3.2.1 On focus / 3.2.2 On input** | Focusing or changing a control doesn't trigger an unexpected context change (auto-submit, navigation, surprise modal). Trace `onFocus`/`onChange` handlers. |
-| **2.5.3 Label in name** | The visible label text is contained in the accessible name (so voice control works). |
+| **2.1.1 Clavier** | Toute action accessible à la souris est accessible au clavier. Les gestionnaires souris seuls (`onMouseEnter`/`onMouseLeave`/`onClick` sur un élément non interactif) demandent un équivalent focus/clavier (`onFocus`/`onKeyDown`) ou un élément interactif natif. |
+| **2.1.2 Pas de piège au clavier** | Le focus peut quitter chaque widget (modales, menus, sélecteurs de date, contenus embarqués). Suivez la logique de piège et le chemin Échap/retour. |
+| **2.4.3 Parcours du focus** | L’ordre de tabulation suit le sens. Surveillez l’ordre du DOM face à l’ordre visuel, les portails/modales et `tabIndex` (le positif est déjà signalé ; raisonnez sur le `tabIndex` itinérant dans les menus/onglets/grilles). |
+| **2.4.7 Visibilité du focus** | Un indicateur de focus visible sur chaque élément focalisable — vérifiez le CSS (`:focus`/`:focus-visible`, jamais un `outline: none` nu) au rendu. |
+| **2.4.11 Focus non masqué** | L’élément qui a le focus n’est pas caché derrière des en-têtes/pieds de page collants ou des surcouches. |
+| **3.2.1 Au focus / 3.2.2 À la saisie** | Donner le focus à un contrôle ou le modifier ne déclenche pas de changement de contexte inattendu (envoi automatique, navigation, modale surprise). Suivez les gestionnaires `onFocus`/`onChange`. |
+| **2.5.3 Étiquette dans le nom** | Le texte de l’étiquette visible est contenu dans le nom accessible (pour que le contrôle vocal fonctionne). |
 
-## Component patterns to trace (where focus logic lives)
+## Motifs de composants à suivre (là où vit la logique de focus)
 
-- **Dialog / modal**: focus moves into it on open, is trapped while open, returns to the
-  trigger on close, Escape closes it, `aria-modal`/`role="dialog"` + a label.
-- **Menu / dropdown / combobox / listbox**: roving `tabIndex` (one tab stop), arrow-key
-  navigation, Escape, `aria-expanded`/`aria-activedescendant`, focus returned to the trigger.
-- **Tabs / accordion**: arrow keys move between tabs, focus follows selection appropriately.
-- **Toast / live region**: announced without stealing focus.
-- **Custom controls built on `<div>`/`<span>`**: prefer a native element; if not, they need
-  `role`, `tabindex="0"`, key handlers (Enter/Space), and state in ARIA — the engine flags
-  the clickable non-interactive element (2.1.1), but YOU verify the full keyboard contract.
+- **Boîte de dialogue / modale** : le focus y entre à l’ouverture, y est piégé tant qu’elle
+  est ouverte, revient au déclencheur à la fermeture, Échap la ferme, `aria-modal`/`role="dialog"`
+  + une étiquette.
+- **Menu / liste déroulante / combobox / listbox** : `tabIndex` itinérant (un seul arrêt de
+  tabulation), navigation aux flèches, Échap, `aria-expanded`/`aria-activedescendant`, focus
+  rendu au déclencheur.
+- **Onglets / accordéon** : les flèches déplacent entre les onglets, le focus suit la
+  sélection de façon appropriée.
+- **Toast / région live** : annoncé sans voler le focus.
+- **Contrôles personnalisés bâtis sur `<div>`/`<span>`** : préférez un élément natif ; sinon,
+  il leur faut `role`, `tabindex="0"`, des gestionnaires de touches (Entrée/Espace) et l’état
+  en ARIA — le moteur signale l’élément non interactif cliquable (2.1.1), mais c’est VOUS qui
+  vérifiez le contrat clavier complet.
 
-## Workflow
+## Démarche
 
-1. **Audit the full scope** with `audit --graph` so every component/import is captured.
-2. **Build the worklists**. `verify --manual --in audit.json` lists each residual (manual)
-   focus/logic criterion, pre-loaded with harvested evidence (ARIA state, `tabindex`, control
-   labels), for the AI agent to adjudicate; `verify --report … --semantic` lists the engine's
-   detected candidates (e.g. a clickable non-interactive element flagged under 2.1.1) to confirm
-   or refute — both grounded in the W3C Understanding reference (see `references/verify.md` /
+1. **Auditez tout le périmètre** avec `audit --graph` pour que chaque composant/import soit
+   capturé.
+2. **Construisez les listes de travail**. `verify --manual --in audit.json` liste chaque
+   critère résiduel (manuel) de focus/logique, préchargé avec les preuves récoltées (état
+   ARIA, `tabindex`, étiquettes des contrôles), pour que l’agent IA l’arbitre ;
+   `verify --report … --semantic` liste les candidats détectés par le moteur (p. ex. un
+   élément non interactif cliquable signalé sous 2.1.1) à confirmer ou réfuter — les deux
+   s’appuient sur la référence W3C Understanding (voir `references/verify.md` /
    `references/judgment.md`).
-3. **For each focus/logic item, open the real source** of the relevant components and reason
-   about the keyboard/focus/interaction behaviour above. Adjudicate a residual criterion in
-   `ADJUDICATE.todo.json`: `C` (justified) / `NC` (with a groundable `file:line` finding: what
-   the keyboard user experiences) / `NA` (justified) / `manual` (with a `reason`). Confirm or
-   refute an engine candidate in `VERIFY.todo.json`: `supported` / `partial` / `refuted` /
-   `unsupported`, with a concrete cited reason. What needs a rendered DOM (focus *visible*, *not
-   obscured*) is marked `needs-rendered-dom` and goes through the `scan` dynamic tier
-   (`references/dynamic.md`). The scan **probes focus
-   visibility (2.4.7)** directly — tabbing through focusables and flagging any whose computed
-   style does not change on focus — alongside 200% zoom (1.4.4), text spacing (1.4.12) and
-   content-on-hover (1.4.13). A probe finding is a real NC; a clean probe still leaves the SC
-   `manual` — never marked conforming on a guess.
-4. **`verify --apply`** to gate FAIL-CLOSED: an unadjudicated, refuted or unsupported focus/logic
-   claim — or an agent verdict missing its justification/finding/reason — fails.
+3. **Pour chaque élément de focus/logique, ouvrez la vraie source** des composants concernés
+   et raisonnez sur le comportement clavier/focus/interaction décrit ci-dessus. Arbitrez un
+   critère résiduel dans `ADJUDICATE.todo.json` : `C` (justifié) / `NC` (avec un constat
+   ancrable `file:line` : ce que vit l’utilisateur au clavier) / `NA` (justifié) / `manual`
+   (avec une `reason`). Confirmez ou réfutez un candidat du moteur dans `VERIFY.todo.json` :
+   `supported` / `partial` / `refuted` / `unsupported`, avec une raison concrète et citée. Ce
+   qui demande un DOM rendu (focus *visible*, *non masqué*) est marqué `needs-rendered-dom` et
+   passe par le niveau dynamique `scan` (`references/dynamic.md`). Le scan **sonde la
+   visibilité du focus (2.4.7)** directement — en tabulant à travers les éléments
+   focalisables et en signalant ceux dont le style calculé ne change pas au focus — en plus du
+   zoom à 200 % (1.4.4), de l’espacement du texte (1.4.12) et du contenu au survol (1.4.13).
+   Un constat de sonde est une vraie NC ; une sonde propre laisse quand même le CS en
+   `manual` — jamais marqué conforme sur une supposition.
+4. **`verify --apply`** pour appliquer le garde-fou en FAIL-CLOSED (en cas de doute,
+   refuser) : une affirmation de focus/logique non arbitrée, réfutée ou non étayée — ou un
+   verdict d’agent sans sa justification/son constat/sa raison — échoue.
 
-The rule that never bends: a focus/interaction criterion the AI agent could not decide by reading
-the source (or rendering) is an **explicit residual risk** with a recorded reason, not a silent pass.
+La règle qui ne plie jamais : un critère de focus/interaction que l’agent IA n’a pas pu
+trancher en lisant la source (ou le rendu) est un **risque résiduel explicite** avec une raison
+consignée, pas un succès silencieux.

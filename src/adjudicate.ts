@@ -2409,48 +2409,116 @@ const T = {
  *  decision rule under a wall of ids. The full list stays in `criteria <sc>`. */
 const MAX_REFS = 12;
 
+/** Fixed prose of references/adjudication.md, per language. The per-criterion protocol,
+ *  the severity rubric and the pack ruling notes carry their own fr/en text. */
+const ADJUDICATION_REF_TEXT = {
+  en: {
+    header: "<!-- GENERATED from src/data/adjudication.json and src/adjudication-rulings.ts by `pnpm run build:adjudication` — do not edit by hand. -->",
+    title: "# Deciding the criteria the engine hands you",
+    intro: [
+      "The static engine decides 3 of the 55 WCAG 2.2 AA success criteria outright. The other 52",
+      "come back as residual risks: 14 need a rendered page (the `scan` tier), 38 are judgment",
+      "calls. This page is the decision rule for each of them — what makes it Conforming, when",
+      "`NA` is legitimate, and the questions that get you there.",
+      "",
+      "It is the same dataset `verify --manual` loads into `ADJUDICATE.md`, so the worklist and",
+      "this page can never disagree. Three rules govern every verdict below:",
+      "",
+      "- **A non-conformity must cite a normative test that resolves.** The worklist proposes the",
+      "  criterion's W3C techniques; `verify --apply` rejects a `normativeRef` that does not exist.",
+      "- **A good practice with no failing test is a recommendation**, not a non-conformity — it",
+      "  never flips a criterion, never enters the conformance rate.",
+      "- **A decided verdict may settle each page of the audit** (#197): an optional `pages` map",
+      "  keyed by audited page id carries per-page outcomes, each passing the same fail-closed gate",
+      "  scoped to that page — every citation and finding names the page's own capture or a source",
+      "  it declares. A page `NC` needs a run-wide `NC`. A page left unnamed keeps the run-wide",
+      "  verdict; a page whose subject is clean gets its own `C`, a page whose subject fails its own `NC`.",
+    ],
+    decide: "**Decide.**",
+    na: "**Not applicable when.**",
+    ask: "**Ask.**",
+    refs: "**Citable references.**",
+    severityTitle: "## Severity",
+    severityLead: "Every NC finding carries a `severity`. The rubric is this tool's — the standards rule conformity, not severity:",
+    severityTail: [
+      "A defect observed at the same anchor under two criteria keeps ONE severity, the highest, not one per",
+      "criterion — the fold warns when it is charged twice. A recommendation is never above `mineur`: a",
+      "defect that leaves no access fails a test, and is an NC.",
+    ],
+    rulingsTitle: (name: string) => `## ${name} — how the standard's own text settles the recurring cases`,
+    rulingsLead: [
+      "Each note rests on the quoted words of the standard (its tests, methodology, particular cases or",
+      "glossary), and the brief of the criterion prints it under the criterion's own text.",
+    ],
+    grounds: "**Grounds.**",
+  },
+  fr: {
+    header: "<!-- GÉNÉRÉ depuis src/data/adjudication.json et src/adjudication-rulings.ts par `pnpm run build:adjudication` — ne pas modifier à la main. -->",
+    title: "# Trancher les critères que le moteur vous confie",
+    intro: [
+      "Le moteur statique tranche d’emblée 3 des 55 critères de succès WCAG 2.2 AA. Les 52 autres",
+      "reviennent comme risques résiduels : 14 exigent une page rendue (le niveau `scan`), 38 relèvent",
+      "du jugement. Cette page donne la règle de décision de chacun — ce qui le rend conforme, quand",
+      "`NA` est légitime, et les questions qui y mènent.",
+      "",
+      "C’est le même jeu de données que `verify --manual` charge dans `ADJUDICATE.md` : la liste de",
+      "travail et cette page ne peuvent jamais diverger. Trois règles gouvernent chaque verdict ci-dessous :",
+      "",
+      "- **Une non-conformité doit citer un test normatif qui se résout.** La liste de travail propose",
+      "  les techniques W3C du critère ; `verify --apply` rejette un `normativeRef` qui n’existe pas.",
+      "- **Une bonne pratique sans test en échec est une recommandation**, pas une non-conformité — elle",
+      "  ne fait jamais basculer un critère et n’entre jamais dans le taux de conformité.",
+      "- **Un verdict tranché peut statuer sur chaque page de l’audit** (#197) : une table `pages`",
+      "  facultative, indexée par identifiant de page auditée, porte des résultats par page, chacun",
+      "  passant le même contrôle fermé par défaut, restreint à cette page — chaque citation et chaque",
+      "  constat nomme la capture propre de la page ou une source qu’elle déclare. Un `NC` de page exige",
+      "  un `NC` global. Une page non nommée garde le verdict global ; une page dont le sujet est sain",
+      "  reçoit son propre `C`, une page dont le sujet échoue son propre `NC`.",
+    ],
+    decide: "**Trancher.**",
+    na: "**Non applicable quand.**",
+    ask: "**Se demander.**",
+    refs: "**Références citables.**",
+    severityTitle: "## Gravité",
+    severityLead:
+      "Chaque constat NC porte une `severity`. Le barème est celui de cet outil — les référentiels statuent sur la conformité, pas sur la gravité :",
+    severityTail: [
+      "Un défaut observé au même ancrage sous deux critères garde UNE seule gravité, la plus haute, pas une par",
+      "critère — l’agrégation avertit quand il est compté deux fois. Une recommandation n’est jamais au-dessus",
+      "de `mineur` : un défaut qui ne laisse aucun accès fait échouer un test, et c’est une NC.",
+    ],
+    rulingsTitle: (name: string) => `## ${name} — comment le texte même du référentiel tranche les cas récurrents`,
+    rulingsLead: [
+      "Chaque note repose sur les mots cités du référentiel (ses tests, sa méthodologie, ses cas particuliers",
+      "ou son glossaire), et le brief du critère l’imprime sous le texte propre du critère.",
+    ],
+    grounds: "**Fondements.**",
+  },
+} as const;
+
 /** Render the per-criterion decision protocol as a standalone reference
  *  (skills/ultra11y/references/adjudication.md). Generated from the same dataset the
  *  worklist uses, so the page an agent reads and the prompt it answers can never drift. */
 export function renderAdjudicationReference(lang: Lang = "en"): string {
+  const t = ADJUDICATION_REF_TEXT[lang];
   const out: string[] = [];
-  out.push("<!-- GENERATED from src/data/adjudication.json and src/adjudication-rulings.ts by `pnpm run build:adjudication` — do not edit by hand. -->", "");
-  out.push("# Deciding the criteria the engine hands you", "");
-  out.push(
-    "The static engine decides 3 of the 55 WCAG 2.2 AA success criteria outright. The other 52",
-    "come back as residual risks: 14 need a rendered page (the `scan` tier), 38 are judgment",
-    "calls. This page is the decision rule for each of them — what makes it Conforming, when",
-    "`NA` is legitimate, and the questions that get you there.",
-    "",
-    "It is the same dataset `verify --manual` loads into `ADJUDICATE.md`, so the worklist and",
-    "this page can never disagree. Three rules govern every verdict below:",
-    "",
-    "- **A non-conformity must cite a normative test that resolves.** The worklist proposes the",
-    "  criterion's W3C techniques; `verify --apply` rejects a `normativeRef` that does not exist.",
-    "- **A good practice with no failing test is a recommendation**, not a non-conformity — it",
-    "  never flips a criterion, never enters the conformance rate.",
-    "- **A decided verdict may settle each page of the audit** (#197): an optional `pages` map",
-    "  keyed by audited page id carries per-page outcomes, each passing the same fail-closed gate",
-    "  scoped to that page — every citation and finding names the page's own capture or a source",
-    "  it declares. A page `NC` needs a run-wide `NC`. A page left unnamed keeps the run-wide",
-    "  verdict; a page whose subject is clean gets its own `C`, a page whose subject fails its own `NC`.",
-    "",
-  );
+  out.push(t.header, "");
+  out.push(t.title, "");
+  out.push(...t.intro, "");
   const byGuideline = new Map<string, string[]>();
   for (const sc of allSC()) {
     const protocol = ADJUDICATION[sc.sc];
     if (!protocol) continue;
     const lines = byGuideline.get(sc.guideline) ?? [];
-    lines.push(`### ${sc.sc} — ${scTitle(sc.sc, lang) ?? sc.title}  ·  ${sc.level}  ·  _${sc.automatability}_`, "", `**Decide.** ${protocol.decide[lang]}`, "");
-    if (protocol.na) lines.push(`**Not applicable when.** ${protocol.na[lang]}`, "");
+    lines.push(`### ${sc.sc} — ${scTitle(sc.sc, lang) ?? sc.title}  ·  ${sc.level}  ·  _${sc.automatability}_`, "", `${t.decide} ${protocol.decide[lang]}`, "");
+    if (protocol.na) lines.push(`${t.na} ${protocol.na[lang]}`, "");
     if (protocol.questions.length) {
-      lines.push("**Ask.**", "");
+      lines.push(t.ask, "");
       for (const q of protocol.questions) lines.push(`- ${q[lang]}`);
       lines.push("");
     }
     const refs = techniquesFor(sc.sc);
-    if (refs.length)
-      lines.push(`**Citable references.** ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${sc.sc}\`)` : ""}`, "");
+    if (refs.length) lines.push(`${t.refs} ${refs.slice(0, MAX_REFS).join(", ")}${refs.length > MAX_REFS ? ` … (\`criteria ${sc.sc}\`)` : ""}`, "");
     byGuideline.set(sc.guideline, lines);
   }
   for (const [guideline, lines] of byGuideline) {
@@ -2460,32 +2528,24 @@ export function renderAdjudicationReference(lang: Lang = "en"): string {
   // THE SEVERITY RUBRIC and THE PACK RULING NOTES (#183) — the same text the briefs carry, so
   // this page and the worklist cannot disagree on them either.
   out.push(
-    "## Severity",
+    t.severityTitle,
     "",
-    "Every NC finding carries a `severity`. The rubric is this tool's — the standards rule conformity, not severity:",
+    t.severityLead,
     "",
     ...(Object.entries(SEVERITY_RUBRIC) as [string, { fr: string; en: string }][]).map(([k, v]) => `- **\`${k}\`** — ${v[lang]};`),
     "",
-    "A defect observed at the same anchor under two criteria keeps ONE severity, the highest, not one per",
-    "criterion — the fold warns when it is charged twice. A recommendation is never above `mineur`: a",
-    "defect that leaves no access fails a test, and is an NC.",
+    ...t.severityTail,
     "",
   );
   for (const [packKey, byCriterion] of Object.entries(PACK_RULINGS)) {
     const name = packKey === "rgaa" ? "RGAA 4.1.2" : packKey;
-    out.push(
-      `## ${name} — how the standard's own text settles the recurring cases`,
-      "",
-      "Each note rests on the quoted words of the standard (its tests, methodology, particular cases or",
-      "glossary), and the brief of the criterion prints it under the criterion's own text.",
-      "",
-    );
+    out.push(t.rulingsTitle(name), "", ...t.rulingsLead, "");
     const ids = Object.keys(byCriterion).sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
     for (const id of ids) {
       const r = byCriterion[id]!;
       out.push(`### ${name} ${id}`, "");
       for (const n of r.notes) out.push(`- ${n[lang]}`);
-      out.push("", `**Grounds.** ${r.grounds.map((g) => `« ${plainTest(g)} »`).join(" · ")}`, "");
+      out.push("", `${t.grounds} ${r.grounds.map((g) => `« ${plainTest(g)} »`).join(" · ")}`, "");
     }
   }
   return out.join("\n");

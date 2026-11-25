@@ -266,6 +266,73 @@ export const ACT_RULES: Record<string, ActMapping> = {
   ac7dc6: { engineRules: [], scope: "deprecated" },
 };
 
+// French editions of the project-authored notes and divergence reasons above, for the
+// committed (French) references/act.md. Keyed like ACT_RULES (rule id) and like
+// `divergences` (test-case id). A missing entry falls back to the English text;
+// tests/act-matrix-sync.test.ts fails if one is missing, so the published doc never mixes.
+export const ACT_NOTES_FR: Record<string, string> = {
+  "7d6734": "role=img sur un <svg> est traité par la même règle",
+  e086e5:
+    "`placeholder-as-label` n’est volontairement PAS rattachée : un placeholder contribue bien au nom accessible, donc ACT valide le cas — ultra11y le signale quand même, en règle maison plus stricte sous 3.3.2.",
+  bf051a:
+    "au-delà de la syntaxe, la sous-étiquette principale est vérifiée contre le registre fermé des codes à deux lettres et les graphies ISO 639-2 des langues qui en ont une (`eng`, `fre`) ; les étiquettes héritées dépréciées `i-*` (`i-lux`) sont acceptées en connaissance de cause",
+  de46e4: "même vérification de registre que pour la langue de la page ; les étiquettes héritées dépréciées `i-*` sont acceptées en connaissance de cause",
+  b40fd1:
+    "tranché seulement quand un <nav> marque le bloc répété et qu’aucune région, aucun titre ni aucun lien d’évitement n’existe ; sinon, savoir quel bloc se répète relève d’un jugement inter-pages. `missing-main-landmark` n’est PAS rattachée : elle exige un <main>, exigence plus stricte que « une région quelconque » chez ACT",
+  bisz58: "cette variante supprime l’exception des plus de 20 h que le moteur respecte : les longs délais ne sont donc pas signalés, en connaissance de cause",
+  f51b46:
+    "`media-no-track` est consultative par conception — les sous-titres peuvent être incrustés dans le fichier média et sa piste audio peut être muette, deux faits invisibles dans le source — elle ne compte donc jamais comme une détection ici ; l’existence et l’exactitude des sous-titres sont tranchées par l’agent face au média",
+  "5c01ea":
+    "couvre les rôles qui interdisent un nom et un ensemble fermé de propriétés propres à un rôle (aria-sort, aria-orientation, aria-value*, aria-pressed, aria-modal…) sur des rôles que le source rend certains ; la matrice complète des attributs autorisés n’est pas encodée",
+  ff89c9: "la parenté assemblée par script (une racine fantôme construite à l’exécution) n’est pas dans le source",
+  d0f69e:
+    "tranché pour un tableau entièrement câblé par `headers` et pour une grille simple (sans fusion de lignes ou de colonnes, avec les lignes d’en-tête en tête, rien de généré par gabarit) ; les autres formes exigent un modèle de tableau complet",
+  ye5d6e:
+    "tranché seulement quand la page n’a aucun lien interne ; savoir si un lien d’évitement existant mène au contenu non répété, ou ce qui se répète sans <nav> pour le marquer, relève du jugement",
+  cf77f2:
+    "tranché seulement quand un <nav> marque le bloc répété ; la page en échec du corpus n’en a pas, l’identification de son bloc répété est donc laissée à l’agent",
+  "047fe0":
+    "tranché seulement quand un <nav> marque le bloc répété et qu’aucun titre, aucune région ni aucun lien d’évitement n’existe hors de lui (h1-missing est consultative, elle ne compte donc pas) ; un titre hors écran exige la page rendue",
+  "24afc2": "valeurs auteur `!important` certainement sous le seuil ; les cas en unités calculées restent du ressort du rendu",
+  "78fd32":
+    "valeurs auteur `!important` certainement sous le seuil (em, sans unité, ou pourcentage de la taille de police propre) ; une valeur en `px` face à une taille de police de feuille de style exige la cascade et reste du ressort du rendu",
+  "9e45ec": "valeurs auteur `!important` certainement sous le seuil ; les cas en unités calculées restent du ressort du rendu",
+  afw4f7: "contraste calculé ; seules les paires de couleurs littérales en ligne sont tranchées statiquement (contrast-literal)",
+  "09o5cg": "contraste renforcé AAA — hors du socle AA",
+  oj04fd: "focus visible (2.4.7) — sondé par scan --runtime local",
+  "59br37": "rognage sous zoom — sondé par scan --runtime local",
+  b33eff: "verrouillage de l’orientation par transformation CSS",
+  akn7bn: "exige le document propre de l’iframe",
+  aaa1bf: "exige la durée du média",
+  "0va7u6": "texte incrusté dans une image",
+  qt1vmo: "l’alternative est-elle pertinente (1.1.1)",
+  e88epe: "l’image est-elle réellement décorative",
+  "5effbb": "fonction du lien en contexte (2.4.4)",
+  ffbc54:
+    "les raccourcis à un seul caractère de 2.1.4 sont enregistrés et désactivés par script (un gestionnaire keydown, un réglage) ; savoir s’il en existe un et s’il peut être désactivé ou remappé se lit dans le comportement, pas dans le balisage",
+  b49b2e: "le titre est-il descriptif (2.4.6)",
+  "9bd38c": "caractéristiques sensorielles (1.3.3)",
+  off6ek: "la sous-étiquette correspond-elle à la langue réelle du texte",
+};
+
+export const ACT_DIVERGENCES_FR: Record<string, string> = {
+  "394132219ba385a90dda40efe822ab8db0cc9483":
+    "une iframe en tabindex=-1 reste exposée aux technologies d’assistance et doit toujours avoir un titre (le RGAA 2.1 l’exige sans condition)",
+  "949f41987201e52f8404c1246d1229eec06dea08":
+    'lang="" sur un élément qui porte du texte ne déclare aucune langue pour ce texte ; ACT juge la règle non applicable, ce moteur le signale sous 3.1.2',
+  "4cfb71fcbfb617bb32540826847a8d6af7890fd4":
+    "un lien sentinelle de focus dans un conteneur aria-hidden : il EST atteignable au Tab, et seul un gestionnaire de focus à l’exécution le renvoie — le même choix qu’axe-core",
+  "6a0fc31d6bea6ceced58d1ef97713935e4fd2717": "le source ne peut pas savoir que le fichier média référencé est muet",
+  cc5c2900c8d128d3ca25d8443f1f3e0a0e5f58e6: "un fragment média #t= qui ramène la lecture sous 3 s ne se résout pas depuis le source",
+  "85c01775d802057e6f43c2248b8a5eb916c50c74": "le mécanisme de pause est un bouton personnalisé câblé en JavaScript, pas un attribut natif `controls`",
+  b13d65523ad27d9c763caca8bcc0fcce4b5ca5fb: "le source ne peut pas savoir que le média référencé n’a pas de piste audio",
+  cf4bc23e70caa9b42a6f82739a8492cb51393dbc: "le mécanisme de pause est un bouton personnalisé câblé en JavaScript, pas un attribut natif `controls`",
+  "65be0004543e57d44dd4a53d9f582c482503727c":
+    "une POLICE d’icônes affiche le texte « search » sous forme de glyphe : l’étiquette visible n’est donc pas le texte du DOM — un fait que seule la page rendue porte",
+};
+
+const UNCLASSIFIED_NOTE = { en: "unclassified — new upstream rule", fr: "non classée — nouvelle règle en amont" } as const;
+
 export interface ActTestcase {
   ruleId: string;
   ruleName: string;
@@ -312,25 +379,153 @@ function mappedFindings(html: string, testcaseId: string, engineRules: string[])
   ].sort();
 }
 
-const VERDICT_LABEL: Record<ActVerdict, string> = {
-  consistent: "✅ consistent",
-  divergent: "🟦 divergent (documented)",
-  "partially-consistent": "🟨 partially consistent",
-  inconsistent: "❌ inconsistent",
-  "not-scored": "—",
+type ActLang = "fr" | "en";
+
+const VERDICT_LABEL: Record<ActLang, Record<ActVerdict, string>> = {
+  en: {
+    consistent: "✅ consistent",
+    divergent: "🟦 divergent (documented)",
+    "partially-consistent": "🟨 partially consistent",
+    inconsistent: "❌ inconsistent",
+    "not-scored": "—",
+  },
+  fr: {
+    consistent: "✅ cohérente",
+    divergent: "🟦 divergente (documentée)",
+    "partially-consistent": "🟨 partiellement cohérente",
+    inconsistent: "❌ incohérente",
+    "not-scored": "—",
+  },
 };
 
-const SCOPE_LABEL: Record<ActScope, string> = {
-  static: "source",
-  rendered: "rendered (`scan`)",
-  judgment: "judgment (agent)",
-  deprecated: "withdrawn upstream",
+const SCOPE_LABEL: Record<ActLang, Record<ActScope, string>> = {
+  en: {
+    static: "source",
+    rendered: "rendered (`scan`)",
+    judgment: "judgment (agent)",
+    deprecated: "withdrawn upstream",
+  },
+  fr: {
+    static: "source",
+    rendered: "rendu (`scan`)",
+    judgment: "jugement (agent)",
+    deprecated: "retirée en amont",
+  },
 };
+
+/** Fixed prose of the ACT matrix, per language. ACT rule names and test-case titles are
+ *  W3C source data and are never translated. */
+const ACT_TEXT = {
+  en: {
+    header: "<!-- GENERATED from the vendored W3C ACT corpus by `pnpm run build:act` — do not edit by hand. -->",
+    title: "# ACT conformance — how this engine scores against a corpus it did not write",
+    intro: [
+      "The recall matrix in this repository proves that each rule fires on the defect written FOR it.",
+      "That is circular. The [W3C ACT-Rules Community Group](https://act-rules.github.io) publishes rules",
+      "with `passed` / `failed` / `inapplicable` examples authored independently of this project, so running",
+      "the engine over them measures something a self-authored fixture cannot.",
+      "",
+      "**How to read this.** An ACT example asserts something about ITS OWN rule and nothing else, so each",
+      "case is judged only with the engine rules mapped to that ACT rule — never with the whole engine.",
+      "Only normative findings count (an `advisory` recommendation never flips a criterion, so it cannot",
+      "fail a case either). Rules needing a rendered page or a human call are declared, not scored — saying",
+      "so beats quietly scoring zero.",
+    ],
+    summary: "## Summary",
+    corpus: (n: number, r: number) => `| Corpus | ${n} examples across ${r} ACT rules |`,
+    source: "Source",
+    scored: "Rules scored",
+    caught: "Failed examples caught",
+    clean: (c: number) => `| Clean examples left alone | **${c} / ${c}** — no unexplained false positive |`,
+    consistent: "Consistent",
+    divergent: (d: number) => `Divergent (documented, ${d} case${d === 1 ? "" : "s"})`,
+    partial: "Partially consistent",
+    inconsistent: "**Inconsistent**",
+    gapsRow: "Declared gaps (static, not implemented)",
+    verdicts: [
+      "*Partially consistent* is the ACT Rules Format's own term for a tool that never reports a false",
+      "positive but does not catch everything — it is a coverage statement, not an error. *Divergent* means",
+      "every deviation on that rule is listed below with the argument for it.",
+    ],
+    scoredTitle: "## Scored rules",
+    scoredHead: "| ACT rule | WCAG | Engine rules | Verdict | Caught |",
+    notesTitle: "### Notes and documented divergences",
+    reportsOn: (title: string, reason: string) => `reports on *${title}*: ${reason}`,
+    gapsTitle: "## Declared gaps — statically decidable, not implemented yet",
+    gapsHead: "| ACT rule | WCAG | Why it is not covered |",
+    outTitle: "## Out of the static engine's reach — routed, not ignored",
+    outHead: "| ACT rule | WCAG | Decided by |",
+    footer: [
+      "The corpus is vendored at `scripts/vendor/act-testcases.json` (refreshed by",
+      "`pnpm run build:act:refresh`, and daily by the act-refresh workflow) so the suite stays",
+      "offline and deterministic.",
+      "ACT-Rules Community Group test cases are © their contributors under the W3C Software and",
+      "Document License — see `NOTICE`.",
+    ],
+  },
+  fr: {
+    header: "<!-- GÉNÉRÉ depuis le corpus W3C ACT embarqué par `pnpm run build:act` — ne pas modifier à la main. -->",
+    title: "# Conformité ACT — comment ce moteur se mesure à un corpus qu’il n’a pas écrit",
+    intro: [
+      "La matrice de rappel de ce dépôt prouve que chaque règle se déclenche sur le défaut écrit POUR elle.",
+      "C’est circulaire. Le [W3C ACT-Rules Community Group](https://act-rules.github.io) publie des règles",
+      "avec des exemples `passed` / `failed` / `inapplicable` rédigés indépendamment de ce projet : faire",
+      "tourner le moteur dessus mesure ce qu’une fixture écrite maison ne peut pas mesurer.",
+      "",
+      "**Comment lire ce document.** Un exemple ACT affirme quelque chose sur SA PROPRE règle et rien d’autre :",
+      "chaque cas n’est donc jugé qu’avec les règles du moteur rattachées à cette règle ACT — jamais avec tout",
+      "le moteur. Seuls les constats normatifs comptent (une recommandation `advisory` ne fait jamais basculer",
+      "un critère, elle ne peut donc pas non plus faire échouer un cas). Les règles qui exigent une page rendue",
+      "ou un jugement humain sont déclarées, pas notées — le dire vaut mieux que noter zéro en silence.",
+    ],
+    summary: "## Synthèse",
+    corpus: (n: number, r: number) => `| Corpus | ${n} exemples sur ${r} règles ACT |`,
+    source: "Source",
+    scored: "Règles notées",
+    caught: "Exemples en échec détectés",
+    clean: (c: number) => `| Exemples sains laissés intacts | **${c} / ${c}** — aucun faux positif inexpliqué |`,
+    consistent: "Cohérentes",
+    divergent: (d: number) => `Divergentes (documentées, ${d} cas)`,
+    partial: "Partiellement cohérentes",
+    inconsistent: "**Incohérentes**",
+    gapsRow: "Lacunes déclarées (statiques, non implémentées)",
+    verdicts: [
+      "*Partiellement cohérente* est le terme du format ACT Rules lui-même pour un outil qui ne signale jamais",
+      "de faux positif mais ne détecte pas tout — c’est un constat de couverture, pas une erreur. *Divergente*",
+      "signifie que chaque écart sur cette règle est listé plus bas avec l’argument qui le justifie.",
+    ],
+    scoredTitle: "## Règles notées",
+    scoredHead: "| Règle ACT | WCAG | Règles du moteur | Verdict | Détectés |",
+    notesTitle: "### Notes et divergences documentées",
+    reportsOn: (title: string, reason: string) => `signale sur *${title}* : ${reason}`,
+    gapsTitle: "## Lacunes déclarées — décidables statiquement, pas encore implémentées",
+    gapsHead: "| Règle ACT | WCAG | Pourquoi elle n’est pas couverte |",
+    outTitle: "## Hors de portée du moteur statique — aiguillées, pas ignorées",
+    outHead: "| Règle ACT | WCAG | Tranchée par |",
+    footer: [
+      "Le corpus est embarqué dans `scripts/vendor/act-testcases.json` (rafraîchi par",
+      "`pnpm run build:act:refresh`, et chaque jour par le workflow act-refresh) pour que la suite reste",
+      "hors ligne et déterministe.",
+      "Les cas de test de l’ACT-Rules Community Group sont © leurs contributeurs, sous la W3C Software and",
+      "Document License — voir `NOTICE`.",
+    ],
+  },
+} as const;
+
+/** The mapping note in the requested language (English fallback). */
+function actNote(r: ActRuleResult, lang: ActLang): string | undefined {
+  const note = r.mapping.note;
+  if (lang === "en" || note === undefined) return note;
+  if (note === UNCLASSIFIED_NOTE.en) return UNCLASSIFIED_NOTE.fr;
+  return ACT_NOTES_FR[r.ruleId] ?? note;
+}
 
 /** Render the published conformance matrix (skills/ultra11y/references/act.md). Generated,
  *  never hand-written: `tests/act-matrix-sync.test.ts` fails if the committed file drifts
- *  from what the current engine actually scores. */
-export function renderActMatrix(testcases: ActTestcase[], source: string): string {
+ *  from what the current engine actually scores. French by default (the committed doc);
+ *  ACT rule names and test-case titles stay in their W3C source language. */
+export function renderActMatrix(testcases: ActTestcase[], source: string, lang: ActLang = "fr"): string {
+  const t = ACT_TEXT[lang];
   const rs = evaluateAct(testcases);
   const scored = rs.filter((r) => r.verdict !== "not-scored");
   const caught = scored.reduce((n, r) => n + r.caught, 0);
@@ -340,87 +535,68 @@ export function renderActMatrix(testcases: ActTestcase[], source: string): strin
   const count = (v: ActVerdict): number => rs.filter((r) => r.verdict === v).length;
 
   const out: string[] = [];
-  out.push(`<!-- GENERATED from the vendored W3C ACT corpus by \`pnpm run build:act\` — do not edit by hand. -->`, "");
-  out.push("# ACT conformance — how this engine scores against a corpus it did not write", "");
-  out.push(
-    "The recall matrix in this repository proves that each rule fires on the defect written FOR it.",
-    "That is circular. The [W3C ACT-Rules Community Group](https://act-rules.github.io) publishes rules",
-    "with `passed` / `failed` / `inapplicable` examples authored independently of this project, so running",
-    "the engine over them measures something a self-authored fixture cannot.",
-    "",
-    "**How to read this.** An ACT example asserts something about ITS OWN rule and nothing else, so each",
-    "case is judged only with the engine rules mapped to that ACT rule — never with the whole engine.",
-    "Only normative findings count (an `advisory` recommendation never flips a criterion, so it cannot",
-    "fail a case either). Rules needing a rendered page or a human call are declared, not scored — saying",
-    "so beats quietly scoring zero.",
-    "",
-  );
-  out.push("## Summary", "");
+  out.push(t.header, "");
+  out.push(t.title, "");
+  out.push(...t.intro, "");
+  out.push(t.summary, "");
   out.push(`| | |`, `|---|---|`);
-  out.push(`| Corpus | ${testcases.length} examples across ${new Set(testcases.map((t) => t.ruleId)).size} ACT rules |`);
-  out.push(`| Source | ${source} |`);
-  out.push(`| Rules scored | **${scored.length}** |`);
-  out.push(`| Failed examples caught | **${caught} / ${failed}** |`);
-  out.push(`| Clean examples left alone | **${clean} / ${clean}** — no unexplained false positive |`);
-  out.push(`| Consistent | ${count("consistent")} |`);
-  out.push(`| Divergent (documented, ${divergences} case${divergences === 1 ? "" : "s"}) | ${count("divergent")} |`);
-  out.push(`| Partially consistent | ${count("partially-consistent")} |`);
-  out.push(`| **Inconsistent** | **${count("inconsistent")}** |`);
-  out.push(`| Declared gaps (static, not implemented) | ${rs.filter((r) => r.mapping.gap).length} |`);
+  out.push(t.corpus(testcases.length, new Set(testcases.map((x) => x.ruleId)).size));
+  out.push(`| ${t.source} | ${source} |`);
+  out.push(`| ${t.scored} | **${scored.length}** |`);
+  out.push(`| ${t.caught} | **${caught} / ${failed}** |`);
+  out.push(t.clean(clean));
+  out.push(`| ${t.consistent} | ${count("consistent")} |`);
+  out.push(`| ${t.divergent(divergences)} | ${count("divergent")} |`);
+  out.push(`| ${t.partial} | ${count("partially-consistent")} |`);
+  out.push(`| ${t.inconsistent} | **${count("inconsistent")}** |`);
+  out.push(`| ${t.gapsRow} | ${rs.filter((r) => r.mapping.gap).length} |`);
   out.push("");
-  out.push(
-    "*Partially consistent* is the ACT Rules Format's own term for a tool that never reports a false",
-    "positive but does not catch everything — it is a coverage statement, not an error. *Divergent* means",
-    "every deviation on that rule is listed below with the argument for it.",
-    "",
-  );
+  out.push(...t.verdicts, "");
 
   if (scored.length) {
-    out.push("## Scored rules", "");
-    out.push("| ACT rule | WCAG | Engine rules | Verdict | Caught |", "|---|---|---|---|---|");
+    out.push(t.scoredTitle, "");
+    out.push(t.scoredHead, "|---|---|---|---|---|");
     for (const r of scored) {
       out.push(
         `| [${r.ruleName}](https://act-rules.github.io/rules/${r.ruleId}) | ${r.wcag.join(", ") || "—"} | ` +
-          `${r.mapping.engineRules.map((x) => `\`${x}\``).join(", ") || "—"} | ${VERDICT_LABEL[r.verdict]} | ${r.caught}/${r.failed} |`,
+          `${r.mapping.engineRules.map((x) => `\`${x}\``).join(", ") || "—"} | ${VERDICT_LABEL[lang][r.verdict]} | ${r.caught}/${r.failed} |`,
       );
     }
     out.push("");
     const notes: string[] = [];
     for (const r of scored) {
-      if (r.mapping.note) notes.push(`- **${r.ruleName}** — ${r.mapping.note}`);
-      for (const d of r.divergences) notes.push(`- **${r.ruleName}** · reports on *${d.title}*: ${d.reason}`);
+      const note = actNote(r, lang);
+      if (note) notes.push(`- **${r.ruleName}** — ${note}`);
+      for (const d of r.divergences) {
+        const reason = lang === "fr" ? (ACT_DIVERGENCES_FR[d.testcaseId] ?? d.reason) : d.reason;
+        notes.push(`- **${r.ruleName}** · ${t.reportsOn(d.title, reason)}`);
+      }
     }
-    if (notes.length) out.push("### Notes and documented divergences", "", ...notes, "");
+    if (notes.length) out.push(t.notesTitle, "", ...notes, "");
   }
 
   const gaps = rs.filter((r) => r.mapping.gap);
   if (gaps.length) {
-    out.push("## Declared gaps — statically decidable, not implemented yet", "");
-    out.push("| ACT rule | WCAG | Why it is not covered |", "|---|---|---|");
+    out.push(t.gapsTitle, "");
+    out.push(t.gapsHead, "|---|---|---|");
     for (const r of gaps)
-      out.push(`| [${r.ruleName}](https://act-rules.github.io/rules/${r.ruleId}) | ${r.wcag.join(", ") || "—"} | ${r.mapping.note ?? ""} |`);
+      out.push(`| [${r.ruleName}](https://act-rules.github.io/rules/${r.ruleId}) | ${r.wcag.join(", ") || "—"} | ${actNote(r, lang) ?? ""} |`);
     out.push("");
   }
 
   const outOfScope = rs.filter((r) => !r.mapping.gap && r.verdict === "not-scored");
   if (outOfScope.length) {
-    out.push("## Out of the static engine's reach — routed, not ignored", "");
-    out.push("| ACT rule | WCAG | Decided by |", "|---|---|---|");
+    out.push(t.outTitle, "");
+    out.push(t.outHead, "|---|---|---|");
     for (const r of outOfScope) {
+      const note = actNote(r, lang);
       out.push(
-        `| [${r.ruleName}](https://act-rules.github.io/rules/${r.ruleId}) | ${r.wcag.join(", ") || "—"} | ${SCOPE_LABEL[r.mapping.scope]}${r.mapping.note ? ` — ${r.mapping.note}` : ""} |`,
+        `| [${r.ruleName}](https://act-rules.github.io/rules/${r.ruleId}) | ${r.wcag.join(", ") || "—"} | ${SCOPE_LABEL[lang][r.mapping.scope]}${note ? ` — ${note}` : ""} |`,
       );
     }
     out.push("");
   }
-  out.push(
-    "The corpus is vendored at `scripts/vendor/act-testcases.json` (refreshed by",
-    "`pnpm run build:act:refresh`, and daily by the act-refresh workflow) so the suite stays",
-    "offline and deterministic.",
-    "ACT-Rules Community Group test cases are © their contributors under the W3C Software and",
-    "Document License — see `NOTICE`.",
-    "",
-  );
+  out.push(...t.footer, "");
   return out.join("\n");
 }
 
@@ -433,7 +609,7 @@ export function evaluateAct(testcases: ActTestcase[], map: Record<string, ActMap
   }
   const out: ActRuleResult[] = [];
   for (const [ruleId, cases] of [...byRule].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const mapping = map[ruleId] ?? { engineRules: [], scope: "static" as ActScope, gap: true, note: "unclassified — new upstream rule" };
+    const mapping = map[ruleId] ?? { engineRules: [], scope: "static" as ActScope, gap: true, note: UNCLASSIFIED_NOTE.en };
     const failedCases = cases.filter((c) => c.expected === "failed");
     const cleanCases = cases.filter((c) => c.expected !== "failed");
     const scored = mapping.scope === "static" && mapping.engineRules.length > 0;

@@ -1,11 +1,11 @@
-# Journeys — user paths you write, ultra11y replays
+# Parcours — les chemins utilisateur que vous écrivez, ultra11y les rejoue
 
-`scan` opens pages and performs only safe, automatic interactions. It never logs in, never
-submits a form, never walks a funnel. A **journey** is that sequence of actions, written by you
-after reading the application, and replayed by `journey run` in the local Playwright with the
-pinned axe-core and the live probes. Every step records a page state in
-`.ultra11y/pages/<journey>-<nn>-<slug>/`, in the same format as `scan`, so each state becomes an
-audited page of the grid.
+`scan` ouvre des pages et n’effectue que des interactions sûres et automatiques. Il ne se connecte
+jamais, ne soumet jamais de formulaire, ne parcourt jamais un tunnel. Un **parcours** est cette suite
+d’actions, écrite par vous après avoir lu l’application, et rejouée par `journey run` dans le
+Playwright local avec l’axe-core épinglé et les sondes en direct. Chaque étape enregistre un état de
+page dans `.ultra11y/pages/<journey>-<nn>-<slug>/`, au même format que `scan`, de sorte que chaque état
+devient une page auditée de la grille.
 
 ```sh
 node scripts/ultra11y.mjs journey list
@@ -13,51 +13,53 @@ node scripts/ultra11y.mjs journey run --all --keyboard --base-url http://localho
   --merge audits/audit-latest.json --out audits
 ```
 
-`journey run <name>…` replays some journeys and `--all` replays every one. `--storage-state
-<file>` loads a session, and a journey's own `storageState` wins over it. `--merge` folds the
-states into the audit, as `scan --merge` does. The command exits 1 when a journey failed.
+`journey run <name>…` rejoue certains parcours et `--all` les rejoue tous. `--storage-state
+<file>` charge une session, et le `storageState` propre à un parcours l’emporte sur elle. `--merge`
+replie les états dans l’audit, comme le fait `scan --merge`. La commande sort avec 1 quand un parcours
+a échoué.
 
-## The file: `.ultra11y/journeys/<name>.json`
+## Le fichier : `.ultra11y/journeys/<name>.json`
 
-| Key | |
+| Clé | |
 |---|---|
-| `name` | `[a-z0-9-]`, prefixes the step ids |
-| `startUrl` | absolute, or a path resolved against `--base-url` (step 0) |
-| `storageState` | optional Playwright session file, relative to the root |
-| `keyboardOnly` | optional, same as `--keyboard` |
+| `name` | `[a-z0-9-]`, préfixe les ids des étapes |
+| `startUrl` | absolue, ou un chemin résolu par rapport à `--base-url` (étape 0) |
+| `storageState` | fichier de session Playwright facultatif, relatif à la racine |
+| `keyboardOnly` | facultatif, équivaut à `--keyboard` |
 | `steps` | `{ action, target?, value?, url?, key?, state?, timeoutMs?, note? }` |
 
-Actions: `goto` (`url`), `click`, `fill` (`value`), `select` (`value`), `check`, `press` (`key`:
-`Tab`, `Enter`, `Escape`, `ArrowDown`, with an optional target), `waitFor` and `expect` (`state`:
-`visible` by default, or `hidden`, `attached`, `detached`). A target is exactly one of
-`{ "role", "name"?, "exact"? }`, `{ "label" }`, `{ "text" }` or `{ "css" }`. Prefer role and
-label: they are what a user perceives. The validator is strict: an unknown key, a missing
-value or an ambiguous target is an error with its path (`journey list` shows them).
+Actions : `goto` (`url`), `click`, `fill` (`value`), `select` (`value`), `check`, `press` (`key` :
+`Tab`, `Enter`, `Escape`, `ArrowDown`, avec une cible facultative), `waitFor` et `expect` (`state` :
+`visible` par défaut, ou `hidden`, `attached`, `detached`). Une cible est exactement l’une de
+`{ "role", "name"?, "exact"? }`, `{ "label" }`, `{ "text" }` ou `{ "css" }`. Préférez le rôle et
+l’étiquette : c’est ce que perçoit un utilisateur. Le validateur est strict : une clé inconnue, une
+valeur manquante ou une cible ambiguë est une erreur accompagnée de son chemin (`journey list` les
+affiche).
 
-## What the replay measures
+## Ce que mesure le rejeu
 
-At every step it runs axe, the probes (zoom, reflow, text spacing, focus visibility, keyboard
-trap on the ring, hover), and these journey observations:
+À chaque étape, il exécute axe, les sondes (zoom, reflow, espacement du texte, visibilité du focus,
+piège clavier sur l’anneau, survol), et ces observations de parcours :
 
 | Observation | WCAG | RGAA |
 |---|---|---|
-| Keyboard mode: Tab walks the whole order and never reaches the control | 2.1.1 (bloquant) | 7.3 |
-| Neither Tab nor Shift+Tab can leave a region | 2.1.2 (bloquant) | 12.9 |
-| Focus not moved into an opened dialog, or not returned to its opener | 2.4.3 | 12.8 |
-| An error shown after an action, tied to no field (`aria-describedby`, `aria-errormessage`, `<label>`) | 3.3.1 | 11.10 |
-| Text that appears outside any live region after an action | 4.1.3 (mineur) | 7.5 |
+| Mode clavier : Tab parcourt tout l’ordre et n’atteint jamais le contrôle | 2.1.1 (bloquant) | 7.3 |
+| Ni Tab ni Shift+Tab ne permettent de quitter une région | 2.1.2 (bloquant) | 12.9 |
+| Focus non déplacé dans une boîte de dialogue ouverte, ou non rendu à l’élément qui l’a ouverte | 2.4.3 | 12.8 |
+| Une erreur affichée après une action, liée à aucun champ (`aria-describedby`, `aria-errormessage`, `<label>`) | 3.3.1 | 11.10 |
+| Du texte qui apparaît hors de toute région live après une action | 4.1.3 (mineur) | 7.5 |
 
-In keyboard mode, `click`, `check`, `fill` and `select` first reach their target with Tab (and
-Shift+Tab), then press Enter or Space, or type. Each step records the focus order it walked. A
-control that cannot be reached is a finding. The step is then played with the pointer, so the
-rest of the journey is still measured, and the annex says so.
+En mode clavier, `click`, `check`, `fill` et `select` atteignent d’abord leur cible avec Tab (et
+Shift+Tab), puis appuient sur Entrée ou Espace, ou saisissent le texte. Chaque étape enregistre l’ordre
+de focus qu’elle a parcouru. Un contrôle qui ne peut pas être atteint est un constat. L’étape est alors
+jouée avec le pointeur, pour que le reste du parcours soit quand même mesuré, et l’annexe le signale.
 
-**Honesty.** A step whose locator matches nothing, whose navigation fails or lands elsewhere, or
-that times out stops its journey, with the reason. Later steps are `not run`. Annex H lists every
-journey and every step: done, failed (with the reason) or not run. A journey file that was never
-replayed is listed too.
+**Honnêteté.** Une étape dont le localisateur ne correspond à rien, dont la navigation échoue ou
+aboutit ailleurs, ou qui dépasse son délai arrête son parcours, avec le motif. Les étapes suivantes
+sont `not run`. L’annexe H liste chaque parcours et chaque étape : effectuée, en échec (avec le motif)
+ou non exécutée. Un fichier de parcours qui n’a jamais été rejoué est listé aussi.
 
-## Example — sign in, keyboard only
+## Exemple — connexion, clavier uniquement
 
 ```json
 {
@@ -76,7 +78,7 @@ replayed is listed too.
 }
 ```
 
-## Example — a modal and a menu
+## Exemple — une modale et un menu
 
 ```json
 {
@@ -93,5 +95,6 @@ replayed is listed too.
 }
 ```
 
-Use test accounts and synthetic values only. Never put a real credential in a journey file:
-commit the file, not a session. Pass the session with `--storage-state`.
+Utilisez uniquement des comptes de test et des valeurs synthétiques. Ne mettez jamais un vrai
+identifiant dans un fichier de parcours : commitez le fichier, pas une session. Passez la session avec
+`--storage-state`.

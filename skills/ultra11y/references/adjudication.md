@@ -1,664 +1,665 @@
-<!-- GENERATED from src/data/adjudication.json and src/adjudication-rulings.ts by `pnpm run build:adjudication` — do not edit by hand. -->
+<!-- GÉNÉRÉ depuis src/data/adjudication.json et src/adjudication-rulings.ts par `pnpm run build:adjudication` — ne pas modifier à la main. -->
 
-# Deciding the criteria the engine hands you
+# Trancher les critères que le moteur vous confie
 
-The static engine decides 3 of the 55 WCAG 2.2 AA success criteria outright. The other 52
-come back as residual risks: 14 need a rendered page (the `scan` tier), 38 are judgment
-calls. This page is the decision rule for each of them — what makes it Conforming, when
-`NA` is legitimate, and the questions that get you there.
+Le moteur statique tranche d’emblée 3 des 55 critères de succès WCAG 2.2 AA. Les 52 autres
+reviennent comme risques résiduels : 14 exigent une page rendue (le niveau `scan`), 38 relèvent
+du jugement. Cette page donne la règle de décision de chacun — ce qui le rend conforme, quand
+`NA` est légitime, et les questions qui y mènent.
 
-It is the same dataset `verify --manual` loads into `ADJUDICATE.md`, so the worklist and
-this page can never disagree. Three rules govern every verdict below:
+C’est le même jeu de données que `verify --manual` charge dans `ADJUDICATE.md` : la liste de
+travail et cette page ne peuvent jamais diverger. Trois règles gouvernent chaque verdict ci-dessous :
 
-- **A non-conformity must cite a normative test that resolves.** The worklist proposes the
-  criterion's W3C techniques; `verify --apply` rejects a `normativeRef` that does not exist.
-- **A good practice with no failing test is a recommendation**, not a non-conformity — it
-  never flips a criterion, never enters the conformance rate.
-- **A decided verdict may settle each page of the audit** (#197): an optional `pages` map
-  keyed by audited page id carries per-page outcomes, each passing the same fail-closed gate
-  scoped to that page — every citation and finding names the page's own capture or a source
-  it declares. A page `NC` needs a run-wide `NC`. A page left unnamed keeps the run-wide
-  verdict; a page whose subject is clean gets its own `C`, a page whose subject fails its own `NC`.
+- **Une non-conformité doit citer un test normatif qui se résout.** La liste de travail propose
+  les techniques W3C du critère ; `verify --apply` rejette un `normativeRef` qui n’existe pas.
+- **Une bonne pratique sans test en échec est une recommandation**, pas une non-conformité — elle
+  ne fait jamais basculer un critère et n’entre jamais dans le taux de conformité.
+- **Un verdict tranché peut statuer sur chaque page de l’audit** (#197) : une table `pages`
+  facultative, indexée par identifiant de page auditée, porte des résultats par page, chacun
+  passant le même contrôle fermé par défaut, restreint à cette page — chaque citation et chaque
+  constat nomme la capture propre de la page ou une source qu’elle déclare. Un `NC` de page exige
+  un `NC` global. Une page non nommée garde le verdict global ; une page dont le sujet est sain
+  reçoit son propre `C`, une page dont le sujet échoue son propre `NC`.
 
-## 1.1 Text Alternatives
+## 1.1 Équivalents textuels
 
-### 1.1.1 — Non-text Content  ·  A  ·  _judgment_
+### 1.1.1 — Contenu non textuel  ·  A  ·  _judgment_
 
-**Decide.** Conforming when EVERY non-text content carries an alternative serving the same purpose: a description of the meaning for an informative image, alt="" for a decorative one, a description of the action for a control. Non-conforming as soon as one alternative is missing, empty on a meaningful image, or off-topic (a file name, "image", "logo").
+**Trancher.** Conforme si CHAQUE contenu non textuel porte une alternative qui remplit la même fonction : description du sens pour une image informative, alt="" pour une image décorative, description de l'action pour un contrôle. Non conforme dès qu'une alternative est absente, vide alors que l'image porte du sens, ou hors sujet (nom de fichier, « image », « logo »).
 
-**Not applicable when.** No non-text content in scope.
+**Non applicable quand.** Aucun contenu non textuel dans le périmètre.
 
-**Ask.**
+**Se demander.**
 
-- For each alt: does it describe what the image CONTRIBUTES here, rather than what it depicts? The same photo can need two different alternatives in two contexts.
-- Do the purely decorative images carry alt="" (not a missing alt)? A named decorative image is as harmful as a silent informative one.
-- For a chart or infographic: does the alternative give the DATA (or point to an equivalent table), or does it merely name the chart?
+- Pour chaque alt : décrit-il ce que l'image APPORTE ici, et non ce qu'elle montre ? Une même photo peut demander deux alternatives différentes selon le contexte.
+- Les images purement décoratives ont-elles alt="" (et non un alt absent) ? Une image de décoration nommée pollue autant qu'une image informative muette.
+- Pour un graphique ou une infographie : l'alternative donne-t-elle la DONNÉE (ou renvoie-t-elle à un tableau équivalent), ou se contente-t-elle de nommer le graphique ?
 
-**Citable references.** ARIA10, ARIA4, ARIA6, ARIA7, ARIA8, ARIA9, C9, F15, F19, F20, F3, F30 … (`criteria 1.1.1`)
+**Références citables.** ARIA10, ARIA4, ARIA6, ARIA7, ARIA8, ARIA9, C9, F15, F19, F20, F3, F30 … (`criteria 1.1.1`)
 
-## 1.2 Time-based Media
+## 1.2 Média temporel
 
-### 1.2.1 — Audio-only and Video-only (Prerecorded)  ·  A  ·  _judgment_
+### 1.2.1 — Contenus seulement audio et seulement vidéo (pré-enregistrés)  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every audio-only media has a text transcript, and every video-only media a transcript OR an equivalent audio track. Non-conforming when the media carries information available nowhere else.
+**Trancher.** Conforme si chaque média audio-seul dispose d'une transcription textuelle, et chaque média vidéo-seul d'une transcription OU d'une piste audio équivalente. Non conforme si le média porte de l'information disponible nulle part ailleurs.
 
-**Not applicable when.** No audio-only or video-only media.
+**Non applicable quand.** Aucun média audio-seul ou vidéo-seul.
 
-**Ask.**
+**Se demander.**
 
-- Is the transcript reachable from the media's own page (an adjacent link, a disclosure panel) rather than buried elsewhere?
-- Does it cover ALL the content, including speaker identification and meaningful sounds?
+- La transcription est-elle atteignable depuis la page du média (lien adjacent, panneau dépliant), et non enfouie ailleurs ?
+- Couvre-t-elle TOUT le contenu, y compris l'identification des locuteurs et les sons signifiants ?
 
-**Citable references.** F30, F67, G158, G159, G166, G173, G58, G69, G78, G8, H96, SM6 … (`criteria 1.2.1`)
+**Références citables.** F30, F67, G158, G159, G166, G173, G58, G69, G78, G8, H96, SM6 … (`criteria 1.2.1`)
 
-### 1.2.2 — Captions (Prerecorded)  ·  A  ·  _judgment_
+### 1.2.2 — Sous-titres (pré-enregistrés)  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every prerecorded video carrying speech has synchronized captions (a <track kind="captions">, captions embedded in the container, or a player supplying them). Non-conforming when the speech is restituted by no caption at all.
+**Trancher.** Conforme si toute vidéo pré-enregistrée porteuse de parole dispose de sous-titres synchronisés (piste <track kind="captions">, sous-titres intégrés au conteneur, ou lecteur en fournissant). Non conforme si la parole n'est restituée par aucun sous-titre.
 
-**Not applicable when.** No prerecorded video carrying meaningful audio.
+**Non applicable quand.** Aucune vidéo pré-enregistrée porteuse de son signifiant.
 
-**Ask.**
+**Se demander.**
 
-- Does a missing <track> really prove there are no captions? Check the container and the player: captions can be embedded — which is why the engine does not class this as a non-conformity.
-- Do the captions also cover meaningful non-speech sounds (music, alarm, laughter)?
+- L'absence de <track> prouve-t-elle vraiment l'absence de sous-titres ? Vérifiez le conteneur et le lecteur : les sous-titres peuvent être intégrés — c'est pourquoi le moteur ne classe pas ce cas en non-conformité.
+- Les sous-titres couvrent-ils aussi les sons non verbaux signifiants (musique, alarme, rire) ?
 
-**Citable references.** F74, F75, F8, G58, G87, G93, H95, SM11, SM12
+**Références citables.** F74, F75, F8, G58, G87, G93, H95, SM11, SM12
 
-### 1.2.3 — Audio Description or Media Alternative (Prerecorded)  ·  A  ·  _judgment_
+### 1.2.3 — Audio-description ou version de remplacement pour un média temporel (pré-enregistré)  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every prerecorded video with audio offers audio description OR a complete text alternative describing the visual information. Non-conforming when information carried only by the picture is restituted nowhere.
+**Trancher.** Conforme si chaque vidéo pré-enregistrée sonore offre une audiodescription OU une alternative textuelle complète décrivant l'information visuelle. Non conforme si l'information portée par l'image seule n'est restituée nulle part.
 
-**Not applicable when.** No prerecorded video with audio.
+**Non applicable quand.** Aucune vidéo pré-enregistrée sonore.
 
-**Ask.**
+**Se demander.**
 
-- What information exists ONLY in the picture (on-screen text, a demonstration, a chart)? Is it spoken or described elsewhere?
+- Quelle information n'existe QUE dans l'image (texte à l'écran, démonstration, graphique) ? Est-elle dite ou décrite ailleurs ?
 
-**Citable references.** F30, F67, G158, G159, G166, G173, G58, G69, G78, G8, H96, SM6 … (`criteria 1.2.3`)
+**Références citables.** F30, F67, G158, G159, G166, G173, G58, G69, G78, G8, H96, SM6 … (`criteria 1.2.3`)
 
-### 1.2.4 — Captions (Live)  ·  AA  ·  _judgment_
+### 1.2.4 — Sous-titres (en direct)  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when every live audio broadcast has real-time captions. Non-conforming otherwise.
+**Trancher.** Conforme si tout contenu audio diffusé en direct dispose de sous-titres en temps réel. Non conforme sinon.
 
-**Not applicable when.** No live broadcast.
+**Non applicable quand.** Aucune diffusion en direct.
 
-**Ask.**
+**Se demander.**
 
-- Is there a live stream (a webinar, a broadcast, an embedded conference) in scope? Is the captioning provider in place for EVERY session?
+- Y a-t-il un flux live (webinaire, direct, visioconférence intégrée) dans le périmètre ? Le prestataire de sous-titrage est-il en place pour CHAQUE session ?
 
-### 1.2.5 — Audio Description (Prerecorded)  ·  AA  ·  _judgment_
+### 1.2.5 — Audio-description (pré-enregistrée)  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when every prerecorded video with audio has audio description (a dedicated track or an audio-described version). Note: at AA a text alternative alone no longer suffices, unlike 1.2.3.
+**Trancher.** Conforme si chaque vidéo pré-enregistrée sonore dispose d'une audiodescription (piste dédiée ou version audiodécrite). Attention : au niveau AA, l'alternative textuelle seule ne suffit plus, contrairement à 1.2.3.
 
-**Not applicable when.** No prerecorded video with audio.
+**Non applicable quand.** Aucune vidéo pré-enregistrée sonore.
 
-**Ask.**
+**Se demander.**
 
-- Does an audio-description track actually exist, or is only the 1.2.3 transcript provided?
+- Une piste d'audiodescription existe-t-elle réellement, ou seule la transcription de 1.2.3 est-elle fournie ?
 
-**Citable references.** G173, G58, G78, G8, H96, SM1, SM2, SM6, SM7
+**Références citables.** G173, G58, G78, G8, H96, SM1, SM2, SM6, SM7
 
 ## 1.3 Adaptable
 
-### 1.3.1 — Info and Relationships  ·  A  ·  _judgment_
+### 1.3.1 — Information et relations  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every relationship and structure conveyed visually (headings, lists, tables, field groups, regions) is programmatically determinable. Non-conforming as soon as a relationship exists visually only — a bold <div> acting as a heading, a list built from <br>, a label/value pair in <span>s.
+**Trancher.** Conforme si chaque relation et structure perçue visuellement (titres, listes, tableaux, groupes de champs, régions) est déterminable par programme. Non conforme dès qu'une relation n'existe que visuellement — un « titre » en <div> gras, une liste faite de <br>, un couple libellé/valeur en <span>.
 
-**Ask.**
+**Se demander.**
 
-- Technique consistency (RGAA 9.1): is the SAME structuring technique (hn vs caption, ul/ol/dl markup) used across ALL similar tables/pages — not instance by instance?
-- Div-presented fields (RGAA 8.9): for each label/value pair shown with <div>/<span>, is the relationship anything other than visual (<dl>/<dt>/<dd> or an ARIA association)?
-- Read without CSS, does the content keep the same meaning and the same order?
+- Cohérence des techniques (RGAA 9.1) : la MÊME technique de structuration (hn vs caption, balisage ul/ol/dl) est-elle employée sur TOUS les tableaux/pages similaires — pas au cas par cas ?
+- Champs présentés en div (RGAA 8.9) : pour chaque paire libellé/valeur affichée avec des <div>/<span>, la relation est-elle autre chose que visuelle (<dl>/<dt>/<dd> ou association ARIA) ?
+- Le contenu lu sans CSS garde-t-il le même sens et le même ordre ?
 
-**Citable references.** ARIA11, ARIA12, ARIA14, ARIA16, ARIA17, ARIA4, ARIA6, ARIA9, C18, C22, C6, C8 … (`criteria 1.3.1`)
+**Références citables.** ARIA11, ARIA12, ARIA14, ARIA16, ARIA17, ARIA4, ARIA6, ARIA9, C18, C22, C6, C8 … (`criteria 1.3.1`)
 
-### 1.3.2 — Meaningful Sequence  ·  A  ·  _judgment_
+### 1.3.2 — Ordre séquentiel logique  ·  A  ·  _judgment_
 
-**Decide.** Conforming when the DOM reading order produces a sequence that preserves meaning. Non-conforming when the visual and DOM orders diverge enough to change the meaning (columns reordered in CSS, `order`/`flex-direction: *-reverse`, absolute positioning).
+**Trancher.** Conforme si l'ordre de lecture du DOM produit une séquence qui garde le sens. Non conforme quand l'ordre visuel et l'ordre DOM divergent au point de changer le sens (colonnes réordonnées en CSS, `order`/`flex-direction: *-reverse`, positionnement absolu).
 
-**Ask.**
+**Se demander.**
 
-- Reading the DOM top to bottom, does the sequence stay understandable — or does a side column cut through the middle of a text?
-- Does a CSS `order` or a reversed `flex-direction` visually move meaning-bearing elements?
+- En lisant le DOM de haut en bas, la séquence reste-t-elle compréhensible — ou une colonne latérale s'intercale-t-elle au milieu d'un texte ?
+- Un `order` CSS ou un `flex-direction` inversé déplace-t-il visuellement des éléments porteurs de sens ?
 
-**Citable references.** ARIA4, C18, C22, C6, C8, F1, F15, F32, F33, F34, F48, F49 … (`criteria 1.3.2`)
+**Références citables.** ARIA4, C18, C22, C6, C8, F1, F15, F32, F33, F34, F48, F49 … (`criteria 1.3.2`)
 
-### 1.3.3 — Sensory Characteristics  ·  A  ·  _judgment_
+### 1.3.3 — Caractéristiques sensorielles  ·  A  ·  _judgment_
 
-**Decide.** Conforming when no instruction relies SOLELY on a sensory characteristic (shape, colour, size, position, sound). Non-conforming for "click the green button", "see the box on the right", "the field below" with no other cue.
+**Trancher.** Conforme si aucune instruction ne repose UNIQUEMENT sur une caractéristique sensorielle (forme, couleur, taille, position, son). Non conforme pour « cliquez sur le bouton vert », « voir l'encadré à droite », « le champ ci-dessous » sans autre repère.
 
-**Ask.**
+**Se demander.**
 
-- Does each instruction also name its target (a label, a heading) in addition to its position or colour?
+- Chaque instruction nomme-t-elle aussi la cible (libellé, intitulé) en plus de sa position ou de sa couleur ?
 
-**Citable references.** F14, F26, G140, G96
+**Références citables.** F14, F26, G140, G96
 
 ### 1.3.4 — Orientation  ·  AA  ·  _needs-rendering_
 
-**Decide.** Conforming when the content displays in both orientations. Non-conforming when display is locked (a blocking CSS `transform`/orientation media query, an app-level lock) without the orientation being essential.
+**Trancher.** Conforme si le contenu s'affiche dans les deux orientations. Non conforme si l'affichage est verrouillé (CSS `transform`/`orientation` media query bloquante, verrouillage applicatif) sans que l'orientation soit essentielle.
 
-**Ask.**
+**Se demander.**
 
-- Is the orientation genuinely ESSENTIAL (a piano keyboard, a cheque to photograph), or merely a layout choice?
+- L'orientation est-elle vraiment ESSENTIELLE (piano, chèque à photographier), ou juste un choix de mise en page ?
 
-### 1.3.5 — Identify Input Purpose  ·  AA  ·  _judgment_
+### 1.3.5 — Identifier la finalité de la saisie  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when every field collecting information ABOUT THE USER declares its purpose with an `autocomplete` token from the WCAG list. Non-conforming when the token is missing or outside the vocabulary.
+**Trancher.** Conforme si chaque champ collectant une information SUR L'UTILISATEUR déclare sa finalité avec un token `autocomplete` de la liste WCAG. Non conforme si le token manque ou n'appartient pas au vocabulaire.
 
-**Not applicable when.** No field collects information about the user.
+**Non applicable quand.** Aucun champ ne collecte d'information sur l'utilisateur.
 
-**Ask.**
+**Se demander.**
 
-- Does the field collect data about the USER (name, email, address, phone) — rather than business data (an order number, a search keyword)?
+- Le champ collecte-t-il une donnée de l'UTILISATEUR (nom, e-mail, adresse, téléphone) — et non une donnée métier (n° de commande, mot-clé de recherche) ?
 
-**Citable references.** H98
+**Références citables.** H98
 
-## 1.4 Distinguishable
+## 1.4 Distinguable
 
-### 1.4.1 — Use of Color  ·  A  ·  _needs-rendering_
+### 1.4.1 — Utilisation de la couleur  ·  A  ·  _needs-rendering_
 
-**Decide.** Conforming when no information is conveyed by colour ALONE. Non-conforming for an in-paragraph link distinguished only by colour, a red/green status with no text or icon, a field error signalled only by a coloured border.
+**Trancher.** Conforme si aucune information n'est donnée par la couleur SEULE. Non conforme pour un lien dans un paragraphe distingué par la seule couleur, un statut « rouge/vert » sans texte ni icône, un champ en erreur signalé par une bordure colorée uniquement.
 
-**Ask.**
+**Se demander.**
 
-- Seen in greyscale, does every piece of information stay distinguishable?
+- Vu en niveaux de gris, chaque information reste-t-elle distinguable ?
 
-**Citable references.** C15, F14, F26, F73, F78, G111, G117, G138, G14, G140, G149, G165 … (`criteria 1.4.1`)
+**Références citables.** C15, F14, F26, F73, F78, G111, G117, G138, G14, G140, G149, G165 … (`criteria 1.4.1`)
 
-### 1.4.3 — Contrast (Minimum)  ·  AA  ·  _needs-rendering_
+### 1.4.3 — Contraste (minimum)  ·  AA  ·  _needs-rendering_
 
-**Decide.** Decided on the render (`scan`): 4.5:1 for body text, 3:1 for large text (>= 18.66px bold or >= 24px). The engine settles the inline-literal colour subset; everything else needs computed styles.
+**Trancher.** Décidé sur le rendu (`scan`) : 4,5:1 pour le texte courant, 3:1 pour le texte large (≥ 18,66 px gras ou ≥ 24 px). Le moteur tranche le sous-ensemble des couleurs littérales en style inline ; tout le reste exige les styles calculés.
 
-**Ask.**
+**Se demander.**
 
-- Have the states (hover, focus, disabled) and text over images/gradients been measured, not just the resting state?
+- Les états (survol, focus, désactivé) et le texte sur image/dégradé ont-ils été mesurés, pas seulement l'état au repos ?
 
-**Citable references.** C29, F24, G136, G145, G148, G174, G18
+**Références citables.** C29, F24, G136, G145, G148, G174, G18
 
-### 1.4.4 — Resize Text  ·  AA  ·  _needs-rendering_
+### 1.4.4 — Redimensionnement du texte  ·  AA  ·  _needs-rendering_
 
-**Decide.** Decided on the render: at 200% text zoom no content or functionality is lost, truncated or overlapped. Non-conforming when a `meta viewport` blocks zooming.
+**Trancher.** Décidé sur le rendu : à 200 % de zoom texte, aucun contenu ni fonctionnalité n'est perdu, tronqué ou superposé. Non conforme si un `meta viewport` bloque le zoom.
 
-**Ask.**
+**Se demander.**
 
-- At 200%, does any text overlap, or any button escape its container?
+- À 200 %, des textes se chevauchent-ils, ou des boutons sortent-ils de leur conteneur ?
 
-**Citable references.** C12, C13, C14, C17, C28, F69, F80, G146, G179, SCR34
+**Références citables.** C12, C13, C14, C17, C28, F69, F80, G146, G179, SCR34
 
-### 1.4.5 — Images of Text  ·  AA  ·  _needs-rendering_
+### 1.4.5 — Texte sous forme d’image  ·  AA  ·  _needs-rendering_
 
-**Decide.** Conforming when text is real text, except for a logotype or an essential presentation. Non-conforming for a heading, a button or a quotation baked into an image.
+**Trancher.** Conforme si le texte est du vrai texte, sauf logotype ou présentation essentielle. Non conforme pour un titre, un bouton ou une citation composés en image.
 
-**Ask.**
+**Se demander.**
 
-- Is the image of text a logo (exempt), or a styling that CSS could reproduce?
+- L'image de texte est-elle un logo (exempté) ou une mise en forme qui pourrait être obtenue en CSS ?
 
-**Citable references.** C22, C30, G136, G140
+**Références citables.** C22, C30, G136, G140
 
-### 1.4.10 — Reflow  ·  AA  ·  _needs-rendering_
+### 1.4.10 — Redistribution  ·  AA  ·  _needs-rendering_
 
-**Decide.** Decided on the render: at 320 CSS px wide (equivalent to 400% on 1280px), no two-dimensional scrolling is required, except for content that inherently needs it (a map, a wide data table).
+**Trancher.** Décidé sur le rendu : à 320 px de large (équivalent 400 % sur 1280 px), aucun défilement bidirectionnel n'est requis, sauf pour un contenu qui l'exige par nature (carte, tableau de données larges).
 
-**Ask.**
+**Se demander.**
 
-- Does the remaining horizontal scrolling apply to genuinely exempt content, or to the whole page?
-- Is some information or functionality actually lost (text cut off, a control clipped or out of reach)? A small overflow of a decorative image, or of a box alone whose text and controls stay available, is a recommendation, not a non-conformity — and a shared component (a header, a footer) is one finding, not one per page.
+- Le défilement horizontal restant concerne-t-il un contenu réellement exempté, ou toute la page ?
+- Une information ou une fonctionnalité est-elle réellement perdue (texte coupé, contrôle rogné ou hors d'atteinte) ? Le petit débordement d'une image décorative, ou d'une boîte seule dont le texte et les contrôles restent disponibles, est une recommandation, pas une non-conformité — et un composant partagé (en-tête, pied de page) fait un seul constat, pas un par page.
 
-**Citable references.** C34, C37
+**Références citables.** C34, C37
 
-### 1.4.11 — Non-text Contrast  ·  AA  ·  _needs-rendering_
+### 1.4.11 — Contraste du contenu non textuel  ·  AA  ·  _needs-rendering_
 
-**Decide.** Decided on the render: 3:1 for user-interface components (a field border, a button outline, the focus indicator) and for the meaningful parts of graphics.
+**Trancher.** Décidé sur le rendu : 3:1 pour les composants d'interface (bordure de champ, contour de bouton, indicateur de focus) et pour les parties signifiantes des graphiques.
 
-**Ask.**
+**Se demander.**
 
-- Do the border identifying a field, and the focus indicator, reach 3:1 against their background?
+- La bordure qui identifie un champ, et l'indicateur de focus, atteignent-ils 3:1 contre leur fond ?
 
-**Citable references.** F78, G145, G174, G18, G183, G195, G207
+**Références citables.** F78, G145, G174, G18, G183, G195, G207
 
-### 1.4.12 — Text Spacing  ·  AA  ·  _needs-rendering_
+### 1.4.12 — Espacement du texte  ·  AA  ·  _needs-rendering_
 
-**Decide.** Decided on the render: forcing line height 1.5x, paragraph spacing 2x, letter spacing 0.12x and word spacing 0.16x, no content is lost or clipped.
+**Trancher.** Décidé sur le rendu : en forçant hauteur de ligne 1,5×, espacement de paragraphe 2×, lettres 0,12× et mots 0,16×, aucun contenu n'est perdu ni tronqué.
 
-**Ask.**
+**Se demander.**
 
-- Do any fixed-height containers clip text once the spacing is increased?
+- Des conteneurs à hauteur fixe coupent-ils le texte une fois l'espacement augmenté ?
 
-**Citable references.** C21, C35, C36, C8
+**Références citables.** C21, C35, C36, C8
 
-### 1.4.13 — Content on Hover or Focus  ·  AA  ·  _needs-rendering_
+### 1.4.13 — Contenu au survol ou au focus  ·  AA  ·  _needs-rendering_
 
-**Decide.** Decided on the render: any additional content shown on hover or focus must be dismissible (Escape), hoverable (the pointer can reach it) and persistent (it does not vanish on its own).
+**Trancher.** Décidé sur le rendu : tout contenu additionnel apparu au survol ou au focus doit être masquable (Échap), survolable (le pointeur peut l'atteindre) et persistant (il ne disparaît pas tout seul).
 
-**Ask.**
+**Se demander.**
 
-- Does the tooltip survive the pointer moving onto it, and does Escape close it without moving focus?
+- L'infobulle survit-elle au déplacement du pointeur vers elle, et Échap la ferme-t-il sans déplacer le focus ?
 
-**Citable references.** F95
+**Références citables.** F95
 
-## 2.1 Keyboard Accessible
+## 2.1 Accessibilité au clavier
 
-### 2.1.1 — Keyboard  ·  A  ·  _judgment_
+### 2.1.1 — Clavier  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every function is operable with the keyboard alone. Non-conforming as soon as an action exists only for the mouse (a handler on a non-interactive element, drag-and-drop with no equivalent, mandatory hover).
+**Trancher.** Conforme si toute fonctionnalité est utilisable au clavier seul. Non conforme dès qu'une action n'existe qu'à la souris (handler sur un élément non interactif, glisser-déposer sans équivalent, survol obligatoire).
 
-**Ask.**
+**Se demander.**
 
-- Does each `onClick`/`onMouseEnter` on a non-native element have a keyboard equivalent (a native element, or role + tabindex + Enter/Space handling)?
-- Do the composite widgets (menu, tabs, combobox) follow the expected keyboard contract (arrows, Escape, Home/End)?
+- Chaque `onClick`/`onMouseEnter` sur un élément non natif a-t-il un équivalent clavier (élément natif, ou role + tabindex + gestion Entrée/Espace) ?
+- Les widgets composites (menu, onglets, combobox) suivent-ils le contrat clavier attendu (flèches, Échap, Origine/Fin) ?
 
-**Citable references.** F10, F42, F54, F55, G202, G21, G4, G90, H91, SCR2, SCR20, SCR29 … (`criteria 2.1.1`)
+**Références citables.** F10, F42, F54, F55, G202, G21, G4, G90, H91, SCR2, SCR20, SCR29 … (`criteria 2.1.1`)
 
-### 2.1.2 — No Keyboard Trap  ·  A  ·  _needs-rendering_
+### 2.1.2 — Pas de piège au clavier  ·  A  ·  _needs-rendering_
 
-**Decide.** Decided on the render: focus must be able to ENTER and LEAVE every component with the keyboard alone. Non-conforming for a modal, an embedded player or an editor that captures focus permanently.
+**Trancher.** Décidé sur le rendu : le focus doit pouvoir ENTRER et SORTIR de chaque composant au clavier seul. Non conforme pour une modale, un lecteur embarqué ou un éditeur qui capture le focus définitivement.
 
-**Ask.**
+**Se demander.**
 
-- In every modal and third-party iframe, does Tab eventually get out — and does Escape hand control back?
+- Dans chaque modale et chaque iframe tierce, Tab finit-il par ressortir — et Échap rend-il la main ?
 
-**Citable references.** F10, G202, G21, G4, G90, H91
+**Références citables.** F10, G202, G21, G4, G90, H91
 
-### 2.1.4 — Character Key Shortcuts  ·  A  ·  _judgment_
+### 2.1.4 — Raccourcis clavier utilisant des caractères  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every single-printable-character shortcut can be turned off, remapped, or is active only while its component has focus. Non-conforming when it is global and cannot be disabled.
+**Trancher.** Conforme si tout raccourci composé d'un seul caractère imprimable peut être désactivé, remappé, ou n'est actif qu'au focus du composant concerné. Non conforme s'il est global et non désactivable.
 
-**Not applicable when.** No single-character shortcut.
+**Non applicable quand.** Aucun raccourci à caractère unique.
 
-**Ask.**
+**Se demander.**
 
-- Could a speech-input user dictating text trigger this shortcut by accident?
+- Un utilisateur de reconnaissance vocale qui dicte du texte peut-il déclencher ce raccourci par accident ?
 
-**Citable references.** F99, G217
+**Références citables.** F99, G217
 
-## 2.2 Enough Time
+## 2.2 Délai suffisant
 
-### 2.2.1 — Timing Adjustable  ·  A  ·  _judgment_
+### 2.2.1 — Réglage du délai  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every time limit can be turned off, adjusted (x10) or extended on request. Exemptions: real-time activity, an essential event, a limit longer than 20 hours.
+**Trancher.** Conforme si toute limite de temps peut être désactivée, ajustée (×10) ou prolongée sur demande. Exemptions : temps réel, événement essentiel, limite > 20 heures.
 
-**Not applicable when.** No time limit.
+**Non applicable quand.** Aucune limite de temps.
 
-**Ask.**
+**Se demander.**
 
-- Does the session expire? Is the user warned BEFORE it does, and can they extend it?
+- La session expire-t-elle ? L'utilisateur est-il averti AVANT expiration et peut-il prolonger ?
 
-**Citable references.** F16, F4, F40, F41, F47, F50, F58, F61, F7, G11, G110, G133 … (`criteria 2.2.1`)
+**Références citables.** F16, F4, F40, F41, F47, F50, F58, F61, F7, G11, G110, G133 … (`criteria 2.2.1`)
 
-### 2.2.2 — Pause, Stop, Hide  ·  A  ·  _judgment_
+### 2.2.2 — Mettre en pause, arrêter, masquer  ·  A  ·  _judgment_
 
-**Decide.** Conforming when any moving, blinking or scrolling content lasting more than 5 seconds and starting automatically can be paused, stopped or hidden. Same for any auto-updating content.
+**Trancher.** Conforme si tout contenu en mouvement, clignotant ou défilant qui dure plus de 5 secondes et démarre automatiquement peut être mis en pause, arrêté ou masqué. Idem pour toute mise à jour automatique.
 
-**Not applicable when.** No moving content and no automatic updates.
+**Non applicable quand.** Aucun contenu en mouvement ni mise à jour automatique.
 
-**Ask.**
+**Se demander.**
 
-- Do carousels, animations and scrolling banners have a pause control reachable by keyboard?
+- Carrousels, animations et bandeaux défilants ont-ils un contrôle de pause atteignable au clavier ?
 
-**Citable references.** F16, F4, F40, F41, F47, F50, F58, F61, F7, G11, G110, G133 … (`criteria 2.2.2`)
+**Références citables.** F16, F4, F40, F41, F47, F50, F58, F61, F7, G11, G110, G133 … (`criteria 2.2.2`)
 
-## 2.3 Seizures and Physical Reactions
+## 2.3 Crises et réactions physiques
 
-### 2.3.1 — Three Flashes or Below Threshold  ·  A  ·  _needs-rendering_
+### 2.3.1 — Pas plus de trois flashs ou sous le seuil critique  ·  A  ·  _needs-rendering_
 
-**Decide.** Decided on the render: nothing flashes more than three times per second, unless it stays below the general and red flash thresholds.
+**Trancher.** Décidé sur le rendu : rien ne clignote plus de 3 fois par seconde, sauf sous les seuils de flash général et de flash rouge.
 
-**Not applicable when.** No flashing content.
+**Non applicable quand.** Aucun contenu clignotant.
 
-**Ask.**
+**Se demander.**
 
-- Does any video or animation contain rapid flashes (explosions, strobe effects)?
+- Une vidéo ou une animation contient-elle des flashs rapides (explosions, stroboscope) ?
 
-**Citable references.** G15, G176, G19
+**Références citables.** G15, G176, G19
 
 ## 2.4 Navigable
 
-### 2.4.1 — Bypass Blocks  ·  A  ·  _judgment_
+### 2.4.1 — Contourner des blocs  ·  A  ·  _judgment_
 
-**Decide.** Conforming when a mechanism bypasses repeated blocks: a working skip link, or a structure of landmarks and headings. Non-conforming when the user must traverse the navigation on every page.
+**Trancher.** Conforme si un mécanisme permet d'éviter les blocs répétés : lien d'évitement fonctionnel, ou structuration en régions (landmarks) et en titres. Non conforme si l'utilisateur doit traverser la navigation à chaque page.
 
-**Ask.**
+**Se demander.**
 
-- Is the skip link the FIRST focusable element, visible on focus, and does its target actually receive focus?
+- Le lien d'évitement est-il le PREMIER élément focalisable, visible au focus, et sa cible reçoit-elle réellement le focus ?
 
-**Citable references.** ARIA11, ARIA12, ARIA4, F15, F66, G1, G10, G115, G123, G124, G130, G135 … (`criteria 2.4.1`)
+**Références citables.** ARIA11, ARIA12, ARIA4, F15, F66, G1, G10, G115, G123, G124, G130, G135 … (`criteria 2.4.1`)
 
-### 2.4.3 — Focus Order  ·  A  ·  _judgment_
+### 2.4.3 — Parcours du focus  ·  A  ·  _judgment_
 
-**Decide.** Conforming when the tab order preserves meaning and operability. Non-conforming when focus jumps incoherently, enters hidden content, or departs from the visual order where that order carries meaning.
+**Trancher.** Conforme si l'ordre de tabulation préserve le sens et l'opérabilité. Non conforme quand le focus saute de façon incohérente, entre dans un contenu masqué, ou ne suit pas l'ordre visuel là où celui-ci porte le sens.
 
-**Ask.**
+**Se demander.**
 
-- SPA (RGAA 12.8): after a partial navigation, is focus moved to the new content (not left on the clicked link, nor reset to the top)?
-- When a modal opens, does focus move into it; when it closes, does it return to the trigger?
+- SPA (RGAA 12.8) : après une navigation partielle, le focus est-il déplacé vers le nouveau contenu (et non laissé sur le lien cliqué ni renvoyé en haut) ?
+- À l'ouverture d'une modale, le focus entre-t-il dedans ; à la fermeture, revient-il sur le déclencheur ?
 
-**Citable references.** C27, F1, F15, F44, F66, F85, G1, G10, G123, G124, G135, G140 … (`criteria 2.4.3`)
+**Références citables.** C27, F1, F15, F44, F66, F85, G1, G10, G123, G124, G135, G140 … (`criteria 2.4.3`)
 
-### 2.4.4 — Link Purpose (In Context)  ·  A  ·  _judgment_
+### 2.4.4 — Fonction du lien (selon le contexte)  ·  A  ·  _judgment_
 
-**Decide.** Conforming when each link's purpose is understandable from its text alone, or from its text plus its immediate context (sentence, list item, cell + headers). Non-conforming for "read more", "click here", a bare URL, or two identically-named links going to different destinations.
+**Trancher.** Conforme si la fonction de chaque lien se comprend depuis son intitulé seul, ou depuis son intitulé + son contexte immédiat (phrase, item de liste, cellule + en-têtes). Non conforme pour « en savoir plus », « cliquez ici », une URL brute, ou deux liens de même intitulé menant ailleurs.
 
-**Ask.**
+**Se demander.**
 
-- Read out of context, does the text say WHERE the link goes or WHAT it triggers?
-- Do two links with the same text lead to the same destination?
-- Does a download link state the format and size (a recommendation, not normative)?
+- Lu hors contexte, l'intitulé dit-il OÙ le lien mène ou CE QU'il déclenche ?
+- Deux liens portant le même intitulé mènent-ils à la même destination ?
+- Un lien de téléchargement annonce-t-il le format et le poids (recommandation, non normatif) ?
 
-**Citable references.** ARIA7, ARIA8, F63, F89, G53, G91, H30, H78, H79, H80, H81
+**Références citables.** ARIA7, ARIA8, F63, F89, G53, G91, H30, H78, H79, H80, H81
 
-### 2.4.5 — Multiple Ways  ·  AA  ·  _judgment_
+### 2.4.5 — Accès multiples  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when at least TWO ways lead to each page: a search engine, a site map, the main navigation, a breadcrumb, an index. Exemption: a page that is a step in a process.
+**Trancher.** Conforme si au moins DEUX moyens permettent d'atteindre chaque page : moteur de recherche, plan du site, navigation principale, fil d'Ariane, index. Exemption : une page qui est une étape d'un processus.
 
-**Ask.**
+**Se demander.**
 
-- Do the two ways exist across the WHOLE site, or only on the home page?
+- Les deux moyens existent-ils sur l'ENSEMBLE du site, ou seulement sur l'accueil ?
 
-**Citable references.** G161, G61, G63, G64
+**Références citables.** G161, G61, G63, G64
 
-### 2.4.6 — Headings and Labels  ·  AA  ·  _judgment_
+### 2.4.6 — En-têtes et étiquettes  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when each heading describes the section it introduces and each label describes what the field expects. Non-conforming for a generic heading ("Section 2"), a vague label ("Value"), or a heading that does not match its content.
+**Trancher.** Conforme si chaque titre décrit la section qu'il introduit et chaque libellé décrit ce que le champ attend. Non conforme pour un titre générique (« Section 2 »), un libellé vague (« Valeur »), ou un intitulé qui ne correspond pas au contenu.
 
-**Ask.**
+**Se demander.**
 
-- Read on their own, do the headings give an understandable outline of the page?
-- Table-title concision (RGAA 5.5): is each <caption> a SHORT, relevant title? A clear but verbose title should become a brief intro, with the details moved into text associated via aria-labelledby/aria-describedby.
+- La suite des titres, lue seule, donne-t-elle un plan compréhensible de la page ?
+- Concision des titres de tableaux (RGAA 5.5) : chaque <caption> est-il un intitulé COURT et pertinent ? Un titre clair mais verbeux doit devenir une brève introduction, les détails étant déportés dans un texte associé via aria-labelledby/aria-describedby.
 
-**Citable references.** ARIA12, ARIA14, ARIA16, ARIA4, ARIA6, ARIA9, F68, F82, F86, G115, G130, G131 … (`criteria 2.4.6`)
+**Références citables.** ARIA12, ARIA14, ARIA16, ARIA4, ARIA6, ARIA9, F68, F82, F86, G115, G130, G131 … (`criteria 2.4.6`)
 
-### 2.4.7 — Focus Visible  ·  AA  ·  _needs-rendering_
+### 2.4.7 — Visibilité du focus  ·  AA  ·  _needs-rendering_
 
-**Decide.** Decided on the render: every focusable element shows a visible focus indicator. Non-conforming for an unreplaced `outline: none`.
+**Trancher.** Décidé sur le rendu : chaque élément focalisable montre un indicateur de focus visible. Non conforme pour un `outline: none` non remplacé.
 
-**Ask.**
+**Se demander.**
 
-- Is the indicator visible on ALL backgrounds (dark theme, hover, elements over images)?
+- L'indicateur est-il visible sur TOUS les fonds (thème sombre, survol, éléments sur image) ?
 
-**Citable references.** C15, F42, F54, F55, F73, F78, G149, G165, G183, G195, G202, G90 … (`criteria 2.4.7`)
+**Références citables.** C15, F42, F54, F55, F73, F78, G149, G165, G183, G195, G202, G90 … (`criteria 2.4.7`)
 
-### 2.4.11 — Focus Not Obscured (Minimum)  ·  AA  ·  _needs-rendering_
+### 2.4.11 — Focus non masqué (minimum)  ·  AA  ·  _needs-rendering_
 
-**Decide.** Decided on the render: the element receiving focus is not entirely hidden by author-created content (a sticky header, a cookie banner, an action bar).
+**Trancher.** Décidé sur le rendu : l'élément qui reçoit le focus n'est pas entièrement masqué par un contenu créé par l'auteur (en-tête collant, bandeau de cookies, barre d'action).
 
-**Ask.**
+**Se demander.**
 
-- Tabbing down then up, does a sticky header or footer cover the focused element?
+- En tabulant vers le bas puis vers le haut, un en-tête ou un pied collant recouvre-t-il l'élément focalisé ?
 
-## 2.5 Input Modalities
+## 2.5 Modalités d’entrée
 
-### 2.5.1 — Pointer Gestures  ·  A  ·  _judgment_
+### 2.5.1 — Gestes pour le contrôle du pointeur  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every function using a multipoint or path-based gesture has a single-pointer alternative. Non-conforming for a pinch, a swipe or a path with no button equivalent.
+**Trancher.** Conforme si toute fonctionnalité utilisant un geste multipoint ou basé sur un tracé dispose d'une alternative à pointeur unique. Non conforme pour un pincement, un balayage ou un tracé sans équivalent bouton.
 
-**Not applicable when.** No complex gesture.
+**Non applicable quand.** Aucun geste complexe.
 
-**Ask.**
+**Se demander.**
 
-- Do carousels, maps and sliders offer buttons in addition to the gesture?
+- Carrousels, cartes et curseurs offrent-ils des boutons en plus du geste ?
 
-**Citable references.** G215, G216
+**Références citables.** G215, G216
 
-### 2.5.2 — Pointer Cancellation  ·  A  ·  _judgment_
+### 2.5.2 — Annulation de l’action du pointeur  ·  A  ·  _judgment_
 
-**Decide.** Conforming when no function executes on the DOWN event, or when it is abortable/reversible. Non-conforming for an action fired on `mousedown`/`touchstart` with no way to abort by moving the pointer away.
+**Trancher.** Conforme si aucune fonctionnalité ne s'exécute à l'APPUI (down-event), ou si elle est annulable/réversible. Non conforme pour une action déclenchée dès `mousedown`/`touchstart` sans possibilité d'annuler en éloignant le pointeur.
 
-**Ask.**
+**Se demander.**
 
-- Do any `onMouseDown`/`onTouchStart` handlers fire the action instead of `onClick`?
+- Des handlers `onMouseDown`/`onTouchStart` déclenchent-ils l'action au lieu de `onClick` ?
 
-### 2.5.3 — Label in Name  ·  A  ·  _judgment_
+### 2.5.3 — Étiquette dans le nom  ·  A  ·  _judgment_
 
-**Decide.** Conforming when, for every control with a visible text label, that text is CONTAINED in the accessible name. Non-conforming when `aria-label` replaces the visible text with a different wording: voice control can no longer find the target.
+**Trancher.** Conforme si, pour chaque contrôle portant un libellé textuel visible, ce texte est CONTENU dans le nom accessible. Non conforme quand `aria-label` remplace le texte visible par un autre libellé : la commande vocale ne trouve plus la cible.
 
-**Ask.**
+**Se demander.**
 
-- Does the accessible name ideally START with the visible text, so voice control matches the first spoken word?
+- Le nom accessible COMMENCE-t-il idéalement par le texte visible, pour que la commande vocale corresponde au premier mot prononcé ?
 
-**Citable references.** ARIA14, ARIA16, ARIA18, ARIA19, ARIA4, ARIA5, ARIA6, ARIA7, ARIA8, ARIA9, F15, F19 … (`criteria 2.5.3`)
+**Références citables.** ARIA14, ARIA16, ARIA18, ARIA19, ARIA4, ARIA5, ARIA6, ARIA7, ARIA8, ARIA9, F15, F19 … (`criteria 2.5.3`)
 
-### 2.5.4 — Motion Actuation  ·  A  ·  _judgment_
+### 2.5.4 — Activation par le mouvement  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every function triggered by device motion (shake, tilt) has an equivalent in the interface AND can be disabled.
+**Trancher.** Conforme si toute fonctionnalité déclenchée par un mouvement de l'appareil (secousse, inclinaison) dispose d'un équivalent dans l'interface ET peut être désactivée.
 
-**Not applicable when.** No motion actuation.
+**Non applicable quand.** Aucune activation par mouvement.
 
-**Ask.**
+**Se demander.**
 
-- Does a `devicemotion`/`deviceorientation` listener trigger an action with no equivalent button?
+- Un écouteur `devicemotion`/`deviceorientation` déclenche-t-il une action sans bouton équivalent ?
 
-### 2.5.7 — Dragging Movements  ·  AA  ·  _judgment_
+### 2.5.7 — Mouvements de glissement  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when every dragging action has a single-pointer alternative that does not require dragging (buttons, an input, a menu). Non-conforming for reordering, a slider or a kanban that only supports drag-and-drop.
+**Trancher.** Conforme si toute action réalisée par glissement dispose d'une alternative à pointeur unique sans glissement (boutons, champ de saisie, menu). Non conforme pour un réordonnancement, un curseur ou un kanban glisser-déposer seul.
 
-**Not applicable when.** No dragging interaction.
+**Non applicable quand.** Aucune interaction par glissement.
 
-**Ask.**
+**Se demander.**
 
-- Do the reorderable lists offer "move up"/"move down" buttons in addition to dragging?
+- Les listes réordonnables offrent-elles des boutons « monter »/« descendre » en plus du glissement ?
 
-### 2.5.8 — Target Size (Minimum)  ·  AA  ·  _needs-rendering_
+### 2.5.8 — Taille de la cible (minimum)  ·  AA  ·  _needs-rendering_
 
-**Decide.** Decided on the render: the pointer target is at least 24x24 CSS px, unless there is sufficient spacing, an equivalent elsewhere, an inline-in-text target, or a legally mandated size.
+**Trancher.** Décidé sur le rendu : la cible de pointage fait au moins 24×24 px CSS, sauf espacement suffisant, équivalent ailleurs, cible en ligne dans du texte, ou taille imposée par la loi.
 
-**Ask.**
+**Se demander.**
 
-- Do the small icons (close, edit, delete) reach 24px, or do they benefit from the spacing exception?
+- Les petites icônes (fermer, éditer, supprimer) atteignent-elles 24 px, ou bénéficient-elles de l'exception d'espacement ?
 
-## 3.1 Readable
+## 3.1 Lisible
 
-### 3.1.2 — Language of Parts  ·  AA  ·  _judgment_
+### 3.1.2 — Langue d’un passage  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when every passage in a language other than the page's carries a correct `lang`. Exemptions: proper nouns, technical terms, words that have entered the vernacular.
+**Trancher.** Conforme si chaque passage dans une langue différente de celle de la page porte un `lang` correct. Exemptions : noms propres, termes techniques, mots passés dans l'usage.
 
-**Not applicable when.** No change of language.
+**Non applicable quand.** Aucun changement de langue.
 
-**Ask.**
+**Se demander.**
 
-- Are quotations, work titles and foreign expressions marked — and does the subtag actually match the text's language?
+- Les citations, titres d'œuvres et expressions étrangères sont-ils marqués — et le sous-tag correspond-il vraiment à la langue du texte ?
 
-**Citable references.** H58
+**Références citables.** H58
 
-## 3.2 Predictable
+## 3.2 Prévisible
 
-### 3.2.1 — On Focus  ·  A  ·  _judgment_
+### 3.2.1 — Au focus  ·  A  ·  _judgment_
 
-**Decide.** Conforming when receiving focus triggers NO change of context. Non-conforming when focus opens a window, submits a form or moves focus elsewhere.
+**Trancher.** Conforme si recevoir le focus ne déclenche AUCUN changement de contexte. Non conforme si le focus ouvre une fenêtre, soumet un formulaire ou déplace le focus ailleurs.
 
-**Ask.**
+**Se demander.**
 
-- Do any `onFocus` handlers navigate, open a modal or move focus?
+- Des handlers `onFocus` naviguent-ils, ouvrent-ils une modale ou déplacent-ils le focus ?
 
-**Citable references.** F22, F36, F37, F41, F55, F9, G107, G13, G76, G80, H32, H84 … (`criteria 3.2.1`)
+**Références citables.** F22, F36, F37, F41, F55, F9, G107, G13, G76, G80, H32, H84 … (`criteria 3.2.1`)
 
-### 3.2.2 — On Input  ·  A  ·  _judgment_
+### 3.2.2 — À la saisie  ·  A  ·  _judgment_
 
-**Decide.** Conforming when changing a control's value does not by itself trigger a change of context, or when the user was warned beforehand. Non-conforming for a `<select>` that navigates on change.
+**Trancher.** Conforme si modifier la valeur d'un contrôle ne déclenche pas seul un changement de contexte, ou si l'utilisateur en a été averti avant. Non conforme pour un `<select>` qui navigue au changement.
 
-**Ask.**
+**Se demander.**
 
-- Is the change announced BEFORE (help text above the field), or does the user discover it afterwards?
+- Le changement est-il annoncé AVANT (texte d'aide au-dessus du champ), ou l'utilisateur le découvre-t-il après coup ?
 
-**Citable references.** F22, F36, F37, F41, F9, G107, G13, G76, G80, H32, H84, SCR19
+**Références citables.** F22, F36, F37, F41, F9, G107, G13, G76, G80, H32, H84, SCR19
 
-### 3.2.3 — Consistent Navigation  ·  AA  ·  _judgment_
+### 3.2.3 — Navigation cohérente  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when repeated navigation mechanisms appear in the SAME relative order from page to page. Non-conforming when the menu entries reorder across pages.
+**Trancher.** Conforme si les mécanismes de navigation répétés apparaissent dans le MÊME ordre relatif d'une page à l'autre. Non conforme si l'ordre des entrées du menu change selon les pages.
 
-**Ask.**
+**Se demander.**
 
-- Across the page sample, do the main navigation, the breadcrumb and the footer keep the same order?
+- Sur l'échantillon de pages, la navigation principale, le fil d'Ariane et le pied de page gardent-ils le même ordre ?
 
-**Citable references.** F66, G1, G123, G124, G59, G61, G63, SCR28
+**Références citables.** F66, G1, G123, G124, G59, G61, G63, SCR28
 
-### 3.2.4 — Consistent Identification  ·  AA  ·  _judgment_
+### 3.2.4 — Identification cohérente  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when components with the same function are identified the same way everywhere (same wording, same icon, same accessible name). Non-conforming when "Search" becomes "Find" from page to page.
+**Trancher.** Conforme si les composants de même fonction sont identifiés de la même manière partout (même intitulé, même icône, même nom accessible). Non conforme si « Rechercher » devient « Trouver » selon les pages.
 
-**Ask.**
+**Se demander.**
 
-- Do the recurring icons (print, share, download) carry the same accessible name everywhere?
+- Les icônes récurrentes (imprimer, partager, télécharger) portent-elles partout le même nom accessible ?
 
-**Citable references.** F31
+**Références citables.** F31
 
-### 3.2.6 — Consistent Help  ·  A  ·  _judgment_
+### 3.2.6 — Aide cohérente  ·  A  ·  _judgment_
 
-**Decide.** Conforming when, wherever a help mechanism (contact, chat, FAQ, contextual help) appears on multiple pages, it sits in the same relative order. New in WCAG 2.2.
+**Trancher.** Conforme si, quand un mécanisme d'aide (contact, chat, FAQ, aide contextuelle) est présent sur plusieurs pages, il apparaît dans le même ordre relatif. Nouveauté WCAG 2.2.
 
-**Not applicable when.** No help mechanism.
+**Non applicable quand.** Aucun mécanisme d'aide.
 
-**Ask.**
+**Se demander.**
 
-- Does the contact link or chat widget sit in the same relative position on every page that carries it?
+- Le lien de contact ou le widget de chat occupe-t-il la même position relative sur toutes les pages qui le portent ?
 
-## 3.3 Input Assistance
+## 3.3 Assistance à la saisie
 
-### 3.3.1 — Error Identification  ·  A  ·  _judgment_
+### 3.3.1 — Identification des erreurs  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every automatically detected input error is identified IN TEXT and the offending field is pointed out. Non-conforming for a red border alone, or a message not associated with its field.
+**Trancher.** Conforme si chaque erreur de saisie détectée automatiquement est identifiée EN TEXTE et le champ fautif désigné. Non conforme pour une bordure rouge seule, ou un message non relié au champ.
 
-**Not applicable when.** No automatic input-error detection.
+**Non applicable quand.** Aucune détection d'erreur de saisie.
 
-**Ask.**
+**Se demander.**
 
-- Is the error message tied to the field (`aria-describedby`/`aria-errormessage`) and announced when it appears?
+- Le message d'erreur est-il relié au champ (`aria-describedby`/`aria-errormessage`) et annoncé au moment où il apparaît ?
 
-**Citable references.** ARIA1, ARIA16, ARIA2, ARIA21, ARIA6, ARIA9, F81, G184, G83, G84, G85, G89 … (`criteria 3.3.1`)
+**Références citables.** ARIA1, ARIA16, ARIA2, ARIA21, ARIA6, ARIA9, F81, G184, G83, G84, G85, G89 … (`criteria 3.3.1`)
 
-### 3.3.2 — Labels or Instructions  ·  A  ·  _judgment_
+### 3.3.2 — Étiquettes ou instructions  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every field carries a label or instruction where input is expected. Non-conforming when the expected format (date, password, phone) is stated nowhere before the error.
+**Trancher.** Conforme si chaque champ porte un libellé ou une instruction quand une saisie est attendue. Non conforme si le format attendu (date, mot de passe, téléphone) n'est indiqué nulle part avant l'erreur.
 
-**Ask.**
+**Se demander.**
 
-- Are the format and constraints stated BEFORE input, not only in the error message?
+- Le format et les contraintes sont-ils annoncés AVANT la saisie, et non seulement dans le message d'erreur ?
 
-**Citable references.** ARIA1, ARIA14, ARIA16, ARIA17, ARIA2, ARIA21, ARIA6, ARIA9, F68, F81, F82, F86 … (`criteria 3.3.2`)
+**Références citables.** ARIA1, ARIA14, ARIA16, ARIA17, ARIA2, ARIA21, ARIA6, ARIA9, F68, F81, F82, F86 … (`criteria 3.3.2`)
 
-### 3.3.3 — Error Suggestion  ·  AA  ·  _judgment_
+### 3.3.3 — Suggestion après une erreur  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when, where the correction is known, a suggestion is offered. Non-conforming for an "invalid field" that does not say what is expected, unless suggesting it would compromise security.
+**Trancher.** Conforme si, quand la correction est connue, une suggestion est proposée. Non conforme pour un « champ invalide » qui ne dit pas ce qui est attendu, sauf si le suggérer compromettrait la sécurité.
 
-**Not applicable when.** No automatically detected input error.
+**Non applicable quand.** Aucune erreur de saisie détectée automatiquement.
 
-**Ask.**
+**Se demander.**
 
-- Does the message say HOW to fix it ("the date must be DD/MM/YYYY"), or only that it is wrong?
+- Le message dit-il COMMENT corriger (« la date doit être au format JJ/MM/AAAA »), ou seulement que c'est faux ?
 
-**Citable references.** G177, G84, G85, G89, H89
+**Références citables.** G177, G84, G85, G89, H89
 
-### 3.3.4 — Error Prevention (Legal, Financial, Data)  ·  AA  ·  _judgment_
+### 3.3.4 — Prévention des erreurs (juridiques, financières, de données)  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when legal, financial or data-modifying submissions are reversible, checked, or confirmed. Non-conforming for a one-click irreversible deletion or order.
+**Trancher.** Conforme si les envois à portée juridique, financière ou modifiant des données sont réversibles, vérifiés, ou confirmés. Non conforme pour une suppression ou une commande définitive en un clic.
 
-**Not applicable when.** No legal, financial or data-modifying transaction.
+**Non applicable quand.** Aucune transaction à portée juridique, financière ou modifiant des données.
 
-**Ask.**
+**Se demander.**
 
-- Can the user review and correct before final submission?
+- L'utilisateur peut-il relire et corriger avant validation définitive ?
 
-**Citable references.** G155, G164, G168, G98, G99
+**Références citables.** G155, G164, G168, G98, G99
 
-### 3.3.7 — Redundant Entry  ·  A  ·  _judgment_
+### 3.3.7 — Saisie redondante  ·  A  ·  _judgment_
 
-**Decide.** Conforming when no information already entered in the same process is asked for again, unless re-entry is essential (password confirmation) or the information is no longer valid. New in WCAG 2.2.
+**Trancher.** Conforme si aucune information déjà saisie dans le même processus n'est redemandée, sauf ressaisie essentielle (confirmation de mot de passe) ou information devenue invalide. Nouveauté WCAG 2.2.
 
-**Ask.**
+**Se demander.**
 
-- Does a multi-step flow ask again for an address or email already entered, with no prefill and no selection?
+- Un tunnel multi-étapes redemande-t-il l'adresse ou l'e-mail déjà saisis, sans pré-remplissage ni sélection ?
 
-### 3.3.8 — Accessible Authentication (Minimum)  ·  AA  ·  _judgment_
+### 3.3.8 — Authentification accessible (minimum)  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when no authentication step requires a cognitive function test (memorise, transcribe, solve), unless an alternative, a mechanism, object recognition or user-provided content is available. Pasting and autofill must remain possible. New in WCAG 2.2.
+**Trancher.** Conforme si aucune étape d'authentification n'exige un test de fonction cognitive (mémoriser, transcrire, résoudre), sauf alternative, aide, reconnaissance d'objet ou contenu fourni par l'utilisateur. Le collage et le remplissage automatique doivent rester possibles. Nouveauté WCAG 2.2.
 
-**Not applicable when.** No authentication.
+**Non applicable quand.** Aucune authentification.
 
-**Ask.**
+**Se demander.**
 
-- Is pasting possible in the credential fields, and can a password manager fill them?
-- Is a transcription CAPTCHA or a code to retype from memory imposed with no alternative?
+- Le collage est-il possible dans les champs d'identification, et le gestionnaire de mots de passe peut-il les remplir ?
+- Un CAPTCHA de transcription ou un code à ressaisir de mémoire est-il imposé sans alternative ?
 
 ## 4.1 Compatible
 
-### 4.1.2 — Name, Role, Value  ·  A  ·  _judgment_
+### 4.1.2 — Nom, rôle et valeur  ·  A  ·  _judgment_
 
-**Decide.** Conforming when every user-interface component exposes a name, a role and — where it carries state — a value, all kept up to date. Non-conforming for a custom widget with no role, no name, or whose ARIA state does not track the real one.
+**Trancher.** Conforme si chaque composant d'interface expose un nom, un rôle et — quand il porte un état — une valeur, tenus à jour. Non conforme pour un widget custom sans rôle, sans nom, ou dont l'état ARIA ne suit pas l'état réel.
 
-**Ask.**
+**Se demander.**
 
-- For each custom widget: does the role match the actual behaviour, and does the state (`aria-expanded`, `aria-checked`, `aria-selected`) track the interaction?
-- Does the accessible name match what the user sees and would say?
+- Pour chaque widget custom : le rôle correspond-il au comportement réel, et l'état (`aria-expanded`, `aria-checked`, `aria-selected`) suit-il l'interaction ?
+- Le nom accessible correspond-il à ce que l'utilisateur voit et dirait ?
 
-**Citable references.** ARIA10, ARIA11, ARIA12, ARIA14, ARIA16, ARIA18, ARIA19, ARIA4, ARIA5, ARIA6, ARIA9, C9 … (`criteria 4.1.2`)
+**Références citables.** ARIA10, ARIA11, ARIA12, ARIA14, ARIA16, ARIA18, ARIA19, ARIA4, ARIA5, ARIA6, ARIA9, C9 … (`criteria 4.1.2`)
 
-### 4.1.3 — Status Messages  ·  AA  ·  _judgment_
+### 4.1.3 — Messages d’état  ·  AA  ·  _judgment_
 
-**Decide.** Conforming when every status message (success, error, search results, loading) is exposed through a role or property allowing announcement WITHOUT receiving focus. Non-conforming for a message inserted into an ordinary container.
+**Trancher.** Conforme si chaque message de statut (succès, erreur, résultat de recherche, chargement) est exposé par un rôle ou une propriété permettant l'annonce SANS recevoir le focus. Non conforme pour un message inséré dans un conteneur ordinaire.
 
-**Not applicable when.** No status message.
+**Non applicable quand.** Aucun message de statut.
 
-**Ask.**
+**Se demander.**
 
-- Does the live region exist IN THE DOM before the message is inserted (a region created together with its content is not announced)?
-- Is the politeness right: `polite` for a status, `alert`/`assertive` for a blocking error?
+- La région live existe-t-elle DANS LE DOM avant l'insertion du message (une région créée en même temps que son contenu n'est pas annoncée) ?
+- La politesse est-elle adaptée : `polite` pour un statut, `alert`/`assertive` pour une erreur bloquante ?
 
-**Citable references.** ARIA19, ARIA22, ARIA23
+**Références citables.** ARIA19, ARIA22, ARIA23
 
-## Severity
+## Gravité
 
-Every NC finding carries a `severity`. The rubric is this tool's — the standards rule conformity, not severity:
+Chaque constat NC porte une `severity`. Le barème est celui de cet outil — les référentiels statuent sur la conformité, pas sur la gravité :
 
-- **`bloquant`** — no access, no workaround;
-- **`majeur`** — access at the cost of a significant extra effort;
-- **`mineur`** — a nuisance;
+- **`bloquant`** — aucun accès, aucun contournement;
+- **`majeur`** — accès au prix d'un effort supplémentaire important;
+- **`mineur`** — une gêne;
 
-A defect observed at the same anchor under two criteria keeps ONE severity, the highest, not one per
-criterion — the fold warns when it is charged twice. A recommendation is never above `mineur`: a
-defect that leaves no access fails a test, and is an NC.
+Un défaut observé au même ancrage sous deux critères garde UNE seule gravité, la plus haute, pas une par
+critère — l’agrégation avertit quand il est compté deux fois. Une recommandation n’est jamais au-dessus
+de `mineur` : un défaut qui ne laisse aucun accès fait échouer un test, et c’est une NC.
 
-## RGAA 4.1.2 — how the standard's own text settles the recurring cases
+## RGAA 4.1.2 — comment le texte même du référentiel tranche les cas récurrents
 
-Each note rests on the quoted words of the standard (its tests, methodology, particular cases or
-glossary), and the brief of the criterion prints it under the criterion's own text.
+Chaque note repose sur les mots cités du référentiel (ses tests, sa méthodologie, ses cas particuliers
+ou son glossaire), et le brief du critère l’imprime sous le texte propre du critère.
 
 ### RGAA 4.1.2 6.1
 
-- A link whose label means nothing to ANYONE — a placeholder link (« Inaccessible », « Lien », « XXX ») that neither its label nor its context explains to a reader with no functional limitation — is the « ambigu pour tout le monde » case: 6.1.1 to 6.1.4 are NOT APPLICABLE to that link, not blocking. It is worth a recommendation at most (replace or remove the link); if it is broken, another criterion owns that (12.3.2 in a site map, for instance).
-- The `title` attribute is NOT a link context: the glossary lists six (the sentence, the paragraph, the list item, the preceding heading, the table header and the table cell), and `title` is not among them. It enters the label only as the last fallback of the accessible name, when the link has no content — so a `title` does not make explicit a link whose content is ambiguous.
+- Un lien dont l'intitulé ne signifie rien pour PERSONNE — un lien de remplissage (« Inaccessible », « Lien », « XXX ») que ni son intitulé ni son contexte n'expliquent à un lecteur sans limitation fonctionnelle — est le cas « ambigu pour tout le monde » : 6.1.1 à 6.1.4 sont NON APPLICABLES pour ce lien, pas bloquants. Il vaut au plus une recommandation (remplacer ou retirer le lien) ; s'il est cassé, c'est l'affaire d'un autre critère (12.3.2 dans un plan du site, par exemple).
+- L'attribut `title` n'est PAS un contexte du lien : le glossaire en énumère six (la phrase, le paragraphe, l'item de liste, le titre précédent, l'en-tête et la cellule de tableau), et `title` n'en fait pas partie. Il n'entre dans l'intitulé que comme dernier recours du nom accessible, quand le lien n'a aucun contenu — un `title` ne rend donc pas explicite un lien dont le contenu est ambigu.
 
-**Grounds.** « Il existe une gestion de cas particuliers pour les tests 6.1.1, 6.1.2, 6.1.3 et 6.1.4 lorsque le lien est ambigu pour tout le monde. Dans cette situation, où il n’est pas possible de rendre le lien explicite dans son contexte, le critère est non applicable. » · « un lecteur sans limitation fonctionnelle ne connaîtrait pas la fonction d’un lien avant de l’activer » · « Note 1 : l’un des 6 contextes de lien combiné à l’ intitulé du lien doit permettre de comprendre la fonction et la destination du lien. » · « sinon, contenu de l’attribut title »
+**Fondements.** « Il existe une gestion de cas particuliers pour les tests 6.1.1, 6.1.2, 6.1.3 et 6.1.4 lorsque le lien est ambigu pour tout le monde. Dans cette situation, où il n’est pas possible de rendre le lien explicite dans son contexte, le critère est non applicable. » · « un lecteur sans limitation fonctionnelle ne connaîtrait pas la fonction d’un lien avant de l’activer » · « Note 1 : l’un des 6 contextes de lien combiné à l’ intitulé du lien doit permettre de comprendre la fonction et la destination du lien. » · « sinon, contenu de l’attribut title »
 
 ### RGAA 4.1.2 8.7
 
-- The harvest's « candidate passages » are LEADS, never NCs: a proper noun, a foreign-origin word present in the dictionary of the page's language, or a word in common use whose pronunciation causes no misunderstanding is exempt. An 8.7.1 NC needs a passage genuinely in a foreign language, with no `lang` on it or on a parent, whose speech rendering would be unintelligible (« deep linking » read with French phonetics, a whole English sentence).
+- Les « passages candidats » de la moisson sont des PISTES, jamais des NC : un nom propre, un mot d'origine étrangère présent dans le dictionnaire de la langue de la page, ou un mot passé dans l'usage courant dont la prononciation ne gêne pas la compréhension sont exemptés. Une NC 8.7.1 exige un passage réellement en langue étrangère, sans `lang` sur lui ni sur un parent, dont la restitution vocale serait incompréhensible (« deep linking » lu à la française, une phrase entière en anglais).
 
-**Grounds.** « Des mots d’origine étrangère et d’usage courant dont la prononciation ne provoque pas d’incompréhension. » · « le critère est applicable, uniquement lorsque l’absence d’indication de langue peut provoquer une incompréhension pour la restitution. »
+**Fondements.** « Des mots d’origine étrangère et d’usage courant dont la prononciation ne provoque pas d’incompréhension. » · « le critère est applicable, uniquement lorsque l’absence d’indication de langue peut provoquer une incompréhension pour la restitution. »
 
 ### RGAA 4.1.2 9.4
 
-- A citation is the words of a THIRD PARTY, presented as reproduced verbatim, in the page's running content. The standard's glossary does not define « citation », so the word keeps that ordinary sense. NOT a citation: the definition of a term in a glossary tooltip, a paraphrase or summary of a law, a page or section title, a label, a key or field name, a slogan in quotation marks. A recommendation at most, never an NC.
-- An INLINE quotation (inside a sentence) can only fail 9.4.1 (`<q>`). 9.4.2 is about a BLOCK of quotation: never cite it for text inside a paragraph.
-- Never propose `<blockquote>` where only phrasing content is allowed (inside a `<span>`, an `<a>`, a `<label>`, a heading or a `<p>`): HTML forbids it there, and the fix would itself be a markup error. An inline quotation is fixed with `<q>`.
+- Une citation, ce sont les mots d'un TIERS, présentés comme reproduits à l'identique, dans le contenu courant de la page. Le glossaire du référentiel ne définit pas « citation » : le mot garde ce sens ordinaire. N'en sont PAS : la définition d'un terme dans une infobulle de glossaire, la paraphrase ou le résumé d'un texte de loi, un titre de page ou de section, une étiquette, un nom de clé ou de champ, un slogan entre guillemets. Au plus une recommandation, jamais une NC.
+- Une citation EN LIGNE (dans une phrase) ne peut échouer qu'à 9.4.1 (`<q>`). 9.4.2 porte sur un BLOC de citation : ne le citez jamais pour un texte pris dans un paragraphe.
+- Ne proposez jamais `<blockquote>` là où seul du contenu phrasé est permis (dans un `<span>`, un `<a>`, un `<label>`, un titre ou un `<p>`) : HTML l'y interdit, et la correction serait elle-même une erreur de balisage. Une citation en ligne se corrige par `<q>`.
 
-**Grounds.** « Retrouver dans le document les citations courtes (ou en ligne) ; » · « Dans chaque page web, chaque citation courte utilise-t-elle une balise `<q>` ? » · « Dans chaque page web, chaque bloc de citation utilise-t-il une balise `<blockquote>` ? »
+**Fondements.** « Retrouver dans le document les citations courtes (ou en ligne) ; » · « Dans chaque page web, chaque citation courte utilise-t-elle une balise `<q>` ? » · « Dans chaque page web, chaque bloc de citation utilise-t-il une balise `<blockquote>` ? »
 
 ### RGAA 4.1.2 10.10
 
-- 10.10 fails only when the information is given ONLY by shape, size or position. A reference that NAMES its target (« the Accessibility tools button », « see the Contact section ») is precisely the alternative means: it passes, even when the name it uses is stale (a button since relabelled). A stale name is a matter of content accuracy: a recommendation, not a 10.10 NC.
-- A 10.10 NC is cited on an instruction that points only at a shape, a size or a position (« click the button on the right », « the active tab is the one in front ») with no other way to recover the information.
+- 10.10 n'échoue que si l'information est donnée UNIQUEMENT par la forme, la taille ou la position. Une référence qui NOMME sa cible (« le bouton Outils d'accessibilité », « voir la rubrique Contact ») est précisément le moyen alternatif : elle est conforme, même quand le nom employé est périmé (un bouton renommé depuis). Un nom périmé relève de l'exactitude du contenu : une recommandation, pas une NC 10.10.
+- Une NC 10.10 se cite sur une consigne qui ne renvoie qu'à une forme, une taille ou une position (« cliquez sur le bouton de droite », « l'onglet actif est celui en avant-plan ») sans aucun autre moyen de retrouver l'information.
 
-**Grounds.** « vérifier que le moyen alternatif de récupérer cette information est pertinent, c’est-à-dire qu’il permet de transmettre l’information dans tous les contextes de consultation et pour tous les utilisateurs. » · « l’information ne doit pas être donnée uniquement [par la forme, taille ou position] »
+**Fondements.** « vérifier que le moyen alternatif de récupérer cette information est pertinent, c’est-à-dire qu’il permet de transmettre l’information dans tous les contextes de consultation et pour tous les utilisateurs. » · « l’information ne doit pas être donnée uniquement [par la forme, taille ou position] »
 
 ### RGAA 4.1.2 10.11
 
-- An NC requires that at 320 px some INFORMATION or FUNCTION is no longer available without horizontal scrolling: text cut off, a control clipped or out of reach. A small overflow of a decorative image, or of a box alone (a background, a border) while all its text and controls stay available, is a recommendation. Images, graphics, videos, data tables and interfaces that need a horizontal scrollbar are the criterion's own exceptions.
-- A convention of this report (not a rule of the standard): a shared component (a header, footer or navigation rendered on every page) is ONE finding, anchored on the component or on the first page it is observed on — not one per page. Name the other pages in the message.
+- Une NC exige qu'à 320 px une INFORMATION ou une FONCTIONNALITÉ ne soit plus disponible sans défilement horizontal : un texte coupé, un contrôle rogné ou hors d'atteinte. Le petit débordement d'une image décorative, ou d'une boîte seule (fond, bordure) alors que tout son texte et ses contrôles restent disponibles, est une recommandation. Images, graphiques, vidéos, tableaux de données et interfaces à ascenseur horizontal sont des exceptions du critère.
+- Convention de ce rapport (pas une règle du référentiel) : un composant partagé (en-tête, pied de page, navigation rendus sur chaque page) fait UN constat, ancré sur le composant ou sur la première page où il est observé — pas un par page. Nommez les autres pages dans le message.
 
-**Grounds.** « l’ensemble des informations et des fonctionnalités sont-elles disponibles sans aucun défilement horizontal (hors cas particuliers) ? » · « sans perte d’information ou de fonctionnalité » · « - Les images, les graphiques ou les vidéos ; »
+**Fondements.** « l’ensemble des informations et des fonctionnalités sont-elles disponibles sans aucun défilement horizontal (hors cas particuliers) ? » · « sans perte d’information ou de fonctionnalité » · « - Les images, les graphiques ou les vidéos ; »
 
 ### RGAA 4.1.2 12.3
 
-- Placeholder entries in a site map (a label that names no page, an `href="#"`) are AT MOST one minor (`mineur`) NC on 12.3.3 — a link that does not lead to the page its label indicates —, cited once on those entries, or a recommendation. And only AFTER checking where the links lead: a link in error belongs to 12.3.2, and a site map that omits pages still passes 12.3.1 if they can be reached otherwise.
-- These are the very links 6.1 rules « ambigu pour tout le monde »: do not charge them a second time with another severity.
+- Des entrées de remplissage dans un plan du site (un intitulé qui ne nomme aucune page, un `href="#"`) valent AU PLUS une NC mineure sur 12.3.3 — un lien qui ne conduit pas à la page indiquée par son intitulé —, citée une fois sur ces entrées, ou une recommandation. Et seulement APRÈS avoir vérifié où mènent les liens : un lien en erreur relève de 12.3.2, et un plan qui omet des pages reste conforme à 12.3.1 si elles sont atteignables autrement.
+- Ce sont les mêmes liens que ceux que 6.1 juge « ambigus pour tout le monde » : ne les facturez pas une seconde fois avec une autre gravité.
 
-**Grounds.** « Les liens du plan du site renvoient-ils bien vers les pages indiquées par l’intitulé ? » · « vérifier qu’ils sont à jour (ni obsolètes ni en erreur) et conduisent à la page indiquée par leur intitulé » · « Il n'est pas obligatoire que toutes les pages soient présentes dans le plan du site si elles peuvent être atteintes, par exemple, à partir de la page d'accueil d'une rubrique ou d'un catalogue. »
+**Fondements.** « Les liens du plan du site renvoient-ils bien vers les pages indiquées par l’intitulé ? » · « vérifier qu’ils sont à jour (ni obsolètes ni en erreur) et conduisent à la page indiquée par leur intitulé » · « Il n'est pas obligatoire que toutes les pages soient présentes dans le plan du site si elles peuvent être atteintes, par exemple, à partir de la page d'accueil d'une rubrique ou d'un catalogue. »

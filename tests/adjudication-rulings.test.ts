@@ -167,10 +167,13 @@ describe("the ruling notes reach the per-criterion brief", () => {
 
 describe("the reference page and the contracts carry the same rubric and notes", () => {
   it("references/adjudication.md lists the RGAA notes with their grounds, and the rubric", () => {
-    const md = renderAdjudicationReference("en");
-    expect(md).toContain("## Severity");
+    const md = renderAdjudicationReference("fr");
+    expect(md).toContain("## Gravité");
     expect(md).toMatch(/### RGAA 4\.1\.2 9\.4/);
-    expect(md).toMatch(/\*\*Grounds\.\*\* « Retrouver dans le document les citations courtes/);
+    expect(md).toMatch(/\*\*Fondements\.\*\* « Retrouver dans le document les citations courtes/);
+    const en = renderAdjudicationReference("en");
+    expect(en).toContain("## Severity");
+    expect(en).toMatch(/\*\*Grounds\.\*\* « Retrouver dans le document les citations courtes/);
     // Glossary link markup is stripped from a quoted ground, as it is everywhere it is shown.
     expect(md).not.toMatch(/\]\(#page-plan-du-site\)/);
     expect(readFileSync(new URL("../skills/ultra11y/references/adjudication.md", import.meta.url), "utf8")).toBe(md);

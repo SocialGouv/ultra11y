@@ -1,54 +1,57 @@
-# Dynamic tier (axe-core) — optional
+# Niveau dynamique (axe-core) — optionnel
 
-The static engine leaves some criteria "to assess" because they need a **render**: computed
-contrast (1.4.3), focus visible (2.4.7), focus not obscured (2.4.11), reflow/zoom
-(1.4.4/1.4.10), text spacing (1.4.12),
-content on hover (1.4.13), target size (2.5.8). The dynamic tier decides them by running
-**axe-core in a real headless browser** (Playwright), on one runtime:
+Le moteur statique laisse certains critères « à évaluer » parce qu’ils demandent un **rendu** :
+contraste calculé (1.4.3), visibilité du focus (2.4.7), focus non masqué (2.4.11),
+redistribution/zoom (1.4.4/1.4.10), espacement du texte (1.4.12),
+contenu au survol (1.4.13), taille de la cible (2.5.8). Le niveau dynamique les tranche en
+exécutant **axe-core dans un vrai navigateur headless** (Playwright), sur un seul runtime :
 
-- **The local Playwright**: `scan` resolves Playwright + `@axe-core/playwright` **at runtime**,
-  from `--cwd` first and from ultra11y's own install second (no global install). A project that
-  pins its own Playwright keeps it, because `--cwd` is tried first. It adds the
-  residual-criteria **probes** (below). `--runtime local` (or its alias `--local`) still names it
-  explicitly; there is no other runtime.
-- **A pinned axe-core, the same one everywhere.** Playwright is resolved project first; axe is
-  not. `scan` and `ultra11y/playwright` inject ultra11y's own `axe-core` (an exact dependency of
-  the package, read from `axe-core/axe.min.js` and passed as `axeSource`) with the same rule
-  tags (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`, `best-practice`), whatever
-  version the audited project installs. The project's copy is used only when ultra11y's
-  cannot be resolved (the standalone skill bundle with no `node_modules` beside it). That
-  fallback prints a note. The version that ran is recorded in every result (`DynamicResult.axe`,
-  each capture's `axe.json`) and in the report annex. `status --browser` shows which copy
-  would run.
-- **`--browser-path <file>`** (or `ULTRA11Y_BROWSER_PATH`): launch **this** executable with the
-  local runtime instead of the browser Playwright resolves — a distribution's Chromium
-  (`/usr/bin/chromium` on Debian, what a sandboxed runner image ships), which Playwright's own
-  resolution and its Google Chrome fallback never find. It is an explicit choice: the engine
-  launches that file and nothing else, and `status --browser --browser-path <file>` answers
-  about that file (`ok` + `executable`, or a reason naming the path).
+- **Le Playwright local** : `scan` résout Playwright + `@axe-core/playwright` **à l’exécution**,
+  d’abord depuis `--cwd` puis depuis l’installation propre d’ultra11y (aucune installation
+  globale). Un projet qui épingle son propre Playwright le conserve, puisque `--cwd` est essayé
+  en premier. Il ajoute les **sondes** des critères résiduels (ci-dessous). `--runtime local`
+  (ou son alias `--local`) le nomme encore explicitement ; il n’existe pas d’autre runtime.
+- **Un axe-core épinglé, le même partout.** Playwright est résolu d’abord dans le projet ; axe
+  ne l’est pas. `scan` et `ultra11y/playwright` injectent l’`axe-core` propre d’ultra11y (une
+  dépendance exacte du package, lue depuis `axe-core/axe.min.js` et passée en `axeSource`)
+  avec les mêmes tags de règles (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`,
+  `best-practice`), quelle que soit la version installée par le projet audité. La copie du
+  projet n’est utilisée que lorsque celle d’ultra11y ne peut pas être résolue (le bundle
+  autonome de la skill sans `node_modules` à côté). Ce repli affiche une note. La version exécutée
+  est consignée dans chaque résultat (`DynamicResult.axe`, le `axe.json` de chaque capture) et
+  dans l’annexe du rapport. `status --browser` indique quelle copie serait exécutée.
+- **`--browser-path <file>`** (ou `ULTRA11Y_BROWSER_PATH`) : lancer **cet** exécutable avec le
+  runtime local au lieu du navigateur que résout Playwright — le Chromium d’une distribution
+  (`/usr/bin/chromium` sur Debian, ce que livre l’image d’un runner en bac à sable), que ni la
+  résolution propre de Playwright ni son repli sur Google Chrome ne trouvent jamais. C’est un
+  choix explicite : le moteur lance ce fichier et rien d’autre, et
+  `status --browser --browser-path <file>` répond à propos de ce fichier (`ok` + `executable`,
+  ou une raison qui nomme le chemin).
 
-## Prerequisites
+## Prérequis
 
-- **local**: a Chromium browser (`npx playwright install chromium`), plus the two npm packages
-  — and **where they have to live depends on how you run the engine**:
+- **local** : un navigateur Chromium (`npx playwright install chromium`), plus les deux
+  packages npm — et **l’endroit où ils doivent se trouver dépend de la façon dont vous lancez
+  le moteur** :
 
-  | Channel | `@playwright/test` + `@axe-core/playwright` |
+  | Canal | `@playwright/test` + `@axe-core/playwright` |
   |---|---|
-  | ultra11y as an npm dependency (`ultra11y/playwright`, `pnpm exec ultra11y`) | **come with it** — they are its own `dependencies`. Nothing to install. |
-  | the standalone skill bundle (`node scripts/ultra11y.mjs` from an installed skill) | **must be in the audited project**, reachable from `--cwd`. An installed skill is a directory of files with no `node_modules` beside it, so the second anchor finds nothing there. |
-  | iterion's `rgaa-audit` bot (CI) | the bot installs the pinned engine package — dependencies included — and probes the tier with `status --browser` before it renders. |
+  | ultra11y comme dépendance npm (`ultra11y/playwright`, `pnpm exec ultra11y`) | **fournis avec lui** — ce sont ses propres `dependencies`. Rien à installer. |
+  | le bundle autonome de la skill (`node scripts/ultra11y.mjs` depuis une skill installée) | **doivent être dans le projet audité**, accessibles depuis `--cwd`. Une skill installée est un répertoire de fichiers sans `node_modules` à côté, donc le second point d’ancrage n’y trouve rien. |
+  | le bot `rgaa-audit` d’iterion (CI) | le bot installe le package épinglé du moteur — dépendances comprises — et sonde le niveau avec `status --browser` avant de rendre. |
 
-  Which of those you are in is answerable: `status --browser [--cwd <dir>]` asks the very
-  function `scan` acts on, and reports `ok` plus, when it is not, WHICH package
-  or binary is missing. That is what a CI harness branches on, rather than re-deriving it.
+  Savoir dans lequel de ces cas vous êtes a une réponse : `status --browser [--cwd <dir>]`
+  interroge la fonction même sur laquelle agit `scan`, et renvoie `ok` et, quand ce n’est pas
+  le cas, QUEL package ou binaire manque. C’est là-dessus qu’un harness de CI se branche,
+  plutôt que de le redéduire.
 
-  Either way, a project that installs them itself wins: `--cwd` is tried first, which is what a
-  repository with its own pinned Playwright wants. When neither anchor resolves, `scan` fails
-  and says which package it could not find.
+  Dans tous les cas, un projet qui les installe lui-même l’emporte : `--cwd` est essayé en
+  premier, ce que veut un dépôt qui épingle son propre Playwright. Quand aucun des deux points
+  d’ancrage ne résout, `scan` échoue et indique quel package il n’a pas trouvé.
 
-The rest of the skill (static audit) needs neither.
+Le reste de la skill (audit statique) n’a besoin ni de l’un ni de l’autre.
 
-## Usage
+## Utilisation
 
 ```
 # resolving deps + browser from the current directory, then from ultra11y itself
@@ -74,10 +77,10 @@ node scripts/ultra11y.mjs scan http://localhost:3000 --cwd packages/app --merge 
 node scripts/ultra11y.mjs report --in audits/audit-latest.json --out audits
 ```
 
-Produce the `--storage-state` file with Playwright (e.g. an e2e auth setup that logs in and
-`context.storageState({ path })`).
+Produisez le fichier `--storage-state` avec Playwright (p. ex. un setup d’authentification e2e
+qui se connecte puis appelle `context.storageState({ path })`).
 
-### Cover many pages (crawl)
+### Couvrir de nombreuses pages (crawl)
 
 ```
 # every URL listed in a sitemap.xml
@@ -87,75 +90,82 @@ node scripts/ultra11y.mjs scan --sitemap https://example.com/sitemap.xml --json
 node scripts/ultra11y.mjs scan --crawl https://example.com --depth 2 --max 50 --json
 ```
 
-Each finding keeps the **page** it came from (`--merge` reports that URL as `file`). `--crawl`
-follows links in the **served HTML** (SSR/MPA); for a pure SPA, use `--sitemap` or pass the
-URLs explicitly. The crawl fetch is unauthenticated — for authed pages pass explicit URLs +
-`--storage-state` instead.
+Chaque constat conserve la **page** d’où il provient (`--merge` rapporte cette URL comme
+`file`). `--crawl` suit les liens du **HTML servi** (SSR/MPA) ; pour une SPA pure, utilisez
+`--sitemap` ou passez les URL explicitement. La récupération du crawl n’est pas authentifiée —
+pour les pages authentifiées, passez plutôt des URL explicites + `--storage-state`.
 
-## What the dynamic tier adds
+## Ce qu’apporte le niveau dynamique
 
-- **Real contrast (1.4.3)** — axe computes the rendered colours (the main win).
-- **Reflow (1.4.10)** — no horizontal scroll at 320px wide.
-- **Cross-check** — axe re-validates the structural criteria (alt, labels, ARIA, headings…) at
-  render; a render finding is **authoritative** and turns the criterion NC.
+- **Contraste réel (1.4.3)** — axe calcule les couleurs rendues (le gain principal).
+- **Redistribution (1.4.10)** — aucun défilement horizontal à 320px de large.
+- **Contre-vérification** — axe revalide les critères structurels (alt, étiquettes, ARIA,
+  titres…) au rendu ; un constat de rendu **fait autorité** et fait passer le critère en NC.
 
-axe findings map to WCAG success criteria via a curated table (`axe-rule → SC`), completed by
-axe's **native WCAG tags** (`wcag<abc>`). On merge (`--merge`), a `manual` criterion the tier
-decides leaves the residual risks and becomes `C`/`NC` (ruleId `axe:<rule>` for axe findings).
+Les constats axe sont associés aux critères de succès WCAG via une table établie à la main
+(`axe-rule → SC`), complétée par les **tags WCAG natifs** d’axe (`wcag<abc>`). À la fusion
+(`--merge`), un critère `manual` que le niveau tranche quitte les risques résiduels et devient
+`C`/`NC` (ruleId `axe:<rule>` pour les constats axe).
 
-### Residual-criteria probes
+### Sondes des critères résiduels
 
-Beyond axe, the scan runs bespoke Playwright probes for the criteria axe alone cannot
-decide. Each raises a **definite NC only when the failure is observed** in the rendered page; a
-clean probe leaves the SC `manual` (never silently conforming). Merged findings get a
-`dyn-<engine>` ruleId.
+Au-delà d’axe, le scan exécute des sondes Playwright sur mesure pour les critères qu’axe seul
+ne peut pas trancher. Chacune ne lève une **NC définitive que lorsque l’échec est observé**
+dans la page rendue ; une sonde propre laisse le CS en `manual` (jamais conforme en silence).
+Les constats fusionnés reçoivent un ruleId `dyn-<engine>`.
 
-| Probe | SC | How |
+| Sonde | CS | Méthode |
 |---|---|---|
-| focus visibility | 2.4.7 | Tab through focusables; flag any whose computed style (outline/box-shadow/border/background) is unchanged when focused |
-| focus not obscured | 2.4.11 | On the SAME walk of the tab ring: sample a grid over the focused component and flag it when NO point of it is on top anywhere, under an element with a `fixed`/`sticky` ancestor. **Entirely** hidden only — a partly-covered component satisfies 2.4.11 (that is 2.4.12, AAA) — and scrolled out of the viewport is not this criterion at all |
-| 200% zoom | 1.4.4 | Enlarge text to 200%; flag page-level horizontal scroll or text clipped in an `overflow:hidden` container |
-| text spacing | 1.4.12 | Inject the WCAG 1.4.12 spacing override; flag clipped/truncated text |
-| content on hover | 1.4.13 | For `aria-describedby` triggers whose target is hidden, hover to reveal then check it is dismissible (Escape) |
+| visibilité du focus | 2.4.7 | Tabuler à travers les éléments focalisables ; signaler tout élément dont le style calculé (outline/box-shadow/border/background) ne change pas au focus |
+| focus non masqué | 2.4.11 | Sur le MÊME parcours de l’anneau de tabulation : échantillonner une grille sur le composant qui a le focus et le signaler quand AUCUN de ses points n’est au premier plan, sous un élément ayant un ancêtre `fixed`/`sticky`. Uniquement **entièrement** masqué — un composant partiellement recouvert satisfait 2.4.11 (cela relève de 2.4.12, AAA) — et un composant sorti du viewport par défilement ne relève pas du tout de ce critère |
+| zoom à 200 % | 1.4.4 | Agrandir le texte à 200 % ; signaler un défilement horizontal au niveau de la page ou un texte rogné dans un conteneur `overflow:hidden` |
+| espacement du texte | 1.4.12 | Injecter la surcharge d’espacement WCAG 1.4.12 ; signaler un texte rogné/tronqué |
+| contenu au survol | 1.4.13 | Pour les déclencheurs `aria-describedby` dont la cible est masquée, survoler pour révéler puis vérifier que le contenu peut être masqué (Échap) |
 
-Visually-hidden (`clip`/1px sr-only) elements are excluded from these probes. **Target size
-(2.5.8)** is intentionally left to axe-core's own `target-size` rule, which applies the inline
-and 24px-spacing exceptions correctly (a hand-rolled probe was strictly noisier on real pages).
+Les éléments masqués visuellement (`clip`/1px sr-only) sont exclus de ces sondes. **La taille
+de la cible (2.5.8)** est volontairement laissée à la règle `target-size` propre d’axe-core,
+qui applique correctement les exceptions « en ligne » et d’espacement de 24px (une sonde faite
+main était strictement plus bruyante sur de vraies pages).
 
-These probes are heuristic (conservative severities: focus + zoom `majeur`, the rest `mineur`).
-Adversarially verify probe findings (a `verify` pass) before filing them.
+Ces sondes sont heuristiques (sévérités prudentes : focus + zoom `majeur`, le reste `mineur`).
+Vérifiez les constats des sondes de manière contradictoire (une passe `verify`) avant de les
+enregistrer.
 
-### Stateful interaction probes (local runtime, interactions ON by default)
+### Sondes d’interaction avec état (runtime local, interactions ACTIVÉES par défaut)
 
-The read-only probes above measure a page **as served**. Some non-conformities only appear
-once the user has *interacted* — a filled field that overflows its cell, a status message
-that never reaches a live region. The local runtime therefore also runs a **stateful** pass
-that drives the page, then restores it. **Safety contract**: only NON-navigating actions are
-performed — fill text inputs (a long representative value, respecting `maxlength`), toggle
-checkbox/radio, click `button[type="button"]`. **Never** a link, a submit button, or a form
-submit; every interaction records `location.href` first and aborts + restores if it changed;
-every loop is bounded; original state is always restored.
+Les sondes en lecture seule ci-dessus mesurent une page **telle que servie**. Certaines
+non-conformités n’apparaissent qu’une fois que l’utilisateur a *interagi* — un champ rempli qui
+déborde de sa cellule, un message de statut qui n’atteint jamais une région live. Le runtime
+local exécute donc aussi une passe **avec état** qui pilote la page, puis la restaure.
+**Contrat de sécurité** : seules des actions qui NE naviguent PAS sont effectuées — remplir des
+champs texte (une valeur longue et représentative, en respectant `maxlength`), basculer des
+cases à cocher/boutons radio, cliquer sur `button[type="button"]`. **Jamais** un lien, un bouton
+d’envoi ni une soumission de formulaire ; chaque interaction consigne d’abord `location.href` et
+abandonne + restaure s’il a changé ; chaque boucle est bornée ; l’état d’origine est toujours
+restauré.
 
-| Stateful probe | SC | What it adds |
+| Sonde avec état | CS | Ce qu’elle ajoute |
 |---|---|---|
-| fill-inputs → re-measure | 1.4.4 / 1.4.10 / 1.4.12 | fills visible text-like inputs with real content, then re-runs the zoom/reflow/spacing stress probes so an overflow that only occurs *when the field holds the value the auditor must type* is caught |
-| live-region | 4.1.3 | triggers safe interactions and checks that a resulting status message lands in an `aria-live`/`role="status"`/`role="alert"` region (status-messages) — the extra SC `localTestedScs` reports only when interactions are on |
+| remplir les champs → remesurer | 1.4.4 / 1.4.10 / 1.4.12 | remplit les champs visibles de type texte avec un vrai contenu, puis relance les sondes de stress zoom/redistribution/espacement, afin d’attraper un débordement qui ne se produit *que lorsque le champ contient la valeur que l’auditeur doit saisir* |
+| région live | 4.1.3 | déclenche des interactions sûres et vérifie que le message de statut qui en résulte arrive dans une région `aria-live`/`role="status"`/`role="alert"` (messages de statut) — le CS supplémentaire que `localTestedScs` ne rapporte que lorsque les interactions sont activées |
 
-- **`--no-interact`** disables the whole stateful pass (fill + live-region), leaving only the
-  read-only probes — use it when even bounded, non-navigating interaction is unwelcome.
-- **Authenticated-scan click policy.** When a `--storage-state` session is loaded, the
-  live-region probe does **not** click buttons by default (even a `type="button"` click can
-  trigger a server mutation the `location.href` assertion cannot see). Fill/toggle still run.
-  **`--interact-clicks`** re-enables the clicks explicitly; unauthenticated scans keep clicks
-  on. Defense-in-depth on top: a button whose accessible name matches a
-  destructive/submitting verb (delete, remove, send, submit, confirm, pay…) is **never**
-  clicked, in either mode.
+- **`--no-interact`** désactive toute la passe avec état (remplissage + région live), ne
+  laissant que les sondes en lecture seule — à utiliser quand même une interaction bornée et
+  sans navigation est malvenue.
+- **Politique de clic des scans authentifiés.** Quand une session `--storage-state` est
+  chargée, la sonde de région live ne clique **pas** sur les boutons par défaut (même un clic
+  sur `type="button"` peut déclencher une mutation côté serveur que l’assertion sur
+  `location.href` ne peut pas voir). Remplissage/bascule s’exécutent toujours.
+  **`--interact-clicks`** réactive explicitement les clics ; les scans non authentifiés gardent
+  les clics actifs. Défense en profondeur par-dessus : un bouton dont le nom accessible
+  correspond à un verbe destructeur/d’envoi (delete, remove, send, submit, confirm, pay…) n’est
+  **jamais** cliqué, dans aucun des deux modes.
 
-## Build the sample from the site (`pages discover`)
+## Construire l’échantillon à partir du site (`pages discover`)
 
-The crawler and the sitemap parser fed a scan and nothing else: no artefact was persisted, so
-the multi-page contract stayed a `sample.pages` block written by hand — which is the step that
-stops people auditing more than one page. `pages discover` writes it:
+Le crawler et le parseur de sitemap alimentaient un scan et rien d’autre : aucun artefact
+n’était persisté, si bien que le contrat multipage restait un bloc `sample.pages` écrit à la
+main — l’étape même qui empêche les gens d’auditer plus d’une page. `pages discover` l’écrit :
 
 ```
 node scripts/ultra11y.mjs pages discover --crawl http://localhost:3000 --max 20      # print the proposal
@@ -163,212 +173,236 @@ node scripts/ultra11y.mjs pages discover --sitemap https://example.com/sitemap.x
 node scripts/ultra11y.mjs pages discover --from-snapshots --write                   # from what your tests already captured
 ```
 
-`--from-snapshots` reads `.ultra11y/pages` instead of the network, and it is the only route that
-can see a **state-reached** page: a modal or a funnel step behind a client-side transition has no
-URL to crawl to, but a Playwright test calling `checkA11y` has already been there.
+`--from-snapshots` lit `.ultra11y/pages` au lieu du réseau, et c’est la seule voie qui puisse
+voir une page **atteinte par un état** : une modale ou une étape de tunnel derrière une
+transition côté client n’a pas d’URL vers laquelle explorer, mais un test Playwright qui
+appelle `checkA11y` y est déjà passé.
 
-Each page gets a stable id from its URL path and a **name read from the served `<title>`** —
-what a human reads in the report — falling back to a humanized path when the document has
-none. The crawl's own responses are memoized, so the titles cost no extra request.
+Chaque page reçoit un id stable tiré de son chemin d’URL et un **nom lu dans le `<title>`
+servi** — ce qu’un humain lit dans le rapport — avec repli sur un chemin rendu lisible quand le
+document n’en a pas. Les réponses du crawl lui-même sont mémoïsées, donc les titres ne coûtent
+aucune requête supplémentaire.
 
-`--write` **merges**: a page already declared is kept verbatim, because `auth`,
-`storageState` and `notes` are human work — someone worked out how to reach that page — and
-re-running discovery must never destroy it. Only genuinely new URLs are appended, ids are
-suffixed rather than collided, and the result is validated *before* the file is written (a
-malformed block would break every later `scan --sample` with no hint of what caused it).
+`--write` **fusionne** : une page déjà déclarée est conservée telle quelle, car `auth`,
+`storageState` et `notes` sont du travail humain — quelqu’un a trouvé comment atteindre cette
+page — et relancer la découverte ne doit jamais le détruire. Seules les URL réellement
+nouvelles sont ajoutées, les ids reçoivent un suffixe plutôt que d’entrer en collision, et le
+résultat est validé *avant* l’écriture du fichier (un bloc malformé casserait tous les
+`scan --sample` ultérieurs sans le moindre indice sur la cause).
 
-A client-rendered SPA does not expose its routes in the served HTML; use a sitemap there.
+Une SPA rendue côté client n’expose pas ses routes dans le HTML servi ; utilisez-y un sitemap.
 
-**The route inventory.** `--write` also records every discovered URL in `.ultra11y/routes.json`
-(union across runs, keyed by path, so the sitemap's production host and the E2E run's
-`localhost` are the same route). `--routes-only` records the inventory alone and leaves the
-sample untouched. Once the inventory exists, `audit` and `scan --merge` set `scope.routes`, and
-the annex lists every route (section F) as captured (E2E), scanned, source code only, or not
-reached.
+**L’inventaire des routes.** `--write` consigne aussi chaque URL découverte dans
+`.ultra11y/routes.json` (union entre les exécutions, indexée par chemin, de sorte que l’hôte de
+production du sitemap et le `localhost` de l’exécution E2E désignent la même route).
+`--routes-only` consigne l’inventaire seul et laisse l’échantillon intact. Une fois
+l’inventaire présent, `audit` et `scan --merge` renseignent `scope.routes`, et l’annexe liste
+chaque route (section F) comme capturée (E2E), scannée, code source uniquement, ou non
+atteinte.
 
-## Scan a normative page sample (`scan --sample`)
+## Scanner un échantillon de pages normatif (`scan --sample`)
 
-A real country-standard audit runs over a declared **page sample** (échantillon), not one
-URL. Declare it by hand, or let `pages discover` above write it. Then:
+Un vrai audit selon un référentiel national porte sur un **échantillon de pages** déclaré, pas
+sur une seule URL. Déclarez-le à la main, ou laissez `pages discover` ci-dessus l’écrire.
+Ensuite :
 
 ```
 node scripts/ultra11y.mjs sample check                                   # lint the sample's coverage vs the standard's required kinds
 node scripts/ultra11y.mjs scan --sample --cwd packages/app --merge audits/audit-latest.json --out audits
 ```
 
-`scan --sample` iterates every configured sample page (per-page `--storage-state` supported
-for authenticated pages), keeps each finding's originating **page name + auth flag** as
-provenance (surfaced in the auditor ticket's *Pages / URLs impactées* and *Contexte de
-reproduction*), and `--merge`s them into the audit. `sample check` is an **advisory** lint —
-it reports which required page kinds the sample lacks (a malformed `sample` block is a hard
-error, exit 2; a merely-incomplete one is guidance, exit 0). See `references/audit.md`
-(sample concept) and `references/standards.md`.
+`scan --sample` parcourt chaque page configurée de l’échantillon (`--storage-state` par page
+pris en charge pour les pages authentifiées), conserve comme provenance le **nom de page +
+indicateur d’authentification** d’origine de chaque constat (repris dans les rubriques *Pages /
+URLs impactées* et *Contexte de reproduction* du ticket de l’auditeur), et les fusionne
+(`--merge`) dans l’audit. `sample check` est un lint **consultatif** — il signale les types de
+pages requis qui manquent à l’échantillon (un bloc `sample` malformé est une erreur bloquante,
+code de sortie 2 ; un bloc simplement incomplet est une indication, code de sortie 0). Voir
+`references/audit.md` (notion d’échantillon) et `references/standards.md`.
 
-**It lints BOTH inventories.** A project running the E2E producer keeps two: `.ultra11yrc.json`,
-and the routes its tests actually snapshot. They drift — and a linter reading only the declared
-list once pronounced a sample "complete" for a configuration that omitted the very URL a
-certifying audit had been run on. `sample check` now prints the census first, unconditionally:
+**Il vérifie LES DEUX inventaires.** Un projet qui fait tourner le producteur E2E en tient
+deux : `.ultra11yrc.json`, et les routes que ses tests capturent réellement en instantané. Ils
+divergent — et un linter qui ne lisait que la liste déclarée a un jour déclaré un échantillon
+« complet » pour une configuration qui omettait l’URL même sur laquelle un audit de
+certification avait été mené. `sample check` affiche désormais d’abord le recensement, sans
+condition :
 
 ```
 17 déclarée(s) · 38 instantanée(s) · 22 instantanée(s) non déclarée(s) · 1 déclarée(s) jamais capturée(s)
 ```
 
-The required kinds are checked over the **union**, and « Échantillon complet » is never printed
-bare while snapshotted pages are missing from the declared sample — so the verdict cannot be read
-as a statement about an inventory it did not see. `pages discover --from-snapshots --write` folds
-them in.
+Les types requis sont vérifiés sur l’**union**, et « Échantillon complet » n’est jamais affiché
+seul tant que des pages capturées en instantané manquent dans l’échantillon déclaré — si bien
+que le verdict ne peut pas se lire comme une affirmation sur un inventaire qu’il n’a pas vu.
+`pages discover --from-snapshots --write` les y intègre.
 
-The issue that prompted this also floated a `via` recipe on a sample page (auth profile, path,
-named interaction steps). It is deliberately **not** implemented: nothing in the engine could
-execute it — every browser path is `goto`-only — so a JSON step DSL would reimplement, worse,
-what a Playwright spec calling `checkA11y` already does.
+L’issue à l’origine de ce point proposait aussi une recette `via` sur une page de
+l’échantillon (profil d’authentification, chemin, étapes d’interaction nommées). Elle n’est
+volontairement **pas** implémentée : rien dans le moteur ne pourrait l’exécuter — chaque chemin
+navigateur ne fait que des `goto` — et un DSL d’étapes en JSON réimplémenterait, en moins bien,
+ce que fait déjà une spec Playwright qui appelle `checkA11y`.
 
-### The sample, then every other route (`--all-routes`)
+### L’échantillon, puis toutes les autres routes (`--all-routes`)
 
 ```
 node scripts/ultra11y.mjs scan --sample --all-routes --max-routes 100 --merge audits/audit-latest.json --out audits
 ```
 
-`--all-routes` reads the inventory and scans, after the sample, each route the sample does not
-hold. It skips a route the E2E run already captured, because that capture holds the state the
-tests built. At most `--max-routes` routes are scanned (default 50). Without `--sample` it scans
-the inventory alone. The extra routes are recorded and audited as pages, but they do not join
-the declared sample. Each one is labelled « hors échantillon » in the annex. A route the bound
-left out, or that the scan refused (redirect, HTTP error, browser failure), is listed as not
-reached with its reason.
+`--all-routes` lit l’inventaire et scanne, après l’échantillon, chaque route que l’échantillon
+ne contient pas. Il ignore une route que l’exécution E2E a déjà capturée, car cette capture
+contient l’état construit par les tests. Au plus `--max-routes` routes sont scannées (50 par
+défaut). Sans `--sample`, il scanne l’inventaire seul. Les routes supplémentaires sont
+consignées et auditées comme des pages, mais elles ne rejoignent pas l’échantillon déclaré.
+Chacune est étiquetée « hors échantillon » dans l’annexe. Une route laissée de côté par la
+borne, ou que le scan a refusée (redirection, erreur HTTP, échec du navigateur), est listée
+comme non atteinte avec sa raison.
 
-### Cover the whole site: the crawl is unbounded by default
+### Couvrir tout le site : le crawl n’est pas borné par défaut
 
-`--max` and `--depth` bound the crawl **when you ask them to**; absent — or `0` — there is no
-bound at all. A sweep that silently stopped at 50 pages produced a report merely SHORTER than
-the site, and a shorter deliverable reads exactly like a complete one. Termination does not
-depend on the cap: the frontier never leaves the origin and every URL is de-duplicated by its
-canonical form, so a cycle (or a site linking `/` and `/index.html` at once) is visited once.
+`--max` et `--depth` bornent le crawl **quand vous le leur demandez** ; absents — ou à `0` —
+il n’y a aucune borne. Un balayage qui s’arrêtait silencieusement à 50 pages produisait un
+rapport simplement PLUS COURT que le site, et un livrable plus court se lit exactement comme un
+livrable complet. L’arrêt ne dépend pas du plafond : la frontière ne quitte jamais l’origine et
+chaque URL est dédoublonnée par sa forme canonique, si bien qu’un cycle (ou un site qui pointe à
+la fois vers `/` et `/index.html`) n’est visité qu’une fois.
 
-Every page reached is announced on stderr with its running count, so an unbounded crawl is
-never a job that merely looks hung — and `--json` on stdout stays machine-readable.
+Chaque page atteinte est annoncée sur stderr avec son compteur courant, si bien qu’un crawl non
+borné n’est jamais une tâche qui a simplement l’air bloquée — et `--json` sur stdout reste
+lisible par une machine.
 
 ```
 node scripts/ultra11y.mjs scan --crawl https://example.com --json          # the whole site
 node scripts/ultra11y.mjs scan --crawl https://example.com --max 50        # bound it explicitly
 ```
 
-A crawl follows links in the served HTML, including ones that are not pages: a directory
-listing that links a `.tsx` file makes the browser start a download instead of a navigation,
-and the scan stops there. Point `--crawl` at a real entry page, or pass the URLs.
+Un crawl suit les liens du HTML servi, y compris ceux qui ne sont pas des pages : un listing de
+répertoire qui pointe vers un fichier `.tsx` fait démarrer au navigateur un téléchargement au
+lieu d’une navigation, et le scan s’arrête là. Pointez `--crawl` vers une vraie page d’entrée,
+ou passez les URL.
 
-## Every scanned page is also a SNAPSHOT
+## Chaque page scannée est aussi un SNAPSHOT
 
-`scan` does not only keep findings: each page it visits is persisted to
-`.ultra11y/pages/<id>/` (DOM + computed styles + boxes + stylesheets + a viewport
-screenshot). The browser is already on the page, so this costs one `evaluate`. `--no-snapshot`
-opts out; `--root <dir>` relocates the tree (default: the working directory — `--cwd` is
-where Playwright resolves from, not where snapshots land).
+`scan` ne conserve pas seulement des constats : chaque page qu’il visite est persistée dans
+`.ultra11y/pages/<id>/` (DOM + styles calculés + boîtes + feuilles de style + une capture
+d’écran du viewport). Le navigateur est déjà sur la page, donc cela coûte un `evaluate`.
+`--no-snapshot` le désactive ; `--root <dir>` déplace l’arborescence (par défaut : le
+répertoire de travail — `--cwd` est l’endroit depuis lequel Playwright est résolu, pas celui
+où arrivent les instantanés).
 
-### …and the PDF documents those pages link to
+### …et les documents PDF vers lesquels pointent ces pages
 
-After the pages are recorded, `scan` downloads the **same-origin document candidates** of each
-captured page (resolved against the page URL and its `<base>`) into
-`.ultra11y/documents/<sha256>.pdf`, beside a `<sha256>.json` sidecar (`kind: "ultra11y-document"`,
-`v: 1`, the URL and **every page that links it** — the reader ignores any other `.json`). A link is
-a candidate when:
+Une fois les pages enregistrées, `scan` télécharge les **candidats documents de même origine**
+de chaque page capturée (résolus par rapport à l’URL de la page et à son `<base>`) dans
+`.ultra11y/documents/<sha256>.pdf`, à côté d’un fichier annexe `<sha256>.json`
+(`kind: "ultra11y-document"`, `v: 1`, l’URL et **chaque page qui pointe vers lui** — le
+lecteur ignore tout autre `.json`). Un lien est candidat quand :
 
-- its path ends in `.pdf`, or it declares `type="application/pdf"`;
-- it is an `<a download>`;
-- its visible text, `aria-label` or `title` names the format (`PDF` as a word: « Télécharger (PDF) »);
-- its path or query names it as a token (`/api/declaration-pdf?year=2026`, `?format=pdf` — not `/pdfs/`).
+- son chemin se termine par `.pdf`, ou il déclare `type="application/pdf"` ;
+- c’est un `<a download>` ;
+- son texte visible, son `aria-label` ou son `title` nomme le format (`PDF` comme un mot : « Télécharger (PDF) ») ;
+- son chemin ou sa query le nomme comme un jeton (`/api/declaration-pdf?year=2026`, `?format=pdf` — pas `/pdfs/`).
 
-A candidate is a document only once the response proves it: `Content-Type: application/pdf` or
-a `%PDF-` header. Anything else — a login page, a CSV behind `download` — is reported « not a
-PDF » with the response type, never audited. Bounded: at most 20 documents per run
-(`--max-pdf <n>`), 20 MiB each. Third-party links are never requested, and **every redirect hop
-is checked before it is followed** — same origin, or the http→https upgrade of it, at most 5
-hops — so a redirect to another host (a metadata address, an intranet) is refused unrequested.
-A local page's documents are read from its own directory only (a regular file, symlinks resolved).
-A bad link is one refusal, never the end of the scan. `--no-pdf` opts out. Each refusal is
-printed with its reason.
+Un candidat n’est un document qu’une fois que la réponse le prouve : `Content-Type: application/pdf`
+ou un en-tête `%PDF-`. Tout le reste — une page de connexion, un CSV derrière `download` — est
+signalé « not a PDF » avec le type de la réponse, jamais audité. Borné : au plus 20 documents
+par exécution (`--max-pdf <n>`), 20 Mio chacun. Les liens tiers ne sont jamais demandés, et
+**chaque saut de redirection est vérifié avant d’être suivi** — même origine, ou sa montée
+http→https, 5 sauts au plus — si bien qu’une redirection vers un autre hôte (une adresse de
+métadonnées, un intranet) est refusée sans être demandée. Les documents d’une page locale ne
+sont lus que depuis son propre répertoire (un fichier ordinaire, liens symboliques résolus). Un
+mauvais lien est un refus, jamais la fin du scan. `--no-pdf` le désactive. Chaque refus est
+affiché avec sa raison.
 
-**Behind a login.** With `--storage-state <file>` (or a sample page's own `storageState`), the
-cookies of that session file that match the document URL — domain (host-only or `.domain`),
-path, `secure` (https, or a loopback host), expiry — go on the request, as the browser sent them
-for the page. They are sent to the audited origin only and written nowhere. The Playwright
-fixture downloads through the test's own request context instead (`references/e2e.md`).
+**Derrière une connexion.** Avec `--storage-state <file>` (ou le `storageState` propre d’une
+page de l’échantillon), les cookies de ce fichier de session qui correspondent à l’URL du
+document — domaine (hôte seul ou `.domain`), chemin, `secure` (https, ou un hôte de bouclage),
+expiration — accompagnent la requête, comme le navigateur les a envoyés pour la page. Ils ne
+sont envoyés qu’à l’origine auditée et ne sont écrits nulle part. La fixture Playwright
+télécharge plutôt via le contexte de requêtes propre au test (`references/e2e.md`).
 
-The snapshot audit then reads them with the engine's own zero-dependency PDF reader
-(`src/parse/pdf.ts`), and a later `audit` re-ingests `.ultra11y/documents/*.pdf` offline. Every
-document finding is attributed to the pages linking the document — under RGAA, candidate evidence
-for 13.3 on those pages (`references/rgaa-review.md`). Without a session, an authenticated
-document answers its login page, is refused « not a PDF », and stays to be judged by hand.
+L’audit des instantanés les lit ensuite avec le lecteur PDF sans dépendance propre au moteur
+(`src/parse/pdf.ts`), et un `audit` ultérieur réingère `.ultra11y/documents/*.pdf` hors ligne.
+Chaque constat sur un document est attribué aux pages qui pointent vers ce document — en RGAA,
+une preuve candidate pour 13.3 sur ces pages (`references/rgaa-review.md`). Sans session, un
+document authentifié renvoie sa page de connexion, est refusé « not a PDF », et reste à juger à
+la main.
 
-### …and what it MEASURED, not only what it saw
+### …et ce qu’il a MESURÉ, pas seulement ce qu’il a vu
 
-The snapshot also carries `probes.json` and `axe.json`: which success criteria the live probes
-actually ran on this page, and the axe pass that ran beside them. That is the half that decides
-anything, and it used to be thrown away at write time.
+L’instantané porte aussi `probes.json` et `axe.json` : quels critères de succès les sondes en
+direct ont réellement exécutés sur cette page, et la passe axe qui a tourné à côté. C’est la
+moitié qui tranche quoi que ce soit, et elle était auparavant jetée au moment de l’écriture.
 
-The consequence was narrow and expensive. `renderedProvesOn` (`src/coverage.ts`) grants a
-conforming verdict from `pageCoverage.scs` / `.axe`, both derived from those two files, so a
-scanned page could report a rendering **violation** and could never conclude **conformity**:
-1.4.4, 1.4.10, 1.4.12 have no offline rule at all, and 1.4.3's canonical decider is axe. On a
-real RGAA run, 3.2 / 10.4 / 10.11 / 10.12 came back « à évaluer » on a page the probes had
-zoomed, reflowed and tabbed through.
+La conséquence était étroite et coûteuse. `renderedProvesOn` (`src/coverage.ts`) accorde un
+verdict conforme à partir de `pageCoverage.scs` / `.axe`, tous deux dérivés de ces deux
+fichiers, si bien qu’une page scannée pouvait rapporter une **violation** de rendu mais ne
+pouvait jamais conclure à la **conformité** : 1.4.4, 1.4.10, 1.4.12 n’ont aucune règle hors
+ligne, et le juge canonique de 1.4.3 est axe. Sur une vraie exécution RGAA, 3.2 / 10.4 / 10.11
+/ 10.12 sont revenus « à évaluer » sur une page que les sondes avaient zoomée, redistribuée et
+parcourue à la tabulation.
 
-`probed` is the load-bearing field and it is written honestly: a probe that threw, a viewport
-that would not resize, a text-spacing override that would not apply — none of them reach it.
-The 320 px resize and the spacing override are part of their own measurement, so a probe read
-at the wrong viewport is not recorded (and never raises a reflow non-conformity measured at
-1280 px).
+`probed` est le champ porteur et il est écrit honnêtement : une sonde qui a levé une
+exception, un viewport qui n’a pas voulu se redimensionner, une surcharge d’espacement du texte
+qui n’a pas voulu s’appliquer — aucun n’y arrive. Le redimensionnement à 320 px et la surcharge
+d’espacement font partie de leur propre mesure, donc une sonde lue au mauvais viewport n’est
+pas consignée (et ne lève jamais une non-conformité de redistribution mesurée à 1280 px).
 
-Measured on a two-file fixture: **80 criteria to adjudicate from source alone, 41 once a single
-page was scanned.**
+Mesuré sur une fixture de deux fichiers : **80 critères à arbitrer à partir de la source
+seule, 41 dès qu’une seule page a été scannée.**
 
-That artefact is not a convenience — it is what makes a URL a real per-page verdict:
+Cet artefact n’est pas une commodité — c’est lui qui fait d’une URL un vrai verdict par page :
 
-- **Without it a scanned page can never be conforming.** `src/pages.ts` grants `C` by silence
-  only to a page whose real DOM the static rules ran against (`basis: "snapshot"`); a page
-  known only by its URL stays `basis: "attributed"` and its criteria stay « à évaluer »
-  forever. A sitemap-driven audit produced an almost empty grid.
-- **The page-scoped rules finally run.** A snapshot is a full document, so RGAA **8.3**
-  (`lang`), **8.4**, **8.5/8.6** (`title`) and 12.6 (`main`) become decidable — none of them
-  can be judged from a component render, nor from source once a framework injects the
-  document shell.
-- **It captures what JavaScript built.** A link, a dialog or a nav injected at runtime exists
-  in no source file; it exists in the snapshot, and the ordinary static rules see it.
-- **It re-audits offline.** `audit` ingests `.ultra11y/pages` automatically, with no browser
-  and no running server — which is how CI decides these without booting the app.
+- **Sans lui, une page scannée ne peut jamais être conforme.** `src/pages.ts` n’accorde `C`
+  par silence qu’à une page dont le vrai DOM a été soumis aux règles statiques
+  (`basis: "snapshot"`) ; une page connue seulement par son URL reste `basis: "attributed"` et
+  ses critères restent « à évaluer » pour toujours. Un audit piloté par sitemap a produit une
+  grille presque vide.
+- **Les règles à l’échelle de la page s’exécutent enfin.** Un instantané est un document
+  complet, donc RGAA **8.3** (`lang`), **8.4**, **8.5/8.6** (`title`) et 12.6 (`main`)
+  deviennent décidables — aucun d’eux ne peut être jugé à partir d’un rendu de composant, ni à
+  partir de la source dès qu’un framework injecte la coquille du document.
+- **Il capture ce que JavaScript a construit.** Un lien, un dialogue ou une nav injecté à
+  l’exécution n’existe dans aucun fichier source ; il existe dans l’instantané, et les règles
+  statiques ordinaires le voient.
+- **Il se ré-audite hors ligne.** `audit` ingère `.ultra11y/pages` automatiquement, sans
+  navigateur et sans serveur en marche — c’est ainsi que la CI tranche ces critères sans
+  démarrer l’application.
 
-The collection happens on the **pristine** page: before axe injects its source, before any
-probe fills an input, resizes the viewport to 320px or bolts on the text-spacing stylesheet.
-Collected later, the snapshot would record our own instrumentation instead of the site.
+La collecte a lieu sur la page **intacte** : avant qu’axe injecte sa source, avant qu’une sonde
+remplisse un champ, redimensionne le viewport à 320px ou greffe la feuille de style
+d’espacement du texte. Collecté plus tard, l’instantané enregistrerait notre propre
+instrumentation au lieu du site.
 
-With `--merge`, the freshly written snapshots are audited and folded into the result in the
-same run, and `scope.pages` is recorded — so `pages` and `report` speak page by page
-immediately, not on the next `audit`.
+Avec `--merge`, les instantanés fraîchement écrits sont audités et intégrés au résultat dans la
+même exécution, et `scope.pages` est consigné — si bien que `pages` et `report` parlent page
+par page immédiatement, pas au prochain `audit`.
 
-## Render BEFORE you adjudicate
+## Rendre AVANT d’arbitrer
 
-A `needs-rendering` criterion handed to an adjudicator on a source-only audit has exactly one
-honest answer, `needs-rendered-dom`, and getting it costs a model pass. Measured on one keyed
-RGAA cascade: three passes, 311 turns and $24.90, ending with seven criteria correctly reported
-as needing a rendered DOM — on a workflow that had snapshotted nothing.
+Un critère `needs-rendering` confié à un arbitre sur un audit à partir de la source seule n’a
+qu’une seule réponse honnête, `needs-rendered-dom`, et l’obtenir coûte une passe de modèle.
+Mesuré sur une cascade RGAA avec clé : trois passes, 311 tours et 24,90 $, pour finir avec sept
+critères correctement signalés comme demandant un DOM rendu — sur un workflow qui n’avait
+capturé aucun instantané.
 
-Two surfaces now say so before the money is spent, and neither guesses:
+Deux surfaces le disent désormais avant que l’argent soit dépensé, et aucune ne devine :
 
-- **`verify --manual`** names them in the log and in `ADJUDICATE.md` when the worklist carries
-  rendering criteria and no page's real DOM was read. Advisory: a source-only audit is a
-  legitimate thing to want.
-- **`check --in <audit.json> --require-rendered`** turns that into a gate, in the family of
-  `--require-decided` (every criterion has a verdict) and `--require-sample` (every declared
-  page was looked at). It asks about the INSTRUMENT, never the answer: a run that rendered a
-  page and still could not settle 1.4.5 passes — that is the honest residual, and failing on it
-  would push a project to manufacture a verdict. It honours `--allow-undecided`.
+- **`verify --manual`** les nomme dans le journal et dans `ADJUDICATE.md` quand la liste de
+  travail contient des critères de rendu et qu’aucun vrai DOM de page n’a été lu. Consultatif :
+  un audit à partir de la source seule est une chose légitime à vouloir.
+- **`check --in <audit.json> --require-rendered`** en fait un garde-fou, de la même famille que
+  `--require-decided` (chaque critère a un verdict) et `--require-sample` (chaque page déclarée
+  a été examinée). Il interroge l’INSTRUMENT, jamais la réponse : une exécution qui a rendu une
+  page et n’a toujours pas pu trancher 1.4.5 passe — c’est le résidu honnête, et échouer
+  là-dessus pousserait un projet à fabriquer un verdict. Il respecte `--allow-undecided`.
 
-`orchestrate` carries the same warning into `RUNBOOK.md`, above the phase table, with the scan
-command already written out.
+`orchestrate` reporte le même avertissement dans `RUNBOOK.md`, au-dessus du tableau des
+phases, avec la commande de scan déjà écrite.
 
-## Limits
+## Limites
 
-Even with the local probes, **reading order**, **alt relevance** and the other judgment criteria
-are the AI agent's to adjudicate (gated, `verify --manual`), not the dynamic tier's. The probes
-reduce — but do not eliminate — the residual on 2.4.7/1.4.4/1.4.12/1.4.13/2.5.8: confirm a sample
-on screen (optional human oversight). pa11y can be added as a second source if needed.
+Même avec les sondes locales, l’**ordre de lecture**, la **pertinence des alternatives** et les
+autres critères qui demandent un jugement reviennent à l’agent IA, qui les arbitre (soumis au
+garde-fou, `verify --manual`), et non au niveau dynamique. Les sondes réduisent — sans
+l’éliminer — le résidu sur 2.4.7/1.4.4/1.4.12/1.4.13/2.5.8 : confirmez un échantillon à l’écran
+(supervision humaine optionnelle). pa11y peut être ajouté comme seconde source si besoin.

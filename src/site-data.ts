@@ -137,7 +137,7 @@ export function buildSiteData(root: string): SiteData {
     const decisive = rules.filter((r) => r.effect === "decisive-nc").map((r) => r.id);
     const signals = rules.filter((r) => r.effect === "candidate").map((r) => r.id);
     const advisory = rules.filter((r) => r.effect === "advisory").map((r) => r.id);
-    // Same routing as the "Reviewed routing" column of references/rgaa-automation.md
+    // Same routing as the "Aiguillage revu" (reviewed routing) column of references/rgaa-automation.md
     // (scripts/build-pack-rgaa.mjs): advisory rules are not evidence.
     const level: Level = c.automation?.completeBySilence ? "det" : decisive.length ? "nc" : signals.length ? "hint" : "llm";
     return {

@@ -16,7 +16,8 @@
 // This module is the published implementation (`ultra11y/playwright`, `ultra11y/cypress`).
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import type { AuditLike, SnapshotPayload } from "./payload.js";
+import { resolveMessage } from "../messages.js";
+import type { AuditLike, CheckLang, FindingLike, SnapshotPayload } from "./payload.js";
 
 // Re-exported so a Node-side consumer needs one import, not two.
 export * from "./payload.js";
@@ -34,6 +35,12 @@ export function enginePath(): string {
     // whose package.json exports are not resolvable — fall back to the relative bundle.
     return new URL("../scripts/ultra11y.mjs", import.meta.url).pathname;
   }
+}
+
+/** One finding's message in the check's language, from the engine's own catalog — the JSON the
+ *  engine returns carries the English bake plus the key to re-render it (src/messages.ts). */
+export function localizedMessage(f: FindingLike, lang: CheckLang): string {
+  return resolveMessage(f, lang);
 }
 
 /** Persist a collected page as a snapshot and audit it. Returns the AuditResult.

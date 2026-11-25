@@ -22,10 +22,15 @@ export interface FindingLike {
   message: string;
   advisory?: boolean;
   origin?: { sourceFile?: string; sourceLine?: number };
+  /** The catalog key the engine's message was baked from, so a Node half can re-render it in
+   *  the check's language (`message` is the English bake). */
+  msg?: { id: string; params?: Record<string, string | number> };
+  i18n?: { message: Partial<Record<CheckLang, string>> };
 }
 
 export interface AuditLike {
   findings?: FindingLike[];
+  scope?: { langs?: string[] };
 }
 
 /** Findings at or above the threshold, ignoring non-normative recommendations — a
@@ -36,13 +41,35 @@ export function failingFindings(result: AuditLike, failOn: string): FindingLike[
   return (result.findings ?? []).filter((f) => !f.advisory && (RANK[f.severity] ?? 99) <= max);
 }
 
-export function formatFailure(pageName: string, failing: FindingLike[]): string {
-  const lines = [`ultra11y: ${failing.length} accessibility non-conformity(ies) on "${pageName}":`];
+const FAILURE: Record<CheckLang, { head: (n: number, page: string) => string; more: (n: number) => string; detail: string }> = {
+  fr: {
+    head: (n, page) => `ultra11y : ${n} non-conformité(s) d'accessibilité sur « ${page} » :`,
+    more: (n) => `  … et ${n} de plus.`,
+    detail: "Détail complet : .ultra11y/pages/ — ré-auditez hors ligne avec `ultra11y audit`.",
+  },
+  en: {
+    head: (n, page) => `ultra11y: ${n} accessibility non-conformity(ies) on "${page}":`,
+    more: (n) => `  … and ${n} more.`,
+    detail: "Full detail: .ultra11y/pages/ — re-audit offline with `ultra11y audit`.",
+  },
+};
+
+/** The message a failing check throws. `message` renders one finding in `lang`; the default is
+ *  the finding's own localized text when it carries one, else the engine's English bake — a
+ *  Node half passes the engine's catalog (core.ts `localizedMessage`) to do better. */
+export function formatFailure(
+  pageName: string,
+  failing: FindingLike[],
+  lang: CheckLang = "fr",
+  message: (f: FindingLike, lang: CheckLang) => string = (f, l) => f.i18n?.message?.[l] ?? f.message,
+): string {
+  const t = FAILURE[lang];
+  const lines = [t.head(failing.length, pageName)];
   for (const f of failing.slice(0, 20)) {
-    lines.push(`  [${f.severity}] ${f.ruleId} (WCAG ${f.criteriaId}) — ${f.origin?.sourceFile ?? f.file} — ${f.message}`);
+    lines.push(`  [${f.severity}] ${f.ruleId} (WCAG ${f.criteriaId}) — ${f.origin?.sourceFile ?? f.file} — ${message(f, lang)}`);
   }
-  if (failing.length > 20) lines.push(`  … and ${failing.length - 20} more.`);
-  lines.push("Full detail: .ultra11y/pages/ — re-audit offline with `ultra11y audit`.");
+  if (failing.length > 20) lines.push(t.more(failing.length - 20));
+  lines.push(t.detail);
   return lines.join("\n");
 }
 
@@ -184,6 +211,33 @@ export interface CheckOptions {
    *  Listeners are read through a CDP session on Chromium (Playwright); `ultra11y/cypress` and
    *  other browsers fall back to what the DOM shows, and the file says so (`collected`). */
   behaviour?: boolean | { windowMs?: number };
+  /** Language of the failure message the check throws, and of the per-page report when
+   *  `report` sets none of its own. Unset, it follows the CLI's rule: the language the page
+   *  declares (`<html lang>`), else French. */
+  lang?: CheckLang;
+}
+
+/** The languages a check can speak — the engine's `Lang`, restated here because this module
+ *  must not import the engine. */
+export type CheckLang = "fr" | "en";
+
+/** The language a check reports in: the caller's choice, else the language the audited page
+ *  declares, else French — the same order as the CLI's `--lang` fallback. */
+export function checkLang(result: AuditLike, lang?: CheckLang): CheckLang {
+  if (lang === "fr" || lang === "en") return lang;
+  const top = result.scope?.langs?.[0];
+  return top === "en" ? "en" : "fr";
+}
+
+/** What the `report` option hands the engine: its own settings, with the check's `lang` when
+ *  it names none. Neither set, `lang` is left to the CLI's own fallback (the page's declared
+ *  language, else French). */
+export function reportOpts(
+  report: boolean | { out?: string; standard?: string; lang?: string },
+  lang?: CheckLang,
+): { out?: string; standard?: string; lang?: string } {
+  const r = typeof report === "object" ? report : {};
+  return r.lang || !lang ? r : { ...r, lang };
 }
 
 /** The bounds a repository may put on the live probes. Stated once, here, because the same
@@ -293,9 +347,15 @@ export function buildPayload(
 }
 
 /** Apply the gate to an audited page: throws with the auditor-shaped message, or returns. */
-export function gate(result: AuditLike, pageName: string, failOn: CheckOptions["failOn"]): void {
+export function gate(
+  result: AuditLike,
+  pageName: string,
+  failOn: CheckOptions["failOn"],
+  lang?: CheckLang,
+  message?: (f: FindingLike, lang: CheckLang) => string,
+): void {
   const threshold = failOn === undefined ? "blocking" : failOn;
   if (threshold === false) return;
   const failing = failingFindings(result, threshold);
-  if (failing.length) throw new Error(formatFailure(pageName, failing));
+  if (failing.length) throw new Error(formatFailure(pageName, failing, checkLang(result, lang), message));
 }

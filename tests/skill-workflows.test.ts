@@ -78,7 +78,7 @@ describe("tickets.md teaches filing into a tracker", () => {
 
   // De-dupe is by exact title and nothing else; a reader who misses this files duplicates.
   it("states that the title is the de-dupe key, and warns about --lang", () => {
-    expect(t).toMatch(/title.{0,20}(IS|is) the key/i);
+    expect(t).toMatch(/titre.{0,20}(EST|est) la clé/i);
     expect(t).toContain("--lang");
   });
 
@@ -153,22 +153,22 @@ describe("pages.md teaches page snapshots", () => {
   });
   it("states the verified join and its fail-closed refusal", () => {
     expect(t).toMatch(/document-order/i);
-    expect(t).toMatch(/refused/i);
+    expect(t).toMatch(/refusé/i);
   });
   it("teaches the rendered tier, its three rules and why it can be trusted", () => {
     expect(t).toContain("rendered-contrast");
     expect(t).toContain("rendered-link-colour-only");
     expect(t).toContain("10.6");
-    expect(t).toMatch(/I don't know|I don’t know/i);
-    expect(t).toMatch(/50 of 106/);
+    expect(t).toMatch(/je ne sais pas/i);
+    expect(t).toMatch(/50 sur 106/);
     expect(t).toContain("rendered-nontext-contrast");
-    expect(t).toMatch(/could not look/i);
+    expect(t).toMatch(/je n’ai pas pu regarder/i);
   });
   it("teaches the per-page grid and its two honesty rules", () => {
     expect(t).toMatch(/ultra11y\.mjs pages/);
     expect(t).toContain("--standard rgaa");
     expect(t).toMatch(/unattributed/i);
-    expect(t).toMatch(/absence of evidence/i);
+    expect(t).toMatch(/l’absence de preuve/i);
   });
 });
 
@@ -209,16 +209,16 @@ describe("judgment.md teaches adjudicating under a country standard", () => {
   const t = read("judgment.md");
   it("says the worklist is keyed by the standard's own criteria", () => {
     expect(t).toContain("--standard rgaa");
-    expect(t).toMatch(/RGAA criteria/);
+    expect(t).toMatch(/critères RGAA/);
     // DERIVED, not hardcoded: this used to pin "99 of", a figure the pack never supported — so
     // the test held a wrong number in place instead of catching it. The cross-document check
     // lives in tests/standards-coverage.test.ts.
     const judgment = [...standardCoverage("rgaa").values()].filter((c) => c.tier === "judgment").length;
-    expect(t).toMatch(new RegExp(`${judgment} of RGAA's 106`));
+    expect(t).toMatch(new RegExp(`${judgment} des 106 critères du RGAA`));
   });
   it("states the citation rule and WHY it exists", () => {
     expect(t).toContain("normativeRef");
-    expect(t).toMatch(/own tests/i);
+    expect(t).toMatch(/tests PROPRES|propres tests/i);
     expect(t).toContain("1.4.3");
   });
   it("points at the glossary lookup", () => {

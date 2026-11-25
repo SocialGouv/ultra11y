@@ -1,31 +1,34 @@
-# Accessible names — how one is computed, and how to get it right
+# Noms accessibles — comment ils sont calculés, et comment les obtenir correctement
 
-Most of what an audit calls "4.1.2" is a naming problem. This page is the reference for
-what a name IS, so a verdict rests on the computation rather than on the markup's appearance.
+L’essentiel de ce qu’un audit appelle « 4.1.2 » est un problème de nommage. Cette page est la
+référence pour ce qu’EST un nom, afin qu’un verdict repose sur le calcul plutôt que sur
+l’apparence du balisage.
 
-## The precedence chain (accname), highest first
+## La chaîne de priorité (accname), de la plus haute à la plus basse
 
-A control's accessible name is the FIRST of these that yields non-empty text:
+Le nom accessible d’un contrôle est la PREMIÈRE de ces sources qui produit un texte non vide :
 
-| # | Source | Notes |
+| # | Source | Remarques |
 |---|---|---|
-| 1 | `aria-labelledby` | Wins over everything, including visible content. Concatenates the text of every id, in the order listed. A dangling id contributes nothing — an all-dangling list leaves the element unnamed. |
-| 2 | `aria-label` | Replaces the visible text entirely. This is what breaks 2.5.3 (see below). |
-| 3 | Native host semantics | `<label for>` / wrapping `<label>` for form fields, `alt` for `<img>`, `<legend>` for `<fieldset>`, `<caption>` for `<table>`, `<figcaption>` for `<figure>`, `value` for `<input type="submit">`. |
-| 4 | Text content | For elements whose role allows "name from content": button, link, heading, menuitem, tab, option… NOT for a `<div>` or an `<input>`. |
-| 5 | `title` | Last resort. Hover-only: absent on touch, unevenly announced. A name that exists but should not be the plan. |
+| 1 | `aria-labelledby` | L’emporte sur tout, y compris le contenu visible. Concatène le texte de chaque id, dans l’ordre listé. Un id orphelin n’apporte rien — une liste entièrement orpheline laisse l’élément sans nom. |
+| 2 | `aria-label` | Remplace entièrement le texte visible. C’est ce qui casse le 2.5.3 (voir plus bas). |
+| 3 | Sémantique native de l’élément hôte | `<label for>` / `<label>` englobant pour les champs de formulaire, `alt` pour `<img>`, `<legend>` pour `<fieldset>`, `<caption>` pour `<table>`, `<figcaption>` pour `<figure>`, `value` pour `<input type="submit">`. |
+| 4 | Contenu textuel | Pour les éléments dont le rôle autorise le « nom issu du contenu » : button, link, heading, menuitem, tab, option… PAS pour un `<div>` ni un `<input>`. |
+| 5 | `title` | Dernier recours. Uniquement au survol : absent au tactile, restitué de façon inégale. Un nom qui existe, mais qui ne devrait pas être la solution prévue. |
 
-Two consequences worth stating explicitly, because both produce confident wrong verdicts:
+Deux conséquences qui méritent d’être énoncées explicitement, car toutes deux produisent des
+verdicts faux mais assurés :
 
-- **A name that exists is not a name that works.** `aria-label="Button"` satisfies "has a
-  name" and helps nobody. Judge relevance, not presence.
-- **The chain stops at the first hit.** `<button aria-label="Close">Save</button>` is named
-  "Close". The visible word "Save" never enters the computation.
+- **Un nom qui existe n’est pas un nom qui fonctionne.** `aria-label="Button"` satisfait
+  « a un nom » et n’aide personne. Jugez la pertinence, pas la présence.
+- **La chaîne s’arrête au premier résultat.** `<button aria-label="Close">Save</button>` est
+  nommé « Close ». Le mot visible « Save » n’entre jamais dans le calcul.
 
-## 2.5.3 Label in Name — the rule voice control depends on
+## 2.5.3 Étiquette dans le nom — la règle dont dépend la commande vocale
 
-When a control shows visible text, that text must be **contained in** the accessible name.
-A speech-input user says what they see; if the name differs, the command silently does nothing.
+Quand un contrôle affiche un texte visible, ce texte doit être **contenu dans** le nom
+accessible. Un utilisateur de saisie vocale prononce ce qu’il voit ; si le nom diffère, la
+commande ne fait rien, sans le moindre signal.
 
 ```html
 <!-- ✗ the spoken "click Send" matches nothing -->
@@ -38,15 +41,15 @@ A speech-input user says what they see; if the name differs, the command silentl
 <button>Send</button>
 ```
 
-Rule of thumb: if you find yourself writing `aria-label` on an element that already shows
-text, you are usually about to break 2.5.3. Prefer `aria-describedby` for the extra detail.
-Engine rule: `label-in-name-mismatch`.
+Règle empirique : si vous vous surprenez à écrire `aria-label` sur un élément qui affiche déjà
+du texte, vous êtes généralement sur le point de casser le 2.5.3. Préférez `aria-describedby`
+pour le détail supplémentaire. Règle du moteur : `label-in-name-mismatch`.
 
-## Visually-hidden text — the CSS that actually works
+## Texte masqué visuellement — le CSS qui fonctionne vraiment
 
-Naming an icon control with text only screen readers reach is the native-first answer.
-`display:none` and `visibility:hidden` remove the text from the accessibility tree too;
-`text-indent:-9999px` breaks in RTL; `font-size:0` is unreliable.
+Nommer un contrôle à icône avec un texte que seuls les lecteurs d’écran atteignent est la
+réponse « natif d’abord ». `display:none` et `visibility:hidden` retirent aussi le texte de
+l’arbre d’accessibilité ; `text-indent:-9999px` casse en RTL ; `font-size:0` n’est pas fiable.
 
 ```css
 /* The only clipping recipe that survives every engine, and stays focusable. */
@@ -71,7 +74,7 @@ Naming an icon control with text only screen readers reach is the native-first a
 }
 ```
 
-## Naming non-text content
+## Nommer le contenu non textuel
 
 ```html
 <!-- Informative image: describe the MEANING in context, not the picture -->
@@ -99,19 +102,20 @@ Naming an icon control with text only screen readers reach is the native-first a
 <p>The <abbr title="World Wide Web Consortium">W3C</abbr> publishes WCAG.</p>
 ```
 
-**Charts.** An `alt` naming the chart ("Sales chart") is not an alternative — it names the
-container and drops the data. Either put the figures in the alt, or point at an equivalent
-table nearby. Engine rule: `chart-no-accessible-name`.
+**Graphiques.** Un `alt` qui nomme le graphique (« Graphique des ventes ») n’est pas une
+alternative — il nomme le conteneur et perd les données. Mettez soit les chiffres dans l’alt,
+soit un renvoi vers un tableau équivalent à proximité. Règle du moteur :
+`chart-no-accessible-name`.
 
-## What the engine settles, and what stays yours
+## Ce que le moteur tranche, et ce qui vous revient
 
-| Decided by the engine | Yours to adjudicate |
+| Décidé par le moteur | À vous d’arbitrer |
 |---|---|
-| Name **absent** (`img-alt-missing`, `button-empty-name`, `link-empty-name`, `control-label-missing`, `iframe-title-missing`, `icon-only-control-unnamed`) | Whether the name is **relevant** (1.1.1, 2.4.4, 2.4.6) — the engine cannot read meaning |
-| Name provided only by `title` (`control-name-title-only`, `img-alt-missing.title-only` as a recommendation) | Whether an `alt=""` image is genuinely decorative |
-| Visible text not contained in the name (`label-in-name-mismatch`) | Whether an icon font makes the DOM text invisible (then 2.5.3 does not apply) |
-| Names prohibited by the role (`aria-prohibited-attr`) | Whether two same-named links share a destination (2.4.4) |
+| Nom **absent** (`img-alt-missing`, `button-empty-name`, `link-empty-name`, `control-label-missing`, `iframe-title-missing`, `icon-only-control-unnamed`) | Si le nom est **pertinent** (1.1.1, 2.4.4, 2.4.6) — le moteur ne peut pas lire le sens |
+| Nom fourni uniquement par `title` (`control-name-title-only`, `img-alt-missing.title-only` en tant que recommandation) | Si une image `alt=""` est réellement décorative |
+| Texte visible non contenu dans le nom (`label-in-name-mismatch`) | Si une police d’icônes rend le texte du DOM invisible (le 2.5.3 ne s’applique alors pas) |
+| Noms interdits par le rôle (`aria-prohibited-attr`) | Si deux liens de même nom partagent une destination (2.4.4) |
 
-Cross-file: under `--graph` the engine resolves a name passed as a prop into a component,
-and flags one that gets lost on the way (`cross-prop-drilled-name-lost`). See
+Inter-fichiers : avec `--graph`, le moteur résout un nom passé en prop à un composant, et
+signale celui qui se perd en chemin (`cross-prop-drilled-name-lost`). Voir
 `references/cross-file.md`.

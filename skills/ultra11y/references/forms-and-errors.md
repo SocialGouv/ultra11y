@@ -1,10 +1,10 @@
-# Forms, errors and authentication
+# Formulaires, erreurs et authentification
 
-Forms are where accessibility failures cost the most: a broken image is an annoyance, an
-unusable form is a transaction the user cannot complete. This page covers 1.3.5, 3.2.2,
-3.3.1–3.3.4 and WCAG 2.2's 3.3.7/3.3.8.
+Les formulaires sont l’endroit où les défauts d’accessibilité coûtent le plus cher : une image
+cassée est une gêne, un formulaire inutilisable est une transaction que l’utilisateur ne peut pas
+mener à bien. Cette page couvre 1.3.5, 3.2.2, 3.3.1–3.3.4 et les 3.3.7/3.3.8 des WCAG 2.2.
 
-## Labels and instructions (3.3.2, 4.1.2)
+## Étiquettes et instructions (3.3.2, 4.1.2)
 
 ```html
 <!-- ✓ the association is programmatic, and clicking the text focuses the field -->
@@ -14,32 +14,35 @@ unusable form is a transaction the user cannot complete. This page covers 1.3.5,
 <p id="email-hint">We use it only to send your receipt.</p>
 ```
 
-- A `placeholder` is **not** a label: it disappears on input, is often too low-contrast, and
-  is announced inconsistently. Keep it for an example (`e.g. name@example.com`), never for
-  the label. Engine rule: `placeholder-as-label`.
-- State the format **before** the error, not only in it: `aria-describedby` on the field.
-- `required` on the control is what assistive tech announces. A red asterisk alone is a
-  1.4.1 failure too — pair it with text ("Required fields are marked *", or a real word).
-- Group related controls: radios and checkboxes in `<fieldset><legend>`, a date split across
-  three inputs likewise. Engine rules: `fieldset-legend-missing`,
+- Un `placeholder` n’est **pas** une étiquette : il disparaît à la saisie, a souvent un contraste
+  trop faible et est restitué de façon inégale. Réservez-le à un exemple
+  (`e.g. name@example.com`), jamais à l’étiquette. Règle du moteur : `placeholder-as-label`.
+- Indiquez le format **avant** l’erreur, pas seulement dans celle-ci : `aria-describedby` sur le
+  champ.
+- C’est le `required` sur le contrôle que les technologies d’assistance restituent. Un astérisque
+  rouge seul est aussi un défaut au titre du 1.4.1 — associez-le à du texte (« Les champs
+  obligatoires sont marqués d’un * », ou un vrai mot).
+- Regroupez les contrôles liés : boutons radio et cases à cocher dans `<fieldset><legend>`, de
+  même pour une date répartie sur trois champs. Règles du moteur : `fieldset-legend-missing`,
   `radio-checkbox-group-ungrouped`, `date-fields-ungrouped`.
 
-## 1.3.5 Identify Input Purpose — the token list
+## 1.3.5 Identifier la finalité des champs — la liste des jetons
 
-A field collecting information **about the user** must declare its purpose. The token has to
-come from the HTML autofill vocabulary; an invented one reads as compliant and fills nothing
-(engine rule: `autocomplete-token-invalid`).
+Un champ qui collecte des informations **sur l’utilisateur** doit déclarer sa finalité. Le jeton
+doit provenir du vocabulaire d’autocomplétion HTML ; un jeton inventé a l’air conforme et ne
+remplit rien (règle du moteur : `autocomplete-token-invalid`).
 
-| Group | Tokens |
+| Groupe | Jetons |
 |---|---|
-| Identity | `name` `honorific-prefix` `given-name` `additional-name` `family-name` `honorific-suffix` `nickname` `organization-title` `organization` `sex` `bday` `bday-day` `bday-month` `bday-year` `photo` `language` |
-| Credentials | `username` `new-password` `current-password` `one-time-code` |
-| Address | `street-address` `address-line1` `address-line2` `address-line3` `address-level1`…`address-level4` `country` `country-name` `postal-code` |
-| Payment | `cc-name` `cc-given-name` `cc-additional-name` `cc-family-name` `cc-number` `cc-exp` `cc-exp-month` `cc-exp-year` `cc-csc` `cc-type` `transaction-currency` `transaction-amount` |
+| Identité | `name` `honorific-prefix` `given-name` `additional-name` `family-name` `honorific-suffix` `nickname` `organization-title` `organization` `sex` `bday` `bday-day` `bday-month` `bday-year` `photo` `language` |
+| Identifiants | `username` `new-password` `current-password` `one-time-code` |
+| Adresse | `street-address` `address-line1` `address-line2` `address-line3` `address-level1`…`address-level4` `country` `country-name` `postal-code` |
+| Paiement | `cc-name` `cc-given-name` `cc-additional-name` `cc-family-name` `cc-number` `cc-exp` `cc-exp-month` `cc-exp-year` `cc-csc` `cc-type` `transaction-currency` `transaction-amount` |
 | Contact | `tel` `tel-country-code` `tel-national` `tel-area-code` `tel-local` `tel-local-prefix` `tel-local-suffix` `tel-extension` `email` `impp` `url` |
 
-Qualifiers may precede the token: `section-*` (to separate two addresses on one form), then
-`shipping`/`billing`, then `home`/`work`/`mobile`/`fax`/`pager` (contact fields only).
+Des qualificatifs peuvent précéder le jeton : `section-*` (pour séparer deux adresses dans un même
+formulaire), puis `shipping`/`billing`, puis `home`/`work`/`mobile`/`fax`/`pager` (champs de
+contact uniquement).
 
 ```html
 <input autocomplete="shipping postal-code">      <!-- ✓ -->
@@ -47,10 +50,11 @@ Qualifiers may precede the token: `section-*` (to separate two addresses on one 
 <input autocomplete="postcode">                  <!-- ✗ not a token -->
 ```
 
-**Applicability:** the criterion covers the USER's own data. An order number, a search term
-or a quantity is not in scope — that is a legitimate `NA` on the field.
+**Applicabilité :** le critère couvre les données propres de l’UTILISATEUR. Un numéro de
+commande, un terme de recherche ou une quantité ne sont pas dans le périmètre — c’est un `NA`
+légitime sur le champ.
 
-## 3.3.1 / 3.3.3 — identifying and fixing errors
+## 3.3.1 / 3.3.3 — identifier et corriger les erreurs
 
 ```html
 <label for="dob">Date of birth</label>
@@ -59,14 +63,14 @@ or a quantity is not in scope — that is a legitimate `NA` on the field.
 <p id="dob-err">Enter the date as DD/MM/YYYY — for example 04/03/1990.</p>
 ```
 
-- The error must be **in text**, not only a red border (1.4.1 + 3.3.1).
-- It must be **associated** with its field. Engine rules: `error-not-associated`,
+- L’erreur doit être **sous forme de texte**, pas seulement une bordure rouge (1.4.1 + 3.3.1).
+- Elle doit être **associée** à son champ. Règles du moteur : `error-not-associated`,
   `aria-invalid-no-description`.
-- 3.3.3 asks for the **correction** when it is knowable: "Enter DD/MM/YYYY" beats "Invalid
-  date". Withhold only where suggesting it would compromise security.
+- Le 3.3.3 demande la **correction** quand elle peut être connue : « Saisissez JJ/MM/AAAA » vaut
+  mieux que « Date invalide ». Ne la taisez que là où la suggérer compromettrait la sécurité.
 
-**Error summary pattern** — for a form with several errors, put a summary at the top, move
-focus to it on submit, and link each entry to its field:
+**Motif du récapitulatif d’erreurs** — pour un formulaire comportant plusieurs erreurs, placez un
+récapitulatif en haut, déplacez-y le focus à la soumission, et liez chaque entrée à son champ :
 
 ```html
 <div role="alert" tabindex="-1" id="errors">
@@ -78,12 +82,12 @@ focus to it on submit, and link each entry to its field:
 </div>
 ```
 
-Focus the summary (not the first field): the user hears how many problems there are before
-being dropped into one of them.
+Donnez le focus au récapitulatif (pas au premier champ) : l’utilisateur entend combien il y a de
+problèmes avant d’être déposé dans l’un d’eux.
 
-## 3.2.2 On Input / 3.2.1 On Focus
+## 3.2.2 À la saisie / 3.2.1 Au focus
 
-Changing a value, or merely receiving focus, must not by itself change the context.
+Modifier une valeur, ou simplement recevoir le focus, ne doit pas à lui seul changer le contexte.
 
 ```html
 <!-- ✗ selecting an option navigates; keyboard users trigger it while browsing the list -->
@@ -95,31 +99,33 @@ Changing a value, or merely receiving focus, must not by itself change the conte
 <button type="submit">Change language</button>
 ```
 
-Engine rule: `on-input-context-change`. Auto-advancing between one-character code fields is
-the same failure in a friendlier costume — allow it, but keep the form usable without it.
+Règle du moteur : `on-input-context-change`. Le passage automatique d’un champ de code à un
+caractère au suivant est le même défaut sous un costume plus aimable — autorisez-le, mais gardez
+le formulaire utilisable sans lui.
 
-## 3.3.4 Error Prevention (legal, financial, data)
+## 3.3.4 Prévention des erreurs (juridiques, financières, données)
 
-For submissions that are legally binding, financial, or that modify/delete user data, one of
-these must hold: **reversible**, **checked** (errors detected and a chance to correct), or
-**confirmed** (a review step before the final commit). A one-click irreversible delete fails.
+Pour les soumissions qui ont une valeur juridique, financière, ou qui modifient/suppriment des
+données de l’utilisateur, l’une de ces conditions doit être remplie : **réversible**,
+**contrôlée** (erreurs détectées et possibilité de corriger) ou **confirmée** (une étape de
+vérification avant la validation finale). Une suppression irréversible en un clic échoue.
 
-## 3.3.7 Redundant Entry (WCAG 2.2)
+## 3.3.7 Saisie redondante (WCAG 2.2)
 
-Information already entered in the same process must not be asked for again — auto-populate
-it, or offer it for selection. Exceptions: re-entry is essential (confirming a password),
-the earlier information is no longer valid, or it would compromise security.
+Une information déjà saisie dans le même processus ne doit pas être redemandée — pré-remplissez-la
+ou proposez-la à la sélection. Exceptions : la nouvelle saisie est essentielle (confirmation d’un
+mot de passe), l’information antérieure n’est plus valide, ou cela compromettrait la sécurité.
 
 ```html
 <!-- ✓ the shipping address is offered rather than retyped -->
 <label><input type="checkbox" name="same" checked> Billing address is the same as shipping</label>
 ```
 
-## 3.3.8 Accessible Authentication (WCAG 2.2)
+## 3.3.8 Authentification accessible (WCAG 2.2)
 
-No step of an authentication process may require a **cognitive function test** — memorising,
-transcribing, or solving a puzzle — unless an alternative, a mechanism to help, object
-recognition, or user-provided content is available.
+Aucune étape d’un processus d’authentification ne peut exiger un **test de fonction cognitive** —
+mémoriser, transcrire ou résoudre une énigme — sauf si une alternative, un mécanisme d’aide, une
+reconnaissance d’objets ou un contenu fourni par l’utilisateur est disponible.
 
 ```html
 <!-- ✗ blocking paste turns login into a memory test and breaks password managers -->
@@ -132,16 +138,17 @@ recognition, or user-provided content is available.
 <input type="text" inputmode="numeric" autocomplete="one-time-code">
 ```
 
-Engine rule: `credential-entry-blocked`. Also in scope: a transcription CAPTCHA with no
-alternative, and a code the user must retype from another screen with no way to paste.
+Règle du moteur : `credential-entry-blocked`. Également dans le périmètre : un CAPTCHA de
+transcription sans alternative, et un code que l’utilisateur doit ressaisir depuis un autre écran
+sans possibilité de le coller.
 
-## What the engine settles, and what stays yours
+## Ce que le moteur tranche, et ce qui vous revient
 
-| Decided by the engine | Yours to adjudicate |
+| Tranché par le moteur | À vous d’arbitrer |
 |---|---|
-| Missing/duplicate labels, placeholder-as-label, ungrouped radios and date parts | Whether a label is **descriptive** (2.4.6) and an instruction sufficient (3.3.2) |
-| `autocomplete` token outside the vocabulary | Whether the field collects **user** data at all (1.3.5 applicability) |
-| Error text not associated, `aria-invalid` with no description | Whether the message says **how to fix it** (3.3.3) |
-| Paste/autofill blocked on a credential field | Whether the whole auth flow imposes a cognitive test (3.3.8) |
-| `onchange` that submits or navigates | Whether a context change was **announced beforehand** (3.2.2) |
-| — | Redundant entry across a multi-step flow (3.3.7) |
+| Étiquettes manquantes/dupliquées, placeholder utilisé comme étiquette, boutons radio et parties de date non regroupés | Si une étiquette est **descriptive** (2.4.6) et une instruction suffisante (3.3.2) |
+| Jeton `autocomplete` hors du vocabulaire | Si le champ collecte bien des données de l’**utilisateur** (applicabilité du 1.3.5) |
+| Texte d’erreur non associé, `aria-invalid` sans description | Si le message dit **comment corriger** (3.3.3) |
+| Collage/autocomplétion bloqués sur un champ d’identifiant | Si l’ensemble du parcours d’authentification impose un test cognitif (3.3.8) |
+| `onchange` qui soumet ou navigue | Si un changement de contexte a été **annoncé au préalable** (3.2.2) |
+| — | Saisie redondante dans un parcours en plusieurs étapes (3.3.7) |

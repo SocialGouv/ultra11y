@@ -80,7 +80,7 @@ describe("snapshot write rejects what it cannot trust", () => {
   it("refuses an empty stdin rather than writing a hollow snapshot", () => {
     const r = runCli(["snapshot", "write"], { cwd: mkTmp(), input: "" });
     expect(r.code).toBe(2);
-    expect(r.stderr).toMatch(/no payload/i);
+    expect(r.stderr).toMatch(/aucune charge utile/i); // French by default (#214)
   });
 
   it("refuses malformed JSON", () => {
