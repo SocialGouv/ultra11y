@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [8.5.0](https://github.com/SocialGouv/ultra11y/compare/v8.4.0...v8.5.0) (2026-11-25)
+
+
+### Features
+
+* **adjudicate:** a verdict can settle each page on its own evidence ([#199](https://github.com/SocialGouv/ultra11y/issues/199)) ([90155d0](https://github.com/SocialGouv/ultra11y/commit/90155d08aad45af155418e1f0188634cf5e15624)), closes [#197](https://github.com/SocialGouv/ultra11y/issues/197) [#197](https://github.com/SocialGouv/ultra11y/issues/197)
+
 # [8.4.0](https://github.com/SocialGouv/ultra11y/compare/v8.3.0...v8.4.0) (2026-11-24)
 
 
