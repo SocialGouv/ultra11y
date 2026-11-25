@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Commandes : les quelques commandes utiles à la main — ultra11y</title>
-<meta name="description" content="Les commandes d’ultra11y qu’une personne peut lancer elle-même : audit, scan, journey, report, pages, serve, check, tickets, criteria, status et install, et les fichiers de référence de la skill.">
+<meta name="description" content="Les commandes d’ultra11y qu’une personne peut lancer elle-même : audit, render, scan, affected, journey, report, pages, serve, check, tickets, criteria, status et install, et les fichiers de référence de la skill.">
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/site.js"></script>
 </head>
@@ -38,15 +38,18 @@
   <thead><tr><th scope="col">Commande</th><th scope="col">Rôle</th></tr></thead>
   <tbody>
     <tr><th scope="row"><code>audit &lt;chemins&gt; --out audits --json</code></th><td>Passe le moteur statique sur le code et écrit <code>audits/audit-latest.json</code>.</td></tr>
-    <tr><th scope="row"><code>render .</code></th><td>Rend chaque composant, page et story du projet avec son propre <code>react-dom/server</code>, sans lire ses tests, vers <code>.ultra11y/captures/</code>. Ce qui n’a pas pu être rendu est listé avec la raison dans l’annexe du rapport.</td></tr>
-    <tr><th scope="row"><code>scan &lt;url&gt; --merge audits/audit-latest.json</code></th><td>Ouvre une page dans un navigateur, la mesure et fusionne le résultat. <code>--sample</code> parcourt l’échantillon déclaré.</td></tr>
+    <tr><th scope="row"><code>render .</code></th><td>Rend chaque composant, page et story du projet avec son propre <code>react-dom/server</code>, sans lire ses tests, vers <code>.ultra11y/captures/</code>. Ce qui n’a pas pu être rendu est listé avec la raison dans l’annexe du rapport. Chaque rendu est ensuite capturé dans Chromium (capture d’écran et axe-core), pour illustrer le rapport sans trancher de critère ; <code>--no-snapshots</code> saute ce passage.</td></tr>
+    <tr><th scope="row"><code>scan &lt;url&gt; --merge audits/audit-latest.json</code></th><td>Ouvre une page dans un navigateur, la mesure et fusionne le résultat. <code>--sample</code> parcourt l’échantillon déclaré. Le navigateur enregistre aussi l’arbre d’accessibilité, ce qu’un lecteur d’écran en annoncerait (<code>sr.json</code>) et une mesure des flashs (<code>media.json</code>).</td></tr>
+    <tr><th scope="row"><code>affected --since &lt;ref&gt;</code></th><td>Liste les pages qu’un changement peut atteindre, en remontant le graphe d’imports jusqu’aux routes.</td></tr>
+    <tr><th scope="row"><code>scan --since &lt;ref&gt; --base-url &lt;url&gt; --baseline &lt;scan.json&gt;</code></th><td>Pour une pull request : ne rend que les pages touchées et n’échoue que sur les nouvelles non-conformités, absentes du <code>scan --json</code> de la branche de base.</td></tr>
     <tr><th scope="row"><code>journey run --all --keyboard --merge audits/audit-latest.json</code></th><td>Rejoue au clavier, dans un navigateur, les parcours que l’agent a écrits dans <code>.ultra11y/journeys/</code> (connexion, formulaire, modale). Chaque étape devient une page auditée ; une étape en échec arrête son parcours, avec la raison.</td></tr>
-    <tr><th scope="row"><code>report --in audits/audit-latest.json --html</code></th><td>Écrit le rapport RGAA daté, en Markdown et en HTML imprimable.</td></tr>
+    <tr><th scope="row"><code>report --in audits/audit-latest.json --html</code></th><td>Écrit le rapport RGAA daté, en Markdown et en HTML imprimable, avec en annexe I la « Carte de l’application » : chaque route, et comment elle a été observée.</td></tr>
     <tr><th scope="row"><code>pages --in audits/audit-latest.json --format report --split page</code></th><td>Écrit un dossier par page, avec sa capture d’écran.</td></tr>
     <tr><th scope="row"><code>serve</code> · <code>serve --static site</code></th><td>Ouvre les résultats sur <code>http://127.0.0.1:4711/</code>, en lecture seule : la grille des 106 critères, le taux de chaque page et le taux moyen, et l’évolution d’un audit à l’autre. <code>--static</code> écrit les mêmes pages en fichiers, publiables tels quels sur GitHub Pages.</td></tr>
     <tr><th scope="row"><code>check --report &lt;rapport.md&gt;</code></th><td>Contrôle l’intégrité d’un rapport : aucun critère inventé, aucun NA sans justification.</td></tr>
     <tr><th scope="row"><code>tickets --in audits/audit-latest.json --dry-run</code></th><td>Prépare les tickets GitHub, GitLab ou Jira. Sans <code>--dry-run</code>, les crée.</td></tr>
     <tr><th scope="row"><code>criteria 8.3</code></th><td>Affiche le texte officiel d’un critère, ses tests et les définitions du glossaire.</td></tr>
+    <tr><th scope="row"><code>criteria --plan</code></th><td>Donne le plan de travail : pour chaque critère, la source de preuve qui le tranche (code, page rendue, navigateur, jugement).</td></tr>
     <tr><th scope="row"><code>install --all</code> · <code>status</code></th><td>Branche la relecture automatique dans les agents détectés, et dit ce qui est réellement actif.</td></tr>
   </tbody>
 </table>
