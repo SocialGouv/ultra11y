@@ -55,8 +55,8 @@ describe("the skills are installable", () => {
 
   it("review-a11y describes the review scope and its change-based scoping", () => {
     const description = (parse(skills["review-a11y"]!.frontmatter) as { description: string }).description;
-    expect(description).toMatch(/review/i);
-    expect(description).toMatch(/staged|diff|branch|change/i);
+    expect(description).toMatch(/review|revue/i);
+    expect(description).toMatch(/staged|diff|branch|change|branche|changement/i);
   });
 
   // The two skills are one pipeline: the audit does the analysis, the review reads the change
@@ -65,19 +65,19 @@ describe("the skills are installable", () => {
   // code was never reviewed as a change.
   it("ultra11y dispatches review-a11y as a subagent once its analysis is done", () => {
     expect(body).toMatch(/review-a11y/);
-    expect(body).toMatch(/subagent/i);
+    expect(body).toMatch(/subagent|sous-agent/i);
     // Named host routes, not a vague "hand it over": a step nobody can execute is a step nobody runs.
     expect(body).toMatch(/Codex/);
     expect(body).toMatch(/Agent\(/);
     // And the fallback, so a harness without subagents is not left stuck.
-    expect(body).toMatch(/no subagent/i);
+    expect(body).toMatch(/no subagent|pas de sous-agents?|aucun outil de sous-agent/i);
   });
 
   it("review-a11y states what it must return when it IS the subagent", () => {
     const b = skills["review-a11y"]!.body;
-    expect(b).toMatch(/subagent/i);
+    expect(b).toMatch(/subagent|sous-agent/i);
     // Its report is the return value, so a summary would lose the findings.
-    expect(b).toMatch(/return value|returns? it whole|verbatim/i);
+    expect(b).toMatch(/return value|returns? it whole|verbatim|valeur de retour|renvoyez-le .*en entier/i);
   });
 
   it.each(SKILL_NAMES)("%s keeps version in lockstep with package.json and src/types.ts", (name) => {
@@ -164,7 +164,7 @@ describe("skill docs stay in sync with the CLI", () => {
     // too, but nothing points at one, so the plain integers are what has to resolve.
     for (const m of text.matchAll(/^>\s*(\d+)\.\s/gm)) rules.add(m[1]!);
     expect(rules.size, `${name} declares no Core rules`).toBeGreaterThan(0);
-    for (const m of text.matchAll(/Core rule (\d+)/g)) {
+    for (const m of text.matchAll(/(?:Core rule|[Rr]ègle fondamentale) (\d+)/g)) {
       expect(rules.has(m[1]!), `${name} points at Core rule ${m[1]} — it declares ${[...rules].join(", ")}`).toBe(true);
     }
   });
@@ -260,15 +260,15 @@ describe("SKILL.md routes to the references (progressive disclosure)", () => {
   it("routes full audits to full-audit.md without a harness condition", () => {
     // No routing bullet's request is conditioned on a harness ("… in Claude Code").
     expect(body).not.toMatch(/- \*\*"[^"\n]*\bin (?:Claude Code|Codex|OpenCode)\b[^"\n]*"\*\*/);
-    const bullet = body.slice(body.indexOf('- **"Full / detailed audit"'));
+    const bullet = body.slice(body.indexOf('- **"Audit complet / détaillé"'));
     const fullBullet = bullet.slice(0, bullet.indexOf("\n- **", 1));
     expect(fullBullet, "SKILL.md has no full-audit routing bullet").toContain("references/full-audit.md");
-    expect(fullBullet).toMatch(/compliance or conformance report/);
-    expect(fullBullet).toMatch(/any\s+harness/);
+    expect(fullBullet).toMatch(/rapport de conformité/);
+    expect(fullBullet).toMatch(/quel que soit le\s+harness/);
     expect(fullBullet).not.toMatch(/\bin Claude Code\b/);
     for (const h of ["Claude Code", "Codex", "OpenCode"]) expect(fullBullet).toContain(h);
     // The quick path stays, but says it is not the conformance deliverable.
-    const quick = body.slice(body.indexOf('- **"Quick audit'));
+    const quick = body.slice(body.indexOf('- **"Audit rapide'));
     expect(quick.slice(0, quick.indexOf("\n- **", 1))).toContain("references/audit.md");
     expect(refBodies["audit.md"] ?? "").toContain("references/full-audit.md");
   });

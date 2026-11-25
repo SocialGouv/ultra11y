@@ -2459,7 +2459,7 @@ const ADJUDICATION_REF_TEXT = {
     title: "# Trancher les critères que le moteur vous confie",
     intro: [
       "Le moteur statique tranche d’emblée 3 des 55 critères de succès WCAG 2.2 AA. Les 52 autres",
-      "reviennent comme risques résiduels : 14 exigent une page rendue (le tiers `scan`), 38 relèvent",
+      "reviennent comme risques résiduels : 14 exigent une page rendue (le niveau `scan`), 38 relèvent",
       "du jugement. Cette page donne la règle de décision de chacun — ce qui le rend conforme, quand",
       "`NA` est légitime, et les questions qui y mènent.",
       "",

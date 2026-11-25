@@ -1,4 +1,4 @@
-<!-- GÉNÉRÉ par `pnpm run build:pack:rgaa` depuis les données RGAA 4.1.2 embarquées et les contrats de règles curés — ne pas modifier à la main. -->
+<!-- GÉNÉRÉ par `pnpm run build:pack:rgaa` depuis les données RGAA 4.1.2 embarquées et les contrats de règles relus — ne pas modifier à la main. -->
 
 # Matrice d’automatisation du RGAA 4.1.2
 

@@ -903,7 +903,7 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
   const packText = biomeFormat(JSON.stringify(pack, null, 2) + "\n", "src/data/standards/rgaa.json");
   const glossaryText = biomeFormat(JSON.stringify(glossary, null, 2) + "\n", "src/data/standards/rgaa.glossary.json");
   const automationLines = [
-    "<!-- GÉNÉRÉ par `pnpm run build:pack:rgaa` depuis les données RGAA 4.1.2 embarquées et les contrats de règles curés — ne pas modifier à la main. -->",
+    "<!-- GÉNÉRÉ par `pnpm run build:pack:rgaa` depuis les données RGAA 4.1.2 embarquées et les contrats de règles relus — ne pas modifier à la main. -->",
     "",
     "# Matrice d’automatisation du RGAA 4.1.2",
     "",
