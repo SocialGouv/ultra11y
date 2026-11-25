@@ -3,7 +3,7 @@ name: ultra11y
 description: "À utiliser pour AUDITER un site, un dépôt ou une page selon le RGAA 4.1.2, le référentiel d’accessibilité de l’État, seul référentiel des rapports (le WCAG n’apparaît que comme la correspondance que cite chaque critère RGAA) ; produire un rapport de conformité daté, une grille par critère, un backlog PRD ou des tickets ; ÉCRIRE du balisage accessible ; corriger l’accessibilité ; ou brancher un garde-fou de dépôt et une chaîne de capture du DOM rendu. Le moteur embarqué, sans installation, exécute 103 vérifications statiques rattachées aux critères RGAA, tandis que l’agent arbitre les critères qui demandent un jugement et envoie les critères de rendu aux scans navigateur ; check/verify rejettent les non-conformités inventées et ne déclarent jamais conforme ce qui n’a pas été vérifié. Utiliser plutôt `review-a11y` pour une revue limitée à un diff, une branche ou une pull request."
 license: MIT
 metadata:
-  version: 9.6.0
+  version: 9.6.1
 ---
 
 # ultra11y — auditer selon le RGAA 4.1.2 et écrire du balisage accessible

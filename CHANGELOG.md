@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [9.6.1](https://github.com/SocialGouv/ultra11y/compare/v9.6.0...v9.6.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **adjudicate:** one evidence class per content across pages, on-topic subjects, the verdict contract written once ([#228](https://github.com/SocialGouv/ultra11y/issues/228)) ([10c46bb](https://github.com/SocialGouv/ultra11y/commit/10c46bbe586f15d3280b61d022f4b2f95987c8ef)), closes [#222](https://github.com/SocialGouv/ultra11y/issues/222)
+* **documents:** one entry per PDF content, and docs aligned with the code ([#227](https://github.com/SocialGouv/ultra11y/issues/227)) ([f98e79d](https://github.com/SocialGouv/ultra11y/commit/f98e79da7cc436c686031bcd577d98209bcfc357)), closes [#225](https://github.com/SocialGouv/ultra11y/issues/225) [#225](https://github.com/SocialGouv/ultra11y/issues/225)
+* **scan:** discovery and scan check HTTP status, follow only harmless redirects, resolve links against the landing URL ([#229](https://github.com/SocialGouv/ultra11y/issues/229)) ([c2ede49](https://github.com/SocialGouv/ultra11y/commit/c2ede49724fe2391659f50d367f4c73b427a51e6)), closes [#224](https://github.com/SocialGouv/ultra11y/issues/224)
+* **verify:** exit 1 on an incomplete fold and name the criterion on every refusal line ([#226](https://github.com/SocialGouv/ultra11y/issues/226)) ([e4b638c](https://github.com/SocialGouv/ultra11y/commit/e4b638cee3147419264ccbd675f7e9fe32155f2e)), closes [#223](https://github.com/SocialGouv/ultra11y/issues/223)
+
 # [9.6.0](https://github.com/SocialGouv/ultra11y/compare/v9.5.0...v9.6.0) (2026-11-25)
 
 

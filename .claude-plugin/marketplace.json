@@ -10,7 +10,7 @@
       "name": "ultra11y",
       "source": "./",
       "description": "Audits d’accessibilité RGAA 4.1.2 : revue automatique avant commit, push et pull request, et rapports de conformité datés et prouvés, en Markdown, en HTML et page par page, dans Claude Code.",
-      "version": "9.6.0",
+      "version": "9.6.1",
       "author": { "name": "maxgfr" },
       "homepage": "https://github.com/SocialGouv/ultra11y",
       "repository": "https://github.com/SocialGouv/ultra11y",

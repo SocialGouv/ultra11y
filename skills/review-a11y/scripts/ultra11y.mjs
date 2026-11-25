@@ -2663,7 +2663,7 @@ import { join as join40, relative as relative15, resolve as resolve19, dirname a
 import { fileURLToPath as fileURLToPath4, pathToFileURL } from "url";
 
 // src/types.ts
-var VERSION = "9.6.0";
+var VERSION = "9.6.1";
 var SCHEMA_VERSION = 2;
 function isAdjudicated(by) {
   return by === "agent" || by === "human";
