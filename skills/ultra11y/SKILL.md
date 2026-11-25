@@ -1,6 +1,6 @@
 ---
 name: ultra11y
-description: "Use to AUDIT a site, repository, or page against RGAA 4.1.2, the French State's accessibility standard (référentiel de l'État), the only standard it reports against (WCAG appears only as the mapping each RGAA criterion cites); produce a dated conformance report, criterion grid, PRD backlog, or tickets; AUTHOR accessible markup; fix accessibility; or wire a repo gate and rendered-DOM capture pipeline. The bundled install-free engine runs 102 static checks tied to RGAA criteria, while the agent adjudicates judgment criteria and routes rendering criteria to browser scans; check/verify reject invented non-conformities and never declare conforming what was not verified. Use `review-a11y` instead for a review scoped only to a diff, branch, or PR."
+description: "Use to AUDIT a site, repository, or page against RGAA 4.1.2, the French State's accessibility standard (référentiel de l'État), the only standard it reports against (WCAG appears only as the mapping each RGAA criterion cites); produce a dated conformance report, criterion grid, PRD backlog, or tickets; AUTHOR accessible markup; fix accessibility; or wire a repo gate and rendered-DOM capture pipeline. The bundled install-free engine runs 103 static checks tied to RGAA criteria, while the agent adjudicates judgment criteria and routes rendering criteria to browser scans; check/verify reject invented non-conformities and never declare conforming what was not verified. Use `review-a11y` instead for a review scoped only to a diff, branch, or PR."
 license: MIT
 metadata:
   version: 9.0.0
@@ -37,7 +37,7 @@ Run it with the audited project as the working directory, and resolve the path p
 
 Per-harness deltas (hooks, install, how a block arrives): `references/harnesses.md`.
 
-**Do not confuse rules with criteria.** The bundle ships 102 static checks and RGAA has 106
+**Do not confuse rules with criteria.** The bundle ships 103 static checks and RGAA has 106
 criteria. Several rules may evidence one criterion, one rule may contribute to several
 criteria, and most criteria remain open until a scan or
 an adjudication. The only honest run-level coverage is the grid's live provenance tally

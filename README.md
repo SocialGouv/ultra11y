@@ -105,10 +105,10 @@ lancer elle-même, avec `npx ultra11y <commande>` (tout le reste : `npx ultra11y
   évaluer ». Seuls 8.3 et 8.5 (langue et titre de la page) peuvent être déclarés conformes
   sur une mesure complète sans erreur :
   **104 critères sur 106 demandent un arbitrage pour obtenir `C`**.
-- **Le moteur fait le travail mécanique** : 102 vérifications statiques, puis le rendu.
+- **Le moteur fait le travail mécanique** : 103 vérifications statiques, puis le rendu.
   Sur les 258 tests officiels, une règle tranche
-  **30 tests `static` sur 22 critères** et **3 tests `rendered` sur 3 critères** ;
-  les **225 tests `judgment` sur 92 critères** passent par l’agent.
+  **32 tests `static` sur 23 critères** et **3 tests `rendered` sur 3 critères** ;
+  les **223 tests `judgment` sur 92 critères** passent par l’agent.
 - **Chaque verdict cite sa preuve.** `check` et `verify` rejettent un critère inventé, une
   non-conformité sans élément réel, un « conforme » sur des preuves incomplètes.
 - **Mesuré sur un corpus qu’il n’a pas écrit** (W3C ACT). Chiffres et limites :

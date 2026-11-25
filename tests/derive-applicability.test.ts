@@ -34,11 +34,12 @@ describe("RGAA applicability — an image-alt NC no longer over-projects", () =>
   const audit = auditHtml(`<!doctype html><html lang="en"><head><title>t</title></head><body><main><h1>H</h1><img src="hero.png"></main></body></html>`);
   const rows = derivePackResults(audit, "rgaa");
 
-  it("routes the ambiguous missing-alt finding to RGAA 1.1 as an adjudication signal", () => {
-    expect(statusOf(rows, "1.1")).toBe("manual");
+  it("routes the missing-alt finding to RGAA 1.1 as a decisive NC — it fails 1.1.1 or 1.2.1, never neither (#203)", () => {
+    expect(statusOf(rows, "1.1")).toBe("NC");
     const c11 = rows.find((r) => r.id === "1.1")!;
-    expect(c11.findings).toEqual([]);
-    expect(c11.candidateFindings?.some((f) => f.ruleId === "img-alt-missing")).toBe(true);
+    expect(c11.findings.some((f) => f.ruleId === "img-alt-missing")).toBe(true);
+    expect(c11.candidateFindings?.some((f) => f.ruleId === "img-alt-missing") ?? false).toBe(false);
+    expect(statusOf(rows, "1.2")).not.toBe("NC");
   });
 
   it("leaves the plainly-inapplicable image criteria NON-NC (CAPTCHA 1.4/1.5, detailed-description 1.6/1.7)", () => {

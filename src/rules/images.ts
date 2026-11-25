@@ -1,7 +1,7 @@
 // Theme 1 — Images.
 import type { Doc, El } from "../parse/html.js";
 import { attr, hasBoundAttr, boundAttr, hasDynamicSpread, visibleText, textContent, ancestors, descendants } from "../parse/html.js";
-import { accessibleName, isNameExempt, labelledbyResolvesEmpty, mayInjectContent } from "../name.js";
+import { accessibleName, isNameExempt, labelledbyResolvesEmpty, mayInjectContent, visibleLabelText } from "../name.js";
 import type { Rule, RuleFinding } from "./rule.js";
 
 // Not exposed to assistive tech (aria-hidden / [hidden] / an inline display:none or
@@ -16,39 +16,68 @@ const isHidden = isNameExempt;
 const named = (el: El, doc: Doc): boolean =>
   !!(boundAttr(el, "aria-label") ?? "").trim() || (hasBoundAttr(el, "aria-labelledby") && !labelledbyResolvesEmpty(el, doc));
 
+// An <img> with no alt inside a link or button whose own visible text already says what the
+// control is: the picture only repeats that text, so it is decorative and needed alt="".
+// Evidence for RGAA 1.2.1 rather than 1.1.1 — either way the image fails (#203).
+const INTERACTIVE_ROLES = new Set(["link", "button"]);
+const textedControl = (el: El): El | undefined => {
+  for (const a of ancestors(el)) {
+    const interactive = (a.tag === "a" && attr(a, "href") !== undefined) || a.tag === "button" || INTERACTIVE_ROLES.has((attr(a, "role") ?? "").trim());
+    if (interactive) return visibleLabelText(a) !== "" ? a : undefined;
+  }
+  return undefined;
+};
+
+// The candidate <img>/role=img/<area> elements that have no text alternative at all, with
+// the title-only case flagged. Shared by the informative and the decorative-context rules so
+// the two stay exact complements.
+function unnamedImages(doc: Doc): Array<{ el: El; titleOnly: boolean }> {
+  const out: Array<{ el: El; titleOnly: boolean }> = [];
+  for (const el of doc.elements) {
+    const role = attr(el, "role") ?? "";
+    const svgTree = el.tag === "svg" || ancestors(el).some((a) => a.tag === "svg");
+    // The SVG graphics roles name a picture exactly as role=img does (Graphics-ARIA).
+    const isImg = el.tag === "img" || el.tag === "area" || role === "img" || (svgTree && (role === "graphics-document" || role === "graphics-symbol"));
+    if (!isImg) continue;
+    // aria-hidden="true" / role="presentation" on an <img> is exactly how RGAA 1.2.1 lets a
+    // decorative image go without alt, so a hidden image is never reported here.
+    if (isHidden(el) && el.tag !== "area") continue;
+    // alt="" is the decorative opt-out (maps the image to presentation); a whitespace-only
+    // alt is NOT — it provides no accessible name yet keeps the image in the a11y tree.
+    const altLiteral = attr(el, "alt");
+    const whitespaceAlt = altLiteral !== undefined && altLiteral !== "" && altLiteral.trim() === "";
+    if ((hasBoundAttr(el, "alt") && !whitespaceAlt) || named(el, doc)) continue; // alt="" / :alt="x" / aria-* → present
+    if (hasDynamicSpread(el)) continue; // {...props} / Svelte {alt} shorthand may carry alt
+    // role="img" on a non-<img> element (e.g. <svg role="img"><title>…) is named by its
+    // <title>/text content, not an alt attribute — accept that accessible name.
+    // Inside SVG, an img/graphics role takes NO name from content (SVG-AAM): a <title> names
+    // it, the drawn <text> does not — a screen reader announces "image", unnamed.
+    if (svgTree && el.tag !== "img") {
+      if (descendants(el).some((d) => d.tag === "title" && visibleText(d).trim() !== "")) continue;
+      // a component / slot / {expression} child may render the <title> this parse cannot see
+      if (doc.kind !== "html" && (mayInjectContent(el) || textContent(el).includes("{"))) continue;
+    } else if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
+    out.push({ el, titleOnly: (attr(el, "title") ?? "").trim() !== "" });
+  }
+  return out;
+}
+
+// A whitespace-only alt is not "no alt attribute": it stays with the informative rule, which
+// has always owned it, rather than being read as a decorative intent gone wrong.
+const decorativeContext = (el: El): boolean => el.tag === "img" && attr(el, "alt") === undefined && textedControl(el) !== undefined;
+
 const imgAltMissing: Rule = {
   id: "img-alt-missing",
   criteria: ["1.1.1"],
   severity: "bloquant",
   run(doc: Doc): RuleFinding[] {
     const out: RuleFinding[] = [];
-    for (const el of doc.elements) {
-      const role = attr(el, "role") ?? "";
-      const svgTree = el.tag === "svg" || ancestors(el).some((a) => a.tag === "svg");
-      // The SVG graphics roles name a picture exactly as role=img does (Graphics-ARIA).
-      const isImg = el.tag === "img" || el.tag === "area" || role === "img" || (svgTree && (role === "graphics-document" || role === "graphics-symbol"));
-      if (!isImg) continue;
-      if (isHidden(el) && el.tag !== "area") continue;
-      // alt="" is the decorative opt-out (maps the image to presentation); a whitespace-only
-      // alt is NOT — it provides no accessible name yet keeps the image in the a11y tree.
-      const altLiteral = attr(el, "alt");
-      const whitespaceAlt = altLiteral !== undefined && altLiteral !== "" && altLiteral.trim() === "";
-      if ((hasBoundAttr(el, "alt") && !whitespaceAlt) || named(el, doc)) continue; // alt="" / :alt="x" / aria-* → present
-      if (hasDynamicSpread(el)) continue; // {...props} / Svelte {alt} shorthand may carry alt
-      // role="img" on a non-<img> element (e.g. <svg role="img"><title>…) is named by its
-      // <title>/text content, not an alt attribute — accept that accessible name.
-      // Inside SVG, an img/graphics role takes NO name from content (SVG-AAM): a <title> names
-      // it, the drawn <text> does not — a screen reader announces "image", unnamed.
-      if (svgTree && el.tag !== "img") {
-        if (descendants(el).some((d) => d.tag === "title" && visibleText(d).trim() !== "")) continue;
-        // a component / slot / {expression} child may render the <title> this parse cannot see
-        if (doc.kind !== "html" && (mayInjectContent(el) || textContent(el).includes("{"))) continue;
-      } else if (el.tag !== "img" && el.tag !== "area" && accessibleName(el, doc).trim() !== "") continue;
+    for (const { el, titleOnly } of unnamedImages(doc)) {
       // `title` IS an accname fallback for an image, so 1.1.1 is technically satisfied and
       // asserting a non-conformity would be inventing one. It is still the wrong tool —
       // `title` is hover-only, absent on touch and unevenly announced — so this stays a
       // recommendation to move the text into `alt`, never a normative failure.
-      if ((attr(el, "title") ?? "").trim() !== "") {
+      if (titleOnly) {
         out.push({
           criteriaId: "1.1.1",
           el,
@@ -59,12 +88,31 @@ const imgAltMissing: Rule = {
         });
         continue;
       }
+      if (decorativeContext(el)) continue; // img-alt-missing-decorative owns it
       out.push({
         criteriaId: "1.1.1",
         el,
         msgId: "img-alt-missing",
         params: { tag: el.tag },
       });
+    }
+    return out;
+  },
+};
+
+// The same missing alt, on an <img> whose link or button already carries visible text: the
+// image repeats that text, so it is decorative and needed alt="" (RGAA 1.2.1). Under WCAG
+// it is the same 1.1.1 failure; the separate id only lets a pack route it to its
+// decorative-image criterion instead of the informative one.
+const imgAltMissingDecorative: Rule = {
+  id: "img-alt-missing-decorative",
+  criteria: ["1.1.1"],
+  severity: "majeur",
+  run(doc: Doc): RuleFinding[] {
+    const out: RuleFinding[] = [];
+    for (const { el, titleOnly } of unnamedImages(doc)) {
+      if (titleOnly || !decorativeContext(el)) continue;
+      out.push({ criteriaId: "1.1.1", el, msgId: "img-alt-missing-decorative", params: { tag: el.tag } });
     }
     return out;
   },
@@ -258,6 +306,7 @@ const figureCaptionUnassociated: Rule = {
 export const imagesRules: Rule[] = [
   figureCaptionUnassociated,
   imgAltMissing,
+  imgAltMissingDecorative,
   decorativeAltMisuse,
   canvasFallbackMissing,
   inputImageAltMissing,

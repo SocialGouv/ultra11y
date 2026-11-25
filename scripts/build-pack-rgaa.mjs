@@ -136,7 +136,7 @@ const RULE_SC = {
   "decorative-alt-misuse": ["1.1.1"], "duplicate-id": ["4.1.2"], "empty-heading": ["1.3.1"], "error-not-associated": ["3.3.1"],
   "field-purpose-incomplete": ["1.3.5", "4.1.2"], "fieldset-legend-missing": ["1.3.1"], "form-field-multiple-labels": ["4.1.2"],
   "h1-missing": ["1.3.1"], "h1-multiple": ["1.3.1"], "heading-order-skip": ["1.3.1"], "html-lang-missing": ["3.1.1"],
-  "icon-only-control-unnamed": ["2.4.4", "4.1.2"], "iframe-title-missing": ["4.1.2"], "img-alt-missing": ["1.1.1"],
+  "icon-only-control-unnamed": ["2.4.4", "4.1.2"], "iframe-title-missing": ["4.1.2"], "img-alt-missing": ["1.1.1"], "img-alt-missing-decorative": ["1.1.1"],
   "inline-lang-change-missing": ["3.1.2"], "input-image-alt-missing": ["1.1.1"], "invalid-aria-role": ["4.1.2"],
   "label-for-dangling": ["1.3.1"], "lang-invalid": ["3.1.1", "3.1.2"], "layout-table-data-markup": ["1.3.1"],
   "link-empty-name": ["2.4.4"], "list-structure": ["1.3.1"], "live-region-conflict": ["4.1.3"], "media-no-track": ["1.2.2"],
@@ -206,6 +206,12 @@ const RULE_TO_CRITERIA = {
   "axe:input-image-alt": ["1.1"], "axe:area-alt": ["1.1"], "axe:role-img-alt": ["1.1"], "axe:svg-img-alt": ["1.1"],
   "axe:object-alt": ["1.1"], "decorative-alt-misuse": ["1.2"], "axe:image-redundant-alt": ["1.2"],
   "decorative-marked-exposed": ["1.2"],
+  // An <img> with no alt at all fails either way (#203): 1.1.1 if it carries information,
+  // 1.2.1 if it is decorative (it then needed alt="", or aria-hidden/role=presentation, which
+  // the rule already accepts). The engine routes it by the evidence it has — an image inside a
+  // link or button whose visible text already names the control is decorative — and keeps
+  // every other one on 1.1, the informative default.
+  "img-alt-missing-decorative": ["1.2"],
   // Theme 2 — frames (2.1 frame title)
   "iframe-title-missing": ["2.1"], "axe:frame-title": ["2.1"], "axe:frame-title-unique": ["2.1"],
   // Theme 3 — colour contrast. RGAA 10.5 asks about paired CSS declarations, not the
@@ -346,6 +352,9 @@ const RULE_TO_CRITERIA = {
 // `candidate` below. This deliberately small table contains only failures whose observation
 // itself exhausts the cited numbered test.
 const DECISIVE_RULE_TESTS = {
+  // No alt attribute and no other text alternative: never a mere candidate (#203).
+  "1.1|img-alt-missing": ["1"],
+  "1.2|img-alt-missing-decorative": ["1"],
   "1.9|figure-caption-unassociated": ["1"],
   "1.1|axe:area-alt": ["2"],
   "1.1|axe:input-image-alt": ["3"],
@@ -404,13 +413,20 @@ const DECISIVE_RULE_TESTS = {
   "7.1|label-in-name-mismatch": ["3"],
 };
 
+// A decisive contract whose reason is narrower than the generic sentence says so here.
+const DECISIVE_RATIONALE = {
+  "1.1|img-alt-missing":
+    "An <img> with no alt attribute and no other text alternative fails either way: 1.1.1 if it carries information, 1.2.1 if it is decorative (alt=\"\" was required). Informative by default; 1.2 if decorative — a decorative context the engine can see is routed to 1.2 by img-alt-missing-decorative.",
+  "1.2|img-alt-missing-decorative":
+    "An <img> with no alt attribute inside a link or button whose visible text already names it repeats that text: it is decorative and fails 1.2.1 (neither alt=\"\" nor aria-hidden/role=presentation). Had it carried information, it would fail 1.1.1 instead — never a conformity.",
+};
+
 // Candidate evidence is test-scoped too. The fallback remains all tests only when one rule id
 // genuinely cannot distinguish the mechanism it observed; the entries below prevent a signal
 // for one numbered test from being presented to the adjudicator as evidence for its siblings.
 const CANDIDATE_RULE_TESTS = {
   "1.1|axe:image-alt": ["1"],
   "1.1|axe:role-img-alt": ["1"],
-  "1.1|img-alt-missing": ["1"],
   "1.1|axe:svg-img-alt": ["5"],
   "1.1|axe:object-alt": ["6"],
   "1.1|object-embed-no-name": ["6", "7"],
@@ -759,11 +775,12 @@ const DOWNLOAD_EXT = "pdf|docx?|pptx?|xlsx?|odt|ods|odp|rtf|csv|zip|rar|7z|gz|ep
         tests: touched,
         effect,
         rationale:
-          effect === "decisive-nc"
+          DECISIVE_RATIONALE[`${c.id}|${id}`] ??
+          (effect === "decisive-nc"
             ? "The observed failure exhausts the cited RGAA test."
             : effect === "candidate"
               ? "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
-              : "Non-normative recommendation; it cannot affect the criterion verdict.",
+              : "Non-normative recommendation; it cannot affect the criterion verdict."),
       };
     });
     c.automation = {

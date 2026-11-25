@@ -438,7 +438,7 @@
       },
       "automation": {
         "tests": {
-          "1": "judgment",
+          "1": "static",
           "2": "rendered",
           "3": "static",
           "4": "judgment",
@@ -499,8 +499,8 @@
           {
             "id": "img-alt-missing",
             "tests": ["1"],
-            "effect": "candidate",
-            "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+            "effect": "decisive-nc",
+            "rationale": "An <img> with no alt attribute and no other text alternative fails either way: 1.1.1 if it carries information, 1.2.1 if it is decorative (alt=\"\" was required). Informative by default; 1.2 if decorative — a decorative context the engine can see is routed to 1.2 by img-alt-missing-decorative."
           },
           {
             "id": "input-image-alt-missing",
@@ -578,11 +578,11 @@
       ],
       "wcag": ["1.1.1", "4.1.2"],
       "appliesTo": {
-        "ruleIds": ["axe:image-redundant-alt", "decorative-alt-misuse", "decorative-marked-exposed"]
+        "ruleIds": ["axe:image-redundant-alt", "decorative-alt-misuse", "decorative-marked-exposed", "img-alt-missing-decorative"]
       },
       "automation": {
         "tests": {
-          "1": "judgment",
+          "1": "static",
           "2": "judgment",
           "3": "judgment",
           "4": "judgment",
@@ -607,6 +607,12 @@
             "tests": ["1", "2", "3", "4", "5", "6"],
             "effect": "candidate",
             "rationale": "Useful engine evidence, but the RGAA test still has an alternative, applicability condition, relevance judgment, or particular case to adjudicate."
+          },
+          {
+            "id": "img-alt-missing-decorative",
+            "tests": ["1"],
+            "effect": "decisive-nc",
+            "rationale": "An <img> with no alt attribute inside a link or button whose visible text already names it repeats that text: it is decorative and fails 1.2.1 (neither alt=\"\" nor aria-hidden/role=presentation). Had it carried information, it would fail 1.1.1 instead — never a conformity."
           }
         ]
       }

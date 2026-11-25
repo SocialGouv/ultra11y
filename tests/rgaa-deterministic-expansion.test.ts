@@ -4,7 +4,7 @@ import { checkDecided } from "../src/check.js";
 import { parseSource } from "../src/parse/source.js";
 import { reportGroups } from "../src/report.js";
 import { runRules } from "../src/rules/registry.js";
-import { derivePackResults } from "../src/standards/index.js";
+import { derivePackResults, loadPack } from "../src/standards/index.js";
 
 const ids = (html: string): string[] => runRules(parseSource(html, "fixture.html")).map((finding) => finding.ruleId);
 const page = (body: string, htmlAttrs = "") => `<!doctype html><html ${htmlAttrs}><head><title>T</title></head><body><main>${body}</main></body></html>`;
@@ -160,5 +160,72 @@ describe("RGAA deterministic expansion — fail-closed boundaries", () => {
       expect(ids(page(`<table><caption>T</caption><tr><th scope="${scope}">H</th></tr><tr><td>D</td></tr></table>`, 'lang="fr"'))).not.toContain(
         "table-scope-invalid",
       );
+  });
+});
+
+// #203 — an <img> with no alt attribute fails either way: 1.1.1 if it carries information,
+// 1.2.1 if it is decorative (it then needed alt=""). It is a decisive NC, never a candidate.
+describe("RGAA — an image with no alt attribute is a non-conformity (#203)", () => {
+  const rgaa = (body: string) => {
+    const audit = buildAudit([parseSource(page(body, 'lang="fr"'), "fixture.html")], ["fixture.html"]);
+    const rows = derivePackResults(audit, "rgaa");
+    return (id: string) => rows.find((row) => row.id === id);
+  };
+  const altRules = (body: string) => ids(page(body, 'lang="fr"')).filter((id) => id.startsWith("img-alt-missing"));
+
+  it("a plain <img> with no alt is an NC of 1.1 (informative by default), not of 1.2", () => {
+    const row = rgaa('<img src="chart.png">');
+    expect(row("1.1")?.status).toBe("NC");
+    expect(row("1.1")?.findings.some((f) => f.ruleId === "img-alt-missing" && !f.advisory)).toBe(true);
+    expect(row("1.2")?.status).not.toBe("NC");
+  });
+
+  it("an <img> with no alt in a link or button that already has text is decorative: NC of 1.2, not of 1.1", () => {
+    for (const body of ['<a href="/">Accueil <img src="house.png"></a>', '<button type="button"><img src="x.png"> Fermer</button>']) {
+      const row = rgaa(body);
+      expect(row("1.2")?.status, body).toBe("NC");
+      expect(
+        row("1.2")?.findings.some((f) => f.ruleId === "img-alt-missing-decorative"),
+        body,
+      ).toBe(true);
+      expect(
+        row("1.1")?.findings.some((f) => f.ruleId.startsWith("img-alt-missing")),
+        body,
+      ).toBe(false);
+    }
+  });
+
+  it("an <img> that is the only content of a link stays informative (1.1)", () => {
+    const row = rgaa('<a href="/"><img src="logo.png"></a>');
+    expect(row("1.1")?.status).toBe("NC");
+    expect(altRules('<a href="/"><img src="logo.png"></a>')).toEqual(["img-alt-missing"]);
+  });
+
+  it("aria-hidden / role=presentation without alt is how RGAA 1.2.1 ignores a decorative image: no NC", () => {
+    for (const body of [
+      '<img src="dot.png" aria-hidden="true">',
+      '<img src="dot.png" role="presentation">',
+      '<a href="/">Accueil <img src="h.png" aria-hidden="true"></a>',
+    ]) {
+      expect(altRules(body), body).toEqual([]);
+      const row = rgaa(body);
+      expect(row("1.1")?.status, body).not.toBe("NC");
+      expect(row("1.2")?.status, body).not.toBe("NC");
+    }
+  });
+
+  it('alt="" and a present alt are unchanged', () => {
+    for (const body of ['<img src="dot.png" alt="">', '<img src="chart.png" alt="Ventes 2025">', '<a href="/">Accueil <img src="h.png" alt=""></a>'])
+      expect(altRules(body), body).toEqual([]);
+  });
+
+  it("the pack contract makes both rules decisive and neither a candidate", () => {
+    const pack = loadPack("rgaa");
+    const contract = (criterionId: string, ruleId: string) =>
+      pack.criteria.find((c) => c.id === criterionId)?.automation?.rules.find((rule) => rule.id === ruleId);
+    expect(contract("1.1", "img-alt-missing")).toMatchObject({ effect: "decisive-nc", tests: ["1"] });
+    expect(contract("1.1", "img-alt-missing")?.rationale).toContain("Informative by default; 1.2 if decorative");
+    expect(contract("1.2", "img-alt-missing-decorative")).toMatchObject({ effect: "decisive-nc", tests: ["1"] });
+    expect(contract("1.1", "img-alt-missing-decorative")).toBeUndefined();
   });
 });

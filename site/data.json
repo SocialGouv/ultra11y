@@ -73,18 +73,18 @@
     ],
     "tests": {
       "total": 258,
-      "static": 30,
+      "static": 32,
       "rendered": 3,
-      "judgment": 225,
-      "decidable": 33
+      "judgment": 223,
+      "decidable": 35
     },
     "levels": {
       "det": 2,
-      "nc": 22,
-      "hint": 30,
+      "nc": 23,
+      "hint": 29,
       "llm": 52
     },
-    "provable": 24,
+    "provable": 25,
     "deterministic": [
       "8.3",
       "8.5"
@@ -99,7 +99,7 @@
     "judgment": 38
   },
   "engine": {
-    "staticRules": 102,
+    "staticRules": 103,
     "crossRules": 8,
     "renderedRules": 6,
     "packRules": 4,
@@ -110,8 +110,8 @@
     {
       "key": "static",
       "touched": 44,
-      "decisive": 20,
-      "signalOnly": 24
+      "decisive": 21,
+      "signalOnly": 23
     },
     {
       "key": "axe",
@@ -184,6 +184,7 @@
       "decisive": [
         "axe:area-alt",
         "axe:input-image-alt",
+        "img-alt-missing",
         "input-image-alt-missing"
       ],
       "signals": [
@@ -193,7 +194,6 @@
         "axe:svg-img-alt",
         "canvas-fallback-missing",
         "chart-no-accessible-name",
-        "img-alt-missing",
         "object-embed-no-name"
       ],
       "advisory": [],
@@ -203,13 +203,17 @@
       "id": "1.2",
       "theme": 1,
       "title": "Chaque image de décoration est-elle correctement ignorée par les technologies d’assistance ?",
-      "level": "hint",
+      "level": "nc",
       "sources": [
         "static",
         "axe"
       ],
-      "decisiveSources": [],
-      "decisive": [],
+      "decisiveSources": [
+        "static"
+      ],
+      "decisive": [
+        "img-alt-missing-decorative"
+      ],
       "signals": [
         "axe:image-redundant-alt",
         "decorative-alt-misuse",

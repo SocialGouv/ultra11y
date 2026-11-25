@@ -37,7 +37,7 @@ every deviation on that rule is listed below with the argument for it.
 | ACT rule | WCAG | Engine rules | Verdict | Caught |
 |---|---|---|---|---|
 | [Document has heading for non-repeated content](https://act-rules.github.io/rules/047fe0) | — | `bypass-blocks-missing` | 🟨 partially consistent | 3/4 |
-| [Image has non-empty accessible name](https://act-rules.github.io/rules/23a2a8) | 1.1.1 | `img-alt-missing` | ✅ consistent | 5/5 |
+| [Image has non-empty accessible name](https://act-rules.github.io/rules/23a2a8) | 1.1.1 | `img-alt-missing`, `img-alt-missing-decorative` | ✅ consistent | 5/5 |
 | [Letter spacing in style attributes is not !important](https://act-rules.github.io/rules/24afc2) | 1.4.12 | `letter-spacing-important` | 🟨 partially consistent | 3/4 |
 | [HTML page has non-empty title](https://act-rules.github.io/rules/2779a5) | 2.4.2 | `title-missing-empty` | ✅ consistent | 5/5 |
 | [Visible label is part of accessible name](https://act-rules.github.io/rules/2ee8b8) | 2.5.3 | `label-in-name-mismatch`, `link-label-in-name-mismatch` | 🟦 divergent (documented) | 3/3 |

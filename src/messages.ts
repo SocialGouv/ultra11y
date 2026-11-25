@@ -190,6 +190,18 @@ export const MSG_CATALOG: Record<string, MsgEntry> = {
       en: () => `Add alt="…" (a description if the image conveys information, alt="" if it is decorative).`,
     },
   },
+  "img-alt-missing-decorative": {
+    message: {
+      fr: (p) =>
+        `<${p.tag}> sans attribut alt dans un lien ou un bouton déjà intitulé par son texte — l'image le répète, elle est décorative et doit être ignorée.`,
+      en: (p) =>
+        `<${p.tag}> has no alt attribute inside a link or button its own text already names — the image repeats it, so it is decorative and must be ignored.`,
+    },
+    remediation: {
+      fr: () => `Ajoutez alt="" (ou aria-hidden="true") ; si l'image apporte une information que le texte n'a pas, décrivez-la dans alt="…".`,
+      en: () => `Add alt="" (or aria-hidden="true"); if the image carries information the text does not, describe it in alt="…".`,
+    },
+  },
   "autocomplete-token-invalid": {
     message: {
       fr: (p) => `autocomplete="${p.value}" n'appartient pas au vocabulaire HTML — la finalité du champ n'est pas identifiable.`,

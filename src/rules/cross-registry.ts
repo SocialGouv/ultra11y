@@ -109,7 +109,14 @@ const crossNextMetadataTitle: CrossRule = {
 
 // 3) An intrinsic control/img that spreads {...props} can be named by its parent →
 //    suppress single-file name-missing findings on it (the component def site).
-const SUPPRESSIBLE_BY_SPREAD = ["icon-only-control-unnamed", "button-empty-name", "link-empty-name", "control-label-missing", "img-alt-missing"];
+const SUPPRESSIBLE_BY_SPREAD = [
+  "icon-only-control-unnamed",
+  "button-empty-name",
+  "link-empty-name",
+  "control-label-missing",
+  "img-alt-missing",
+  "img-alt-missing-decorative",
+];
 const crossAriaForwarding: CrossRule = {
   id: "cross-aria-forwarding",
   criteria: ["4.1.2"],

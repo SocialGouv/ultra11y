@@ -62,7 +62,7 @@ describe("renderPageReport", () => {
   });
 
   it("marks the page's own status, which is not the scope-wide one", () => {
-    expect(md).toMatch(/\| 1\.1 —[^|]*\|[^|]*\| \? \|/); // missing alt is a signal until image purpose is adjudicated
+    expect(md).toMatch(/\| 1\.1 —[^|]*\|[^|]*\| NC \|/); // an <img> with no alt fails 1.1 or 1.2 either way (#203)
     expect(md).toMatch(/\| 11\.9 —[^|]*\|[^|]*\| NC \|/); // the unnamed button is a decisive failure
     expect(md).toMatch(/\| 8\.3 —[^|]*\|[^|]*\| C \|/); // exhaustive language rule ran and found a declared page language
   });
