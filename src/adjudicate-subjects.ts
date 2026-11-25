@@ -30,6 +30,8 @@ import { AXE_WCAG } from "./axe-map.js";
 import { computedTextPairs, renderedRulesFor, renderedRulesRan } from "./rules/rendered.js";
 import { rendersNativeLink } from "./rules/rule.js";
 import { consentContainerOf, consentNote } from "./consent.js";
+import { SR_FIELD_ROLES, SR_LIVE_ROLES, SR_SCRIPTED_STATES, SR_WIDGET_ROLES } from "./screen-reader.js";
+import type { MediaItem, SrEntry } from "./types.js";
 
 /** Mask the parts of a text that change between runs without the code changing.
  *
@@ -1917,6 +1919,11 @@ export const SUBJECTS: Record<string, Subject> = {
   // evidence and none of the evidence the three-flash test actually asks for.
   flashes: (docs) =>
     docs.flatMap((d) => [
+      // The measure first: on a captured page it is what the three-flash test is ruled on.
+      ...((page) => {
+        const a = page === undefined ? undefined : flashAnchor(d, page);
+        return a ? [a] : [];
+      })(pageOfDoc(d.file)),
       ...d.elements
         .filter((e) => ["video", "img", "svg", "canvas", "embed", "object", "blink"].includes(e.tag))
         .map((e) =>
@@ -2319,10 +2326,12 @@ export const SUBJECTS: Record<string, Subject> = {
           const tracks = elementsByTag(d, "track")
             .filter((x) => ancestors(x).includes(e))
             .map((x) => `${attr(x, "kind") ?? "subtitles"}:${attr(x, "srclang") ?? ""}`);
+          // On a capture the browser probe says what loaded and what sits beside the player.
+          const probed = mediaItemFor(d, e);
           return h(
             d,
             e,
-            `<${e.tag}> src="${(attr(e, "src") ?? attr(e, "data") ?? "").slice(0, 80)}" controls=${attr(e, "controls") !== undefined} autoplay=${attr(e, "autoplay") !== undefined} tracks=[${tracks.join(", ")}] heading="${nearestHeading(d, e) ?? ""}" — is it identified by adjacent text, and does it have its transcript/captions/description?`,
+            `<${e.tag}> src="${(attr(e, "src") ?? attr(e, "data") ?? "").slice(0, 80)}" controls=${attr(e, "controls") !== undefined} autoplay=${attr(e, "autoplay") !== undefined} tracks=[${tracks.join(", ")}] heading="${nearestHeading(d, e) ?? ""}"${probed ? ` — ${mediaFacts(probed)}` : ""} — is it identified by adjacent text, and does it have its transcript/captions/description?`,
             `tmedia|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? ""}`,
           );
         }),
@@ -2852,6 +2861,142 @@ const BEHAVIOUR_SUBJECTS: Record<string, Subject> = {
 
 Object.assign(SUBJECTS, BEHAVIOUR_SUBJECTS);
 
+// ---- WHAT A SCREEN READER IS HANDED (#208) ---------------------------------------------------
+//
+// `sr.json` is the accessibility tree a Chromium capture recorded, read out in reading order
+// (src/screen-reader.ts). It is a SIMULATION from the tree, never a run of a real reader, and the
+// notes say so: what it establishes is what the browser EXPOSES — the role, the accessible name,
+// the value, the description, the states — on that page state. A journey step is a page state of
+// its own, so the announcement after the menu opened or after the form refused the address is the
+// one its own capture carries.
+
+/** An announcement as an anchor: on its element when the ordinal joins (tag verified), else on
+ *  the capture's first line, saying it could not be placed. */
+function srAnchor(d: Doc, e: SrEntry, note: string, cls: string): Harvested {
+  const el = e.i !== undefined ? d.elements[e.i] : undefined;
+  if (el && e.tag && el.tag.toLowerCase() === e.tag.toLowerCase()) return h(d, el, note, cls);
+  return hAt(d, 1, `sr:${e.role}`, `${note} [not joined to an element of dom.html]`, cls);
+}
+
+const srSays = (page: string, e: SrEntry): string =>
+  `page="${page}" a screen reader would announce (simulated from the captured accessibility tree): ${e.text}${e.name ? "" : " — NO accessible name"}`;
+const srClass = (kind: string, e: SrEntry): string => `sr|${kind}|${e.role}|${e.name}|${e.states.join(",")}|${e.description ?? ""}`;
+
+/** One sr subject: the captured pages carrying `sr.json`, the entries `pick` keeps, and — when
+ *  `coverage` — a per-page line saying how many there were, so a page with none still has its
+ *  one citable fact. Never on an EXISTENCE subject: that line would make every page « carry » it. */
+function srSubject(kind: string, pick: (e: SrEntry) => boolean, coverage?: (n: number) => string): Subject {
+  return (docs) =>
+    docs.flatMap((d) => {
+      const page = pageOfDoc(d.file);
+      const sr = d.signals?.sr;
+      if (page === undefined || !sr) return [];
+      const hits = sr.entries.filter(pick);
+      const out = hits.map((e) => srAnchor(d, e, srSays(page, e), srClass(kind, e)));
+      if (coverage)
+        out.unshift(
+          hAt(
+            d,
+            1,
+            `sr:${kind}`,
+            `page="${page}" screen-reader simulation (sr.json, ${plural(sr.entries.length, "announcement")} in reading order${sr.truncated ? ", CAPPED — absence proves nothing" : ""}): ${coverage(hits.length)}`,
+            `srcov|${kind}|${hits.length}|${sr.truncated ? "capped" : ""}`,
+          ),
+        );
+      return out;
+    });
+}
+
+const SR_SUBJECTS: Record<string, Subject> = {
+  // RGAA 11.x — every form field as announced: its role, the name a reader says, and the states
+  // (required, invalid, expanded…) the page exposes on that state. An EXISTENCE subject: a page
+  // whose tree announces no form field has none for theme 11 to be about.
+  "sr:fields": srSubject("fields", (e) => SR_FIELD_ROLES.has(e.role)),
+  // RGAA 7.1 / 7.3 — the widgets a script drives, and any node whose state a script keeps in
+  // step (expanded, pressed, selected, checked): what a reader is told about them.
+  "sr:widgets": srSubject(
+    "widgets",
+    (e) => !SR_FIELD_ROLES.has(e.role) && (SR_WIDGET_ROLES.has(e.role) || e.states.some((st) => SR_SCRIPTED_STATES.test(st))),
+    (n) => `${plural(n, "scripted widget or stateful control", "scripted widgets or stateful controls")} announced`,
+  ),
+  // RGAA 7.5 — what a reader hears without moving to it: status, alert, log, timer, progress,
+  // and any region exposing `live`.
+  "sr:live": srSubject(
+    "live",
+    (e) => SR_LIVE_ROLES.has(e.role) || e.states.some((st) => st.startsWith("live=")),
+    (n) => `${plural(n, "live region or status", "live regions or statuses")} exposed`,
+  ),
+};
+
+Object.assign(SUBJECTS, SR_SUBJECTS);
+
+// ---- WHAT THE BROWSER MEASURED OF THE MEDIA (#208) --------------------------------------------
+
+/** The media.json entry for an element, when its ordinal joins (tag verified). */
+function mediaItemFor(d: Doc, el: El): MediaItem | undefined {
+  const items = d.signals?.media?.items;
+  if (!items?.length) return undefined;
+  const at = d.elements.indexOf(el);
+  return items.find((m) => m.i === at && m.tag.toLowerCase() === el.tag.toLowerCase());
+}
+
+/** What the media probe saw of one element, as a clause of a note. */
+function mediaFacts(m: MediaItem): string {
+  const tracks = m.tracks.length
+    ? m.tracks
+        .map(
+          (t) =>
+            `${t.kind}${t.srclang ? `:${t.srclang}` : ""}${t.label ? ` "${t.label}"` : ""} (${t.readyState === 2 ? "loaded" : t.readyState === 3 ? "FAILED to load" : t.readyState === 1 ? "loading" : "not loaded"})`,
+        )
+        .join(", ")
+    : "none";
+  const comps = m.companions.length
+    ? m.companions.map((c) => `${c.via} "${c.text.slice(0, 80)}"${c.href ? ` -> ${c.href.slice(0, 80)}` : ""}`).join("; ")
+    : "none found beside it";
+  const play = [
+    m.duration !== undefined ? `${m.duration}s` : "",
+    m.autoplay ? "autoplay" : "",
+    m.muted ? "muted" : "",
+    m.loop ? "loop" : "",
+    m.controls === false ? "no native controls" : m.controls ? "native controls" : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return `browser media probe: tracks [${tracks}]; captions/transcripts/descriptions in the DOM: ${comps}${play ? `; ${play}` : ""}`;
+}
+
+/** The flash measure of one capture, as one anchor — what ran, what it saw, and what it cannot see. */
+function flashAnchor(d: Doc, page: string): Harvested | undefined {
+  const media = d.signals?.media;
+  if (!media) return undefined;
+  const animated = media.items.length;
+  const f = media.flash;
+  const limits = "only the viewport, after load, with nobody touching the page; saturated-red flashes are not measured";
+  if (!f)
+    return hAt(
+      d,
+      1,
+      "probe:flash",
+      `page="${page}" flash measure did NOT run: ${media.flashSkipped ?? "no reason recorded"} — ${plural(animated, "media or animated element", "media or animated elements")} inventoried`,
+      `flashskip|${media.flashSkipped ?? ""}|${animated}`,
+    );
+  const said =
+    f.outcome === "undersampled"
+      ? `UNDERSAMPLED (${f.fps} frames/s, below the rate a 3-per-second count needs) — measured nothing`
+      : f.outcome === "none"
+        ? "no luminance flash in any cell"
+        : f.outcome === "below-threshold"
+          ? `luminance changes seen, at most ${f.maxFlashesPerSecond} flash(es)/s, flashing area ${f.flashingArea} px² (threshold ${f.areaThreshold} px²) — under the general flash threshold`
+          : `OVER the general flash threshold: ${f.maxFlashesPerSecond} flashes/s over ${f.flashingArea} px² (threshold ${f.areaThreshold} px²)`;
+  return hAt(
+    d,
+    1,
+    "probe:flash",
+    `page="${page}" flash measure RAN on a ${f.durationMs} ms viewport recording (${f.frames} frames, ${f.fps} frames/s): ${said}; ${plural(animated, "media or animated element", "media or animated elements")} on the page — ${limits}`,
+    `flash|${f.outcome}|${f.maxFlashesPerSecond}|${animated}`,
+  );
+}
+
 // ---- which subjects serve which criterion ------------------------------------------------
 //
 // EVERY success criterion the static engine cannot decide names its subjects. The integrity
@@ -2964,9 +3109,9 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     "9.3": ["lists"],
     "9.4": ["quotes"],
     // Theme 11 — forms.
-    "11.1": ["controls"],
-    "11.2": ["controls"],
-    "11.3": ["controls", "nameVsAccName"],
+    "11.1": ["controls", "sr:fields"],
+    "11.2": ["controls", "sr:fields"],
+    "11.3": ["controls", "nameVsAccName", "sr:fields"],
     "11.4": ["controls"],
     "11.5": ["controls"],
     "11.6": ["controls", "landmarks"],
@@ -2976,8 +3121,8 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // Fields stay listed beside the buttons so an audit recorded before `buttons` existed (whose
     // subjectsSeen cannot contain it) is never read as « no button anywhere ».
     "11.9": ["buttons", "controls"],
-    "11.10": ["controls", "errors"],
-    "11.11": ["errors", "controls"],
+    "11.10": ["controls", "errors", "sr:fields"],
+    "11.11": ["errors", "controls", "sr:fields"],
     "11.12": ["controls", "errors"],
     "11.13": ["autocomplete"],
     // Theme 12 — navigation.
@@ -3026,11 +3171,11 @@ export const PACK_SUBJECTS: Record<string, Record<string, string[]>> = {
     // handlers and the focusable surface, never about the page's headings and lists.
     // The behaviour digest (scripts.json, #190) is what these are judged on in a capture: a
     // listener on a `<div>`, an `aria-expanded` the script toggles, a status that is announced.
-    "7.1": ["aria", "pointerHandlers", "behaviour:clickable", "behaviour:aria"],
+    "7.1": ["aria", "pointerHandlers", "behaviour:clickable", "behaviour:aria", "sr:widgets"],
     "7.2": ["scriptAlternatives"],
-    "7.3": ["pointerHandlers", "pointerActions", "focusables", "behaviour:keyboard", "behaviour:clickable"],
+    "7.3": ["pointerHandlers", "pointerActions", "focusables", "behaviour:keyboard", "behaviour:clickable", "sr:widgets"],
     "7.4": ["contextChange"],
-    "7.5": ["liveRegions", "rendered:4.1.3", "behaviour:live"],
+    "7.5": ["liveRegions", "rendered:4.1.3", "behaviour:live", "sr:live"],
     // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
     // reorders, and what is hidden on purpose.
     //
@@ -3170,6 +3315,9 @@ export const EXISTENCE_SUBJECTS: ReadonlySet<string> = new Set([
   // A page that declares no default language has no language code for 8.4 to be about. The
   // `<html>` element is always there; the attribute is what this subject looks for.
   "declaredLang",
+  // A page whose captured accessibility tree announces no form field (#208). Its silence is the
+  // tree's, so beside `controls` it can only ever make an absence harder to conclude, never easier.
+  "sr:fields",
 ]);
 
 /** Pack criteria that apply to EVERY page with content, so « non applicable » is never a

@@ -14,7 +14,15 @@ That difference is not cosmetic. It is what makes a whole class of criteria deci
   styles.json   computed-style digest, joined to the DOM by document-order index
   boxes.json    bounding boxes, same join key
   css.json      the page's own stylesheets (rules + declarations), NOT element-indexed
-  axtree.json   the accessibility tree, when a producer supplies it (no rule reads it yet)
+  axtree.json   the accessibility tree Chromium computed (`scan`, `journey run`); no rule reads it
+  sr.json       what a screen reader would announce, in reading order, derived from axtree.json:
+                role, accessible name, value, description, states — a simulation from the tree,
+                never a real reader; evidence for RGAA 7.1, 7.3, 7.5 and the form criteria
+  media.json    the media of the page (video, audio, players, animated content) with their
+                tracks as the browser loaded them and the captions, transcripts or descriptions
+                found beside them; and, on a scanned page, the flash measure of a 1.5 s viewport
+                recording (RGAA 13.7: `none`, `below-threshold`, `over-threshold`, or
+                `undersampled` — which measured nothing)
   probes.json   what the LIVE probes measured here — and `probed`, which ones actually ran
   axe.json      the axe pass that ran beside them (`ran: true` is what makes its silence usable)
   scripts.json  what the page's SCRIPTS did during a short capture window: listeners (flagged
@@ -91,7 +99,7 @@ match `[a-z0-9][a-z0-9-]*` — it becomes a directory name, so it cannot be allo
 
 ## The join key, and why it is verified
 
-`styles.json`, `boxes.json` and `axtree.json` index elements by **document-order ordinal**,
+`styles.json`, `boxes.json`, `axtree.json`, `sr.json` and `media.json` index elements by **document-order ordinal**,
 not by CSS selector — a selector would have to survive serialization and re-parsing, an
 ordinal does not. Each entry repeats its `tag`, and the join (`alignedStyles`) checks every
 one against the re-parsed DOM.

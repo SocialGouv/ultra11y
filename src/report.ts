@@ -29,6 +29,7 @@ import { conformanceRate, type ConformanceRate, formatPageRate, pageCriterionRow
 
 export { conformanceRate, type ConformanceRate };
 import { mdLink, mdText } from "./md.js";
+import { renderAppMap } from "./app-map.js";
 import { isLinkableUrl } from "./util.js";
 import { renderSnapshotAnnex } from "./render-snapshot-report.js";
 import {
@@ -2111,6 +2112,10 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   if (r.scope.renders?.units.length && r.scope.renders.snapshots) ax.push(...renderSnapshotAnnex(r.scope.renders.snapshots, lang, opts.outDir));
   // H. every journey the agent wrote and every step of it: done, failed with the reason, or not run.
   if (r.scope.journeys?.journeys.length) ax.push("", ...renderJourneys(r.scope.journeys, lang));
+  // I. the application map: the pages and states read, the instrument that saw each and what it
+  // recorded, the rendered units by route, and per evidence source the criteria it can reach (#208).
+  const map = renderAppMap(r, opts.standard, rows, lang);
+  if (map.length) ax.push("", ...map);
 
   return { report: out.join("\n"), annex: ax.join("\n"), reportFile, annexFile };
 }

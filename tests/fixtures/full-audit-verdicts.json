@@ -387,9 +387,9 @@
     "13.5": { "verdict": "NA", "justification": "No cryptic content." },
     "13.6": { "verdict": "NA", "justification": "No cryptic content." },
     "13.7": {
-      "verdict": "manual",
-      "reason": "undecidable",
-      "justification": "The image files are not served, so whether they flash cannot be seen; a human has to open the original assets."
+      "verdict": "NA",
+      "justification": "Nothing on any page flashes. The flash measure (media.json) recorded every scanned page's viewport for about 1.5 s at some 60 frames a second and saw no luminance flash in any cell; the media inventory found no video, canvas, animated image, SVG animation or running CSS animation on any page or journey state, and the two images are not served, so they paint nothing that could flash. The journey states record the inventory only: each is a state of a page measured above, with no animated element of its own.",
+      "cite": "all"
     },
     "13.8": { "verdict": "NA", "justification": "No moving or blinking content: every page's behaviour digest (scripts.json) records no self-updating element and no CSS animation longer than 5 s.", "cite": "all" },
     "13.9": { "verdict": "C", "justification": "No orientation lock; the orientation probe found nothing.", "cite": "all" },
@@ -409,8 +409,7 @@
     "entries": [
       { "criteriaId": "1.3", "reason": "The trial refuted the « non applicable » claim; a human has to rule the relevance of the alternatives once the images carry one." },
       { "criteriaId": "1.8", "reason": "The image file is not served, so whether it is an image of text needs the original asset." },
-      { "criteriaId": "8.2", "reason": "Validity of the generated source needs a validator run on each page." },
-      { "criteriaId": "13.7", "reason": "The image files are not served, so whether they flash needs the original assets." }
+      { "criteriaId": "8.2", "reason": "Validity of the generated source needs a validator run on each page." }
     ]
   }
 }

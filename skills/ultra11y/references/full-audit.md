@@ -126,6 +126,15 @@ traps, focus into and out of dialogs, errors not tied to their field and unannou
 messages. A failing step stops its journey with the reason, and annex H lists every step.
 Fix the journey and run it again. Do not drop it.
 
+Every page `scan` opens and every journey state also records its accessibility tree and, from
+it, what a screen reader would announce there (`sr.json`): the evidence 7.1, 7.3, 7.5 and the
+form criteria are ruled on, state by state — the disclosure « collapsed » before the click and
+« expanded » after, the field « invalid » once the form refused it. `scan` records the media
+inventory and a short viewport recording measured for flashes (`media.json`), the evidence of
+theme 4 and 13.7. Annex I, the application map, puts the routes, the page states, the rendered
+units and the criteria each evidence source can reach side by side; `criteria --plan` prints the
+same matrix, and no criterion of the standard is without a path.
+
 `scan` and `ultra11y/playwright` run the same axe: ultra11y's own pinned `axe-core` and rule
 tags, whatever version the project installs. The annex names the version that ran. If it says
 « copie du projet audité », ultra11y's own copy could not be resolved; reinstall ultra11y with

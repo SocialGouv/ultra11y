@@ -11,7 +11,11 @@
 //     dom.html      documentElement.outerHTML, prefixed with the usual capture comment
 //     styles.json   computed-style digest, joined to the DOM by document-order index
 //     boxes.json    bounding boxes, same join key
-//     axtree.json   accessibility tree as the browser computed it
+//     axtree.json   accessibility tree as the browser computed it (Chromium, src/screen-reader.ts)
+//     sr.json       what a screen reader would announce, in reading order — derived from
+//                   axtree.json alone when it is written, never measured separately
+//     media.json    the page's media (tracks, captions, transcripts found in the DOM) and the
+//                   flash measure of a short viewport recording (src/media.ts)
 //     scripts.json  what the page's scripts DID during the capture window — listeners, inline
 //                   handlers, ARIA mutations, live regions, timers, moving content, scripts and
 //                   stylesheets loaded (src/behaviour.ts); same join key, verified per entry
@@ -39,7 +43,20 @@ import { SCRIPTS_VERSION } from "./behaviour.js";
 import { formatCaptureComment } from "./capture.js";
 import { parseHtml } from "./parse/html.js";
 import type { Doc } from "./parse/html.js";
-import type { AxNode, BoxDigest, BoxEntry, CssDigest, ReflowClipped, RenderSignals, ScriptsDigest, StyleDigest, StyleEntry } from "./types.js";
+import { announce } from "./screen-reader.js";
+import type {
+  AxNode,
+  BoxDigest,
+  BoxEntry,
+  CssDigest,
+  MediaDigest,
+  ReflowClipped,
+  RenderSignals,
+  ScriptsDigest,
+  SrDigest,
+  StyleDigest,
+  StyleEntry,
+} from "./types.js";
 
 export type { AxNode, BoxDigest, BoxEntry, CssDigest, RenderSignals, ScriptsDigest, StyleDigest, StyleEntry };
 
@@ -159,6 +176,11 @@ export interface Snapshot {
   styles?: StyleDigest;
   boxes?: BoxDigest;
   axtree?: AxNode;
+  /** What a screen reader would announce, derived from `axtree` (set on READ; `writeSnapshot`
+   *  derives it itself, so a producer never supplies a second copy that could disagree). */
+  sr?: SrDigest;
+  /** The media and flash measure (`media.json`), when the producer ran them. */
+  media?: MediaDigest;
   css?: CssDigest;
   /** What the live probes measured, when the producer ran them. */
   probes?: SnapshotProbes;
@@ -211,6 +233,11 @@ export interface CollectedPage {
   /** The behaviour digest, when the producer opened a capture window after collecting
    *  (src/behaviour.ts) — not part of COLLECT_SNAPSHOT itself, which is synchronous. */
   scripts?: ScriptsDigest;
+  /** The accessibility tree, read through the DevTools protocol right after collecting
+   *  (src/screen-reader.ts) — Chromium only, so absent from any other producer. */
+  axtree?: AxNode;
+  /** The media inventory and flash measure (src/media.ts), when the producer ran them. */
+  media?: MediaDigest;
 }
 
 // ---- page identity --------------------------------------------------------------------
@@ -362,7 +389,11 @@ export function writeSnapshot(root: string, snap: Snapshot): string {
   writeFileSync(join(dir, "dom.html"), `${comment}\n${snap.dom}\n`);
   if (snap.styles) writeFileSync(join(dir, "styles.json"), `${JSON.stringify(snap.styles)}\n`);
   if (snap.boxes) writeFileSync(join(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}\n`);
-  if (snap.axtree) writeFileSync(join(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}\n`);
+  if (snap.axtree) {
+    writeFileSync(join(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}\n`);
+    writeFileSync(join(dir, "sr.json"), `${JSON.stringify(announce(snap.axtree))}\n`);
+  }
+  if (snap.media) writeFileSync(join(dir, "media.json"), `${JSON.stringify(snap.media)}\n`);
   if (snap.css) writeFileSync(join(dir, "css.json"), `${JSON.stringify(snap.css)}\n`);
   if (snap.probes) writeFileSync(join(dir, "probes.json"), `${JSON.stringify(snap.probes)}\n`);
   if (snap.axe) writeFileSync(join(dir, "axe.json"), `${JSON.stringify(snap.axe)}\n`);
@@ -419,6 +450,8 @@ export function readSnapshot(dir: string): Snapshot | null {
   const styles = readJson<StyleDigest>(join(dir, "styles.json"));
   const boxes = readJson<BoxDigest>(join(dir, "boxes.json"));
   const axtree = readJson<AxNode>(join(dir, "axtree.json"));
+  const sr = readSr(dir);
+  const media = readMedia(dir);
   const css = readJson<CssDigest>(join(dir, "css.json"));
   // `writeSnapshot` writes these two and `attachSignals` reads them off disk, but this reader
   // used to drop them — so a round-trip through `readSnapshot` silently lost the measurement
@@ -436,6 +469,8 @@ export function readSnapshot(dir: string): Snapshot | null {
     ...(styles ? { styles } : {}),
     ...(boxes ? { boxes } : {}),
     ...(axtree ? { axtree } : {}),
+    ...(sr ? { sr } : {}),
+    ...(media ? { media } : {}),
     ...(css ? { css } : {}),
     ...(probes ? { probes } : {}),
     ...(axe ? { axe } : {}),
@@ -444,6 +479,27 @@ export function readSnapshot(dir: string): Snapshot | null {
     ...(existsSync(full) ? { screenshotFull: "screen-full.png" } : {}),
     ...(existsSync(narrow) ? { screenshot320: "screen-320.png" } : {}),
   };
+}
+
+/** Read `sr.json`, or undefined when it is absent or not a digest this engine understands. */
+export function readSr(dir: string): SrDigest | undefined {
+  const raw = readJson<unknown>(join(dir, "sr.json"));
+  if (!isObj(raw) || raw.v !== 1 || !Array.isArray(raw.entries)) return undefined;
+  const entries = raw.entries.filter(
+    (e): e is SrDigest["entries"][number] => isObj(e) && isStr(e.role) && isStr(e.name) && isStr(e.text) && Array.isArray(e.states),
+  );
+  return { v: 1, entries, ...(raw.truncated === true ? { truncated: true } : {}) };
+}
+
+/** Read `media.json`, or undefined when it is absent or not a digest this engine understands. */
+export function readMedia(dir: string): MediaDigest | undefined {
+  const raw = readJson<unknown>(join(dir, "media.json"));
+  if (!isObj(raw) || raw.v !== 1 || !Array.isArray(raw.items)) return undefined;
+  const items = raw.items.filter(
+    (e): e is MediaDigest["items"][number] => isObj(e) && isStr(e.tag) && isStr(e.selector) && Array.isArray(e.tracks) && Array.isArray(e.companions),
+  );
+  const flash = isObj(raw.flash) && isStr(raw.flash.outcome) && isNum(raw.flash.frames) ? (raw.flash as unknown as MediaDigest["flash"]) : undefined;
+  return { v: 1, items, ...(flash ? { flash } : {}), ...(isStr(raw.flashSkipped) ? { flashSkipped: raw.flashSkipped } : {}) };
 }
 
 /** Read `scripts.json`, or undefined when it is absent or not a behaviour digest this engine
@@ -750,6 +806,8 @@ export function attachSignals(doc: Doc): void {
   const styles = readJson<StyleDigest>(join(dir, "styles.json"));
   const boxes = readJson<BoxDigest>(join(dir, "boxes.json"));
   const axtree = readJson<AxNode>(join(dir, "axtree.json"));
+  const sr = readSr(dir);
+  const media = readMedia(dir);
   const css = readJson<CssDigest>(join(dir, "css.json"));
   const meta = readJson<{ doctype?: string; loading?: unknown }>(join(dir, "meta.json"));
   const loading = Array.isArray(meta?.loading) ? meta.loading.filter((m): m is string => typeof m === "string") : [];
@@ -775,6 +833,10 @@ export function attachSignals(doc: Doc): void {
     // Not aligned wholesale like the styles: its reader verifies each entry's tag against the
     // DOM, because an element the page created during the window legitimately has no ordinal.
     ...(scripts ? { scripts } : {}),
+    // Element-indexed by ordinal + tag like the scripts digest, and verified per entry by its
+    // reader (src/adjudicate-subjects.ts) for the same reason.
+    ...(sr ? { sr } : {}),
+    ...(media ? { media } : {}),
     ...(truncated ? { truncated } : {}),
     ...(loading.length ? { capturedLoading: loading } : {}),
   };

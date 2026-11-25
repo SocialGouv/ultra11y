@@ -437,6 +437,9 @@ interface Accum {
   // because — the same rule as everywhere in this tier — a rule engine that did not run has
   // measured nothing, and its silence must never read as a clean page.
   axeRan: Set<string>;
+  // WHAT EACH PAGE'S EVIDENCE WAS READ FROM (#208): the capture files beside its dom.html that
+  // carried a signal. For the application map annex — what was seen and how — never a verdict.
+  pageCaptures: Map<string, Set<string>>;
   // The axe-core builds those passes recorded (src/axe-engine.ts) — what the report names.
   axeEngines: AxeEngineInfo[];
 }
@@ -512,6 +515,7 @@ function newAccum(): Accum {
     renderedRan: new Map(),
     probedScs: new Map(),
     axeRan: new Set(),
+    pageCaptures: new Map(),
     axeEngines: [],
     subjectsSeen: new Set(),
     pageSubjects: new Map(),
@@ -655,6 +659,8 @@ export function foldDoc(acc: Accum, doc: Doc, graph?: DepGraph): void {
   const pageId = snapshotPageId(doc.file);
   if (pageId) {
     acc.pageIds.add(pageId);
+    const files = captureFilesOf(doc.signals);
+    if (files.length) acc.pageCaptures.set(pageId, new Set([...(acc.pageCaptures.get(pageId) ?? []), ...files]));
     // A CAPTURE OF A PLACEHOLDER (#135). The page was recorded while it still declared itself
     // loading, so what it holds is a spinner and a frame: its findings are real and are kept,
     // but every COVERAGE credit below is withheld — a measurement that found nothing on content
@@ -852,6 +858,23 @@ function scopeCoverage(acc: Accum): PageCoverage | undefined {
   };
 }
 
+/** The capture files a page's signals were read from, by the digest each one carries. */
+function captureFilesOf(signals: Doc["signals"]): string[] {
+  if (!signals) return [];
+  const out: string[] = [];
+  if (signals.styles) out.push("styles.json");
+  if (signals.boxes) out.push("boxes.json");
+  if (signals.css) out.push("css.json");
+  if (signals.probes) out.push("probes.json");
+  if (signals.axe) out.push("axe.json");
+  if (signals.scripts) out.push("scripts.json");
+  if (signals.axtree) out.push("axtree.json");
+  if (signals.sr) out.push("sr.json");
+  if (signals.media) out.push("media.json");
+  if (signals.screenshot) out.push("screen.png");
+  return out;
+}
+
 /** What each page in scope was measured by — the per-page half of `scopeCoverage`, persisted
  *  on the audit so a grid can be rebuilt from the JSON alone, offline and with no browser. */
 function pageCoverageOf(acc: Accum): Record<string, PageCoverage> {
@@ -864,12 +887,14 @@ function pageCoverageOf(acc: Accum): Record<string, PageCoverage> {
   for (const id of [...acc.pageIds].sort()) {
     const rules = on(acc.renderedRan, id);
     const scs = on(acc.probedScs, id);
+    const captures = [...(acc.pageCaptures.get(id) ?? [])].sort();
     out[id] = {
       // Its DOM was parsed and folded, so the whole static rule set ran against it.
       dom: true,
       ...(acc.axeRan.has(id) ? { axe: true } : {}),
       ...(rules.length ? { rules } : {}),
       ...(scs.length ? { scs } : {}),
+      ...(captures.length ? { captures } : {}),
     };
   }
   return out;

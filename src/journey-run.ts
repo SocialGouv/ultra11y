@@ -31,6 +31,8 @@ import { TIMER_HOOK, startBehaviour } from "./behaviour.js";
 import { PRELUDE, runLiveProbes } from "./probes.js";
 import { type ProbeHit, type RunnerOutput, toDynamicResult, writeRunnerSnapshot } from "./scan.js";
 import { landedOnRequestedPage, launchChromium, resolveLocalDeps } from "./scan-local.js";
+import { captureAxTree } from "./screen-reader.js";
+import { probeMedia } from "./media.js";
 import { COLLECT_SNAPSHOT, type CollectedPage, FULL_SCREENSHOT_MAX_HEIGHT, PAGES_DIR, waitForLoaded } from "./snapshot.js";
 import type { AxeEngineInfo, DynamicFinding, JourneyRecord, JourneyStepRecord, Lang } from "./types.js";
 
@@ -392,6 +394,10 @@ async function capture(page: Any, axe: AxeEngine, lang: Lang): Promise<RunnerOut
     /* no snapshot for this state: its findings still count, its silence does not */
   }
   if (snapshot) {
+    // What a screen reader is handed in THIS state (#208) — the tree after the step, so sr.json
+    // says what is announced once the menu opened or the form refused the address.
+    const axtree = await captureAxTree(page);
+    if (axtree) snapshot.axtree = axtree;
     try {
       snapshot.screenshot = ((await page.screenshot({ fullPage: false })) as Buffer).toString("base64");
     } catch {
@@ -406,6 +412,9 @@ async function capture(page: Any, axe: AxeEngine, lang: Lang): Promise<RunnerOut
         /* the report shows the viewport shot instead */
       }
     }
+    // The media inventory of this state; the flash measure is `scan`'s, on the page as loaded.
+    const media = await probeMedia(page, { flash: false });
+    if (media) snapshot.media = media;
   }
   // THE BEHAVIOUR WINDOW (#190), as `scan` opens it: on the DOM just serialized, idle first (what
   // changes then changed on its own), the probes below as its interaction half, closed after
