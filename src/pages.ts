@@ -96,7 +96,88 @@ export function pagesOf(result: AuditResult): PageScope[] {
   // map says: the basis guard above and this one answer the same question and must not
   // disagree — otherwise a source-only re-run would re-publish the verdicts of a sweep it
   // never performed.
-  return stamped.map((p) => (p.basis === "snapshot" ? p : p.coverage ? { ...p, coverage: undefined } : p));
+  const measured = stamped.map((p) => (p.basis === "snapshot" ? p : p.coverage ? { ...p, coverage: undefined } : p));
+  return classifyPages(result, measured);
+}
+
+/** WHAT EACH ENTRY IS TO THE SAMPLE (#232), stamped in the same funnel.
+ *
+ *  Every snapshot directory is an entry of the scope, and a replayed journey writes one per
+ *  step: an eleven-page sample with two journeys and one stray route printed « 30 pages
+ *  auditées », and averaged the RGAA « taux moyen » over thirty rates of which nineteen were
+ *  not pages of the sample. A journey state is a STATE of a page (`scope.journeys` names the
+ *  snapshot each step recorded); a route no declared sample lists is outside it. Both stay in
+ *  scope — their findings are real and count against the criterion — but they are labelled,
+ *  listed after the sample pages, and kept out of the page count and the mean.
+ *
+ *  Without a declared sample every entry that is not a journey state is a page: a crawl has no
+ *  sample to be outside of. */
+function classifyPages(result: AuditResult, pages: PageScope[]): PageScope[] {
+  const states = new Map<string, { name: string; step: number }>();
+  const sample = result.scope.sample?.pages;
+  const sampleIds = new Set((sample ?? []).map((p) => p.id));
+  // A step's snapshot id has the shape `journey run` gives it (`<journey>-<nn>[-<slug>]`, src/
+  // journey.ts stepPageId) and is never a declared sample page: a journey that names a page of
+  // the sample as one of its steps does not turn that page into a state.
+  for (const j of result.scope.journeys?.journeys ?? [])
+    for (const st of j.steps) {
+      const shaped = st.page?.startsWith(`${j.name}-${String(st.n).padStart(2, "0")}`);
+      if (st.page && shaped && !sampleIds.has(st.page)) states.set(st.page, { name: j.name, step: st.n });
+    }
+  const sampleUrls = new Set((sample ?? []).map((p) => p.url));
+  const rank = { page: 0, "out-of-sample": 1, "journey-state": 2 } as const;
+  // A STATE IS ITS PAGE IN ANOTHER STATE: it belongs to the sample page at the same address,
+  // and what fails in it fails on that page. A state whose page is not in the sample belongs to
+  // no page of it, and counts against its criterion only.
+  const address = (u: string) => u.split("#")[0]!;
+  const classified: PageScope[] = pages.map((p) => {
+    const journey = states.get(p.id);
+    if (journey) return { ...p, kind: "journey-state" as const, journey };
+    if (sample?.length && !sampleIds.has(p.id) && !sampleUrls.has(p.url)) return { ...p, kind: "out-of-sample" as const };
+    return p;
+  });
+  const byUrl = new Map<string, string>();
+  for (const p of classified) if (p.kind === undefined && !byUrl.has(address(p.url))) byUrl.set(address(p.url), p.id);
+  for (const [i, p] of classified.entries()) {
+    const parent = p.kind === "journey-state" ? byUrl.get(address(p.url)) : undefined;
+    if (parent) classified[i] = { ...p, parent };
+  }
+  // Sample pages first, then the routes outside it, then the journey states: a stable sort, so
+  // each group keeps the order the audit recorded.
+  return classified
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => rank[a.p.kind ?? "page"] - rank[b.p.kind ?? "page"] || a.i - b.i)
+    .map(({ p }) => p);
+}
+
+/** The pages of the sample — the entries the page count and the RGAA mean rate are taken over.
+ *  Journey states and out-of-sample routes are left out (see `classifyPages`). */
+export function samplePages<T extends { kind?: PageScope["kind"] }>(pages: T[]): T[] {
+  return pages.filter((p) => p.kind === undefined);
+}
+
+/** What an occurrence with no page was found in, as one cell's words (#232). */
+export function offPageLabel(kind: OffPageKind, lang: Lang): string {
+  return L[lang].offPage[kind];
+}
+
+/** A page's name with what it is to the sample, as every list prints it: « Contact (état de
+ *  parcours — contact, étape 4) ». A page of the sample is just its name. */
+export function pageLabel(p: Pick<PageScope, "name" | "kind" | "journey">, lang: Lang): string {
+  // `journey run` names a state « <journey> — <n>. <step> »: the journey and the step are said
+  // already, only what the entry is remains to be.
+  const named = p.journey !== undefined && p.name.startsWith(`${p.journey.name} — ${p.journey.step}.`);
+  const note = named ? L[lang].journeyState : pageKindNote(p, lang);
+  return note ? `${p.name} (${note})` : p.name;
+}
+
+/** The label an entry that is not a sample page carries after its name, in every list: the
+ *  journey and its step for a state, « hors échantillon » for a stray route. Empty for a page. */
+export function pageKindNote(p: Pick<PageScope, "kind" | "journey">, lang: Lang): string {
+  const s = L[lang];
+  if (p.kind === "journey-state") return p.journey ? s.journeyStateOf(p.journey.name, p.journey.step) : s.journeyState;
+  if (p.kind === "out-of-sample") return s.outOfSample;
+  return "";
 }
 
 /** Capture provenance is repo-relative ("app/page.tsx"); a finding's file may be cwd-relative
@@ -190,6 +271,35 @@ export interface PageResolver {
    *  shared by five pages lands on one, so a page list built from it is a floor, and the report
    *  says so. A source only one page declares has nowhere else to be: that list is complete. */
   approximate(f: Finding): boolean;
+  /** For an occurrence no page claims, what it was found in instead (#232): a component the
+   *  engine rendered on its own (`render`, a `.ultra11y/captures/` file) that no audited page
+   *  serves, a downloadable document, or neither. « Sans page » for all three told a reader
+   *  nothing about where to look. */
+  offPageKind(f: Finding): OffPageKind;
+}
+
+/** Where an occurrence with no page was found — see `PageResolver.offPageKind`. */
+export type OffPageKind = "component" | "document" | "unknown";
+
+/** The extensions of the office documents RGAA 13.3 asks about, for a finding citing one. */
+const DOCUMENT_FILE = /\.(pdf|docx?|odt|ods|odp|xlsx?|pptx?|rtf|epub)(?:[?#].*)?$/i;
+
+function offPageKindOf(result: AuditResult): (f: Finding) => OffPageKind {
+  const documents = new Set<string>();
+  for (const d of result.documents ?? []) for (const x of [d.file, d.url, ...(d.copies ?? []), ...(d.urls ?? [])]) if (x) documents.add(x);
+  const rendered = new Set<string>();
+  for (const u of result.scope.renders?.units ?? []) {
+    rendered.add(u.file);
+    if (u.capture) rendered.add(u.capture);
+  }
+  return (f) => {
+    const file = typeof f.file === "string" ? f.file : "";
+    if (documents.has(file) || file.startsWith(".ultra11y/documents/") || DOCUMENT_FILE.test(file)) return "document";
+    const capture = f.origin?.capture ?? "";
+    const src = f.origin?.sourceFile ?? file;
+    if (capture.startsWith(".ultra11y/captures/") || file.startsWith(".ultra11y/captures/") || f.origin?.component || rendered.has(src)) return "component";
+    return "unknown";
+  };
 }
 
 /** Build the resolver for one audit. Attributes first (idempotent, as `render` always did), then
@@ -198,7 +308,8 @@ export interface PageResolver {
  *  copy never received the stamp, and looking it up by object would find no page at all. */
 export function pageResolver(result: AuditResult): PageResolver {
   const pages = pagesOf(result);
-  if (!pages.length) return { pages, pageOf: () => undefined, approximate: () => false };
+  const offPageKind = offPageKindOf(result);
+  if (!pages.length) return { pages, pageOf: () => undefined, approximate: () => false, offPageKind };
   attributePages(result, pages);
   const byId = new Map(pages.map((p) => [p.id, p]));
   const stamped = new Map<string, string>();
@@ -213,7 +324,7 @@ export function pageResolver(result: AuditResult): PageResolver {
     const src = f.origin?.sourceFile ?? f.file;
     return pages.filter((p) => p.sources?.some((s) => pathMatch(src, s))).length > 1;
   };
-  return { pages, pageOf, approximate: (f) => pageOf(f) !== undefined && !exact(f) && shared(f) };
+  return { pages, pageOf, approximate: (f) => pageOf(f) !== undefined && !exact(f) && shared(f), offPageKind };
 }
 
 /** The pages a set of occurrences was found on, most occurrences first (then scope order), and
@@ -222,14 +333,16 @@ export function pageResolver(result: AuditResult): PageResolver {
 export function occurrencesByPage(
   findings: Finding[],
   resolver: PageResolver,
-): { pages: { page: PageScope; count: number }[]; orphans: number; approximate: boolean } {
+): { pages: { page: PageScope; count: number }[]; orphans: number; offPage: Record<OffPageKind, number>; approximate: boolean } {
   const counts = new Map<string, { page: PageScope; count: number }>();
   let orphans = 0;
+  const offPage: Record<OffPageKind, number> = { component: 0, document: 0, unknown: 0 };
   let approximate = false;
   for (const f of findings) {
     const page = resolver.pageOf(f);
     if (!page) {
       orphans++;
+      offPage[resolver.offPageKind(f)]++;
       continue;
     }
     if (resolver.approximate(f)) approximate = true;
@@ -239,7 +352,7 @@ export function occurrencesByPage(
   }
   const order = new Map(resolver.pages.map((p, i) => [p.id, i]));
   const pages = [...counts.values()].sort((a, b) => b.count - a.count || (order.get(a.page.id) ?? 0) - (order.get(b.page.id) ?? 0));
-  return { pages, orphans, approximate };
+  return { pages, orphans, offPage, approximate };
 }
 
 /** Findings no page could claim. Reported explicitly — never silently dropped, never spread. */
@@ -361,7 +474,11 @@ export function derivePages(result: AuditResult, pages: PageScope[]): PageResult
   if (!pages.length) return [];
   const out: PageResult[] = [];
   for (const p of pages) {
-    const own = result.findings.filter((f) => f.page === p.id);
+    // A sample page carries the findings of its journey states: they were seen on this page, in
+    // another state. Each finding keeps its own `page`, so every list still names the state.
+    const states = p.kind === undefined ? pages.filter((x) => x.parent === p.id).map((x) => x.id) : [];
+    const ids = new Set([p.id, ...states]);
+    const own = result.findings.filter((f) => f.page !== undefined && ids.has(f.page));
     const criteria: CriterionResult[] = result.criteria.map((c) => {
       const pf = own.filter((f) => f.criteriaId === c.id);
       const status = pageStatus(c, pf, p.basis, p.coverage);
@@ -395,6 +512,10 @@ export function derivePages(result: AuditResult, pages: PageScope[]): PageResult
       url: p.url,
       ...(p.auth !== undefined ? { auth: p.auth } : {}),
       basis: p.basis,
+      ...(p.kind ? { kind: p.kind } : {}),
+      ...(p.journey ? { journey: p.journey } : {}),
+      ...(p.parent ? { parent: p.parent } : {}),
+      ...(states.length ? { states } : {}),
       criteria,
       findings: own,
       conformancePct: rate,
@@ -436,6 +557,12 @@ const L = {
     humanMark:
       "`C†` : conformité tranchée par un auditeur humain nommé à partir des évidences citées (même gate que l'agent), et non prouvée par le moteur déterministe.",
     originNote: (o: string) => `Les colonnes sont les URL des pages, relatives à \`${o}\`.`,
+    journeyState: "état de parcours",
+    journeyStateOf: (name: string, step: number) => `état de parcours — ${name}, étape ${step}`,
+    outOfSample: "hors échantillon",
+    offPage: { component: "composant non servi", document: "document téléchargeable", unknown: "sans page" },
+    kindNote:
+      "Les colonnes marquées « état de parcours » ou « hors échantillon » ne sont pas des pages de l'échantillon : leurs constats comptent pour leur critère, mais elles n'entrent ni dans le nombre de pages auditées ni dans le taux moyen.",
   },
   en: {
     title: "Per-page grid",
@@ -461,6 +588,12 @@ const L = {
     agentMark: "`C*`: conformity ruled by the AI agent from the evidence it cited (gated), not proven by the deterministic engine.",
     humanMark: "`C†`: conformity ruled by a named human auditor from the evidence they cited (the agent's gate), not proven by the deterministic engine.",
     originNote: (o: string) => `Columns are the pages' URLs, relative to \`${o}\`.`,
+    journeyState: "journey state",
+    journeyStateOf: (name: string, step: number) => `journey state — ${name}, step ${step}`,
+    outOfSample: "outside the sample",
+    offPage: { component: "component no page serves", document: "downloadable document", unknown: "on no page" },
+    kindNote:
+      "Columns marked “journey state” or “outside the sample” are not pages of the sample: their findings count against their criterion, but they enter neither the audited page count nor the mean rate.",
   },
 } as const;
 
@@ -575,13 +708,15 @@ export function unattributedNote(n: number, lang: Lang): string {
  *  Exported for the same reason `formatRate` and `basisLabel` are: the Markdown grid, the HTML
  *  grid and the pull-request grid all draw this header, and a surface that composes its own is
  *  a surface that will drift from the other two. */
-export function pageColumnLabel(page: { url: string; auth?: boolean }, origin?: string): string {
+export function pageColumnLabel(page: Pick<PageScope, "url" | "auth" | "kind" | "journey">, origin?: string, lang?: Lang): string {
   let label = page.url;
   if (origin && page.url.startsWith(origin)) {
     const rest = page.url.slice(origin.length);
     label = rest === "" ? "/" : rest;
   }
-  return `${label}${page.auth ? " 🔒" : ""}`;
+  // A journey state shares its page's URL: without its label, seven columns read « /contact ».
+  const kind = lang ? pageKindNote(page, lang) : "";
+  return `${label}${page.auth ? " 🔒" : ""}${kind ? ` (${kind})` : ""}`;
 }
 
 /** The one origin every page in scope shares, or undefined when they do not share one.
@@ -660,7 +795,10 @@ function adjudicationOnPage(
   const stamped = new Set(page.findings.map(findingId));
   const sources = result.scope.pages?.find((p) => p.id === page.id)?.sources ?? [];
   const onPage = (f: Finding): boolean => stamped.has(findingId(f)) || sources.some((s) => pathMatch(f.origin?.sourceFile ?? f.file, s));
-  const seen = result.scope.pageSubjects?.[page.id];
+  const subjectMap = result.scope.pageSubjects;
+  const seenHere = subjectMap?.[page.id];
+  // Its states' subjects are this page's too (#232).
+  const seen = seenHere && page.states?.length ? [...seenHere, ...page.states.flatMap((id) => subjectMap?.[id] ?? [])] : seenHere;
   const absentHere = (id: string): boolean => {
     if (!seen) return false;
     const wcag = getCriterion(loadPack(adjudication.standard), id)?.wcag ?? [];
@@ -677,6 +815,16 @@ function adjudicationOnPage(
     // page outcome's alone. decidedBy/auditor travel through the spread: the provenance
     // says WHO ruled, and it ruled here too. Pages NOT named in the map fall through to the
     // run-wide handling below, unchanged.
+    // A NON-CONFORMITY RULED ON ONE OF ITS STATES IS A NON-CONFORMITY OF THE PAGE (#232). It wins
+    // over the page's own outcome: a page is conforming only if it conforms in every state.
+    const stateNc = (page.states ?? []).map((id) => c.pages?.[id]).filter((o) => o?.status === "NC");
+    if (stateNc.length) {
+      const { pages: _perPage, citations: _runCitations, ...rest } = c;
+      const own = c.pages?.[page.id];
+      const findings = [...(own?.status === "NC" ? (own.findings ?? []) : []), ...stateNc.flatMap((o) => o!.findings ?? [])];
+      const justification = own?.status === "NC" ? own.justification : stateNc[0]!.justification;
+      return [{ ...rest, status: "NC" as const, ...(justification ? { justification } : {}), findings }];
+    }
     const outcome = c.pages?.[page.id];
     if (outcome) {
       // The run-wide citations are other pages' evidence: the page shows only its own. A
@@ -729,7 +877,11 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
   // « the ensemble has two navigation systems » on a page that happens to carry one.
   //
   // Absent map ⇒ unchanged behaviour, so an audit written before the fold reads as it always did.
-  const own = result.scope.pageSubjects?.[page.id];
+  // A state's subjects exist on its page: the error message a submit reveals is on the form.
+  const subjects = result.scope.pageSubjects;
+  const mine = subjects?.[page.id];
+  const own = mine && page.states?.length ? [...new Set([...mine, ...page.states.flatMap((id) => subjects?.[id] ?? [])])] : mine;
+  const here = new Set([page.id, ...(page.states ?? [])]);
   const packAdjudication = result.packAdjudication ? adjudicationOnPage(result, result.packAdjudication, page) : undefined;
   return {
     ...result,
@@ -737,9 +889,9 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
     ...(packAdjudication ? { packAdjudication } : {}),
     criteria: page.criteria,
     findings: page.findings,
-    ...(result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}),
+    ...(result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page !== undefined && here.has(f.page)) } : {}),
     // A document's findings are attributed to each page linking it (src/audit.ts foldDocument).
-    ...(result.documentFindings ? { documentFindings: result.documentFindings.filter((f) => f.page === page.id) } : {}),
+    ...(result.documentFindings ? { documentFindings: result.documentFindings.filter((f) => f.page !== undefined && here.has(f.page)) } : {}),
   };
 }
 
@@ -884,7 +1036,8 @@ export function renderPageGrid(result: AuditResult, pages: PageScope[], standard
   const origin = commonOrigin(derived);
   const originNote = pageOriginNote(origin, lang);
   if (originNote) out.push(`> ${originNote}`, "");
-  const head = [s.criterion, ...derived.map((p) => pageColumnLabel(p, origin))];
+  if (derived.some((p) => p.kind)) out.push(`> ${s.kindNote}`, "");
+  const head = [s.criterion, ...derived.map((p) => pageColumnLabel(p, origin, lang))];
   out.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
   // THE MODEL FIRST, because the rate is a summary OF THIS GRID and has to be computed from
   // the rows it is printed above. It was read off `PageResult` instead — which is always the

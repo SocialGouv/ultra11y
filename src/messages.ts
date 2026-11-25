@@ -1471,7 +1471,20 @@ export function resolveRemediation(
   const localized = f.i18n?.remediation?.[lang];
   if (localized) return localized;
   const entry = entryFor(f.msg?.id);
-  return entry ? entry.remediation[lang](f.msg?.params ?? {}) : f.remediation;
+  if (entry) return entry.remediation[lang](f.msg?.params ?? {});
+  return lang === "en" ? f.remediation : (stockRemediation(f.remediation, lang) ?? f.remediation);
+}
+
+/** THE ENGINE'S OWN DEFAULT REMEDIATIONS, BAKED IN ENGLISH (#232). An agent-declared
+ *  non-conformity carries no catalog id — its message is the agent's — so the fold stamps one
+ *  of two stock English remediations on it (src/adjudicate.ts `agentFinding`), and every NC row
+ *  of a French report read « Address the reported non-conformity. ». They are recognised here,
+ *  at render time, so audits already written are fixed too and the JSON stays as it is. */
+function stockRemediation(text: string, lang: Lang): string | undefined {
+  if (lang !== "fr") return undefined;
+  if (text === "Address the reported non-conformity.") return "Corrigez la non-conformité relevée.";
+  const sc = /^See WCAG (\d+\.\d+\.\d+)\.$/.exec(text)?.[1];
+  return sc ? `Voir le critère de succès WCAG ${sc}.` : undefined;
 }
 
 /** Resolve a cross-file RelatedSite's note by lang: NOTE_CATALOG entry when `noteId` is

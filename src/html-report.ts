@@ -18,7 +18,9 @@ import {
   derivePages,
   formatRate,
   pageBasisWarning,
+  offPageLabel,
   pageColumnLabel,
+  pageLabel,
   pageOriginNote,
   pagesOf,
   unattributedFindings,
@@ -141,7 +143,8 @@ const T = {
     noScreenshot: "Aucune capture d'écran pour cette page.",
     screenshotAlt: (n: string) => `Capture d'écran de la page ${n}`,
     scopeTitle: "Périmètre réellement testé",
-    renderedPages: (n: number) => `${n} page(s) rendue(s) réellement testée(s)`,
+    renderedPages: (n: number, others: number) =>
+      `${n} page(s) rendue(s) réellement testée(s)${others ? `, plus ${others} état(s) de parcours ou route(s) hors échantillon` : ""}`,
     noRenderedPages: "Aucune page rendue : les tests rendered n'ont pas été exécutés dans ce run.",
     automation: (s: number, sc: number, r: number, rc: number, j: number, jc: number) =>
       `Contrat RGAA : ${s} test(s) static sur ${sc} critère(s), ${r} rendered sur ${rc}, ${j} judgment sur ${jc}.`,
@@ -204,7 +207,8 @@ const T = {
     noScreenshot: "No screenshot for this page.",
     screenshotAlt: (n: string) => `Screenshot of the ${n} page`,
     scopeTitle: "Actual tested scope",
-    renderedPages: (n: number) => `${n} rendered page(s) actually tested`,
+    renderedPages: (n: number, others: number) =>
+      `${n} rendered page(s) actually tested${others ? `, plus ${others} journey state(s) or route(s) outside the sample` : ""}`,
     noRenderedPages: "No rendered page: the rendered tests were not executed in this run.",
     automation: (s: number, sc: number, r: number, rc: number, j: number, jc: number) =>
       `RGAA contract: ${s} static test(s) across ${sc} criterion(ia), ${r} rendered across ${rc}, ${j} judgment across ${jc}.`,
@@ -386,7 +390,9 @@ function criterionBlocks(unit: PrdUnit, standard: StandardId, lang: Lang, level:
     const cells: Cell[] = [
       // Name AND address, as text: the artifact links nothing outside itself (html-emit.ts
       // `externalReferences`), and the URL is what the reader came to this column for.
-      ...(withPages ? [page ? { text: `${page.name} (${page.url})` } : { text: "—" }] : []),
+      // No page: what the occurrence was found in instead — a component no page serves, a
+      // downloadable document — rather than a dash that says nothing (#232).
+      ...(withPages ? [page ? { text: `${pageLabel(page, lang)} (${page.url})` } : { text: offPageLabel(pages.offPageKind(f), lang) }] : []),
       { text: `${f.file}:${f.line}`, mono: true },
       { text: f.selectorHint, mono: true },
       { text: resolveOccurrence(f, lang) },
@@ -438,8 +444,11 @@ function findingsBlocks(result: AuditResult, standard: StandardId, lang: Lang, l
 /** What this run truly executed, kept separate from the pack's capability contract. */
 function scopeBlocks(result: AuditResult, standard: StandardId, lang: Lang): Block[] {
   const t = T[lang];
-  const pages = result.scope.pagesAudited?.length ?? 0;
-  const items: Run[][] = [[{ text: `${result.scope.files} ${t.files}` }], [{ text: t.renderedPages(pages) }]];
+  // Pages of the sample counted as pages, the journey states and stray routes beside them (#232).
+  const read = new Set(result.scope.pagesAudited ?? []);
+  const others = pagesOf(result).filter((p) => p.kind && read.has(p.id)).length;
+  const pages = read.size - others;
+  const items: Run[][] = [[{ text: `${result.scope.files} ${t.files}` }], [{ text: t.renderedPages(pages, others) }]];
   const automation = automationOverview(standard);
   if (automation) {
     items.push([
@@ -505,7 +514,7 @@ export function scoreboardBlocks(result: AuditResult, standard: StandardId, lang
   const rows = derived.map((p) => {
     const criteria = pageCriterionRows(result, p, standard, lang);
     return [
-      { text: `${p.name}${p.auth ? " 🔒" : ""}`, ...(sheetHref ? { href: sheetHref(p.id) } : {}) },
+      { text: `${pageLabel(p, lang)}${p.auth ? " 🔒" : ""}`, ...(sheetHref ? { href: sheetHref(p.id) } : {}) },
       { text: p.url, mono: true },
       { text: basisLabel(p.basis, lang) },
       { text: formatPageRate(criteria, standard, lang), align: "end" as const },
@@ -542,7 +551,7 @@ export function crossGridBlocks(result: AuditResult, derived: PageResult[], stan
   const table: Block = {
     kind: "table",
     caption: t.crossGridCaption,
-    columns: [{ text: t.criterion }, ...derived.map((p) => ({ text: pageColumnLabel(p, origin) }))],
+    columns: [{ text: t.criterion }, ...derived.map((p) => ({ text: pageColumnLabel(p, origin, lang) }))],
     rows: [],
   };
   let group = "";

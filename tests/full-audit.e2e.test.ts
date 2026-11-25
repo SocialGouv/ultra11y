@@ -496,6 +496,11 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
     expect(cell("rubriques-01-click-button-rubriques", "7.5")).not.toBe("NC");
     // Per-page outcomes (#197): each page of 11.13, 7.5 and 11.10 is settled on its own evidence.
     expect(cell("contact", "11.13")).toBe("NC");
+    // #232 — a state is its page in another state: what the invalid submit revealed fails on
+    // the contact page too, while the home page its menu journey ran on stays as it was.
+    expect(cell("contact", "11.10")).toBe("NC");
+    expect(cell("contact", "7.5")).toBe("NC");
+    expect(cell("accueil", "7.5")).not.toBe("NC");
     expect(cell("connexion", "11.13")).toBe("C");
     expect(cell("contact-05-expect-text-adresse-electronique-invalid", "7.5")).toBe("NC");
     expect(cell("contact-05-expect-text-adresse-electronique-invalid", "11.10")).toBe("NC");
@@ -687,6 +692,53 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
     expect(cell("actualites-101", "1.1")).toBe("NC");
     expect(cell("documents", "13.3")).toBe("NC");
     expect(cell("aide", "1.1")).not.toBe("NC");
+  });
+
+  // #232 — the sample is eleven pages. The nine journey states and the one captured route the
+  // sample does not declare (/actualites/102) are listed apart, and the « taux moyen » is the mean
+  // of the eleven sample pages' rates alone. Their findings still count against their criterion.
+  it("counts the eleven sample pages as pages and lists the journey states and the stray route apart", () => {
+    if (!browserAvailable) return;
+    const md = read(report);
+    expect(md).toMatch(/^- \*\*Pages auditées\*\* : 11 — /m);
+    expect(md).toMatch(/^- \*\*États de parcours\*\* : 9 — /m);
+    expect(md).toMatch(/^- \*\*Routes hors échantillon\*\* : 1 — Ouverture du service en ligne/m);
+    expect(md).toContain("des 11 pages de l'échantillon");
+    // Folding its states into the contact page never makes that page look better than any of
+    // them: it fails what the invalid submit revealed, 92 % (47/51), like the state itself.
+    expect(md).toMatch(/^\| Contact - Service de démonstration \| [^|]+ \| 92 % \(47\/51\)/m);
+    expect(md).toMatch(/^\| contact — 4\. click button "Envoyer le message" \(état de parcours\) \| [^|]+ \| 92 % \(47\/51\)/m);
+    expect(md).toContain("hors moyenne : 9 état(s) de parcours, 1 route(s) hors échantillon");
+    const pages = readJson<{
+      pages: { id: string; kind?: string; parent?: string; states?: string[] }[];
+      averageRate: { pages: { id: string }[]; outside: { states: number; routes: number } };
+    }>("audits/pages.json");
+    expect(pages.pages).toHaveLength(21);
+    expect(pages.pages.filter((p) => !p.kind)).toHaveLength(11);
+    expect(pages.pages.find((p) => p.id === "actualites-102")?.kind).toBe("out-of-sample");
+    expect(pages.averageRate.pages.map((p) => p.id)).not.toContain("contact-04-click-button-envoyer-le-message");
+    expect(pages.averageRate.outside).toEqual({ states: 9, routes: 1 });
+    expect(pages.pages.find((p) => p.id === "contact")?.states).toHaveLength(6);
+    expect(pages.pages.find((p) => p.id === "rubriques-01-click-button-rubriques")?.parent).toBe("accueil");
+    // A journey state's non-conformity is still located, on the labelled state.
+    expect(md).toMatch(/RGAA 7\.5 — [^\n]*contact — 4\. click button "Envoyer le message" \(état de parcours\)/);
+    const index = read("audits/pages/index.md");
+    expect(index).toMatch(/^- \*\*Pages\*\* : 11$/m);
+    expect(index).toMatch(/^- \*\*États de parcours\*\* : 9$/m);
+  });
+
+  // #232 — an occurrence no page claims says what it was found in, and the French report gives
+  // an agent-declared non-conformity a French remediation.
+  it("labels off-page occurrences by what holds them and words every expected fix in French", () => {
+    if (!browserAvailable) return;
+    const md = read(report);
+    // SiteLogo is rendered on its own (render) and served by no audited page.
+    expect(md).toMatch(/RGAA 6\.2 — [^\n]*\| 2 dans un composant non servi \|/);
+    expect(md).toContain("occurrence(s) dans un composant non servi");
+    expect(md).not.toContain("Address the reported non-conformity.");
+    expect(md).toContain("**Correction attendue** : Corrigez la non-conformité relevée.");
+    // The sample proposal's English reasons stay out of the French deliverable.
+    expect(md).not.toMatch(/proposal: required kind/);
   });
 
   it("never reads the project's tests, snapshots or Playwright specs", () => {

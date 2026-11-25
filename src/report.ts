@@ -6,7 +6,20 @@
 // (never silently C).
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import type { AuditResult, Auditor, DecidedBy, Finding, JourneyScope, Lang, PageResult, RenderScope, RouteCoverage, Severity, Status } from "./types.js";
+import type {
+  AuditResult,
+  Auditor,
+  DecidedBy,
+  Finding,
+  JourneyScope,
+  Lang,
+  PageResult,
+  PageScope,
+  RenderScope,
+  RouteCoverage,
+  Severity,
+  Status,
+} from "./types.js";
 import { isAdjudicated } from "./types.js";
 import { guidelineTitle, scTitle } from "./wcag.js";
 import { prdUnits, partitionUnits, type PrdUnit } from "./prd.js";
@@ -17,13 +30,17 @@ import {
   derivePages,
   formatPackPageRate,
   occurrencesByPage,
+  type OffPageKind,
   packPageRate,
+  pageLabel,
   type PageResolver,
   pageResolver,
   pageView,
   renderPageGrid,
   renderRedirected,
+  samplePages,
 } from "./pages.js";
+import { humanNotes } from "./sample-propose.js";
 import { PAGES_DIR, pageScreenshot } from "./snapshot.js";
 import { conformanceRate, type ConformanceRate, formatPageRate, pageCriterionRows, pageTally } from "./pages-report.js";
 
@@ -98,6 +115,8 @@ const L = {
     averageRateFact: (pct: number, n: number) => `${pct} % — ${averageOfFr(n)}`,
     averageRateNone: "non calculable — aucune page de l'échantillon n'a de critère décidé (conforme ou non conforme)",
     averageRateExcluded: (k: number) => ` ; ${k} page(s) sans critère décidé, hors moyenne`,
+    averageRateOutside: (states: number, routes: number) =>
+      ` ; hors moyenne : ${[states ? `${states} état(s) de parcours` : "", routes ? `${routes} route(s) hors échantillon` : ""].filter(Boolean).join(", ")}`,
     averageRateOpen: (k: number) => ` ; ${k} critère(s) encore à évaluer sur ces pages, hors des taux`,
     conformanceNone: (na: number) =>
       `non calculable — aucun critère applicable dans ce périmètre (${na} critère(s) conforme(s) faute de sujet, aucun autre décidé ni ouvert). Un dénominateur vide n'est pas un taux de 100 %.`,
@@ -196,6 +215,8 @@ const L = {
     // Task 5 — « Constats par page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Constats par page",
     perPageNote: "Pour chaque page de l'échantillon : sa capture d'écran et les critères non conformes relevés sur cette page.",
+    pageKindsNote:
+      "Les lignes marquées « état de parcours » (un état d'une page, enregistré par un parcours rejoué) ou « hors échantillon » (une route capturée que l'échantillon ne déclare pas) ne sont pas des pages de l'échantillon : leurs constats comptent pour leur critère — et, pour un état, pour la page de l'échantillon dont il est un état —, mais elles n'entrent ni dans le nombre de pages auditées ni dans le taux moyen.",
     pageNcCriteria: (n: number) => `${n} critère(s) non conforme(s) sur cette page`,
     transverseNote: (list: string) => `Éléments transverses audités sur chaque page : ${list}.`,
     authYes: "🔒 authentification requise",
@@ -256,6 +277,8 @@ const L = {
     allPages: (n: number) => `toutes les pages (${n}/${n})`,
     morePages: (n: number) => `+${n} autre(s)`,
     offPage: (n: number) => `${n} sans page`,
+    offPageComponent: (n: number) => `${n} dans un composant non servi`,
+    offPageDocument: (n: number) => `${n} dans un document téléchargeable`,
     atLeast: "(au moins)",
     noPagesNote:
       "Aucune URL : cet audit porte sur le code source, aucune page du site n'a été analysée. Les anomalies ne peuvent donc pas encore être situées sur des pages ; l'annexe technique indique comment compléter l'analyse.",
@@ -296,6 +319,8 @@ const L = {
     annexTitle: "Annexe — grille exhaustive des critères",
     // THE READER'S REPORT and ITS TECHNICAL ANNEX.
     pagesAudited: "Pages auditées",
+    journeyStatesAudited: "États de parcours",
+    outOfSampleAudited: "Routes hors échantillon",
     morePagesAudited: (n: number) => `+${n} autre(s)`,
     sourceOnlyScope: (files: number) => `code source uniquement (${files} fichier(s)) — aucune page du site n'a été analysée`,
     annexPointer: (href: string) => `📎 Emplacements dans le code, méthode et commandes : [annexe technique](${href})`,
@@ -310,6 +335,8 @@ const L = {
     everyPage: (n: number) => `Toutes les pages auditées (${n})`,
     morePagesConcerned: (n: number) => `+${n} autre(s) page(s) — voir la grille par page`,
     orphanOccurrences: (n: number) => `${n} occurrence(s) sans page identifiée (dans le code source)`,
+    orphanComponent: (n: number) => `${n} occurrence(s) dans un composant non servi (rendu isolément, servi par aucune page auditée)`,
+    orphanDocument: (n: number) => `${n} occurrence(s) dans un document téléchargeable`,
     whereCode: "Où",
     inCodeOnly: (n: number) => `${n} occurrence(s) dans le code source — emplacements dans l'annexe technique`,
     expectedFix: "Correction attendue",
@@ -415,6 +442,8 @@ const L = {
     averageRateFact: (pct: number, n: number) => `${pct}% — ${averageOfEn(n)}`,
     averageRateNone: "not computable — no page of the sample has a decided criterion (conforming or non-conforming)",
     averageRateExcluded: (k: number) => `; ${k} page(s) with no decided criterion, left out of the mean`,
+    averageRateOutside: (states: number, routes: number) =>
+      `; left out of the mean: ${[states ? `${states} journey state(s)` : "", routes ? `${routes} route(s) outside the sample` : ""].filter(Boolean).join(", ")}`,
     averageRateOpen: (k: number) => `; ${k} criteria still to assess across these pages, left out of the rates`,
     conformanceNone: (na: number) =>
       `not computable — no applicable criterion in this scope (${na} conforming for want of a subject, none other decided or open). An empty denominator is not a rate of 100%.`,
@@ -504,6 +533,8 @@ const L = {
     // Task 5 — « Findings per page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Findings per page",
     perPageNote: "For each sample page: its screenshot and the criteria found non-conforming on that page.",
+    pageKindsNote:
+      "Rows marked “journey state” (a state of a page, recorded by a replayed journey) or “outside the sample” (a captured route the sample does not declare) are not pages of the sample: their findings count against their criterion — and, for a state, against the sample page it is a state of — but they enter neither the audited page count nor the mean rate.",
     pageNcCriteria: (n: number) => `${n} non-conforming criterion/criteria on this page`,
     transverseNote: (list: string) => `Transverse elements audited on every page: ${list}.`,
     authYes: "🔒 authentication required",
@@ -561,6 +592,8 @@ const L = {
     allPages: (n: number) => `all pages (${n}/${n})`,
     morePages: (n: number) => `+${n} more`,
     offPage: (n: number) => `${n} on no page`,
+    offPageComponent: (n: number) => `${n} in a component no page serves`,
+    offPageDocument: (n: number) => `${n} in a downloadable document`,
     atLeast: "(at least)",
     noPagesNote:
       "No URL: this audit read source code, and no page of the site was analysed. The defects therefore cannot be located on pages yet; the technical annex explains how to complete the analysis.",
@@ -598,6 +631,8 @@ const L = {
     showCriteria: (n: number) => `Show the ${n} criterion/criteria`,
     annexTitle: "Appendix — exhaustive criteria grid",
     pagesAudited: "Pages audited",
+    journeyStatesAudited: "Journey states",
+    outOfSampleAudited: "Routes outside the sample",
     morePagesAudited: (n: number) => `+${n} more`,
     sourceOnlyScope: (files: number) => `source code only (${files} file(s)) — no page of the site was analysed`,
     annexPointer: (href: string) => `📎 Code locations, method and commands: [technical annex](${href})`,
@@ -611,6 +646,8 @@ const L = {
     everyPage: (n: number) => `Every audited page (${n})`,
     morePagesConcerned: (n: number) => `+${n} more page(s) — see the per-page grid`,
     orphanOccurrences: (n: number) => `${n} occurrence(s) on no known page (in the source code)`,
+    orphanComponent: (n: number) => `${n} occurrence(s) in a component no page serves (rendered on its own, served by no audited page)`,
+    orphanDocument: (n: number) => `${n} occurrence(s) in a downloadable document`,
     whereCode: "Where",
     inCodeOnly: (n: number) => `${n} occurrence(s) in the source code — locations in the technical annex`,
     expectedFix: "Expected fix",
@@ -933,10 +970,19 @@ export interface AverageRate {
   pages: PageConformance[];
   excluded: string[];
   open: number;
+  /** The entries left out because they are not pages of the sample (#232): journey states and
+   *  routes outside the declared sample. Their own rates exist; they are not part of the mean. */
+  outside: { states: number; routes: number };
 }
 
 export function averageConformanceRate(r: AuditResult, pages: PageResult[], standard: StandardId, lang: Lang): AverageRate {
-  const rated = pages.map((p) => {
+  // THE MEAN IS OVER THE SAMPLE'S PAGES. A journey state is a state of one of them and a stray
+  // route is outside it: averaging them in weighted the contact form seven times over.
+  const outside = {
+    states: pages.filter((p) => p.kind === "journey-state").length,
+    routes: pages.filter((p) => p.kind === "out-of-sample").length,
+  };
+  const rated = samplePages(pages).map((p) => {
     const rate = packPageRate(pageTally(pageCriterionRows(r, p, standard, lang)));
     return { id: p.id, name: p.name, url: p.url, pct: rate.pct ?? 0, validated: rate.validated, applicable: rate.decided, open: rate.open };
   });
@@ -947,7 +993,14 @@ export function averageConformanceRate(r: AuditResult, pages: PageResult[], stan
     pages: counted,
     excluded: rated.filter((p) => p.applicable === 0).map((p) => p.id),
     open: counted.reduce((n, p) => n + p.open, 0),
+    outside,
   };
+}
+
+/** The clause naming what the mean leaves out because it is not a sample page. */
+function averageOutside(avg: AverageRate, lang: Lang): string {
+  const { states, routes } = avg.outside;
+  return states || routes ? L[lang].averageRateOutside(states, routes) : "";
 }
 
 /** The average as the one line the header and the `pages` grid print — with the criteria still
@@ -955,7 +1008,7 @@ export function averageConformanceRate(r: AuditResult, pages: PageResult[], stan
 export function averageRateLine(avg: AverageRate, lang: Lang): string {
   const s = L[lang];
   const title = `${s.averageRate}${avg.open > 0 ? ` (${s.conformanceProvisional})` : ""}`;
-  const excluded = avg.excluded.length ? s.averageRateExcluded(avg.excluded.length) : "";
+  const excluded = (avg.excluded.length ? s.averageRateExcluded(avg.excluded.length) : "") + averageOutside(avg, lang);
   const open = avg.pct !== null && avg.open > 0 ? s.averageRateOpen(avg.open) : "";
   return avg.pct === null
     ? `**${title}** : ${s.averageRateNone}${excluded}`
@@ -1188,6 +1241,8 @@ export interface SummaryPages {
   all?: number;
   /** Occurrences no page claims. */
   orphans: number;
+  /** The same occurrences, by what they were found in instead (`PageResolver.offPageKind`). */
+  offPage?: Record<OffPageKind, number>;
   approximate: boolean;
 }
 
@@ -1229,7 +1284,7 @@ export function summaryModel(
   if (!isCore(standard) && average?.pct != null) {
     facts.push({
       label: s.averageRate,
-      value: `${s.averageRateFact(average.pct, average.pages.length)}${average.open > 0 ? s.averageRateOpen(average.open) : ""}${average.excluded.length ? s.averageRateExcluded(average.excluded.length) : ""}`,
+      value: `${s.averageRateFact(average.pct, average.pages.length)}${average.open > 0 ? s.averageRateOpen(average.open) : ""}${average.excluded.length ? s.averageRateExcluded(average.excluded.length) : ""}${averageOutside(average, lang)}`,
     });
   }
   facts.push({ label: s.tallyLabel(rate.total), value: s.tallyValue(rate.validated, tot.nc, rate.na, rate.open) });
@@ -1244,16 +1299,18 @@ export function summaryModel(
     const fix = (fixes[0] ?? "") + (fixes.length > 1 ? ` ${s.moreFixes(fixes.length - 1)}` : "");
     if (!withPages) return { icon: m.icon, priority: s.sev[u.severity], criterion: u.label, occurrences: m.occurrences, fix };
     const found = occurrencesByPage(m.normative, resolver);
-    const total = resolver.pages.length;
     // « Every page » is a finding in itself: the defect lives in something all pages share, and is
-    // fixed once. Below four pages, naming them is as short as saying so.
-    const all = found.pages.length > SUMMARY_PAGES_MAX && found.pages.length === total ? total : undefined;
-    const listed = all ? [] : found.pages.slice(0, SUMMARY_PAGES_MAX).map(({ page }) => ({ name: page.name, url: page.url }));
+    // fixed once. Below four pages, naming them is as short as saying so. Every page OF THE
+    // SAMPLE: a journey state or a stray route is not a page the sentence is about.
+    const total = samplePages(resolver.pages).length;
+    const all = total > SUMMARY_PAGES_MAX && samplePages(found.pages.map((x) => x.page)).length === total ? total : undefined;
+    const listed = all ? [] : found.pages.slice(0, SUMMARY_PAGES_MAX).map(({ page }) => ({ name: pageLabel(page, lang), url: page.url }));
     const pages: SummaryPages = {
       listed,
       more: all ? 0 : Math.max(0, found.pages.length - SUMMARY_PAGES_MAX),
       ...(all ? { all } : {}),
       orphans: found.orphans,
+      offPage: found.offPage,
       approximate: found.approximate && !all,
     };
     return { icon: m.icon, priority: s.sev[u.severity], criterion: u.label, occurrences: m.occurrences, pages, fix };
@@ -1304,7 +1361,13 @@ export function summaryPagesText(p: SummaryPages | undefined, lang: Lang, link: 
   const parts: string[] = [];
   if (p.all) parts.push(s.allPages(p.all));
   else if (p.listed.length) parts.push(p.listed.map((x) => link(x.name, x.url)).join(", ") + (p.more ? ` ${s.morePages(p.more)}` : ""));
-  if (p.orphans) parts.push(s.offPage(p.orphans));
+  if (p.orphans) {
+    // Where an occurrence with no page was found instead, when that is known (#232).
+    const by = p.offPage ?? { component: 0, document: 0, unknown: p.orphans };
+    if (by.component) parts.push(s.offPageComponent(by.component));
+    if (by.document) parts.push(s.offPageDocument(by.document));
+    if (by.unknown) parts.push(s.offPage(by.unknown));
+  }
   if (!parts.length) return "—";
   return parts.join(" · ") + (p.approximate ? ` ${s.atLeast}` : "");
 }
@@ -1531,15 +1594,17 @@ function renderReaderUnit(u: PrdUnit, standard: StandardId, lang: Lang, resolver
   const example = cropFor ? m.normative.map((f) => cropFor(f)).find((c) => c !== undefined) : undefined;
   if (example) out.push(`![${example.alt}](${example.href})`, "");
   if (resolver.pages.length) {
-    const { pages, orphans, approximate } = occurrencesByPage(m.normative, resolver);
-    const total = resolver.pages.length;
+    const { pages, offPage, approximate } = occurrencesByPage(m.normative, resolver);
+    const total = samplePages(resolver.pages).length;
     const lines: string[] = [];
-    if (pages.length > 3 && pages.length === total) lines.push(`- ${s.everyPage(total)}`);
+    if (total > 3 && samplePages(pages.map((x) => x.page)).length === total) lines.push(`- ${s.everyPage(total)}`);
     else {
-      for (const { page, count } of pages.slice(0, READER_PAGES_MAX)) lines.push(`- ${mdText(page.name)} : ${urlText(page.url)} (${count})`);
+      for (const { page, count } of pages.slice(0, READER_PAGES_MAX)) lines.push(`- ${mdText(pageLabel(page, lang))} : ${urlText(page.url)} (${count})`);
       if (pages.length > READER_PAGES_MAX) lines.push(`- ${s.morePagesConcerned(pages.length - READER_PAGES_MAX)}`);
     }
-    if (orphans) lines.push(`- ${s.orphanOccurrences(orphans)}`);
+    if (offPage.component) lines.push(`- ${s.orphanComponent(offPage.component)}`);
+    if (offPage.document) lines.push(`- ${s.orphanDocument(offPage.document)}`);
+    if (offPage.unknown) lines.push(`- ${s.orphanOccurrences(offPage.unknown)}`);
     out.push(`**${approximate ? s.pagesConcernedAtLeast : s.pagesConcerned}** :`, "", ...lines, "");
   } else {
     out.push(`**${s.whereCode}** : ${s.inCodeOnly(m.occurrences)}`, "");
@@ -1740,10 +1805,18 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   out.push(`# ${s.title(opts.std)}`, "");
   out.push(`- **${s.date}** : ${r.date}`);
   if (pageScope.length) {
-    const names = pageScope.slice(0, 8).map((p) => mdText(p.name));
-    out.push(
-      `- **${s.pagesAudited}** : ${pageScope.length} — ${names.join(", ")}${pageScope.length > 8 ? ` ${s.morePagesAudited(pageScope.length - 8)}` : ""}`,
-    );
+    // THE SAMPLE'S PAGES, COUNTED AS PAGES (#232) — then the journey states and the routes
+    // outside the sample, each on its own line: an eleven-page sample is not « 30 pages ».
+    const listLine = (label: string, list: PageScope[]) => {
+      const names = list.slice(0, 8).map((p) => mdText(p.name));
+      return `- **${label}** : ${list.length} — ${names.join(", ")}${list.length > 8 ? ` ${s.morePagesAudited(list.length - 8)}` : ""}`;
+    };
+    const sample = samplePages(pageScope);
+    if (sample.length) out.push(listLine(s.pagesAudited, sample));
+    const routes = pageScope.filter((p) => p.kind === "out-of-sample");
+    if (routes.length) out.push(listLine(s.outOfSampleAudited, routes));
+    const states = pageScope.filter((p) => p.kind === "journey-state");
+    if (states.length) out.push(listLine(s.journeyStatesAudited, states));
   } else {
     out.push(`- **${s.scope}** : ${s.sourceOnlyScope(r.scope.files)}`);
   }
@@ -1835,14 +1908,22 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
   // `pageCriterionRows`/`pageRatePct`, the per-page dossier's own helpers.
   if (derivedPages.length) {
     out.push('<a id="page-rates"></a>', `## 📋 ${s.pageRatesTitle}`, "", `> ${average ? s.pageRatesNotePack : s.pageRatesNoteBusiness}`, "");
+    if (derivedPages.some((p) => p.kind)) out.push(`> ${s.pageKindsNote}`, "");
     // Under a pack, each page's own conformity rate beside it: the figures the « taux moyen » in
     // the header is the mean of, so a reader can recompute it.
     const conf = average ? new Map(average.pages.map((p) => [p.id, p])) : undefined;
     out.push(`| ${s.pageCol} | ${s.urlCol} | ${conf ? s.conformanceCol : s.rateCol} |`, "| --- | --- | --- |");
     for (const p of derivedPages) {
       const criteria = pageCriterionRows(r, p, opts.standard, lang);
-      const cell = conf ? pageConformanceCell(conf.get(p.id), lang) : formatPageRate(criteria, opts.standard, lang);
-      out.push(`| ${mdText(p.name)}${p.auth ? " 🔒" : ""} | ${urlText(p.url)} | ${cell} |`);
+      // An entry outside the mean still shows its own rate — computed the same way, labelled as
+      // what it is, and absent from the figures the header averages.
+      const own = conf && p.kind ? packPageRate(pageTally(criteria)) : undefined;
+      const cell = own
+        ? pageConformanceCell({ pct: own.pct ?? 0, validated: own.validated, applicable: own.decided, open: own.open }, lang)
+        : conf
+          ? pageConformanceCell(conf.get(p.id), lang)
+          : formatPageRate(criteria, opts.standard, lang);
+      out.push(`| ${mdText(pageLabel(p, lang))}${p.auth ? " 🔒" : ""} | ${urlText(p.url)} | ${cell} |`);
     }
     out.push("");
   }
@@ -1864,14 +1945,17 @@ function render(r: AuditResult, lang: Lang, opts: RenderOpts): ReportDocuments {
     if (r.scope.redirected?.length) out.push(...renderRedirected(r.scope.redirected, lang), "");
     for (const pg of derivedPages) {
       const adv = pg.findings.filter((f) => f.advisory);
-      out.push("<details>", `<summary>${pg.name} — <code>${pg.url}</code> — ${pg.auth ? s.authYes : s.authNo}</summary>`, "");
+      out.push("<details>", `<summary>${pageLabel(pg, lang)} — <code>${pg.url}</code> — ${pg.auth ? s.authYes : s.authNo}</summary>`, "");
       // THE PAGE'S OWN VERDICTS, not its raw findings: the criteria the per-page grid rules
       // non-conforming here, each with how many occurrences back it. Raw findings listed an
       // English axe message beside the engine's French one for the same defect, and cited WCAG
       // success criteria inside an RGAA deliverable whenever a finding projected onto none.
       const failing = pageFailingCriteria(r, pg, opts.standard, lang);
       out.push(`- ${s.pageNcCriteria(failing.length)}${adv.length ? ` · ${adv.length} ${s.advCount}` : ""}`);
-      const notes = pageScope.find((x) => x.id === pg.id)?.notes;
+      // The sample proposal's own reasons are an English engine note (`sample propose`): the
+      // reader's document keeps only what a person wrote. The annex keeps the full note.
+      const rawNotes = pageScope.find((x) => x.id === pg.id)?.notes;
+      const notes = lang === "en" ? rawNotes : humanNotes(rawNotes);
       if (notes) out.push(`- _${notes}_`);
       // The screenshot the snapshot already holds, copied next to the report so the directory
       // travels intact — CI uploads `audits/` alone.
