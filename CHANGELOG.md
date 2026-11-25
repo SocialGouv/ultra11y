@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [9.3.0](https://github.com/SocialGouv/ultra11y/compare/v9.2.0...v9.3.0) (2026-11-25)
+
+
+### Features
+
+* **rgaa:** decide every criterion: media and screen-reader probes, coverage matrix, application map ([#218](https://github.com/SocialGouv/ultra11y/issues/218)) ([9cb0f85](https://github.com/SocialGouv/ultra11y/commit/9cb0f85caeca3efcdcea4421202ea9058718fe24)), closes [#208](https://github.com/SocialGouv/ultra11y/issues/208)
+
 # [9.2.0](https://github.com/SocialGouv/ultra11y/compare/v9.1.0...v9.2.0) (2026-11-25)
 
 
