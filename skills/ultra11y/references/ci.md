@@ -1,6 +1,6 @@
 # CI : lancer le bot `rgaa-audit` d’iterion
 
-ultra11y est un skill et un moteur. Il ne livre **aucune intégration CI qui lui soit propre** —
+ultra11y est une skill et un moteur. Il ne livre **aucune intégration CI qui lui soit propre** —
 ni GitHub Action, ni template GitLab. Un audit d’accessibilité en CI passe par le
 **bot `rgaa-audit`** de [SocialGouv/iterion](https://github.com/SocialGouv/iterion) :
 [`bots/rgaa-audit`](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit).

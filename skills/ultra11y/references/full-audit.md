@@ -6,8 +6,8 @@ harness. Chaque étape est un simple appel CLI au moteur, si bien que la même d
 mêmes livrables partout. La session d’agent active est l’auditeur : elle lit les briefs de
 critère et écrit elle-même les verdicts.
 
-`node scripts/ultra11y.mjs` ci-dessous est le moteur livré dans ce skill (voir
-**Running the engine** dans `SKILL.md` pour son chemin sur chaque harness) ; `npx -y ultra11y`
+`node scripts/ultra11y.mjs` ci-dessous est le moteur livré dans cette skill (voir
+**Lancer le moteur** dans `SKILL.md` pour son chemin sur chaque harness) ; `npx -y ultra11y`
 est le même moteur là où aucun répertoire de skill n’est résolu.
 
 `references/audit.md` est le chemin rapide — un audit statique, un rapport et le `check`

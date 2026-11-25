@@ -17,7 +17,7 @@ exécutant **axe-core dans un vrai navigateur headless** (Playwright), sur un se
   avec les mêmes tags de règles (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`,
   `best-practice`), quelle que soit la version installée par le projet audité. La copie du
   projet n’est utilisée que lorsque celle d’ultra11y ne peut pas être résolue (le bundle
-  autonome du skill sans `node_modules` à côté). Ce repli affiche une note. La version exécutée
+  autonome de la skill sans `node_modules` à côté). Ce repli affiche une note. La version exécutée
   est consignée dans chaque résultat (`DynamicResult.axe`, le `axe.json` de chaque capture) et
   dans l’annexe du rapport. `status --browser` indique quelle copie serait exécutée.
 - **`--browser-path <file>`** (ou `ULTRA11Y_BROWSER_PATH`) : lancer **cet** exécutable avec le
@@ -37,7 +37,7 @@ exécutant **axe-core dans un vrai navigateur headless** (Playwright), sur un se
   | Canal | `@playwright/test` + `@axe-core/playwright` |
   |---|---|
   | ultra11y comme dépendance npm (`ultra11y/playwright`, `pnpm exec ultra11y`) | **fournis avec lui** — ce sont ses propres `dependencies`. Rien à installer. |
-  | le bundle autonome du skill (`node scripts/ultra11y.mjs` depuis un skill installé) | **doivent être dans le projet audité**, accessibles depuis `--cwd`. Un skill installé est un répertoire de fichiers sans `node_modules` à côté, donc le second point d’ancrage n’y trouve rien. |
+  | le bundle autonome de la skill (`node scripts/ultra11y.mjs` depuis une skill installée) | **doivent être dans le projet audité**, accessibles depuis `--cwd`. Une skill installée est un répertoire de fichiers sans `node_modules` à côté, donc le second point d’ancrage n’y trouve rien. |
   | le bot `rgaa-audit` d’iterion (CI) | le bot installe le package épinglé du moteur — dépendances comprises — et sonde le niveau avec `status --browser` avant de rendre. |
 
   Savoir dans lequel de ces cas vous êtes a une réponse : `status --browser [--cwd <dir>]`
@@ -49,7 +49,7 @@ exécutant **axe-core dans un vrai navigateur headless** (Playwright), sur un se
   premier, ce que veut un dépôt qui épingle son propre Playwright. Quand aucun des deux points
   d’ancrage ne résout, `scan` échoue et indique quel package il n’a pas trouvé.
 
-Le reste du skill (audit statique) n’a besoin ni de l’un ni de l’autre.
+Le reste de la skill (audit statique) n’a besoin ni de l’un ni de l’autre.
 
 ## Utilisation
 
