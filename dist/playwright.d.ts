@@ -1,5 +1,6 @@
-import { a as CheckOptions, A as AuditLike } from './payload-92OwFKBr.js';
+import { a as CheckOptions, A as AuditLike, C as CheckLang } from './payload-92OwFKBr.js';
 
+type Lang = "fr" | "en";
 /** The axe-core build a result was measured with (src/axe-engine.ts). */
 interface AxeEngineInfo {
     version: string;
@@ -31,6 +32,9 @@ interface AxeEngine {
     origin: AxeOrigin;
     /** Set when the copy is not ultra11y's pinned one — the visible half of the fallback. */
     note?: string;
+    /** The axe locale `source` configures (`axe.configure({ locale })`), when one was asked for
+     *  and that axe-core ships it. Absent: axe speaks its built-in English. */
+    locale?: Lang;
 }
 
 interface PlaywrightPage {
@@ -107,8 +111,9 @@ declare function downloadPageDocuments(page: PlaywrightPage, pageId: string, opt
     root?: string;
 }): Promise<string[]>;
 /** The axe engine this integration runs — exported so a test can check it is the one `scan`
- *  resolves. Prints the fallback note once per worker. */
-declare function resolveIntegrationAxe(cwd?: string): AxeEngine;
+ *  resolves. Prints the fallback note once per worker. Under `lang: "fr"` axe's rule help comes
+ *  in French, from the locale the resolved axe-core ships (src/axe-engine.ts). */
+declare function resolveIntegrationAxe(cwd?: string, lang?: CheckLang): AxeEngine;
 /** Collect the current page, persist it as a snapshot, audit it, and fail on the threshold. */
 declare function checkA11y(page: PlaywrightPage, opts?: PlaywrightCheckOptions): Promise<AuditLike>;
 /** Optional fixture form. Import `test` from here instead of `@playwright/test`.

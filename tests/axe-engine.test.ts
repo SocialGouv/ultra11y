@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { AXE_CORE_PIN, AXE_TAGS, type AxeEngine, resolveAxeEngine, runAxe, unionAxeEngines } from "../src/axe-engine.js";
+import { AXE_CORE_PIN, AXE_TAGS, type AxeEngine, readAxeLocale, resolveAxeEngine, runAxe, unionAxeEngines } from "../src/axe-engine.js";
 import { resolveIntegrationAxe } from "../src/integrations/playwright.js";
 import { resolveLocalDeps } from "../src/scan-local.js";
 
@@ -165,6 +165,59 @@ describe("scan and ultra11y/playwright run the SAME axe", () => {
   it("covers the rule AXE_DECIDES relies on", () => {
     // color-contrast is tagged wcag2aa; a tag set without it would leave 1.4.3 unmeasured.
     expect(AXE_TAGS).toContain("wcag2aa");
+  });
+});
+
+// Issue #238: under French output, axe's own help and failure text must be French too — read
+// from the locale the RESOLVED axe-core ships, never bundled, and never at the cost of the run.
+describe("axe speaks the output language", () => {
+  const raw = () => resolveAxeEngine({ cwd: projectWithItsOwnAxe(), lang: "en" }).source;
+
+  it("configures the French locale of the axe-core that runs, read from its own locales/", () => {
+    const e = resolveAxeEngine({ cwd: projectWithItsOwnAxe(), lang: "fr" });
+    expect(e.locale).toBe("fr");
+    const shipped = JSON.parse(readFileSync(join(e.sourcePath, "..", "locales", "fr.json"), "utf8")) as { rules: Record<string, { help: string }> };
+    expect(e.source.startsWith(raw())).toBe(true);
+    const tail = e.source.slice(raw().length);
+    expect(tail).toContain("axe.configure({locale:");
+    expect(tail).toContain(JSON.stringify(shipped.rules["image-alt"]!.help));
+    // The rule configuration is untouched: only axe's text changes, never what it runs.
+    expect(e.version).toBe(pinned);
+  });
+
+  it("stays English under en, and when no language is given", () => {
+    for (const e of [resolveAxeEngine({ cwd: projectWithItsOwnAxe(), lang: "en" }), resolveAxeEngine({ cwd: projectWithItsOwnAxe() })]) {
+      expect(e.locale).toBeUndefined();
+      expect(e.source).not.toContain("axe.configure({locale:");
+    }
+  });
+
+  it("keeps English, without a word, when the axe-core that runs ships no such locale", () => {
+    // The project's fake axe-core has no locales/ directory.
+    const e = withoutNodePath(() => resolveAxeEngine({ cwd: projectWithItsOwnAxe(), self: bareAnchor(), lang: "fr" }));
+    expect(e.origin).toBe("project");
+    expect(e.locale).toBeUndefined();
+    expect(e.source).toBe("/* the project's axe */");
+    expect(e.note).not.toMatch(/locale|langue|anglais/i);
+  });
+
+  it("ignores a locale file it cannot read as a locale", () => {
+    const dir = mkdtempSync(join(tmpdir(), "u11y-locale-"));
+    mkdirSync(join(dir, "locales"));
+    writeFileSync(join(dir, "locales", "fr.json"), "{ not json");
+    expect(readAxeLocale(join(dir, "axe.min.js"), "fr")).toBeUndefined();
+    writeFileSync(join(dir, "locales", "fr.json"), "[1]");
+    expect(readAxeLocale(join(dir, "axe.min.js"), "fr")).toBeUndefined();
+    writeFileSync(join(dir, "locales", "fr.json"), JSON.stringify({ lang: "fr" }));
+    expect(readAxeLocale(join(dir, "axe.min.js"), "fr")).toEqual({ lang: "fr" });
+    expect(readAxeLocale(join(dir, "axe.min.js"), "en")).toBeUndefined();
+  });
+
+  it("is the same in scan and ultra11y/playwright", () => {
+    const cwd = projectWithItsOwnAxe();
+    expect(resolveLocalDeps(cwd, "fr").axe.locale).toBe("fr");
+    expect(resolveIntegrationAxe(cwd, "fr").locale).toBe("fr");
+    expect(resolveIntegrationAxe(cwd, "en").locale).toBeUndefined();
   });
 });
 

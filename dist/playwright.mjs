@@ -910,6 +910,21 @@ var BUILDER_SPEC = "@axe-core/playwright";
 var SOURCE_SPEC = "axe-core/axe.min.js";
 var PACKAGE_SPEC = "axe-core/package.json";
 var sourceCache = /* @__PURE__ */ new Map();
+var localizedCache = /* @__PURE__ */ new Map();
+function readAxeLocale(sourcePath, lang) {
+  if (lang !== "fr") return void 0;
+  try {
+    const data = JSON.parse(readFileSync2(join2(dirname(sourcePath), "locales", `${lang}.json`), "utf8"));
+    return data && typeof data === "object" && !Array.isArray(data) ? data : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function withLocale(source, locale) {
+  return `${source}
+;try{axe.configure({locale:${JSON.stringify(locale)}})}catch(e){}
+`;
+}
 function locateSource(anchor) {
   const tryFrom = (from) => {
     try {
@@ -984,9 +999,27 @@ function resolveAxeEngine(opts) {
   }
   const origin = own && insideUltra11y(self) ? located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned" : "project";
   const note = axeFallbackNote(origin, located.version, located.path, opts.lang ?? "fr");
+  let locale;
+  if (opts.lang === "fr") {
+    const key = `${located.path}
+${opts.lang}`;
+    let localized = localizedCache.get(key);
+    if (localized === void 0) {
+      const data = readAxeLocale(located.path, opts.lang);
+      if (data) {
+        localized = withLocale(source, data);
+        localizedCache.set(key, localized);
+      }
+    }
+    if (localized !== void 0) {
+      source = localized;
+      locale = opts.lang;
+    }
+  }
   return {
     AxeBuilder,
     source,
+    ...locale ? { locale } : {},
     sourcePath: located.path,
     version: located.version,
     origin,
@@ -3609,20 +3642,20 @@ function fromConfig() {
   }
 }
 var notedAxe = /* @__PURE__ */ new Set();
-function resolveIntegrationAxe(cwd = process.cwd()) {
-  const engine = resolveAxeEngine({ cwd });
+function resolveIntegrationAxe(cwd = process.cwd(), lang) {
+  const engine = resolveAxeEngine({ cwd, ...lang ? { lang } : {} });
   if (engine.note && !notedAxe.has(engine.sourcePath)) {
     notedAxe.add(engine.sourcePath);
     console.warn(engine.note);
   }
   return engine;
 }
-async function runAxePass(page, mode) {
+async function runAxePass(page, mode, lang) {
   if (mode === false) return void 0;
   const demanded = mode === true;
   let engine;
   try {
-    engine = resolveIntegrationAxe();
+    engine = resolveIntegrationAxe(process.cwd(), lang);
   } catch (e) {
     if (demanded) {
       console.warn(
@@ -3692,7 +3725,8 @@ async function checkA11y(page, opts = {}) {
   }
   const scripts = behaviour ? await behaviour.finish() : void 0;
   if (scripts) collected.scripts = scripts;
-  const axe = await runAxePass(page, opts.axe ?? "auto");
+  const axeLang = opts.lang ?? (/^en\b/i.test(String(collected.lang ?? "")) ? "en" : "fr");
+  const axe = await runAxePass(page, opts.axe ?? "auto", axeLang);
   const payload = buildPayload(collected, url, "playwright", opts, shot, probes, axe, fullShot);
   const result = auditSnapshot(payload);
   if (opts.pdf !== false) {

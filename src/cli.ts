@@ -2592,6 +2592,7 @@ async function cmdRenderEngine(p: ParsedArgs, root: string, lang: Lang): Promise
       ? await snapshotRenderCaptures({
           root,
           manifest,
+          lang,
           ...(browserPathOf(p.flags) ? { browserPath: browserPathOf(p.flags) } : {}),
           warn: (m) => console.error(m),
           onProgress: p.flags.json ? undefined : (done, total, id) => console.error(`ultra11y render: snapshot [${done}/${total}] ${id}`),

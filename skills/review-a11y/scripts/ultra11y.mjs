@@ -35920,6 +35920,21 @@ var BUILDER_SPEC = "@axe-core/playwright";
 var SOURCE_SPEC = "axe-core/axe.min.js";
 var PACKAGE_SPEC = "axe-core/package.json";
 var sourceCache = /* @__PURE__ */ new Map();
+var localizedCache = /* @__PURE__ */ new Map();
+function readAxeLocale(sourcePath, lang) {
+  if (lang !== "fr") return void 0;
+  try {
+    const data2 = JSON.parse(readFileSync5(join4(dirname3(sourcePath), "locales", `${lang}.json`), "utf8"));
+    return data2 && typeof data2 === "object" && !Array.isArray(data2) ? data2 : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function withLocale(source, locale) {
+  return `${source}
+;try{axe.configure({locale:${JSON.stringify(locale)}})}catch(e){}
+`;
+}
 function locateSource(anchor) {
   const tryFrom = (from) => {
     try {
@@ -35994,9 +36009,27 @@ function resolveAxeEngine(opts) {
   }
   const origin = own && insideUltra11y(self) ? located.version === AXE_CORE_PIN ? "ultra11y" : "unpinned" : "project";
   const note = axeFallbackNote(origin, located.version, located.path, opts.lang ?? "fr");
+  let locale;
+  if (opts.lang === "fr") {
+    const key2 = `${located.path}
+${opts.lang}`;
+    let localized = localizedCache.get(key2);
+    if (localized === void 0) {
+      const data2 = readAxeLocale(located.path, opts.lang);
+      if (data2) {
+        localized = withLocale(source, data2);
+        localizedCache.set(key2, localized);
+      }
+    }
+    if (localized !== void 0) {
+      source = localized;
+      locale = opts.lang;
+    }
+  }
   return {
     AxeBuilder,
     source,
+    ...locale ? { locale } : {},
     sourcePath: located.path,
     version: located.version,
     origin,
@@ -62439,7 +62472,7 @@ async function snapshotRenderCaptures(opts) {
   let chromium;
   let axe;
   try {
-    ({ chromium, axe } = resolveLocalDeps(root));
+    ({ chromium, axe } = resolveLocalDeps(root, opts.lang));
   } catch (e) {
     return unavailable((e instanceof Error ? e.message : String(e)).split("\n")[0] ?? "Playwright unavailable");
   }
@@ -72428,6 +72461,7 @@ async function cmdRenderEngine(p2, root, lang) {
   const snapshots = !snapshotsOff && n.rendered > 0 ? await snapshotRenderCaptures({
     root,
     manifest,
+    lang,
     ...browserPathOf(p2.flags) ? { browserPath: browserPathOf(p2.flags) } : {},
     warn: (m3) => console.error(m3),
     onProgress: p2.flags.json ? void 0 : (done, total, id) => console.error(`ultra11y render: snapshot [${done}/${total}] ${id}`)

@@ -48,6 +48,7 @@ import { aliasesOf } from "./render-engine.js";
 import { launchChromium, localTierStatus, resolveLocalDeps } from "./scan-local.js";
 import type {
   AxeEngineInfo,
+  Lang,
   RenderManifest,
   RenderSnapshotIndex,
   RenderSnapshotSetAside,
@@ -494,6 +495,8 @@ export interface SnapshotRunOptions {
   browserPath?: string;
   /** Pages open at once. */
   concurrency?: number;
+  /** The output language: under `fr`, axe's rule help comes in French (src/axe-engine.ts). */
+  lang?: Lang;
   warn?: (msg: string) => void;
   onProgress?: (done: number, total: number, id: string) => void;
 }
@@ -535,7 +538,7 @@ export async function snapshotRenderCaptures(opts: SnapshotRunOptions): Promise<
   let chromium: any;
   let axe: AxeEngine;
   try {
-    ({ chromium, axe } = resolveLocalDeps(root));
+    ({ chromium, axe } = resolveLocalDeps(root, opts.lang));
   } catch (e) {
     return unavailable((e instanceof Error ? e.message : String(e)).split("\n")[0] ?? "Playwright unavailable");
   }

@@ -1708,3 +1708,82 @@ describe("the behaviour digest records what the page's scripts do", () => {
     }
   }, 60_000);
 });
+
+// ISSUE #238: AXE SPOKE ENGLISH UNDER A FRENCH REPORT. Every other line of a French audit is
+// French; the rendered findings carried axe-core's own English help (« Images must have
+// alternative text ») because nothing told axe which language to use. axe-core ships official
+// locales, so under French output the engine configures `locales/fr.json` of the axe-core that
+// runs. Only the TEXT changes: the rule id, the criterion it maps to and the finding identity
+// a baseline compares on are the same in both languages.
+describe("axe speaks the output language", () => {
+  const LOCALE_PAGE = `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Galerie</title></head>
+<body><main><h1>Galerie</h1><img src="/photo.png"></main></body></html>`;
+  let local: Server | undefined;
+  let localOrigin = "";
+
+  beforeAll(async () => {
+    if (!browserAvailable) return;
+    local = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(LOCALE_PAGE);
+    });
+    await new Promise<void>((resolve) => local?.listen(0, "127.0.0.1", resolve));
+    const addr = local.address();
+    localOrigin = typeof addr === "object" && addr ? `http://127.0.0.1:${addr.port}` : "";
+  }, 120_000);
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => (local ? local.close(() => resolve()) : resolve()));
+  });
+
+  it("writes axe's help in French under fr, in English under en, with the same finding identity", async () => {
+    if (!browserAvailable) return;
+    const { runScanManyLocal } = await import("../src/scan-local.js");
+    const { dynamicFindingId } = await import("../src/baseline.js");
+    const cwd = join(dirname(fileURLToPath(import.meta.url)), "..");
+    const scanIn = async (lang: "fr" | "en") => {
+      const out = await runScanManyLocal([`${localOrigin}/galerie`], {
+        cwd,
+        snapshotRoot: mkdtempSync(join(tmpdir(), `u11y-axe-${lang}-`)),
+        lang,
+        interact: false,
+      });
+      const hit = out.findings.find((f) => f.axeRule === "image-alt");
+      expect(hit, `axe's image-alt did not fire under ${lang}`).toBeDefined();
+      return hit!;
+    };
+    const fr = await scanIn("fr");
+    const en = await scanIn("en");
+    expect(fr.message).toBe("Les images doivent avoir une alternative textuelle (axe: image-alt)");
+    expect(en.message).toBe("Images must have alternative text (axe: image-alt)");
+    expect(fr.criteriaId).toBe(en.criteriaId);
+    expect(dynamicFindingId(fr)).toBe(dynamicFindingId(en));
+  }, 120_000);
+
+  it("does the same inside ultra11y/playwright, which follows the check's language", async () => {
+    if (!browserAvailable) return;
+    const { checkA11y } = await import("../src/integrations/playwright.js");
+    const work = mkdtempSync(join(tmpdir(), "u11y-axe-pw-"));
+    const context = await browser!.newContext();
+    const page = await context.newPage();
+    const cwd = process.cwd();
+    process.chdir(work);
+    try {
+      await page.goto(`${localOrigin}/galerie`);
+      for (const [lang, help] of [
+        ["fr", "Les images doivent avoir une alternative textuelle"],
+        ["en", "Images must have alternative text"],
+      ] as const) {
+        // `any`: the plugin is typed against Playwright's Page structurally.
+        await checkA11y(page as any, { as: `galerie-${lang}`, name: "Galerie", failOn: false, lang, probes: false, pdf: false });
+        const axe = JSON.parse(readFileSync(join(work, PAGES_DIR, `galerie-${lang}`, "axe.json"), "utf8")) as { violations: { id: string; help: string }[] };
+        expect(axe.violations.find((v) => v.id === "image-alt")?.help).toBe(help);
+      }
+    } finally {
+      process.chdir(cwd);
+      await page.close();
+      await context.close();
+    }
+  }, 120_000);
+});
