@@ -460,6 +460,27 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
     for (const id of states) expect(existsSync(join(project, "audits", "pages", `page-${id}.md`)), id).toBe(true);
   });
 
+  // #198 — the scripted 13.1 NA says « no interval, no timeout, no meta refresh » and cites every
+  // page's timers. The fixture's pages and journey states schedule no timer of their own, so the
+  // collector must record none: an axe or probe timeout counted as the page's would make the
+  // verdict cite evidence that contradicts it.
+  it("records no timer on any page or journey state: the 13.1 NA's justification is what the digests say", () => {
+    if (!browserAvailable) return;
+    const base = join(project, ".ultra11y", "pages");
+    const ids = readdirSync(base).filter((d) => existsSync(join(base, d, "scripts.json")));
+    expect(ids.length).toBeGreaterThan(10);
+    for (const id of ids) {
+      const s = readJson<{ timers?: { timeouts: number; intervals: number[]; longTimeouts: number[]; metaRefresh?: string } }>(
+        `.ultra11y/pages/${id}/scripts.json`,
+      );
+      expect(s.timers, id).toBeDefined();
+      expect(s.timers!.timeouts, `${id}: ${JSON.stringify(s.timers)}`).toBe(0);
+      expect(s.timers!.intervals, id).toEqual([]);
+      expect(s.timers!.longTimeouts, id).toEqual([]);
+      expect(s.timers!.metaRefresh, id).toBeUndefined();
+    }
+  });
+
   it("writes every deliverable the skill hands over", () => {
     if (!browserAvailable) return;
     const day = report.match(/rgaa-(\d{4}-\d{2}-\d{2})\.md$/)![1];

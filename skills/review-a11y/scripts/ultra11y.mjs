@@ -23924,7 +23924,7 @@ var FOCUS_EVENTS = ["focus", "blur", "focusin", "focusout"];
 var WATCHED = /* @__PURE__ */ new Set([...ACTIVATION_EVENTS, ...HOVER_EVENTS, ...KEY_EVENTS, ...FOCUS_EVENTS]);
 var TIMER_HOOK_BODY = (since) => `
   if (!window.__ultra11yTimers) {
-    const t = { since: '${since}', intervals: new Map(), timeouts: 0, long: [], orig: { si: window.setInterval, ci: window.clearInterval, st: window.setTimeout } };
+    const t = { since: '${since}', intervals: new Map(), timeouts: 0, long: [], paused: false, orig: { si: window.setInterval, ci: window.clearInterval, st: window.setTimeout } };
     window.setInterval = function (fn, delay, ...rest) {
       const id = t.orig.si.call(this, fn, delay, ...rest);
       if (t.intervals.size < 500) t.intervals.set(id, Number(delay) || 0);
@@ -23935,9 +23935,11 @@ var TIMER_HOOK_BODY = (since) => `
       return t.orig.ci.call(this, id);
     };
     window.setTimeout = function (fn, delay, ...rest) {
-      t.timeouts++;
-      const d = Number(delay) || 0;
-      if (d >= 20000 && t.long.length < 20) t.long.push(d);
+      if (!t.paused) {
+        t.timeouts++;
+        const d = Number(delay) || 0;
+        if (d >= 20000 && t.long.length < 20) t.long.push(d);
+      }
       return t.orig.st.call(this, fn, delay, ...rest);
     };
     Object.defineProperty(window, '__ultra11yTimers', { value: t, configurable: true, enumerable: false, writable: true });
@@ -23951,6 +23953,9 @@ var BEHAVIOUR_START = `(() => {
   for (let i = 0; i < els.length; i++) idx.set(els[i], i);
   const installedTimers = !window.__ultra11yTimers;
   ${TIMER_HOOK_BODY("window")}
+  // A window counts the page's timers: a hook an earlier window left paused (its close never
+  // ran) counts again from here.
+  window.__ultra11yTimers.paused = false;
   const B = { idx: idx, els: els, phase: 'idle', t0: performance.now(), idleMs: undefined, changed: new Map(), aria: new Map(), installedTimers: installedTimers, overflow: { changed: 0, aria: 0 }, batch: 0 };
   const inHead = (n) => !!(document.head && (n === document.head || document.head.contains(n)));
   const OWN = /^(STYLE|SCRIPT|LINK)$/;
@@ -24061,9 +24066,13 @@ var BEHAVIOUR_MARK = `(() => {
   if (!B) return false;
   B.phase = 'interaction';
   B.idleMs = Math.round(performance.now() - B.t0);
-  // The probes schedule timeouts of their own once the page is in their hands: counted here, the
-  // page's are not mixed with ours.
-  B.timeoutsAtMark = window.__ultra11yTimers ? window.__ultra11yTimers.timeouts : 0;
+  // axe and the probes schedule timeouts of their own once the page is in their hands: the count
+  // is taken here and the hook paused until the window closes, so the page's are never mixed
+  // with ours \u2014 not in this window, and not in a later one the same hook serves.
+  const T = window.__ultra11yTimers;
+  B.timeoutsAtMark = T ? T.timeouts : 0;
+  B.longAtMark = T ? T.long.length : 0;
+  if (T) T.paused = true;
   return true;
 })()`;
 var behaviourFinishExpr = (domListeners) => `(() => {
@@ -24164,7 +24173,7 @@ var behaviourFinishExpr = (domListeners) => `(() => {
     source: T ? T.since : 'none',
     intervals: T ? cap('intervals', Array.from(T.intervals.values()).sort((a, b) => a - b)) : [],
     timeouts: T ? (B.timeoutsAtMark !== undefined ? B.timeoutsAtMark : T.timeouts) : 0,
-    longTimeouts: T ? T.long.slice().sort((a, b) => a - b) : [],
+    longTimeouts: T ? T.long.slice(0, B.longAtMark !== undefined ? B.longAtMark : T.long.length).sort((a, b) => a - b) : [],
     inlineSetInterval: count(/\\bsetInterval\\s*\\(/g),
     inlineSetTimeout: count(/\\bsetTimeout\\s*\\(/g),
     ...(refresh ? { metaRefresh: refresh.getAttribute('content') || '' } : {}),
@@ -24174,6 +24183,9 @@ var behaviourFinishExpr = (domListeners) => `(() => {
     window.clearInterval = T.orig.ci;
     window.setTimeout = T.orig.st;
     try { delete window.__ultra11yTimers; } catch (e) {}
+  } else if (T) {
+    // The hook outlives this window (installed at navigation): the page is the page's again.
+    T.paused = false;
   }
   // The scripts and stylesheets loaded \u2014 the ones the page had when the window opened.
   const sizeOf = (url) => {
@@ -25667,27 +25679,55 @@ var MOTION_OK = (m3) => isObj(m3) && isBehaviourEl(m3) && isNum(m3.changes) && i
 var ANIMATION_OK = (a2) => isObj(a2) && isBehaviourEl(a2) && isStr(a2.name) && (a2.iterations === "infinite" || isNum(a2.iterations)) && isNum(a2.durationMs);
 var RESOURCE_OK = (r2) => isObj(r2) && (r2.kind === "script" || r2.kind === "stylesheet") && (r2.origin === "inline" || r2.origin === "same-origin" || r2.origin === "cross-origin") && (r2.url === void 0 || isStr(r2.url)) && (r2.size === void 0 || isNum(r2.size));
 var TIMERS_OK = (t3) => isObj(t3) && (t3.source === "init" || t3.source === "window" || t3.source === "none") && isNumArr(t3.intervals) && isNum(t3.timeouts) && isNumArr(t3.longTimeouts) && isNum(t3.inlineSetInterval) && isNum(t3.inlineSetTimeout) && (t3.metaRefresh === void 0 || isStr(t3.metaRefresh));
-var listField = (raw, ok) => Array.isArray(raw) ? raw.filter(ok) : void 0;
-var countsOf = (raw) => isObj(raw) ? Object.fromEntries(Object.entries(raw).filter(([, v2]) => isNum(v2))) : {};
+var drop = (dropped, field, n) => {
+  if (n > 0) dropped[field] = (dropped[field] ?? 0) + n;
+};
+var listField = (raw, ok, field, dropped) => {
+  if (raw === void 0) return void 0;
+  if (!Array.isArray(raw)) {
+    drop(dropped, field, 1);
+    return void 0;
+  }
+  const kept = raw.filter(ok);
+  drop(dropped, field, raw.length - kept.length);
+  return kept;
+};
+var countsOf = (raw, field, dropped) => {
+  if (!isObj(raw)) {
+    if (raw !== void 0) drop(dropped, field, 1);
+    return {};
+  }
+  const entries = Object.entries(raw);
+  const kept = entries.filter(([, v2]) => isNum(v2));
+  drop(dropped, field, entries.length - kept.length);
+  return Object.fromEntries(kept);
+};
 function asScriptsDigest(input) {
   if (!isObj(input)) return void 0;
   const raw = input;
   if (typeof raw.v !== "number" || raw.v < 1 || raw.v > SCRIPTS_VERSION) return void 0;
   if (raw.collected !== "cdp" && raw.collected !== "dom" && raw.collected !== "none") return void 0;
-  const out = { v: raw.v, collected: raw.collected, caps: countsOf(raw.caps) };
+  const dropped = {};
+  for (const [k, n] of Object.entries(countsOf(raw.invalid, "invalid", dropped))) drop(dropped, k, n);
+  const out = { v: raw.v, collected: raw.collected, caps: countsOf(raw.caps, "caps", dropped) };
   if (isStr(raw.why)) out.why = raw.why;
+  else if (raw.why !== void 0) drop(dropped, "why", 1);
   if (isNum(raw.windowMs)) out.windowMs = raw.windowMs;
+  else if (raw.windowMs !== void 0) drop(dropped, "windowMs", 1);
   if (isNum(raw.idleMs)) out.idleMs = raw.idleMs;
-  const listeners = listField(raw.listeners, LISTENER_OK);
-  const delegated = listField(raw.delegated, DELEGATED_OK);
-  const inline = listField(raw.inline, INLINE_OK);
-  const ariaMutations = listField(raw.ariaMutations, ARIA_MUTATION_OK);
-  const liveRegions = listField(raw.liveRegions, LIVE_REGION_OK);
-  const updates = listField(raw.updates, UPDATE_OK);
-  const motion = listField(raw.motion, MOTION_OK);
-  const animations = listField(raw.animations, ANIMATION_OK);
-  const resources = listField(raw.resources, RESOURCE_OK);
-  const truncated = countsOf(raw.truncated);
+  else if (raw.idleMs !== void 0) drop(dropped, "idleMs", 1);
+  const listeners = listField(raw.listeners, LISTENER_OK, "listeners", dropped);
+  const delegated = listField(raw.delegated, DELEGATED_OK, "delegated", dropped);
+  const inline = listField(raw.inline, INLINE_OK, "inline", dropped);
+  const ariaMutations = listField(raw.ariaMutations, ARIA_MUTATION_OK, "ariaMutations", dropped);
+  const liveRegions = listField(raw.liveRegions, LIVE_REGION_OK, "liveRegions", dropped);
+  const updates = listField(raw.updates, UPDATE_OK, "updates", dropped);
+  const motion = listField(raw.motion, MOTION_OK, "motion", dropped);
+  const animations = listField(raw.animations, ANIMATION_OK, "animations", dropped);
+  const resources = listField(raw.resources, RESOURCE_OK, "resources", dropped);
+  const truncated = countsOf(raw.truncated, "truncated", dropped);
+  const timersOk = TIMERS_OK(raw.timers);
+  if (raw.timers !== void 0 && !timersOk) drop(dropped, "timers", 1);
   return {
     ...out,
     ...listeners ? { listeners } : {},
@@ -25699,13 +25739,11 @@ function asScriptsDigest(input) {
     ...motion ? { motion } : {},
     ...animations ? { animations } : {},
     ...resources ? { resources } : {},
-    // The timers fields are read together (`.length` on the arrays beside the counters), so a
-    // half-valid timers object would be read as "no timers" — a statement of evidence, not the
-    // absence of one. It is dropped WHOLESALE when any field is missing or of the wrong type.
-    ...TIMERS_OK(raw.timers) ? { timers: raw.timers } : {},
+    ...timersOk ? { timers: raw.timers } : {},
     // The truncated counts are evidence-bearing only when non-empty; an all-invalid or
-    // non-object `truncated` simply says nothing was capped.
-    ...Object.keys(truncated).length ? { truncated } : {}
+    // non-object `truncated` says nothing was capped — and is itself recorded in `invalid`.
+    ...Object.keys(truncated).length ? { truncated } : {},
+    ...Object.keys(dropped).length ? { invalid: Object.fromEntries(Object.entries(dropped).sort(([a2], [b]) => a2.localeCompare(b))) } : {}
   };
 }
 function pageScreenshot(pagesDir, id) {
@@ -37472,6 +37510,13 @@ function behaviourCoverage(d2, page, s2, subject, found, listeners, lists) {
     );
   const cut = lists.filter((l) => s2.truncated?.[l] !== void 0).map((l) => `${l} capped at ${s2.caps?.[l] ?? "?"} of ${s2.truncated?.[l]}`);
   if (cut.length) caveats.push(cut.join(", "));
+  const bad = [...lists, ...listeners ? ["delegated"] : [], "truncated", "caps"].filter((l) => (s2.invalid?.[l] ?? 0) > 0);
+  if (bad.length) {
+    const n = bad.reduce((sum, l) => sum + (s2.invalid?.[l] ?? 0), 0);
+    caveats.push(
+      `${plural(n, "malformed entry", "malformed entries")} dropped (${bad.map((l) => `${l} \xD7${s2.invalid?.[l]}`).join(", ")}) \u2014 absence proves nothing`
+    );
+  }
   return hAt(
     d2,
     1,
@@ -37486,7 +37531,7 @@ function behaviourSubject(subject, listeners, lists, anchors, found) {
     const s2 = d2.signals?.scripts;
     if (page === void 0 || !s2) return [];
     const items = s2.collected === "none" ? [] : anchors(d2, s2);
-    return [behaviourCoverage(d2, page, s2, subject, found(items.length), listeners, lists), ...items];
+    return [behaviourCoverage(d2, page, s2, subject, found(items.length, s2), listeners, lists), ...items];
   });
 }
 var plural = (n, one2, many = `${one2}s`) => `${n} ${n === 1 ? one2 : many}`;
@@ -37616,7 +37661,7 @@ var BEHAVIOUR_SUBJECTS = {
   "behaviour:timers": behaviourSubject(
     "timers",
     false,
-    ["intervals"],
+    ["intervals", "timers"],
     (d2, s2) => {
       const t3 = s2.timers;
       if (!t3) return [];
@@ -37640,7 +37685,9 @@ var BEHAVIOUR_SUBJECTS = {
         )
       ];
     },
-    (n) => n ? "timers recorded" : "no timer recorded"
+    // Only a timers record that was READ and is empty says « no timer »: a malformed one dropped by
+    // the reader is unreadable, an absent one unrecorded, an unhooked one unwatched.
+    (n, s2) => n ? "timers recorded" : !s2.timers ? (s2.invalid?.timers ?? 0) > 0 ? "timers unreadable (malformed in scripts.json)" : "timers not recorded" : s2.timers.source === "none" ? "timers not hooked (only inline scripts were read)" : "no timer recorded"
   )
 };
 Object.assign(SUBJECTS, BEHAVIOUR_SUBJECTS);
@@ -59117,13 +59164,13 @@ function pruneRefuted(audit, standard, items, lang = "en", untried = []) {
   const prune = (rec, setOpen) => {
     const isAgent = rec.decidedBy === "agent";
     if (rec.decidedBy === "human") human.add(rec.id);
-    const drop = removedNc.get(rec.id);
-    if (drop?.size) {
+    const drop2 = removedNc.get(rec.id);
+    if (drop2?.size) {
       if (isAgent) {
         acted.add(rec.id);
         const keep = rec.findings.filter((f2) => {
           const k = findingKey(f2);
-          if (f2.advisory || !drop.has(k)) return true;
+          if (f2.advisory || !drop2.has(k)) return true;
           deleted.add(`${rec.id}|${k}`);
           removedFindings++;
           return false;
@@ -67281,6 +67328,7 @@ async function cmdSnapshot(p2) {
     console.error("ultra11y snapshot write: `dom` must be the serialized documentElement.outerHTML.");
     return 2;
   }
+  const scripts = asScriptsDigest(payload.scripts);
   let dir;
   try {
     dir = writeSnapshot(root, {
@@ -67298,9 +67346,8 @@ async function cmdSnapshot(p2) {
       // the process that found it, or the offline re-audit sees a page nobody ran axe on.
       ...payload.axe ? { axe: payload.axe } : {},
       // And for the behaviour digest (#190): what the page's scripts did during the capture
-      // window. Checked first — a producer is untrusted input, and a digest this engine cannot
-      // read is not written as if it could.
-      ...asScriptsDigest(payload.scripts) ? { scripts: asScriptsDigest(payload.scripts) } : {},
+      // window, as checked above — with what the check dropped recorded in it (`invalid`).
+      ...scripts ? { scripts } : {},
       // The screenshot rides in as base64 (a producer has bytes, not a path) and powers the
       // pixel tier. writeSnapshot owns the decoding, so every producer — this command,
       // `scan` — writes it the one same way.

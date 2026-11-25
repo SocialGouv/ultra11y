@@ -554,7 +554,9 @@ async function runOne(
   const context = await browser.newContext(storageState ? { storageState } : {});
   const page = await context.newPage();
   // The timer hook before the application's own scripts, so each step's behaviour digest counts
-  // the intervals started at load (src/behaviour.ts), as `scan` does.
+  // the intervals started at load (src/behaviour.ts), as `scan` does. One hook serves every step's
+  // window: each window pauses it while axe and the probes hold the page (#198), so a later step
+  // never counts an earlier step's tool timeouts as the application's.
   await page.addInitScript(TIMER_HOOK).catch(() => {});
   const traps = new Set<string>();
   try {

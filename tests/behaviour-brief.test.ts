@@ -17,7 +17,7 @@ import { buildAdjudicationWorklist, captureFilesPresent } from "../src/adjudicat
 import { runAudit } from "../src/audit.js";
 import { BEHAVIOUR_CAPS, assembleDigest, classifyListener, noDigest } from "../src/behaviour.js";
 import { parseHtml } from "../src/parse/html.js";
-import { PAGES_DIR, SNAPSHOT_VERSION, readSnapshot, writeSnapshot } from "../src/snapshot.js";
+import { PAGES_DIR, SNAPSHOT_VERSION, asScriptsDigest, readSnapshot, writeSnapshot } from "../src/snapshot.js";
 import type { ScriptsDigest } from "../src/types.js";
 
 const DOM = `<html lang="fr"><head><title>Comportements</title></head><body><main>
@@ -134,6 +134,14 @@ describe("scripts.json round-trips with the snapshot", () => {
     expect(readSnapshot(dir)?.scripts?.listeners?.length).toBe(3);
     expect(captureFilesPresent([join(dir, "dom.html")])).toContain("scripts.json");
   });
+  it("reads back EXACTLY the digest that was written — no field dropped, nothing marked invalid", () => {
+    const written = digest();
+    const read = readSnapshot(join(capture(written), PAGES_DIR, "comportements"))?.scripts;
+    expect(read).toEqual(written);
+    expect(read?.invalid).toBeUndefined();
+    // And the check is idempotent: a digest it already read reads the same again.
+    expect(asScriptsDigest(read)).toEqual(read);
+  });
   it("refuses a digest from a future format rather than half-reading it", () => {
     const root = capture({ ...digest(), v: 99 });
     expect(readSnapshot(join(root, PAGES_DIR, "comportements"))?.scripts).toBeUndefined();
@@ -231,11 +239,43 @@ describe("a malformed scripts.json degrades to less evidence, never a crash", ()
     expect(s?.listeners).toHaveLength(1);
     expect(s?.listeners?.[0]?.events).toEqual(["click"]);
     expect(s?.updates).toEqual([]);
+    // What was dropped is recorded, field by field — and survives a second read.
+    expect(s?.invalid).toEqual({ listeners: 1, timers: 1, updates: 1 });
+    expect(asScriptsDigest(s)).toEqual(s);
     // The criteria the digest informs are harvested on it — none of it may throw.
     for (const [std, ids] of [
       ["rgaa", ["7.1", "7.3", "7.5", "13.1", "13.8"]],
       ["wcag", ["2.1.1", "2.2.1", "2.2.2", "4.1.2", "4.1.3"]],
     ] as const)
       for (const id of ids) expect(() => evidenceOf(root, std, id)).not.toThrow();
+  });
+
+  it("never reads what it dropped as absence: the coverage line says so, and timers it could not read are « unreadable »", () => {
+    const d = digest();
+    const bad = {
+      ...d,
+      timers: { ...d.timers, timeouts: "many" },
+      listeners: [{ i: 0, tag: "div", selector: "div#carte", events: "click" }, { nope: true }],
+    } as unknown as ScriptsDigest;
+    const root = capture(bad);
+    const coverage = (id: string): string => evidenceOf(root, "rgaa", id).find((e) => /behaviour digest/.test(e)) ?? "";
+    const clickable = coverage("7.1");
+    expect(clickable).toMatch(/0 clickable elements without role or tabindex/);
+    expect(clickable).toMatch(/2 malformed entries dropped \(listeners ×2\) — absence proves nothing/);
+    const timers = evidenceOf(root, "rgaa", "13.1").filter((e) => /scripts:timers/.test(e));
+    expect(timers.join("\n")).toMatch(/timers unreadable/);
+    expect(timers.join("\n")).toMatch(/1 malformed entry dropped \(timers ×1\) — absence proves nothing/);
+    expect(timers.join("\n")).not.toMatch(/no timer recorded/);
+    // A page whose digest dropped nothing carries no such caveat.
+    expect(evidenceOf(capture(d), "rgaa", "7.1").some((e) => /malformed/.test(e))).toBe(false);
+  });
+
+  it("a snapshot written by `snapshot write` records what the producer's digest lost", () => {
+    const d = digest();
+    const s = asScriptsDigest({ ...d, motion: "turning", windowMs: "long", truncated: { listeners: "lots" } });
+    expect(s?.motion).toBeUndefined();
+    expect(s?.windowMs).toBeUndefined();
+    expect(s?.truncated).toBeUndefined();
+    expect(s?.invalid).toEqual({ motion: 1, truncated: 1, windowMs: 1 });
   });
 });

@@ -1650,6 +1650,40 @@ describe("the behaviour digest records what the page's scripts do", () => {
     expectBriefsCarryIt(join(work, PAGES_DIR));
   }, 120_000);
 
+  // #198 — a hook installed at navigation serves every window opened on that document (a journey
+  // opens one per step). What ultra11y schedules once it holds the page (axe, the probes) is not
+  // the page's, in that window or in any later one; what the page schedules between them is.
+  it("a hook that serves several windows counts only the page's own timeouts, short and long", async () => {
+    if (!browserAvailable) return;
+    const { TIMER_HOOK, startBehaviour } = await import("../src/behaviour.js");
+    const context = await browser!.newContext();
+    const page = await context.newPage();
+    try {
+      await page.addInitScript(TIMER_HOOK);
+      await page.goto(bOrigin);
+      // The page's own, before the first window.
+      await page.evaluate("setTimeout(() => {}, 10); setTimeout(() => {}, 25000)");
+      // ultra11y's phase, as an axe pass and the probes schedule theirs.
+      const tool = "for (let i = 0; i < 40; i++) setTimeout(() => {}, 0); setTimeout(() => {}, 60000)";
+      const w1 = await startBehaviour(page as any);
+      await w1.idle(200);
+      await page.evaluate(tool);
+      const s1 = await w1.finish();
+      // The page's own again, between two steps.
+      await page.evaluate("setTimeout(() => {}, 30000)");
+      const w2 = await startBehaviour(page as any);
+      await w2.idle(200);
+      await page.evaluate(tool);
+      const s2 = await w2.finish();
+      expect(s1.timers).toMatchObject({ source: "init", timeouts: 2, longTimeouts: [25000] });
+      expect(s2.timers).toMatchObject({ source: "init", timeouts: 3, longTimeouts: [25000, 30000] });
+      // The hook outlives the windows, counting again: the page is the page's.
+      expect(await page.evaluate("window.__ultra11yTimers.paused")).toBe(false);
+    } finally {
+      await context.close();
+    }
+  }, 60_000);
+
   it("falls back to the DOM without a CDP session, and says what it cannot see", async () => {
     if (!browserAvailable) return;
     const { startBehaviour } = await import("../src/behaviour.js");

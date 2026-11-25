@@ -70,12 +70,21 @@ export const FOCUS_EVENTS = ["focus", "blur", "focusin", "focusout"];
 const WATCHED = new Set([...ACTIVATION_EVENTS, ...HOVER_EVENTS, ...KEY_EVENTS, ...FOCUS_EVENTS]);
 
 /** The timer hook. Installed with `addInitScript` BEFORE the page's own scripts when the producer
- *  navigates (`scan`), so an interval started at load is counted; installed by `startBehaviour`
- *  itself otherwise, and then only what is scheduled during the window is. Transparent: the
- *  originals are called with the same arguments and their return value is returned. */
+ *  navigates (`scan`, the journey runner), so an interval started at load is counted; installed
+ *  by `startBehaviour` itself otherwise, and then only what is scheduled during the window is.
+ *  Transparent: the originals are called with the same arguments and their return value is
+ *  returned.
+ *
+ *  PAUSED during ultra11y's own phases. axe-core and the live probes run in the page's world and
+ *  schedule timeouts of their own (an axe pass alone schedules dozens); counted, they would be
+ *  reported as the page's. `BEHAVIOUR_MARK` pauses the timeout count when the producer takes the
+ *  page in hand and the close of the window resumes it, so a hook that serves several windows
+ *  (a journey: one navigation, one hook, a window per step) never carries the tool's timeouts of
+ *  an earlier step into a later one. Intervals stay tracked: the list is of those still RUNNING
+ *  when the window closes. */
 const TIMER_HOOK_BODY = (since: "init" | "window"): string => `
   if (!window.__ultra11yTimers) {
-    const t = { since: '${since}', intervals: new Map(), timeouts: 0, long: [], orig: { si: window.setInterval, ci: window.clearInterval, st: window.setTimeout } };
+    const t = { since: '${since}', intervals: new Map(), timeouts: 0, long: [], paused: false, orig: { si: window.setInterval, ci: window.clearInterval, st: window.setTimeout } };
     window.setInterval = function (fn, delay, ...rest) {
       const id = t.orig.si.call(this, fn, delay, ...rest);
       if (t.intervals.size < 500) t.intervals.set(id, Number(delay) || 0);
@@ -86,9 +95,11 @@ const TIMER_HOOK_BODY = (since: "init" | "window"): string => `
       return t.orig.ci.call(this, id);
     };
     window.setTimeout = function (fn, delay, ...rest) {
-      t.timeouts++;
-      const d = Number(delay) || 0;
-      if (d >= 20000 && t.long.length < 20) t.long.push(d);
+      if (!t.paused) {
+        t.timeouts++;
+        const d = Number(delay) || 0;
+        if (d >= 20000 && t.long.length < 20) t.long.push(d);
+      }
       return t.orig.st.call(this, fn, delay, ...rest);
     };
     Object.defineProperty(window, '__ultra11yTimers', { value: t, configurable: true, enumerable: false, writable: true });
@@ -105,6 +116,9 @@ export const BEHAVIOUR_START = `(() => {
   for (let i = 0; i < els.length; i++) idx.set(els[i], i);
   const installedTimers = !window.__ultra11yTimers;
   ${TIMER_HOOK_BODY("window")}
+  // A window counts the page's timers: a hook an earlier window left paused (its close never
+  // ran) counts again from here.
+  window.__ultra11yTimers.paused = false;
   const B = { idx: idx, els: els, phase: 'idle', t0: performance.now(), idleMs: undefined, changed: new Map(), aria: new Map(), installedTimers: installedTimers, overflow: { changed: 0, aria: 0 }, batch: 0 };
   const inHead = (n) => !!(document.head && (n === document.head || document.head.contains(n)));
   const OWN = /^(STYLE|SCRIPT|LINK)$/;
@@ -217,9 +231,13 @@ export const BEHAVIOUR_MARK = `(() => {
   if (!B) return false;
   B.phase = 'interaction';
   B.idleMs = Math.round(performance.now() - B.t0);
-  // The probes schedule timeouts of their own once the page is in their hands: counted here, the
-  // page's are not mixed with ours.
-  B.timeoutsAtMark = window.__ultra11yTimers ? window.__ultra11yTimers.timeouts : 0;
+  // axe and the probes schedule timeouts of their own once the page is in their hands: the count
+  // is taken here and the hook paused until the window closes, so the page's are never mixed
+  // with ours — not in this window, and not in a later one the same hook serves.
+  const T = window.__ultra11yTimers;
+  B.timeoutsAtMark = T ? T.timeouts : 0;
+  B.longAtMark = T ? T.long.length : 0;
+  if (T) T.paused = true;
   return true;
 })()`;
 
@@ -324,7 +342,7 @@ export const behaviourFinishExpr = (domListeners: boolean): string => `(() => {
     source: T ? T.since : 'none',
     intervals: T ? cap('intervals', Array.from(T.intervals.values()).sort((a, b) => a - b)) : [],
     timeouts: T ? (B.timeoutsAtMark !== undefined ? B.timeoutsAtMark : T.timeouts) : 0,
-    longTimeouts: T ? T.long.slice().sort((a, b) => a - b) : [],
+    longTimeouts: T ? T.long.slice(0, B.longAtMark !== undefined ? B.longAtMark : T.long.length).sort((a, b) => a - b) : [],
     inlineSetInterval: count(/\\bsetInterval\\s*\\(/g),
     inlineSetTimeout: count(/\\bsetTimeout\\s*\\(/g),
     ...(refresh ? { metaRefresh: refresh.getAttribute('content') || '' } : {}),
@@ -334,6 +352,9 @@ export const behaviourFinishExpr = (domListeners: boolean): string => `(() => {
     window.clearInterval = T.orig.ci;
     window.setTimeout = T.orig.st;
     try { delete window.__ultra11yTimers; } catch (e) {}
+  } else if (T) {
+    // The hook outlives this window (installed at navigation): the page is the page's again.
+    T.paused = false;
   }
   // The scripts and stylesheets loaded — the ones the page had when the window opened.
   const sizeOf = (url) => {
