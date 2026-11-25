@@ -331,6 +331,15 @@ anormal.
   d’identité est la même mauvaise attribution (un schéma, un port ou un `www.` peuvent différer
   librement — c’est de la canonicalisation). La comparaison utilise l’URL capturée juste après que
   la navigation s’est stabilisée, avant qu’une sonde puisse cliquer sur quelque chose qui route.
+  Une redirection qui ne fait que **canonicaliser** l’adresse — ajouter ou retirer la barre
+  oblique finale (`/documents` → 301 → `/documents/`, ce que fait tout serveur statique pour un
+  répertoire), changer le schéma, le port ou le `www.` — n’est pas un déplacement : elle est
+  **suivie**, et c’est la page d’arrivée qui est auditée **et enregistrée à son adresse
+  d’arrivée** (l’`url` de l’instantané). C’est cette adresse qui sert de base aux liens de la
+  page : les documents liés se résolvent contre elle (et contre son `<base href>` s’il y en a
+  un), jamais contre l’adresse demandée — sinon `formulaire.pdf` sur `/documents/` devient
+  `/formulaire.pdf`, une 404. Le scan le signale (ℹ️) et vous invite à déclarer l’adresse
+  canonique dans l’échantillon ; `pages discover` la déclare d’emblée.
 - **Elle a répondu une erreur.** La propre page « introuvable » d’un framework est un document
   complet et valide servi à l’adresse demandée — `notFound()` dans Next est exactement cela — donc
   aucune comparaison d’adresses ne peut la voir. Le statut HTTP, lui, le peut : tout ce qui est
@@ -339,8 +348,22 @@ anormal.
 Une page refusée est **nommée dans le rapport**, avec ce qui a été demandé, ce qui a été atteint
 et pourquoi, et elle est retirée de `scope.sample` — l’y laisser la remettrait dans la grille
 avec la même base qu’une page réellement visitée, et le livrable prétendrait alors que nous
-l’avons examinée. Une exécution où *toutes* les pages ont été refusées sort avec un code non
-nul : ce n’est pas un résultat partiel, c’est un scan qui n’a rien mesuré. Une page signalée
+l’avons examinée. **Une seule page refusée suffit à faire sortir `scan --sample` avec le code
+1** : un échantillon partiel n’est pas un succès. Le rapport est tout de même écrit sur les pages
+mesurées, et la dernière ligne nomme les pages refusées (« échantillon partiel — 2 page(s) sur
+11 non enregistrée(s) : … »). Une exécution où *toutes* les pages ont été refusées sort aussi
+avec 1, avant tout rapport : ce n’est pas un résultat partiel, c’est un scan qui n’a rien
+mesuré. Sous `--baseline`, c’est la porte de la référence qui tranche : une page déjà
+impossible à rendre dans la référence ne bloque pas, une page nouvellement impossible à rendre
+bloque.
+
+**La découverte applique la même règle en amont.** `pages discover --sitemap|--crawl` interroge
+chaque URL et écarte de l’échantillon, en la nommant, celle qui répond une erreur HTTP (une
+page « Error response » n’est pas une page du site), qui redirige vers une autre page, ou qui
+sert un listing de répertoire généré par le serveur (« Index of / », « Directory listing for
+… »). L’inventaire `.ultra11y/routes.json` garde chaque route avec ce qu’elle a répondu
+(`status`, `landed`, `refused`), et `sample check` refuse de dire « complet » un échantillon
+dont une page déclarée est connue injoignable : il la nomme. Une page signalée
 manquante est un bug dans l’échantillon ou dans l’état que vous avez préparé, et les deux se
 corrigent ; une page signalée sous le mauvais nom est une fausse déclaration de conformité.
 

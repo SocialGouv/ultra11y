@@ -36,6 +36,8 @@ export default defineConfig({
       "tests/render-snapshot.e2e.test.ts",
       // The media and screen-reader probes (#208) record a real viewport and read a real tree.
       "tests/capture-probes.e2e.test.ts",
+      // `scan --sample` over a real server's redirects and errors (#224): same browser, same job.
+      "tests/scan-redirects.e2e.test.ts",
       "tests/opencode-smoke.e2e.test.ts",
       "tests/codex-smoke.e2e.test.ts",
     ],

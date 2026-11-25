@@ -16,15 +16,27 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { RouteCoverage, ScanRedirect } from "./types.js";
+import type { UnreachableReason } from "./reachability.js";
 
 export const ROUTES_FILE = ".ultra11y/routes.json";
 
 /** How a route entered the inventory. */
 export type RouteSource = "sitemap" | "crawl" | "snapshots";
 
+/** What discovery's GET of a route answered, when it made one (sitemap and crawl; the snapshots
+ *  route has no network). `status` is the final HTTP status after redirects, `landed` the address
+ *  it ended on when that differs, `refused` why discovery left it out of the sample — the same
+ *  vocabulary as the scan's refusals (src/reachability.ts). Overwritten by every discovery that
+ *  probes the route, so a page that was fixed stops being reported. */
+export interface RouteCheck {
+  status?: number;
+  landed?: string;
+  refused?: UnreachableReason;
+}
+
 export interface RouteInventory {
   v: 1;
-  routes: { url: string; via: RouteSource[] }[];
+  routes: ({ url: string; via: RouteSource[] } & RouteCheck)[];
 }
 
 /** Default bound of `scan --all-routes`: enough for most applications, and stated in the
@@ -55,7 +67,16 @@ export function readRoutes(root: string): RouteInventory | undefined {
     const raw = JSON.parse(readFileSync(file, "utf8")) as Partial<RouteInventory>;
     if (!Array.isArray(raw.routes)) return undefined;
     const routes = raw.routes.filter((r): r is RouteInventory["routes"][number] => !!r && typeof r.url === "string" && r.url.length > 0);
-    return { v: 1, routes: routes.map((r) => ({ url: r.url, via: Array.isArray(r.via) ? r.via : [] })) };
+    return {
+      v: 1,
+      routes: routes.map((r) => ({
+        url: r.url,
+        via: Array.isArray(r.via) ? r.via : [],
+        ...(typeof r.status === "number" ? { status: r.status } : {}),
+        ...(typeof r.landed === "string" && r.landed ? { landed: r.landed } : {}),
+        ...(typeof r.refused === "string" && r.refused ? { refused: r.refused } : {}),
+      })),
+    };
   } catch {
     return undefined;
   }
@@ -63,7 +84,12 @@ export function readRoutes(root: string): RouteInventory | undefined {
 
 /** Merge discovered URLs into the inventory (union by path; a known route gains the new source).
  *  Returns the file written, how many routes were new, and the total. */
-export function writeRoutes(root: string, urls: readonly string[], via: RouteSource): { file: string; added: number; total: number } {
+export function writeRoutes(
+  root: string,
+  urls: readonly string[],
+  via: RouteSource,
+  checks?: ReadonlyMap<string, RouteCheck>,
+): { file: string; added: number; total: number } {
   const file = join(root, ROUTES_FILE);
   const inv = readRoutes(root) ?? { v: 1 as const, routes: [] };
   const byPath = new Map(inv.routes.map((r) => [routePath(r.url), r]));
@@ -71,11 +97,18 @@ export function writeRoutes(root: string, urls: readonly string[], via: RouteSou
   for (const url of urls) {
     const key = routePath(url);
     const hit = byPath.get(key);
+    const check = checks?.get(url);
     if (hit) {
       if (!hit.via.includes(via)) hit.via.push(via);
+      if (check) {
+        delete hit.status;
+        delete hit.landed;
+        delete hit.refused;
+        Object.assign(hit, check);
+      }
       continue;
     }
-    const entry = { url, via: [via] };
+    const entry = { url, via: [via], ...(check ?? {}) };
     byPath.set(key, entry);
     inv.routes.push(entry);
     added++;
@@ -155,6 +188,29 @@ export function routeCoverage(input: RouteCoverageInput): RouteCoverage[] {
     if (row.observed === "not-reached" && !row.why) row.why = { reason: "max-routes", ...(input.max !== undefined ? { detail: String(input.max) } : {}) };
   }
   return [...rows.values()].sort((a, b) => Number(b.sample) - Number(a.sample) || a.path.localeCompare(b.path));
+}
+
+/** The declared pages the inventory KNOWS cannot be audited: discovery probed their route and
+ *  refused it (an HTTP error, a redirect to another page, a directory listing, a network error).
+ *  Matched on the route path, like every other inventory lookup. What `sample check` refuses to
+ *  call complete — a sample is the set of pages the verdicts are stated over, and a page that
+ *  answers 404 holds no verdict. */
+export function unreachableSamplePages<P extends { id: string; url: string }>(
+  inventory: RouteInventory | undefined,
+  pages: readonly P[],
+): (P & { check: RouteCheck & { refused: UnreachableReason } })[] {
+  if (!inventory) return [];
+  const byPath = new Map(inventory.routes.map((r) => [routePath(r.url), r]));
+  const out: (P & { check: RouteCheck & { refused: UnreachableReason } })[] = [];
+  for (const p of pages) {
+    const r = byPath.get(routePath(p.url));
+    if (!r?.refused) continue;
+    out.push({
+      ...p,
+      check: { refused: r.refused, ...(r.status !== undefined ? { status: r.status } : {}), ...(r.landed ? { landed: r.landed } : {}) },
+    });
+  }
+  return out;
 }
 
 /** Counts per observation, for a one-line summary. */

@@ -296,7 +296,9 @@ où arrivent les instantanés).
 ### …et les documents PDF vers lesquels pointent ces pages
 
 Une fois les pages enregistrées, `scan` télécharge les **candidats documents de même origine**
-de chaque page capturée (résolus par rapport à l’URL de la page et à son `<base>`) dans
+de chaque page capturée (résolus par rapport à l’URL **d’arrivée** de la page — celle où le
+navigateur a atterri après une redirection qui canonicalise l’adresse, `/documents` →
+`/documents/` — et à son `<base>`) dans
 `.ultra11y/documents/<sha256>.pdf`, à côté d’un fichier annexe `<sha256>.json`
 (`kind: "ultra11y-document"`, `v: 1`, l’URL et **chaque page qui pointe vers lui** — le
 lecteur ignore tout autre `.json`). Un lien est candidat quand :

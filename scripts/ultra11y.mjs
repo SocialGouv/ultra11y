@@ -46914,12 +46914,21 @@ function readRoutes(root) {
     const raw = JSON.parse(readFileSync10(file, "utf8"));
     if (!Array.isArray(raw.routes)) return void 0;
     const routes = raw.routes.filter((r2) => !!r2 && typeof r2.url === "string" && r2.url.length > 0);
-    return { v: 1, routes: routes.map((r2) => ({ url: r2.url, via: Array.isArray(r2.via) ? r2.via : [] })) };
+    return {
+      v: 1,
+      routes: routes.map((r2) => ({
+        url: r2.url,
+        via: Array.isArray(r2.via) ? r2.via : [],
+        ...typeof r2.status === "number" ? { status: r2.status } : {},
+        ...typeof r2.landed === "string" && r2.landed ? { landed: r2.landed } : {},
+        ...typeof r2.refused === "string" && r2.refused ? { refused: r2.refused } : {}
+      }))
+    };
   } catch {
     return void 0;
   }
 }
-function writeRoutes(root, urls, via) {
+function writeRoutes(root, urls, via, checks) {
   const file = join10(root, ROUTES_FILE);
   const inv = readRoutes(root) ?? { v: 1, routes: [] };
   const byPath = new Map(inv.routes.map((r2) => [routePath(r2.url), r2]));
@@ -46927,11 +46936,18 @@ function writeRoutes(root, urls, via) {
   for (const url of urls) {
     const key2 = routePath(url);
     const hit = byPath.get(key2);
+    const check = checks?.get(url);
     if (hit) {
       if (!hit.via.includes(via)) hit.via.push(via);
+      if (check) {
+        delete hit.status;
+        delete hit.landed;
+        delete hit.refused;
+        Object.assign(hit, check);
+      }
       continue;
     }
-    const entry2 = { url, via: [via] };
+    const entry2 = { url, via: [via], ...check ?? {} };
     byPath.set(key2, entry2);
     inv.routes.push(entry2);
     added++;
@@ -46979,6 +46995,20 @@ function routeCoverage(input) {
     if (row.observed === "not-reached" && !row.why) row.why = { reason: "max-routes", ...input.max !== void 0 ? { detail: String(input.max) } : {} };
   }
   return [...rows.values()].sort((a2, b) => Number(b.sample) - Number(a2.sample) || a2.path.localeCompare(b.path));
+}
+function unreachableSamplePages(inventory, pages) {
+  if (!inventory) return [];
+  const byPath = new Map(inventory.routes.map((r2) => [routePath(r2.url), r2]));
+  const out = [];
+  for (const p2 of pages) {
+    const r2 = byPath.get(routePath(p2.url));
+    if (!r2?.refused) continue;
+    out.push({
+      ...p2,
+      check: { refused: r2.refused, ...r2.status !== void 0 ? { status: r2.status } : {}, ...r2.landed ? { landed: r2.landed } : {} }
+    });
+  }
+  return out;
 }
 function routeCounts(rows) {
   const out = { captured: 0, scanned: 0, source: 0, "not-reached": 0 };
@@ -59791,12 +59821,18 @@ async function crawlUrls(start, opts) {
     opts.onPage?.(url, order2.length);
     if (d2 >= depth) continue;
     let html = "";
+    let base = url;
     try {
-      html = await opts.fetchHtml(url);
+      const got = await opts.fetchHtml(url);
+      if (typeof got === "string") html = got;
+      else {
+        html = got.html;
+        if (got.url) base = got.url;
+      }
     } catch {
       continue;
     }
-    for (const link of extractLinks(html, url)) {
+    for (const link of extractLinks(html, base)) {
       const canon = canonicalUrl(link);
       if (seen.has(canon)) continue;
       seen.add(canon);
@@ -60020,16 +60056,16 @@ function toDynamicResult(out, target, lang = "en", engine = "axe-core@playwright
 async function fetchHtml(url) {
   try {
     const res = await fetch(url, { redirect: "follow" });
-    if (!res.ok) return "";
-    return await res.text();
+    if (!res.ok) return { html: "", url };
+    return { html: await res.text(), url: res.url || url };
   } catch {
-    return "";
+    return { html: "", url };
   }
 }
 async function discoverUrls(opts) {
   const max = crawlBound(opts.max);
   if (opts.sitemap) {
-    const urls = parseSitemapUrls(await fetchHtml(opts.sitemap));
+    const urls = parseSitemapUrls((await fetchHtml(opts.sitemap)).html);
     const kept = Number.isFinite(max) ? urls.slice(0, max) : urls;
     kept.forEach((u2, i) => opts.onPage?.(u2, i + 1));
     return kept;
@@ -60567,6 +60603,67 @@ function kindLabel(kind, locale = "fr") {
   return kind.label[locale] ?? Object.values(kind.label)[0] ?? kind.id;
 }
 
+// src/reachability.ts
+function landedOnRequestedPage(requested, landed) {
+  if (!landed || requested === landed) return true;
+  const parse2 = (u2) => {
+    try {
+      return new URL(u2, "http://x.invalid");
+    } catch {
+      return void 0;
+    }
+  };
+  const a2 = parse2(requested);
+  const b = parse2(landed);
+  if (!a2 || !b) return true;
+  const path = (u2) => u2.pathname.replace(/\/+$/, "");
+  if (path(a2) !== path(b)) return false;
+  const host = (u2) => u2.hostname.replace(/^www\./, "");
+  if (host(a2) !== host(b)) return false;
+  if (a2.hash && a2.hash !== b.hash) return false;
+  if (a2.search && a2.search !== b.search) return false;
+  return true;
+}
+var LISTING_TITLE = /^\s*(?:directory listing for|index of|listing directory|files within)\s+\S/i;
+function looksLikeDirectoryListing(html) {
+  const m3 = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+  return !!m3 && LISTING_TITLE.test(m3[1]);
+}
+async function probePage(url) {
+  try {
+    const res = await fetch(url, { redirect: "follow" });
+    const ok = res.status >= 200 && res.status < 300;
+    const html = ok ? await res.text() : "";
+    if (!ok) await res.body?.cancel().catch(() => {
+    });
+    return { requested: url, url: res.url || url, status: res.status, html };
+  } catch (e) {
+    return { requested: url, url, html: "", error: String(e?.message ?? e).slice(0, 200) };
+  }
+}
+function classifyProbe(p2) {
+  if (p2.status === void 0) return { ok: false, url: p2.requested, reason: "error", ...p2.error ? { detail: p2.error } : {} };
+  if (p2.status < 200 || p2.status >= 300) {
+    return { ok: false, url: p2.requested, reason: "http-status", status: p2.status, ...p2.url !== p2.requested ? { landed: p2.url } : {} };
+  }
+  if (!landedOnRequestedPage(p2.requested, p2.url)) return { ok: false, url: p2.requested, reason: "redirect", status: p2.status, landed: p2.url };
+  if (looksLikeDirectoryListing(p2.html)) return { ok: false, url: p2.requested, reason: "directory-listing", status: p2.status };
+  return { ok: true, url: p2.url || p2.requested, status: p2.status };
+}
+function describeUnreachable(u2, lang) {
+  const fr2 = lang === "fr";
+  switch (u2.reason) {
+    case "http-status":
+      return fr2 ? `${u2.url} a r\xE9pondu HTTP ${u2.status}` : `${u2.url} answered HTTP ${u2.status}`;
+    case "redirect":
+      return fr2 ? `${u2.url} redirige vers ${u2.landed} (une autre page)` : `${u2.url} redirects to ${u2.landed} (another page)`;
+    case "directory-listing":
+      return fr2 ? `${u2.url} est un listing de r\xE9pertoire g\xE9n\xE9r\xE9 par le serveur, pas une page du site` : `${u2.url} is a directory listing generated by the server, not a page of the site`;
+    default:
+      return fr2 ? `${u2.url} est injoignable${u2.detail ? ` \u2014 ${u2.detail}` : ""}` : `${u2.url} is unreachable${u2.detail ? ` \u2014 ${u2.detail}` : ""}`;
+  }
+}
+
 // src/scan-local.ts
 var LOCAL_ENGINE = "axe-core@playwright (local)";
 var LOCAL_TESTED_SCS = ["1.4.4", "1.4.10", "1.4.12", "2.4.7", "2.4.11", "1.4.13", "2.1.2"];
@@ -60888,26 +60985,6 @@ async function probeDialogs(page) {
 function clicksAllowed(storageState, interactClicks) {
   return interactClicks === true || !storageState;
 }
-function landedOnRequestedPage(requested, landed) {
-  if (!landed || requested === landed) return true;
-  const parse2 = (u2) => {
-    try {
-      return new URL(u2, "http://x.invalid");
-    } catch {
-      return void 0;
-    }
-  };
-  const a2 = parse2(requested);
-  const b = parse2(landed);
-  if (!a2 || !b) return true;
-  const path = (u2) => u2.pathname.replace(/\/+$/, "");
-  if (path(a2) !== path(b)) return false;
-  const host = (u2) => u2.hostname.replace(/^www\./, "");
-  if (host(a2) !== host(b)) return false;
-  if (a2.hash && a2.hash !== b.hash) return false;
-  if (a2.search && a2.search !== b.search) return false;
-  return true;
-}
 async function runOnPage(browser, axe, target, isFile, opts) {
   const context = await browser.newContext(opts.storageState ? { storageState: opts.storageState } : {});
   const page = await context.newPage();
@@ -61193,6 +61270,14 @@ async function runScanManyLocal(urls, opts) {
     ...redirected.length ? { redirected } : {}
   };
 }
+function addressOf(url) {
+  try {
+    const u2 = new URL(url);
+    return u2.origin + u2.pathname;
+  } catch {
+    return url;
+  }
+}
 async function runSampleScanLocal(pages, opts) {
   const lang = opts.lang ?? "en";
   const interact = opts.interact !== false;
@@ -61202,6 +61287,7 @@ async function runSampleScanLocal(pages, opts) {
   const snapshots = [];
   const outs = [];
   const redirected = [];
+  const redirectsFollowed = [];
   const scannedUrls = [];
   try {
     for (const page of pages) {
@@ -61239,8 +61325,11 @@ async function runSampleScanLocal(pages, opts) {
       }
       findings.push(...tagSampleFindings(toDynamicResult(out, page.url, lang, LOCAL_ENGINE).findings, page));
       outs.push(out);
-      scannedUrls.push(page.url);
-      const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, page.url, page) : void 0;
+      const followed = !isFile && /^https?:\/\//i.test(landedUrl) && addressOf(landedUrl) !== addressOf(page.url);
+      const recordedPage = followed ? { ...page, url: landedUrl } : page;
+      if (followed) redirectsFollowed.push({ id: page.id, requested: page.url, landed: landedUrl });
+      scannedUrls.push(recordedPage.url);
+      const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, recordedPage.url, recordedPage) : void 0;
       if (id) snapshots.push(id);
     }
   } finally {
@@ -61259,7 +61348,8 @@ async function runSampleScanLocal(pages, opts) {
     axe: axeInfo(outs, axe),
     ...scannedUrls.length ? { scanned: scannedUrls } : {},
     ...snapshots.length ? { snapshots } : {},
-    ...redirected.length ? { redirected } : {}
+    ...redirected.length ? { redirected } : {},
+    ...redirectsFollowed.length ? { followed: redirectsFollowed } : {}
   };
 }
 async function runCrawlScanLocal(opts) {
@@ -69607,9 +69697,13 @@ Options:
                      discovered route in the inventory .ultra11y/routes.json
   --routes-only      pages discover: record the route inventory (.ultra11y/routes.json) and
                      leave the sample untouched \u2014 the RGAA sample stays the one you chose,
-                     and the report's annex lists every other route with how it was observed
+                     and the report's annex lists every other route with how it was observed.
+                     With --from-snapshots and no snapshot, there is nothing to add: exit 0
   --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling \u2014
-                     the only route that sees a state-reached page (a modal, a funnel step)
+                     the only route that sees a state-reached page (a modal, a funnel step).
+                     --sitemap/--crawl ask every URL: one answering an HTTP error, redirecting
+                     to another page or serving a directory listing is left out of the sample
+                     by name, and recorded as such in .ultra11y/routes.json
   --propose          pages discover: propose a DETERMINISTIC sample instead of every page \u2014
                      the required kinds of the standard (--standard, default rgaa) matched by
                      keyword on the sorted URLs and titles, the search page with a fixed
@@ -69629,7 +69723,11 @@ Options:
                      the routes left out are listed \xAB not reached \xBB, never dropped
   --sample           scan: scan the NORMATIVE page sample from .ultra11yrc.json (its
                      sample.pages), per-page storage-state overriding --storage-state,
-                     aggregating one result with per-page provenance for the report
+                     aggregating one result with per-page provenance for the report.
+                     A page that redirects elsewhere or answers HTTP >= 400 is refused and
+                     named; any refused page makes the run exit 1 (partial sample), the
+                     report still written. A trailing-slash redirect is followed and the
+                     page recorded at its landing address
   --no-snapshot      scan: do NOT persist each scanned page to .ultra11y/pages/<id>/.
                      Snapshots are ON by default: the browser is already on the page, and
                      without one the page can never be re-audited offline nor earn a
@@ -70137,10 +70235,14 @@ Options :
   --routes-only      pages discover : enregistrer l'inventaire des routes (.ultra11y/routes.json) et
                      laisser l'\xE9chantillon intact \u2014 l'\xE9chantillon RGAA reste celui que vous avez
                      choisi, et l'annexe du rapport liste chaque autre route avec la fa\xE7on dont
-                     elle a \xE9t\xE9 observ\xE9e
+                     elle a \xE9t\xE9 observ\xE9e. Avec --from-snapshots et aucun instantan\xE9, il n'y a
+                     rien \xE0 ajouter : sortie 0
   --from-snapshots   pages discover : construire l'\xE9chantillon \xE0 partir de .ultra11y/pages au lieu de
                      crawler \u2014 la seule voie qui voit une page atteinte par un \xE9tat (une modale,
-                     une \xE9tape de tunnel)
+                     une \xE9tape de tunnel). --sitemap/--crawl interrogent chaque URL : celle qui
+                     r\xE9pond une erreur HTTP, redirige vers une autre page ou sert un listing de
+                     r\xE9pertoire est \xE9cart\xE9e de l'\xE9chantillon et nomm\xE9e, et consign\xE9e comme telle
+                     dans .ultra11y/routes.json
   --propose          pages discover : proposer un \xE9chantillon D\xC9TERMINISTE plut\xF4t que toutes les
                      pages \u2014 les types exig\xE9s par le r\xE9f\xE9rentiel (--standard, rgaa par d\xE9faut)
                      rep\xE9r\xE9s par mot-cl\xE9 sur les URL et titres tri\xE9s, la page de recherche avec
@@ -70163,7 +70265,11 @@ Options :
   --sample           scan : scanner l'\xE9chantillon de pages NORMATIF de .ultra11yrc.json (son
                      sample.pages), le storage-state de chaque page l'emportant sur
                      --storage-state, en agr\xE9geant un r\xE9sultat avec la provenance par page pour
-                     le rapport
+                     le rapport. Une page qui redirige ailleurs ou r\xE9pond HTTP >= 400 est
+                     refus\xE9e et nomm\xE9e ; toute page refus\xE9e fait sortir avec 1 (\xE9chantillon
+                     partiel), le rapport \xE9tant tout de m\xEAme \xE9crit. Une redirection qui
+                     n'ajoute ou ne retire qu'une barre oblique finale est suivie, et la page
+                     enregistr\xE9e \xE0 son adresse d'arriv\xE9e
   --no-snapshot      scan : NE PAS conserver chaque page scann\xE9e dans .ultra11y/pages/<id>/.
                      Les instantan\xE9s sont actifs par d\xE9faut : le navigateur est d\xE9j\xE0 sur la page,
                      et sans instantan\xE9 la page ne peut jamais \xEAtre r\xE9-audit\xE9e hors ligne ni
@@ -70717,6 +70823,12 @@ async function cmdPagesDiscover(p2) {
     const recorded2 = readSnapshots(root);
     const snaps = sampleFromSnapshots(recorded2);
     if (!snaps.length) {
+      if (p2.flags["routes-only"] === true) {
+        console.error(
+          lang === "fr" ? `\u2139\uFE0F ultra11y pages discover : aucun instantan\xE9 sous ${join40(root, PAGES_DIR)} \u2014 aucune route captur\xE9e par des tests E2E \xE0 ajouter \xE0 l'inventaire. Rien n'a \xE9t\xE9 \xE9crit.` : `\u2139\uFE0F ultra11y pages discover: no snapshot under ${join40(root, PAGES_DIR)} \u2014 no route captured by E2E tests to add to the inventory. Nothing was written.`
+        );
+        return 0;
+      }
       console.error(
         lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join40(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join40(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
       );
@@ -70753,22 +70865,22 @@ async function cmdPagesDiscover(p2) {
   const depth = typeof p2.flags.depth === "string" ? Number(p2.flags.depth) : void 0;
   const max = typeof p2.flags.max === "string" ? Number(p2.flags.max) : void 0;
   const cache2 = /* @__PURE__ */ new Map();
-  const fetchHtml2 = async (url) => {
-    const hit = cache2.get(url);
-    if (hit !== void 0) return hit;
-    let html = "";
-    try {
-      const res = await fetch(url, { redirect: "follow" });
-      if (res.ok) html = await res.text();
-    } catch {
+  const fetchProbe = (url) => {
+    let hit = cache2.get(url);
+    if (!hit) {
+      hit = probePage(url);
+      cache2.set(url, hit);
     }
-    cache2.set(url, html);
-    return html;
+    return hit;
+  };
+  const fetchHtml2 = async (url) => {
+    const got = await fetchProbe(url);
+    return { html: got.html, url: got.url };
   };
   let urls;
   try {
     const cap = crawlBound(max);
-    urls = sitemap ? ((u2) => Number.isFinite(cap) ? u2.slice(0, cap) : u2)(parseSitemapUrls(await fetchHtml2(sitemap))) : await crawlUrls(crawl, { fetchHtml: fetchHtml2, depth, max, onPage: (url, n) => console.error(`ultra11y pages discover: ${n} \u2014 ${url}`) });
+    urls = sitemap ? ((u2) => Number.isFinite(cap) ? u2.slice(0, cap) : u2)(parseSitemapUrls((await fetchHtml2(sitemap)).html)) : await crawlUrls(crawl, { fetchHtml: fetchHtml2, depth, max, onPage: (url, n) => console.error(`ultra11y pages discover: ${n} \u2014 ${url}`) });
   } catch (e) {
     console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
@@ -70779,19 +70891,51 @@ async function cmdPagesDiscover(p2) {
     );
     return 1;
   }
-  recordRouteInventory(p2, lang, urls, sitemap ? "sitemap" : "crawl");
-  if (p2.flags["routes-only"] === true) return 0;
-  const titles = /* @__PURE__ */ new Map();
   const CONCURRENCY = 6;
   const queue = [...urls];
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-      for (let url = queue.shift(); url !== void 0; url = queue.shift()) {
-        const t3 = extractTitle(await fetchHtml2(url));
-        if (t3) titles.set(url, t3);
-      }
+      for (let url = queue.shift(); url !== void 0; url = queue.shift()) await fetchProbe(url);
     })
   );
+  const probes = /* @__PURE__ */ new Map();
+  for (const url of urls) probes.set(url, await fetchProbe(url));
+  const verdicts = urls.map((url) => ({ url, probe: probes.get(url), verdict: classifyProbe(probes.get(url)) }));
+  const unreachable = verdicts.flatMap(({ verdict }) => verdict.ok ? [] : [verdict]);
+  const checks = new Map(
+    verdicts.map(({ url, probe, verdict }) => [
+      url,
+      {
+        ...probe.status !== void 0 ? { status: probe.status } : {},
+        ...probe.url !== url ? { landed: probe.url } : {},
+        ...!verdict.ok ? { refused: verdict.reason } : {}
+      }
+    ])
+  );
+  recordRouteInventory(p2, lang, urls, sitemap ? "sitemap" : "crawl", checks);
+  for (const u2 of unreachable)
+    console.error(
+      lang === "fr" ? `\u26A0\uFE0F ultra11y pages discover : \xE9cart\xE9e de l'\xE9chantillon \u2014 ${describeUnreachable(u2, lang)}.` : `\u26A0\uFE0F ultra11y pages discover: left out of the sample \u2014 ${describeUnreachable(u2, lang)}.`
+    );
+  if (p2.flags["routes-only"] === true) return 0;
+  const pageUrls = [];
+  const htmlOf = /* @__PURE__ */ new Map();
+  for (const { probe, verdict } of verdicts) {
+    if (!verdict.ok || htmlOf.has(verdict.url)) continue;
+    pageUrls.push(verdict.url);
+    htmlOf.set(verdict.url, probe.html);
+  }
+  if (!pageUrls.length) {
+    console.error(
+      lang === "fr" ? `ultra11y pages discover : aucune des ${urls.length} URL d\xE9couverte(s) ne r\xE9pond comme une page du site \u2014 rien \xE0 proposer. V\xE9rifiez l'URL de d\xE9part et que le serveur est lanc\xE9.` : `ultra11y pages discover: none of the ${urls.length} discovered URL(s) answers as a page of the site \u2014 nothing to propose. Check the start URL and that the server is running.`
+    );
+    return 1;
+  }
+  const titles = /* @__PURE__ */ new Map();
+  for (const url of pageUrls) {
+    const t3 = extractTitle(htmlOf.get(url) ?? "");
+    if (t3) titles.set(url, t3);
+  }
   if (p2.flags.propose === true) {
     const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
     const snapshotOf = /* @__PURE__ */ new Map();
@@ -70801,8 +70945,8 @@ async function cmdPagesDiscover(p2) {
       if (!snapshotOf.has(key2))
         snapshotOf.set(key2, { id: s2.meta.id, skeleton: skeletonOf(s2.dom), ...s2.meta.auth !== void 0 ? { auth: s2.meta.auth } : {} });
     }
-    const inputs = urls.map((url) => {
-      const html = cache2.get(url);
+    const inputs = pageUrls.map((url) => {
+      const html = htmlOf.get(url);
       const title = titles.get(url);
       const snap = snapshotOf.get(routePath(url));
       return {
@@ -70812,11 +70956,11 @@ async function cmdPagesDiscover(p2) {
         ...snap ? { id: snap.id, skeleton: snap.skeleton, ...snap.auth !== void 0 ? { auth: snap.auth } : {} } : {}
       };
     });
-    return writeProposedSample(p2, lang, inputs);
+    return writeProposedSample(p2, lang, inputs, unreachable);
   }
-  return writeDiscoveredSample(p2, lang, proposeSamplePages(urls, titles), urls.length);
+  return writeDiscoveredSample(p2, lang, proposeSamplePages(pageUrls, titles), pageUrls.length, unreachable);
 }
-function writeProposedSample(p2, lang, inputs) {
+function writeProposedSample(p2, lang, inputs, unreachable = []) {
   const key2 = typeof p2.flags.standard === "string" && p2.flags.standard ? p2.flags.standard : "rgaa";
   let methodology;
   let locale = "fr";
@@ -70873,6 +71017,7 @@ function writeProposedSample(p2, lang, inputs) {
           documents: proposal.documents,
           clusters: proposal.clusters,
           leftOut: proposal.leftOut,
+          ...unreachable.length ? { unreachable } : {},
           kept: applied.kept.map((x2) => ({ id: x2.id, url: x2.url })),
           dropped: applied.dropped.map((x2) => ({ id: x2.id, url: x2.url }))
         },
@@ -70947,15 +71092,15 @@ function stampRoutes(result, root, lang, extra = {}) {
     lang === "fr" ? `ultra11y : ${result.scope.routes.length} route(s) \u2014 ${n.captured} captur\xE9e(s) (E2E), ${n.scanned} scann\xE9e(s), ${n.source} source seule, ${n["not-reached"]} non atteinte(s).` : `ultra11y: ${result.scope.routes.length} route(s) \u2014 ${n.captured} captured (E2E), ${n.scanned} scanned, ${n.source} source only, ${n["not-reached"]} not reached.`
   );
 }
-function recordRouteInventory(p2, lang, urls, via) {
+function recordRouteInventory(p2, lang, urls, via, checks) {
   if (p2.flags.write !== true && p2.flags["routes-only"] !== true) return;
   const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
-  const { file, added, total } = writeRoutes(root, urls, via);
+  const { file, added, total } = writeRoutes(root, urls, via, checks);
   console.error(
     lang === "fr" ? `ultra11y pages discover : inventaire des routes \u2192 ${file} (${total} route(s), ${added} nouvelle(s)). \`ultra11y scan --sample --all-routes\` couvre l'\xE9chantillon puis le reste.` : `ultra11y pages discover: route inventory \u2192 ${file} (${total} route(s), ${added} new). \`ultra11y scan --sample --all-routes\` covers the sample, then the rest.`
   );
 }
-function writeDiscoveredSample(p2, lang, proposed, found) {
+function writeDiscoveredSample(p2, lang, proposed, found, unreachable = []) {
   let existing;
   try {
     existing = loadConfig(process.cwd())?.sample;
@@ -70970,7 +71115,8 @@ function writeDiscoveredSample(p2, lang, proposed, found) {
     for (const i of v2.issues) console.error(`  \u2717 ${i.path ? `${i.path}: ` : ""}${i.message}`);
     return 1;
   }
-  if (p2.flags.json) console.log(JSON.stringify({ sample: v2.sample, added: merged.added, kept: merged.kept }, null, 2));
+  if (p2.flags.json)
+    console.log(JSON.stringify({ sample: v2.sample, added: merged.added, kept: merged.kept, ...unreachable.length ? { unreachable } : {} }, null, 2));
   if (p2.flags.write !== true) {
     if (!p2.flags.json) {
       console.log(JSON.stringify({ sample: v2.sample }, null, 2));
@@ -73252,6 +73398,19 @@ async function cmdScan(p2) {
       return 1;
     }
   }
+  for (const f2 of dynamic.followed ?? [])
+    console.error(
+      lang === "fr" ? `\u2139\uFE0F ultra11y scan : \xAB ${f2.id} \xBB \u2014 ${f2.requested} redirige vers ${f2.landed} (m\xEAme page, adresse canonicalis\xE9e) : page audit\xE9e et enregistr\xE9e \xE0 ${f2.landed}. D\xE9clarez cette adresse dans l'\xE9chantillon pour l'ouvrir directement.` : `\u2139\uFE0F ultra11y scan: "${f2.id}" \u2014 ${f2.requested} redirects to ${f2.landed} (same page, canonical address): audited and recorded at ${f2.landed}. Declare that address in the sample to open it directly.`
+    );
+  const sampleIdSet = new Set((useSample && sampleConfig ? sampleConfig.pages : []).map((pg) => pg.id));
+  const refusedSample = (dynamic.redirected ?? []).filter((r2) => sampleIdSet.has(r2.id));
+  const finish = () => {
+    if (!refusedSample.length || !sampleConfig) return 0;
+    console.error(
+      lang === "fr" ? `\u2717 ultra11y scan : \xE9chantillon partiel \u2014 ${refusedSample.length} page(s) sur ${sampleConfig.pages.length} non enregistr\xE9e(s) : ${refusedSample.map((r2) => `\xAB ${r2.name} \xBB (${r2.id})`).join(", ")}. Le rapport ne couvre que les pages mesur\xE9es ; corrigez ces pages ou l'\xE9chantillon, puis relancez \`scan --sample\`.` : `\u2717 ultra11y scan: partial sample \u2014 ${refusedSample.length} of ${sampleConfig.pages.length} page(s) not recorded: ${refusedSample.map((r2) => `"${r2.name}" (${r2.id})`).join(", ")}. The report covers the measured pages only; fix those pages or the sample, then re-run \`scan --sample\`.`
+    );
+    return 1;
+  };
   if (baseline) {
     const newAll = newDynamicFindings(dynamic, baseline);
     const fresh = findingsAtOrAbove(newAll, gateOn);
@@ -73402,7 +73561,7 @@ async function cmdScan(p2) {
           lang === "fr" ? `${dynamic.snapshots.length} instantan\xE9(s) de page \xE9crit(s) dans ${PAGES_DIR}/ \u2014 committez-les pour auditer ces pages hors ligne (\`ultra11y pages\`).` : `${dynamic.snapshots.length} page snapshot(s) written to ${PAGES_DIR}/ \u2014 commit them to audit those pages offline (\`ultra11y pages\`).`
         );
     }
-    return 0;
+    return finish();
   }
   if (p2.flags.json) console.log(JSON.stringify(dynamic, null, 2));
   else {
@@ -73417,7 +73576,7 @@ ${dynamic.snapshots.length} instantan\xE9(s) de page \xE9crit(s) dans ${PAGES_DI
 ${dynamic.snapshots.length} page snapshot(s) written to ${PAGES_DIR}/ \u2014 \`ultra11y audit\` picks them up automatically.`
       );
   }
-  return 0;
+  return finish();
 }
 function cmdSample(p2) {
   const action = p2.positionals[0];
@@ -73476,6 +73635,7 @@ function cmdSample(p2) {
   const snapshotted = sampleFromSnapshots(readSnapshots(root));
   const union = unionSample(v2.sample, snapshotted);
   const { missing, waived } = lintSample(union.sample, methodology);
+  const unreachable = unreachableSamplePages(readRoutes(root), v2.sample.pages);
   const loc = pack?.defaultLocale ?? "fr";
   const counts = {
     declared: v2.sample.pages.length,
@@ -73492,6 +73652,8 @@ function cmdSample(p2) {
           ...counts,
           undeclaredPages: union.undeclared.map((x2) => ({ id: x2.id, url: x2.url })),
           uncapturedPages: union.uncaptured.map((x2) => ({ id: x2.id, url: x2.url })),
+          unreachablePages: unreachable.map((x2) => ({ id: x2.id, url: x2.url, ...x2.check })),
+          complete: missing.length === 0 && counts.undeclared === 0 && unreachable.length === 0,
           missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, loc) })),
           waived: waived.map((w2) => ({ id: w2.kind.id, label: kindLabel(w2.kind, loc), reason: w2.reason })),
           warnings: v2.warnings
@@ -73506,7 +73668,15 @@ function cmdSample(p2) {
     lang === "fr" ? `${counts.declared} d\xE9clar\xE9e(s) \xB7 ${counts.snapshotted} instantan\xE9e(s) \xB7 ${counts.undeclared} instantan\xE9e(s) non d\xE9clar\xE9e(s) \xB7 ${counts.uncaptured} d\xE9clar\xE9e(s) jamais captur\xE9e(s)` : `${counts.declared} declared \xB7 ${counts.snapshotted} snapshotted \xB7 ${counts.undeclared} snapshotted but undeclared \xB7 ${counts.uncaptured} declared but never captured`
   );
   for (const w2 of waived) console.log(`\u2139\uFE0F ${kindLabel(w2.kind, loc)} \u2014 ${lang === "fr" ? "absent, raison consign\xE9e" : "absent, reason recorded"} : ${w2.reason}`);
-  if (missing.length) {
+  for (const u2 of unreachable)
+    console.log(
+      lang === "fr" ? `\u26A0\uFE0F Page d\xE9clar\xE9e injoignable \u2014 \xAB ${u2.name} \xBB (${u2.id}) : ${describeUnreachable({ url: u2.url, reason: u2.check.refused, ...u2.check }, lang)} lors de la derni\xE8re d\xE9couverte. Retirez-la, ou d\xE9clarez l'adresse r\xE9elle de la page.` : `\u26A0\uFE0F Declared page unreachable \u2014 "${u2.name}" (${u2.id}): ${describeUnreachable({ url: u2.url, reason: u2.check.refused, ...u2.check }, lang)} at the last discovery. Remove it, or declare the page's real address.`
+    );
+  if (unreachable.length && !missing.length) {
+    console.log(
+      lang === "fr" ? `\u26A0\uFE0F \xC9chantillon non complet (${union.sample.pages.length} page(s)) \u2014 ${unreachable.length} page(s) d\xE9clar\xE9e(s) connue(s) injoignable(s) : ${unreachable.map((u2) => u2.id).join(", ")}. Relancez \`pages discover\` une fois corrig\xE9es.` : `\u26A0\uFE0F Sample not complete (${union.sample.pages.length} page(s)) \u2014 ${unreachable.length} declared page(s) known to be unreachable: ${unreachable.map((u2) => u2.id).join(", ")}. Re-run \`pages discover\` once fixed.`
+    );
+  } else if (missing.length) {
     console.log(
       (lang === "fr" ? `\u26A0\uFE0F \xC9chantillon incomplet (${union.sample.pages.length} page(s)) \u2014 types de page requis absents (${pack.name}) :` : `\u26A0\uFE0F Incomplete sample (${union.sample.pages.length} page(s)) \u2014 required page kinds missing (${pack.name}):`) + ` ${missing.map((k) => kindLabel(k, loc)).join(", ")}`
     );
