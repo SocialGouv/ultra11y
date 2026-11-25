@@ -52230,7 +52230,7 @@ function groundItems(items, opts = {}) {
       if (r2.moved) s2.moved++;
     } else {
       s2.failed++;
-      if (r2.issue) s2.issues.push(r2.issue);
+      if (r2.issue) s2.issues.push(it.subject ? `${it.subject}: ${r2.issue}` : r2.issue);
     }
   }
   return s2;
@@ -54358,8 +54358,8 @@ function applyAdjudication(audit, adj, opts = {}) {
     }
     return engineNcCache.get(key2) ?? EMPTY_IDS;
   };
-  const toGround = (criteriaId, g, fallback, offHarvest) => {
-    const entry2 = { g, ...fallback ? { fallback } : {}, ...offHarvest ? { offHarvest } : {} };
+  const toGround = (criteriaId, subject, g, fallback, offHarvest) => {
+    const entry2 = { subject, g, ...fallback ? { fallback } : {}, ...offHarvest ? { offHarvest } : {} };
     const list = groundInputs.get(criteriaId);
     if (list) list.push(entry2);
     else groundInputs.set(criteriaId, [entry2]);
@@ -54372,9 +54372,9 @@ function applyAdjudication(audit, adj, opts = {}) {
     const cite = { file: c.file, line: c.line, selector: c.selector, snippet: c.snippet };
     const { fallback, onAnchor } = evidenceFallback(evidence, c, citationDrift);
     if (fallback) {
-      toGround(criteriaId, cite, fallback);
+      toGround(criteriaId, subject, cite, fallback);
     } else {
-      toGround(criteriaId, cite, void 0, onAnchor ? void 0 : offHarvestHint(criteriaId, evidence));
+      toGround(criteriaId, subject, cite, void 0, onAnchor ? void 0 : offHarvestHint(criteriaId, evidence));
     }
   };
   const gateFinding = (criteriaId, subject, evidence, f2) => {
@@ -54404,7 +54404,7 @@ function applyAdjudication(audit, adj, opts = {}) {
     const anchor = anchorFor(evidence, f2, citationDrift);
     const cite = { file: f2.file, line: f2.line, selector: f2.selector, snippet: f2.snippet };
     if (anchor && recognisablySame(f2, anchor.at)) {
-      toGround(criteriaId, cite, {
+      toGround(criteriaId, subject, cite, {
         file: anchor.at.file,
         line: anchor.at.line,
         selector: anchor.at.selector,
@@ -54413,7 +54413,7 @@ function applyAdjudication(audit, adj, opts = {}) {
     } else {
       if (!anchor && !inAuditScope(f2.file))
         blame(criteriaId, `${subject}: finding ${f2.file}:${f2.line} is not among this criterion's harvested evidence (fabricated?)`);
-      toGround(criteriaId, cite, void 0, anchor ? void 0 : offHarvestHint(criteriaId, evidence));
+      toGround(criteriaId, subject, cite, void 0, anchor ? void 0 : offHarvestHint(criteriaId, evidence));
     }
   };
   let auditPageCache;
@@ -54627,12 +54627,12 @@ function applyAdjudication(audit, adj, opts = {}) {
         );
         continue;
       }
-      toGround(it.criteriaId, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
+      toGround(it.criteriaId, `criterion ${it.criteriaId}`, { file: rec.file, line: rec.line, selector: rec.selector, snippet: rec.snippet });
     }
   }
   const grounding = { grounded: 0, moved: 0, failed: 0, issues: [] };
   for (const [criteriaId, inputs] of groundInputs) {
-    for (const { g, fallback, offHarvest } of inputs) {
+    for (const { subject, g, fallback, offHarvest } of inputs) {
       let r2 = groundFinding(g, { cwd: opts.cwd });
       if (!r2.ok && fallback) {
         const viaAnchor = groundFinding(fallback, { cwd: opts.cwd });
@@ -54644,7 +54644,7 @@ function applyAdjudication(audit, adj, opts = {}) {
       } else {
         grounding.failed++;
         if (r2.issue) {
-          const issue = offHarvest && r2.issue.startsWith("cited snippet not found") ? `${r2.issue}${offHarvest}` : r2.issue;
+          const issue = `${subject}: ${offHarvest && r2.issue.startsWith("cited snippet not found") ? `${r2.issue}${offHarvest}` : r2.issue}`;
           grounding.issues.push(issue);
           blame(criteriaId, issue);
         }
@@ -62183,12 +62183,13 @@ var resumableItemKey = (it) => {
   return `${it.kind ?? "nc"}|${it.criteriaId}|${canonicalFile(it.file)}|${it.line}|${it.selector}|${it.claim}|${citationSetKey(it)}`;
 };
 function verifyGroundingInputs(items, fallbackFor) {
-  return items.flatMap(
-    (it) => it.uncited ? [] : it.kind === "c" && it.citations?.length ? it.citations.map((cite) => {
+  return items.flatMap((it) => {
+    const subject = `criterion ${it.criteriaId}`;
+    return it.uncited ? [] : it.kind === "c" && it.citations?.length ? it.citations.map((cite) => {
       const fallback = fallbackFor?.(it, cite);
-      return { file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet, ...fallback ? { fallback } : {} };
-    }) : [{ file: it.file, line: it.line, selector: it.selector, snippet: it.snippet }]
-  );
+      return { file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet, subject, ...fallback ? { fallback } : {} };
+    }) : [{ file: it.file, line: it.line, selector: it.selector, snippet: it.snippet, subject }];
+  });
 }
 var PASSING = /* @__PURE__ */ new Set(["supported", "partial"]);
 function normalizeVerdict2(v2) {
@@ -67746,7 +67747,7 @@ ${status}
 ## The loop (play every role yourself, one item at a time)
 
 1. **Audit** (if not done): \`${cmd("audit")}\` \u2192 \`${join37(runAbs, "audit-latest.json")}\`.
-2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join37(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join37(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
+2. **Adjudicate the residual criteria** \u2014 \`${cmd("adjudicate-worklist")}\` writes \`${join37(runAbs, "ADJUDICATE.todo.json")}\`. For EVERY item, apply \`${join37(runAbs, "orchestration", "agents", "adjudicator.md")}\` yourself (read the evidence, rule C/NC/NA/manual, fill the required justification/findings/reason IN the todo file). Then fold \u2014 gated per verdict, so a refusal costs its own criterion and no other: \`${cmd("adjudicate-fold")}\`. It exits 0 only when the gate refused nothing; any refusal exits 1 with the partial audit still written and a closing \xAB Repli incomplet \xBB line \u2014 the refused criteria (each line names \`criterion <id>\`, and the page when page-scoped) stay to assess: regenerate the worklist from the written audit, rule them again and fold. Add \`--ledger .ultra11y/verdicts/<standard>.json\` to RECORD the verdicts that landed, so CI can replay them without a model; \`--strict\` restores the old all-or-nothing fold.
 3. **Report**: \`${cmd("report")}\`.
 4. **Verify the report's claims** \u2014 \`${cmd("verify-worklist")}\` writes \`${join37(runAbs, "VERIFY.todo.json")}\` (and \`${join37(runAbs, "VERIFY.context.json")}\`, the context it was built from): the report's non-conformities AND the conformities the adjudication cleared in that audit. For EVERY entry, apply \`${join37(runAbs, "orchestration", "agents", "refuter.md")}\` yourself (open file:line, verdict supported/partial/refuted/unsupported + note IN the todo file). Then: \`${cmd("verify-fold")}\`. Generation and apply carry the SAME \`--in\`, \`--standard\` and conformity source (\`--conformities <file>\` / \`--no-conformities\`, if you used one): a list built from another source covers other claims, and \`--max-verify 0\` does not fix that \u2014 regenerate it. \`--no-conformities\` or an explicit \`--max-verify\` makes a PARTIAL trial; do not present it as covering the audit.
 5. **Gate**: \`${cmd("gate")}\` must exit 0 before presenting anything.
@@ -68008,8 +68009,8 @@ function buildManifest(runDir, engineAbs, batchSize = BATCH_SIZE) {
         [adjTodo, audit],
         [audit],
         {
-          "0": "at least one verdict landed (refusals, if any, named in rejectedCriteria[] / issues[])",
-          "1": "nothing landed, or --strict and a refusal",
+          "0": "complete fold: the gate refused nothing (manual verdicts and notInWorklist[] are not refusals)",
+          "1": "incomplete fold: a refusal \u2014 the partial audit is still written (auditPath), the refused criteria named in rejectedCriteria[] / issues[] stay to assess \u2014 or nothing landed, or --strict and a refusal (nothing written)",
           "2": EXIT_USAGE
         },
         "report"
@@ -69506,7 +69507,8 @@ Options:
   --strict           verify --apply: all-or-nothing fold \u2014 one refused
                      verdict discards the whole adjudication. The default folds PER
                      VERDICT: a refusal costs its own criterion, which stays to assess
-                     carrying the refusal, and every verdict that proved itself lands
+                     carrying the refusal, and every verdict that proved itself lands;
+                     any refusal still exits 1 (incomplete fold, partial audit written)
   --semantic         verify: fold the support-check into one pass
                      check: engage the semantic gate \u2014 requires an adjudicated verdicts
                      artifact (fails closed when absent) and re-grounds every passing
@@ -70041,7 +70043,8 @@ Options :
   --strict           verify --apply : int\xE9gration tout ou rien \u2014 un verdict refus\xE9 \xE9carte tout
                      l'arbitrage. Par d\xE9faut, l'int\xE9gration se fait PAR VERDICT : un refus ne
                      co\xFBte que son propre crit\xE8re, qui reste \xE0 \xE9valuer en portant le refus, et
-                     chaque verdict qui a fait ses preuves est int\xE9gr\xE9
+                     chaque verdict qui a fait ses preuves est int\xE9gr\xE9 ; tout refus sort
+                     quand m\xEAme en 1 (repli incomplet, audit partiel \xE9crit)
   --semantic         verify : int\xE9grer la v\xE9rification d'\xE9tayage en une seule passe
                      check : activer la barri\xE8re s\xE9mantique \u2014 exige un artefact de verdicts
                      arbitr\xE9s (\xE9choue s'il est absent) et r\xE9-ancre chaque verdict positif au
@@ -72453,7 +72456,7 @@ function replayLedgerFile(p2, ledger, lang) {
     console.log(
       JSON.stringify(
         {
-          ok: true,
+          ok: r2.rejected === 0,
           auditPath,
           applied: r2.applied,
           stillManual: r2.stillManual,
@@ -72475,7 +72478,7 @@ function replayLedgerFile(p2, ledger, lang) {
     );
   else {
     console.log(
-      lang === "fr" ? `\u2713 ${r2.applied} verdict(s) rejou\xE9(s) depuis le registre, ${r2.stillManual} laiss\xE9(s) en r\xE9siduel${r2.rejected ? `, ${r2.rejected} refus\xE9(s)` : ""} \u2192 ${auditPath}` : `\u2713 ${r2.applied} verdict(s) replayed from the ledger, ${r2.stillManual} left residual${r2.rejected ? `, ${r2.rejected} refused` : ""} \u2192 ${auditPath}`
+      lang === "fr" ? `${r2.rejected ? "\u26A0" : "\u2713"} ${r2.applied} verdict(s) rejou\xE9(s) depuis le registre, ${r2.stillManual} laiss\xE9(s) en r\xE9siduel${r2.rejected ? `, ${r2.rejected} refus\xE9(s)` : ""} \u2192 ${auditPath}` : `${r2.rejected ? "\u26A0" : "\u2713"} ${r2.applied} verdict(s) replayed from the ledger, ${r2.stillManual} left residual${r2.rejected ? `, ${r2.rejected} refused` : ""} \u2192 ${auditPath}`
     );
     if (rp.stale.length)
       console.error(
@@ -72489,8 +72492,10 @@ function replayLedgerFile(p2, ledger, lang) {
       console.error(
         lang === "fr" ? `\u2139 ${rp.obsolete.length} entr\xE9e(s) obsol\xE8te(s) (le moteur les d\xE9cide d\xE9sormais) : ${rp.obsolete.join(", ")}` : `\u2139 ${rp.obsolete.length} obsolete entry(ies) (the engine now decides them): ${rp.obsolete.join(", ")}`
       );
+    if (r2.rejected) for (const i of r2.issues) console.error(`  \u2717 ${i}`);
+    return reportIncompleteFold(r2.rejected, auditPath, lang);
   }
-  return 0;
+  return r2.rejected ? 1 : 0;
 }
 function reportDuplicateCharges(list, lang) {
   if (!list?.length) return;
@@ -72506,6 +72511,13 @@ function reportNotInWorklist(ids2, lang) {
   console.error(
     lang === "fr" ? `\u2139 ${ids2.length} crit\xE8re(s) hors de la liste \u2014 absent(s) de ce fichier, rien n'a \xE9t\xE9 refus\xE9 ; ils restent \xE0 \xE9valuer : ${shown}` : `\u2139 ${ids2.length} criterion(ia) not in this worklist \u2014 absent from this file, nothing was refused; they stay to assess: ${shown}`
   );
+}
+function reportIncompleteFold(rejected, auditPath, lang) {
+  if (rejected === 0) return 0;
+  console.error(
+    lang === "fr" ? `\u2717 Repli incomplet : ${rejected} crit\xE8re(s) refus\xE9(s) par la porte, qui reste(nt) \xE0 \xE9valuer. L'audit partiel est \xE9crit (${auditPath}) ; r\xE9g\xE9n\xE9rez la liste depuis cet audit, retranchez ces crit\xE8res et repliez \xE0 nouveau.` : `\u2717 Incomplete fold: ${rejected} criterion(ia) refused by the gate, still to assess. The partial audit is written (${auditPath}); regenerate the worklist from it, rule those criteria again and fold again.`
+  );
+  return 1;
 }
 function applyAdjudicationFile(p2, adj, lang) {
   const inFlag = p2.flags.in;
@@ -72567,7 +72579,7 @@ function applyAdjudicationFile(p2, adj, lang) {
     console.log(
       JSON.stringify(
         {
-          ok: true,
+          ok: r2.rejected === 0,
           auditPath,
           applied: r2.applied,
           stillManual: r2.stillManual,
@@ -72585,11 +72597,13 @@ function applyAdjudicationFile(p2, adj, lang) {
         2
       )
     );
-  else
+  else {
     console.log(
-      lang === "fr" ? `\u2713 ${r2.applied} crit\xE8re(s) adjug\xE9(s), ${r2.stillManual} laiss\xE9(s) en r\xE9siduel${r2.rejected ? `, ${r2.rejected} refus\xE9(s)` : ""}${r2.notInWorklist.length ? `, ${r2.notInWorklist.length} hors de la liste` : ""} \u2192 ${auditPath}` : `\u2713 ${r2.applied} criterion(ia) adjudicated, ${r2.stillManual} left residual${r2.rejected ? `, ${r2.rejected} refused` : ""}${r2.notInWorklist.length ? `, ${r2.notInWorklist.length} not in this worklist` : ""} \u2192 ${auditPath}`
+      lang === "fr" ? `${r2.rejected ? "\u26A0" : "\u2713"} ${r2.applied} crit\xE8re(s) adjug\xE9(s), ${r2.stillManual} laiss\xE9(s) en r\xE9siduel${r2.rejected ? `, ${r2.rejected} refus\xE9(s)` : ""}${r2.notInWorklist.length ? `, ${r2.notInWorklist.length} hors de la liste` : ""} \u2192 ${auditPath}` : `${r2.rejected ? "\u26A0" : "\u2713"} ${r2.applied} criterion(ia) adjudicated, ${r2.stillManual} left residual${r2.rejected ? `, ${r2.rejected} refused` : ""}${r2.notInWorklist.length ? `, ${r2.notInWorklist.length} not in this worklist` : ""} \u2192 ${auditPath}`
     );
-  return 0;
+    return reportIncompleteFold(r2.rejected, auditPath, lang);
+  }
+  return r2.rejected ? 1 : 0;
 }
 async function cmdFix(p2) {
   const inputs = p2.positionals.length ? p2.positionals : ["."];

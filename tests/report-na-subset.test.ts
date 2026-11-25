@@ -127,8 +127,12 @@ async function fold(R: string, decide: Record<string, "C" | "manual">) {
   const filled = join(R, "filled.json");
   writeFileSync(filled, JSON.stringify(todo));
   const app = await run(["verify", "--apply", filled, "--in", join(R, "audit-latest.json"), "--out", R, "--json"]);
-  expect(app.code).toBe(0); // a partial fold is exit 0: the refused stay to assess, carrying why
-  const res = JSON.parse(app.out) as { applied: number; stillManual: number; rejected: number; rejectedCriteria: string[] };
+  const res = JSON.parse(app.out) as { ok: boolean; auditPath: string; applied: number; stillManual: number; rejected: number; rejectedCriteria: string[] };
+  // A partial fold writes the audit — the refused stay to assess, carrying why — and exits 1
+  // when anything was refused, so the exit code alone never reads as a complete fold (#223).
+  expect(app.code).toBe(res.rejected ? 1 : 0);
+  expect(res.ok).toBe(res.rejected === 0);
+  expect(res.auditPath).toBeTruthy();
   return res;
 }
 

@@ -65,8 +65,11 @@ $ENGINE verify --manual --in "$RUN/audit-latest.json" --out "$RUN" --json
 #    in `rejectedCriteria[]` / `issues[]`, and a criterion absent from the file — a coverage
 #    gap, not a refusal — is named apart in `notInWorklist[]` and stays to assess. A verdict for a criterion a previous fold already decided is refused too
 #    (« not open for adjudication »), so re-applying a file on the written-back audit is safe.
-#    Exit 1 only when nothing landed. `--strict` makes it all-or-nothing (exit 1
-#    on any refusal, audit left untouched).
+#    Exit 0 only when the gate refused nothing. Any refusal exits 1: the accepted verdicts
+#    are still written to audit-latest.json, the refused criteria stay to assess, and a
+#    closing « Repli incomplet : N critère(s) refusé(s) » line says so. Nothing landed also
+#    exits 1, with no audit written. `--strict` makes it all-or-nothing (exit 1 on any
+#    refusal, audit left untouched). A `manual` verdict (undecidable) is not a refusal.
 $ENGINE verify --apply "$RUN/ADJUDICATE.verdicts.json" --in "$RUN/audit-latest.json" --out "$RUN" --json
 
 # 5. REPORT — deterministic rendering of the adjudicated audit.
@@ -211,7 +214,7 @@ orchestrateur peut s’exécuter depuis le checkout audité sans le salir. `audi
 | | 0 | 1 | 2 |
 |---|---|---|---|
 | `audit` | rapporté (sans `--fail-on`), ou propre | constats ≥ `--fail-on` | usage / entrée invalide |
-| `verify --apply` | au moins un verdict a atterri (refus éventuels dans `rejectedCriteria[]` / `issues[]`) | rien n’a atterri, ou `--strict` et un refus | usage / entrée invalide |
+| `verify --apply` | repli complet : le garde-fou n’a rien refusé (les `manual` et les `notInWorklist[]` ne sont pas des refus) | repli incomplet : au moins un refus (l’audit partiel est écrit, `auditPath` présent, refus dans `rejectedCriteria[]` / `issues[]`), ou rien n’a atterri, ou `--strict` et un refus (rien n’est écrit) | usage / entrée invalide |
 | `check` | le rapport est sain | échec d’intégrité | rapport introuvable / entrée invalide |
 | `prd` | écrit | — (il écrit du markdown et ne dépose rien) | usage / entrée invalide |
 | `tickets` | déposé, ignoré, ou rien à déposer | une création a échoué, le fournisseur est inutilisable, ou aucune page dans le périmètre | usage / entrée invalide / au-delà de `--max-tickets` |
@@ -226,15 +229,19 @@ rapporte le statut de `head`, et c’est ainsi qu’un garde-fou en échec se li
   `conformancePct` — le **taux de réussite statique automatique**, pas un taux de conformité.
 - `verify --apply --json` → `{ ok, auditPath, applied, stillManual, rejected, rejectedCriteria[], notInWorklist[],
   issues[], conformancePct, automaticPassRatePct, conformanceRatePct?, conformance?, findings, grounding }` ;
-  `ok: false` quand rien n’a atterri. `conformancePct` est conservé tel quel — le taux de réussite
+  `ok` suit le code de sortie : `false` dès que le garde-fou a refusé un critère (`rejected > 0`),
+  y compris quand le reste a atterri — **`ok: false` ne signifie donc pas « rien n’a été écrit »** :
+  la présence d’`auditPath` dit que l’audit partiel a été écrit ; seule la sortie d’un repli où rien
+  n’a atterri (ou `--strict`) en est dépourvue. Chaque ligne de refus d’`issues[]` commence par
+  `criterion <id>:` (ou `criterion <id>, page <id>:` pour un verdict de page). `conformancePct` est conservé tel quel — le taux de réussite
   statique **automatique** du cœur WCAG, qu’aucun jugement ne fait bouger — et `automaticPassRatePct`
   est le même nombre sous son vrai nom. Sous un référentiel de pack, `conformance` est le taux de
   conformité propre au référentiel avec ses opérandes (l’objet que porte `report --json`) et
   `conformanceRatePct` son pourcentage, `null` quand rien n’est applicable : c’est le taux qu’un
   arbitrage fait bouger. `rejected` ne compte que les verdicts que le garde-fou a refusés ; les critères
   ouverts que le fichier n’a jamais mentionnés (un lot, un balayage tronqué) sont dans
-  `notInWorklist[]`. Comptez sur `applied + stillManual + rejected + notInWorklist.length`, jamais sur
-  le seul code de sortie.
+  `notInWorklist[]`. Le code de sortie dit si le repli est complet (0) ou non (1) ; pour savoir ce qui
+  a atterri, comptez sur `applied + stillManual + rejected + notInWorklist.length`.
 - Avec `--prune`, **`ok: false` ne signifie pas « rien n’a été appliqué »**. La CLI calcule d’abord les
   verdicts de couverture et d’ancrage, mais `applyPrune` écrit le `audit-latest.json` élagué et répare
   le fichier `--ledger` AVANT que `ok` ne soit dérivé — donc une contre-vérification qui échoue sur

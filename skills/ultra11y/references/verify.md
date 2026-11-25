@@ -155,11 +155,19 @@ Il rejette un verdict nul, un `C`/`NA` sans `justification`, un `NC` sans consta
 `manual` sans `reason`, ou tout critère résiduel non couvert. Un critère ouvert que le fichier ne
 mentionne pas du tout n’est pas un refus — rien n’a été proposé — et il est nommé à part dans
 `notInWorklist[]` (« hors de la liste ») : replier un lot de 11 critères sur 46 rapporte
-`rejected: 0, notInWorklist: [35 ids]`, jamais « 35 rejetés ». Il reste « à évaluer » et maintient
-`ok: false` (le fold est incomplet) ; `--strict` refuse toujours sur lui. Un verdict pour un critère
+`rejected: 0, notInWorklist: [35 ids]`, jamais « 35 rejetés ». Il reste « à évaluer » sans faire
+échouer le repli (code 0) ; `--strict` refuse toujours sur lui. Un verdict pour un critère
 qui n’est plus ouvert — un critère qu’un fold précédent a déjà décidé — est de même refusé nommément
 (« not open for adjudication »), jamais réappliqué : replier à nouveau le même fichier sur l’audit
-réécrit répond `ok: false` avec ce critère dans `rejectedCriteria[]`. Les `NC` de l’agent deviennent de
+réécrit répond `ok: false` avec ce critère dans `rejectedCriteria[]`.
+
+**Code de sortie.** 0 seulement quand le garde-fou n’a rien refusé. Dès qu’un critère est refusé,
+le repli est **incomplet** et sort en 1 — même si le reste a atterri : l’audit partiel est écrit
+(`auditPath`), les critères refusés restent « à évaluer », `ok: false`, et une dernière ligne
+`✗ Repli incomplet : N critère(s) refusé(s) par la porte…` le dit. Un verdict `manual` (indécidable,
+nommé plus tard sous `check --allow-undecided`) n’est pas un refus. Chaque ligne de refus commence
+par `criterion <id>:` — `criterion <id>, page <id>:` pour un verdict de page —, y compris
+« cited snippet not found in … ». 2 reste l’usage / entrée invalide. Les `NC` de l’agent deviennent de
 vrais constats `agent:<sc>` qui se réaffichent dans le §2 du rapport et réintègrent la liste de travail
 de vérification ; `report`/`prd` se réaffichent avec les statuts arbitrés ; le §5 se réduit aux seuls
 items encore `manual`. Un verdict `manual` — ou un trou de couverture — sur un critère que le moteur

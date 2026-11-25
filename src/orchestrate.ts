@@ -409,8 +409,8 @@ export function buildManifest(runDir: string, engineAbs: string, batchSize = BAT
         [adjTodo, audit],
         [audit],
         {
-          "0": "at least one verdict landed (refusals, if any, named in rejectedCriteria[] / issues[])",
-          "1": "nothing landed, or --strict and a refusal",
+          "0": "complete fold: the gate refused nothing (manual verdicts and notInWorklist[] are not refusals)",
+          "1": "incomplete fold: a refusal — the partial audit is still written (auditPath), the refused criteria named in rejectedCriteria[] / issues[] stay to assess — or nothing landed, or --strict and a refusal (nothing written)",
           "2": EXIT_USAGE,
         },
         "report",

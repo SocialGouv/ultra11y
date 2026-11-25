@@ -355,6 +355,10 @@ describe("the gate refuses a page outcome that fails its own gate (#197)", () =>
     const r = fold112({ good: { verdict: "C", justification: "Étiquette pertinente.", citations: [forged] } }, {}, true);
     expect(r.ok).toBe(false);
     expect(r.issues.join("\n")).toMatch(/page good.*(not found|fabricated)/);
+    // EVERY refusal line names its criterion and page, the grounding ones included (#223).
+    const grounding = r.issues.filter((i) => /cited (snippet|selector|file|line)/.test(i));
+    expect(grounding.length, r.issues.join("\n")).toBeGreaterThan(0);
+    for (const i of grounding) expect(i).toMatch(/^criterion 11\.2, page good: cited /);
     expect(r.rejectedCriteria, r.issues.join("\n")).toContain("11.2");
     expect(r.audit.packAdjudication?.criteria.find((c) => c.id === "11.2")?.pages).toBeUndefined();
   });

@@ -70,6 +70,10 @@ describe("orchestrate --manifest — the step graph as data (#82)", () => {
     expect(m.steps.find((s) => s.id === "gate")!.next).toBeNull();
     expect(m.steps.find((s) => s.id === "gate")!.onFailure).toBe("fix");
     expect(m.steps.find((s) => s.id === "fix")!.next).toBe("audit");
+    // A fold the gate refused anything in is incomplete, and its exit code says so (#223).
+    const fold = m.steps.find((s) => s.id === "adjudicate-fold")!;
+    expect(fold.exit?.["0"]).toMatch(/refused nothing/);
+    expect(fold.exit?.["1"]).toMatch(/incomplete fold: a refusal/);
   });
 
   it("gives every engine step its command as a line and as argv, plus an exit-code contract", () => {

@@ -478,7 +478,8 @@ Options:
   --strict           verify --apply: all-or-nothing fold — one refused
                      verdict discards the whole adjudication. The default folds PER
                      VERDICT: a refusal costs its own criterion, which stays to assess
-                     carrying the refusal, and every verdict that proved itself lands
+                     carrying the refusal, and every verdict that proved itself lands;
+                     any refusal still exits 1 (incomplete fold, partial audit written)
   --semantic         verify: fold the support-check into one pass
                      check: engage the semantic gate — requires an adjudicated verdicts
                      artifact (fails closed when absent) and re-grounds every passing
@@ -1014,7 +1015,8 @@ Options :
   --strict           verify --apply : intégration tout ou rien — un verdict refusé écarte tout
                      l'arbitrage. Par défaut, l'intégration se fait PAR VERDICT : un refus ne
                      coûte que son propre critère, qui reste à évaluer en portant le refus, et
-                     chaque verdict qui a fait ses preuves est intégré
+                     chaque verdict qui a fait ses preuves est intégré ; tout refus sort
+                     quand même en 1 (repli incomplet, audit partiel écrit)
   --semantic         verify : intégrer la vérification d'étayage en une seule passe
                      check : activer la barrière sémantique — exige un artefact de verdicts
                      arbitrés (échoue s'il est absent) et ré-ancre chaque verdict positif au

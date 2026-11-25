@@ -197,6 +197,12 @@ node scripts/ultra11y.mjs verify --apply audits/ADJUDICATE.todo.json \
   --in audits/audit-latest.json --standard <standard> --out audits --ledger
 ```
 
+Le repli sort en 0 seulement si le garde-fou n’a rien refusé. S’il refuse des critères, il sort
+en 1 et termine par `✗ Repli incomplet : N critère(s) refusé(s) par la porte…` : les verdicts acceptés
+sont écrits dans `audits/audit-latest.json`, les refusés restent « à évaluer ». Chaque ligne de refus
+nomme son critère (et sa page). Ne passez pas à l’étape 4 sur un repli incomplet sans l’avoir dit :
+régénérez la liste depuis l’audit écrit, retranchez les critères refusés et repliez à nouveau.
+
 Un critère de rendu dont le brief indique qu’aucune preuve n’a été récoltée ne peut pas être
 `C` (le repli le refuse) : enregistrez `manual` avec la raison `undecidable` et une
 justification qui dit ce que vous avez vérifié, et nommez-le dans le fichier `--allow-undecided`

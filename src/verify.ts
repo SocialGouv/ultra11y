@@ -433,17 +433,26 @@ const resumableItemKey = (it: VerifyItem): string => {
 export function verifyGroundingInputs(
   items: VerifyItem[],
   fallbackFor?: (it: VerifyItem, cite: CriterionCitation) => { file: string; line: number; selector?: string; snippet?: string } | undefined,
-): Array<{ file: string; line: number; selector?: string; snippet?: string; fallback?: { file: string; line: number; selector?: string; snippet?: string } }> {
-  return items.flatMap((it) =>
-    it.uncited
+): Array<{
+  file: string;
+  line: number;
+  selector?: string;
+  snippet?: string;
+  subject: string;
+  fallback?: { file: string; line: number; selector?: string; snippet?: string };
+}> {
+  return items.flatMap((it) => {
+    // Named on every grounding refusal, like the other refusal lines (#223).
+    const subject = `criterion ${it.criteriaId}`;
+    return it.uncited
       ? [] // nothing was cited, so there is no anchor to re-open
       : it.kind === "c" && it.citations?.length
         ? it.citations.map((cite) => {
             const fallback = fallbackFor?.(it, cite);
-            return { file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet, ...(fallback ? { fallback } : {}) };
+            return { file: cite.file, line: cite.line, selector: cite.selector, snippet: cite.snippet, subject, ...(fallback ? { fallback } : {}) };
           })
-        : [{ file: it.file, line: it.line, selector: it.selector, snippet: (it as { snippet?: string }).snippet }],
-  );
+        : [{ file: it.file, line: it.line, selector: it.selector, snippet: (it as { snippet?: string }).snippet, subject }];
+  });
 }
 
 // Only these two verdicts clear the gate. Everything else — refuted, unsupported,

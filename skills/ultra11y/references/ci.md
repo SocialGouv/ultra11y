@@ -48,7 +48,7 @@ bot s’appuie sur :
 | `scan --sample --merge <audit.json>` | rendre, capturer en instantané et replier l’échantillon de pages (`--storage-state` pour les pages derrière une connexion) |
 | `verify --apply <ledger>` | rejouer le registre des verdicts commité (`.ultra11y/verdicts/<standard>.json`) — une re-vérification sur des preuves fraîches, jamais un simple hit de cache |
 | `verify --manual` | la liste de travail d’arbitrage pour les critères encore « à évaluer » |
-| `verify --apply <adjudication.json> --ledger <file>` | le repli fail-closed, qui enregistre les verdicts acceptés |
+| `verify --apply <adjudication.json> --ledger <file>` | le repli fail-closed, qui enregistre les verdicts acceptés ; sort en 1 dès qu’un critère est refusé (repli incomplet, audit partiel écrit), comme le rejeu d’un registre |
 | `verify --report …` · `verify --apply <VERIFY.todo.json> --prune` | la contre-vérification : chaque affirmation écrite mise à l’épreuve, les réfutées retirées |
 | `report` · `report --html` | le rapport de conformité daté, et son HTML imprimable |
 | `check --report <md>` | le contrôle d’intégrité : chaque critère cité se résout, chaque NA est justifié |

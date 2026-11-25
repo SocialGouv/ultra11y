@@ -150,6 +150,9 @@ describe("the trial grounds a retained claim the way the fold did", () => {
     const parsed = JSON.parse(a.out) as { ok: boolean; grounding: { failed: number; issues: string[] } };
     expect(parsed.grounding.failed).toBe(1);
     expect(parsed.grounding.issues.join("\n")).toMatch(/cited snippet not found/);
+    // The trial's grounding refusal names its criterion too (#223).
+    const id = (todo[0] as unknown as { criteriaId: string }).criteriaId;
+    expect(parsed.grounding.issues[0]!.startsWith(`criterion ${id}: cited snippet not found in `), parsed.grounding.issues[0]).toBe(true);
   });
 
   it("keeps the strict literal check when no audit is in hand", async () => {
