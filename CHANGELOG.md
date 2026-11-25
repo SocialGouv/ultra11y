@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [9.6.5](https://github.com/SocialGouv/ultra11y/compare/v9.6.4...v9.6.5) (2026-11-25)
+
+
+### Bug Fixes
+
+* **report:** French default text, sample pages counted as pages with their journey states folded in, distinct no-page labels ([#237](https://github.com/SocialGouv/ultra11y/issues/237)) ([b802ee3](https://github.com/SocialGouv/ultra11y/commit/b802ee35b29a30005ebb23d712b4ea4c24c604f2)), closes [#232](https://github.com/SocialGouv/ultra11y/issues/232) [#232](https://github.com/SocialGouv/ultra11y/issues/232)
+
 ## [9.6.4](https://github.com/SocialGouv/ultra11y/compare/v9.6.3...v9.6.4) (2026-11-25)
 
 
