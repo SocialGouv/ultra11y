@@ -1,19 +1,20 @@
-# Media, pointer input and motion
+# Médias, saisie par pointeur et mouvement
 
-The criteria in this page are the ones a source-only audit is least able to settle: what a
-video actually contains, how big a target renders, whether an animation lasts five seconds.
-Each entry says what decides it — you, the `scan` tier, or the engine.
+Les critères de cette page sont ceux qu’un audit de la seule source est le moins à même de
+trancher : ce que contient réellement une vidéo, la taille d’une cible une fois rendue, si une
+animation dure cinq secondes. Chaque entrée dit ce qui la tranche — vous, le niveau `scan` ou le
+moteur.
 
-## Time-based media (1.2.x)
+## Médias temporels (1.2.x)
 
-| Media | What it needs | Level |
+| Média | Ce dont il a besoin | Niveau |
 |---|---|---|
-| Audio-only, prerecorded | A text transcript | A (1.2.1) |
-| Video-only, prerecorded | A transcript OR an equivalent audio track | A (1.2.1) |
-| Video with audio, prerecorded | Synchronized captions | A (1.2.2) |
-| Video with audio, prerecorded | Audio description OR a full text alternative | A (1.2.3) |
-| Video with audio, prerecorded | Audio description — a transcript no longer suffices | **AA (1.2.5)** |
-| Any live audio | Real-time captions | AA (1.2.4) |
+| Audio seul, préenregistré | Une transcription textuelle | A (1.2.1) |
+| Vidéo seule, préenregistrée | Une transcription OU une piste audio équivalente | A (1.2.1) |
+| Vidéo avec son, préenregistrée | Des sous-titres synchronisés | A (1.2.2) |
+| Vidéo avec son, préenregistrée | Une audiodescription OU une alternative textuelle complète | A (1.2.3) |
+| Vidéo avec son, préenregistrée | Une audiodescription — une transcription ne suffit plus | **AA (1.2.5)** |
+| Tout audio en direct | Des sous-titres en temps réel | AA (1.2.4) |
 
 ```html
 <video controls>
@@ -24,42 +25,45 @@ Each entry says what decides it — you, the `scan` tier, or the engine.
 <p><a href="talk-transcript.html">Read the transcript of this talk</a></p>
 ```
 
-`kind` matters: `captions` include non-speech sounds and speaker identification;
-`subtitles` are a translation for people who can hear; `descriptions` narrate the picture.
-A `subtitles` track does not satisfy 1.2.2.
+`kind` compte : `captions` inclut les sons non verbaux et l’identification des locuteurs ;
+`subtitles` est une traduction destinée aux personnes qui entendent ; `descriptions` raconte
+l’image. Une piste `subtitles` ne satisfait pas le 1.2.2.
 
-**Why the engine only recommends here.** A `<video>` without `<track>` may still carry
-captions embedded in the container, and its audio track may be silent. Neither is knowable
-from source, so `media-no-track` is a **recommendation**: 1.2.2 stays yours to adjudicate
-against the real media. Check the file and the player before writing a verdict.
+**Pourquoi le moteur se contente ici de recommander.** Une `<video>` sans `<track>` peut tout de
+même porter des sous-titres intégrés au conteneur, et sa piste audio peut être muette. Ni l’un ni
+l’autre ne peut être connu à partir de la source, donc `media-no-track` est une
+**recommandation** : le 1.2.2 reste à vous d’arbitrer au regard du média réel. Vérifiez le
+fichier et le lecteur avant d’écrire un verdict.
 
-Also in scope: a media player's own controls must be keyboard-operable and named (2.1.1,
-4.1.2) — a custom player is a composite widget, see `references/widgets.md`.
+Également dans le périmètre : les contrôles propres d’un lecteur multimédia doivent être
+utilisables au clavier et nommés (2.1.1, 4.1.2) — un lecteur personnalisé est un widget
+composite, voir `references/widgets.md`.
 
-## Autoplay (1.4.2, 2.2.2)
+## Lecture automatique (1.4.2, 2.2.2)
 
-Audio that plays automatically for more than 3 seconds needs a mechanism to pause, stop or
-control its volume, independent of the system volume. Native `controls` is that mechanism.
+Un son qui se lance automatiquement pendant plus de 3 secondes nécessite un mécanisme pour le
+mettre en pause, l’arrêter ou contrôler son volume, indépendamment du volume système. Les
+`controls` natifs sont ce mécanisme.
 
 ```html
 <video autoplay muted playsinline>…</video>   <!-- no audio: 1.4.2 not engaged -->
 <audio src="jingle.mp3" autoplay controls>     <!-- ✓ a stop mechanism exists -->
 ```
 
-Engine rule: `autoplay-media` — normative only when there is no `controls` and no `muted`;
-the muted-video case is raised as a recommendation, since the source cannot show whether the
-movement lasts the 5 seconds 2.2.2 requires.
+Règle du moteur : `autoplay-media` — normative uniquement en l’absence de `controls` et de
+`muted` ; le cas de la vidéo muette est soulevé comme recommandation, puisque la source ne peut
+pas montrer si le mouvement dure les 5 secondes qu’exige le 2.2.2.
 
-## Pointer input (2.5.x)
+## Saisie par pointeur (2.5.x)
 
-| SC | Requirement | How to satisfy it |
+| Critère de succès | Exigence | Comment la satisfaire |
 |---|---|---|
-| **2.5.1** Pointer Gestures | No function requires a multipoint or path-based gesture | Add buttons beside the swipe/pinch: carousel arrows, map zoom controls |
-| **2.5.2** Pointer Cancellation | No function executes on the DOWN event, or it is abortable | Act on `click`/`pointerup`, not `pointerdown`; allow the user to slide off to abort |
-| **2.5.3** Label in Name | Visible label contained in the accessible name | See `references/naming.md` |
-| **2.5.4** Motion Actuation | Motion-triggered functions have a UI equivalent AND can be disabled | Keep a button for "shake to undo"; offer a setting |
-| **2.5.7** Dragging Movements (2.2) | Every drag has a single-pointer alternative | "Move up"/"Move down" buttons beside a drag handle; a numeric input beside a slider |
-| **2.5.8** Target Size (2.2) | Targets are at least 24×24 CSS px | Or spaced so 24px circles do not overlap; inline links in text are exempt |
+| **2.5.1** Gestes de pointage | Aucune fonction n’exige un geste multipoint ou basé sur un tracé | Ajoutez des boutons à côté du balayage/pincement : flèches de carrousel, contrôles de zoom de carte |
+| **2.5.2** Annulation de l’action du pointeur | Aucune fonction ne s’exécute sur l’événement DOWN, ou elle peut être annulée | Agissez sur `click`/`pointerup`, pas sur `pointerdown` ; permettez à l’utilisateur de glisser hors de la cible pour annuler |
+| **2.5.3** Étiquette dans le nom | L’étiquette visible est contenue dans le nom accessible | Voir `references/naming.md` |
+| **2.5.4** Activation par le mouvement | Les fonctions déclenchées par le mouvement ont un équivalent dans l’interface ET peuvent être désactivées | Gardez un bouton pour « secouer pour annuler » ; proposez un réglage |
+| **2.5.7** Mouvements de glissement (2.2) | Chaque glissement a une alternative à pointeur unique | Des boutons « Monter »/« Descendre » à côté d’une poignée de glissement ; un champ numérique à côté d’un curseur |
+| **2.5.8** Taille de la cible (2.2) | Les cibles mesurent au moins 24×24 px CSS | Ou sont espacées de sorte que des cercles de 24px ne se chevauchent pas ; les liens en ligne dans le texte sont exemptés |
 
 ```html
 <!-- ✓ drag remains, but is never the only way -->
@@ -70,25 +74,27 @@ movement lasts the 5 seconds 2.2.2 requires.
 </li>
 ```
 
-2.5.8 is decided on the render — `scan` measures it through axe's `target-size` rule.
+Le 2.5.8 se tranche sur le rendu — `scan` le mesure via la règle `target-size` d’axe.
 
-## Orientation, reflow, spacing, zoom (1.3.4, 1.4.4, 1.4.10, 1.4.12)
+## Orientation, redistribution, espacement, zoom (1.3.4, 1.4.4, 1.4.10, 1.4.12)
 
-All four are decided on the rendered page (`scan` probes zoom, spacing and
-overflow). What to check:
+Les quatre se tranchent sur la page rendue (`scan` sonde le zoom, l’espacement et le
+débordement). Ce qu’il faut vérifier :
 
-- **1.3.4 Orientation** — the content works in both portrait and landscape, unless the
-  orientation is genuinely essential (a piano keyboard, a cheque to photograph). A CSS
-  `transform` or a blocking orientation media query is the usual culprit.
-- **1.4.4 Resize Text** — at 200% text zoom nothing is lost, clipped or overlapped. A
-  `meta viewport` blocking zoom fails outright (engine rule: `meta-viewport-zoom-block`).
-- **1.4.10 Reflow** — at **320 CSS px** wide (the equivalent of 400% zoom on a 1280px
-  viewport) no two-dimensional scrolling is required, except for content that inherently
-  needs it: maps, data tables, diagrams, code.
-- **1.4.12 Text Spacing** — forcing line height 1.5×, paragraph spacing 2×, letter spacing
-  0.12× and word spacing 0.16× loses no content. Fixed-height containers are what break.
+- **1.3.4 Orientation** — le contenu fonctionne en portrait comme en paysage, sauf si
+  l’orientation est réellement essentielle (un clavier de piano, un chèque à photographier). Un
+  `transform` CSS ou une media query d’orientation bloquante est le coupable habituel.
+- **1.4.4 Redimensionnement du texte** — à 200 % de zoom du texte, rien n’est perdu, tronqué ni
+  superposé. Un `meta viewport` qui bloque le zoom échoue d’emblée (règle du moteur :
+  `meta-viewport-zoom-block`).
+- **1.4.10 Redistribution** — à **320 px CSS** de large (l’équivalent d’un zoom à 400 % sur un
+  viewport de 1280px), aucun défilement bidimensionnel n’est requis, sauf pour un contenu qui en a
+  intrinsèquement besoin : cartes, tableaux de données, diagrammes, code.
+- **1.4.12 Espacement du texte** — forcer une hauteur de ligne de 1,5×, un espacement des
+  paragraphes de 2×, un espacement des lettres de 0,12× et un espacement des mots de 0,16× ne fait
+  perdre aucun contenu. Ce sont les conteneurs à hauteur fixe qui cassent.
 
-## Motion and vestibular safety (2.3.1, 2.2.2)
+## Mouvement et sécurité vestibulaire (2.3.1, 2.2.2)
 
 ```css
 /* Respect the OS-level preference — a one-line win that costs nothing */
@@ -102,15 +108,15 @@ overflow). What to check:
 }
 ```
 
-`prefers-reduced-motion` is not itself a WCAG 2.2 AA requirement, but large parallax,
-auto-playing motion and full-page transitions trigger vestibular disorders, and honouring it
-is how you avoid the 2.2.2 problem entirely. 2.3.1 (nothing flashes more than three times a
-second) is decided on the render.
+`prefers-reduced-motion` n’est pas en soi une exigence WCAG 2.2 AA, mais les grands effets de
+parallaxe, les mouvements en lecture automatique et les transitions pleine page déclenchent des
+troubles vestibulaires, et le respecter est la façon d’éviter entièrement le problème du 2.2.2.
+Le 2.3.1 (rien ne flashe plus de trois fois par seconde) se tranche sur le rendu.
 
-## What the engine settles, and what stays yours
+## Ce que le moteur tranche, et ce qui vous revient
 
-| Decided by the engine | Decided by `scan` | Yours to adjudicate |
+| Tranché par le moteur | Tranché par `scan` | À vous d’arbitrer |
 |---|---|---|
-| `autoplay` with no stop mechanism; `meta viewport` blocking zoom; `blink`/`marquee`; timed `meta refresh` | Zoom 200%, reflow 320px, text spacing, target size, flashing | Whether captions/audio description/transcripts exist and are accurate (1.2.x) |
-| Missing `<track>` — as a recommendation, not a failure | — | Whether a gesture, a drag or a motion trigger has an alternative (2.5.1/2.5.2/2.5.4/2.5.7) |
-| — | — | Whether an orientation is genuinely essential (1.3.4) |
+| `autoplay` sans mécanisme d’arrêt ; `meta viewport` qui bloque le zoom ; `blink`/`marquee` ; `meta refresh` temporisé | Zoom à 200 %, redistribution à 320px, espacement du texte, taille de la cible, flashs | Si les sous-titres/l’audiodescription/les transcriptions existent et sont exacts (1.2.x) |
+| `<track>` manquant — comme recommandation, pas comme échec | — | Si un geste, un glissement ou un déclencheur par le mouvement a une alternative (2.5.1/2.5.2/2.5.4/2.5.7) |
+| — | — | Si une orientation est réellement essentielle (1.3.4) |

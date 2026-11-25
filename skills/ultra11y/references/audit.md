@@ -1,75 +1,83 @@
-# Quick audit → WCAG report (and the page sample)
+# Audit rapide → rapport WCAG (et l’échantillon de pages)
 
-**This is the quick path**: a static audit, a dated report and the integrity `check` — a first
-map of a codebase. It has no verdict ledger, no adversarial refutation, no per-page dossiers and
-no `check --require-decided` completeness gate. When the user asks for a full or detailed audit,
-a compliance or conformance report, or an RGAA audit, follow **`references/full-audit.md`**
-instead — on every harness. This page stays the reference for the normative page sample and
-the PDF document checks, which the full audit relies on.
+**Ceci est le parcours rapide** : un audit statique, un rapport daté et le contrôle d’intégrité
+`check` — une première cartographie d’une base de code. Il n’a ni registre des verdicts, ni
+contre-vérification adverse, ni dossiers par page, ni garde-fou de complétude
+`check --require-decided`. Quand l’utilisateur demande un audit complet ou détaillé, un rapport
+de conformité ou un audit RGAA, suivez plutôt **`references/full-audit.md`** — sur tous les
+harness. Cette page reste la référence pour l’échantillon de pages normatif et les contrôles
+des documents PDF, sur lesquels l’audit complet s’appuie.
 
-Goal: a dated WCAG 2.2 AA report from the static pass. The engine decides the
-automatable subset; the **AI agent** adjudicates the judgment criteria (`verify --manual`,
-gated) and routes the rendering criteria to `scan`; the gates stop any hallucinated
-non-conformity.
+Objectif : un rapport WCAG 2.2 AA daté, issu de la passe statique. Le moteur tranche le
+sous-ensemble automatisable ; l’**agent IA** arbitre les critères qui demandent un jugement
+(`verify --manual`, sous garde-fou) et oriente les critères de rendu vers `scan` ; les
+garde-fous arrêtent toute non-conformité hallucinée.
 
-## The loop
+## La boucle
 
-1. **Scope it.** Which files / components? HTML, JSX/TSX and Vue/Svelte/Astro components
-   (`.vue`/`.svelte`/`.astro`) are walked by default; add server templates (Twig, ERB,
-   Handlebars…) with `--ext .twig,.erb`. **Test/spec/story markup** (`*.test.*`,
-   `*.spec.*`, `*.stories.*`, `__tests__/`) is excluded by default — it is bad-by-design
-   and never shipped; pass `--no-default-excludes` (or name the file) to audit it anyway.
-   **`.vue`/`.svelte`/`.astro` are audited as SOURCE templates**: slots, snippets and
-   dynamic bindings are invisible, so their findings are flagged `preliminary` and the run
-   carries a `scope.sourceTemplate` caveat — audit the rendered output to confirm (step 3,
-   and `references/rendered.md`).
-2. **Run the engine:**
+1. **Délimitez le périmètre.** Quels fichiers / composants ? Le HTML, le JSX/TSX et les
+   composants Vue/Svelte/Astro (`.vue`/`.svelte`/`.astro`) sont parcourus par défaut ; ajoutez
+   les gabarits serveur (Twig, ERB, Handlebars…) avec `--ext .twig,.erb`. **Le balisage de
+   test/spec/story** (`*.test.*`, `*.spec.*`, `*.stories.*`, `__tests__/`) est exclu par
+   défaut — il est mauvais à dessein et jamais livré ; passez `--no-default-excludes` (ou
+   nommez le fichier) pour l’auditer quand même.
+   **Les `.vue`/`.svelte`/`.astro` sont audités comme gabarits SOURCE** : slots, snippets et
+   liaisons dynamiques sont invisibles, donc leurs constats sont marqués `preliminary` et
+   l’exécution porte une réserve `scope.sourceTemplate` — auditez la sortie rendue pour
+   confirmer (étape 3, et `references/rendered.md`).
+2. **Lancez le moteur :**
    ```
    node scripts/ultra11y.mjs audit "src/**/*.html" --json > audit.json
    ```
-   or on a snippet: `node scripts/ultra11y.mjs audit - < page.html --json`.
-   The `AuditResult` classes each success criterion as `C` / `NC` / `NA` (static) or
-   `manual` (rendering / judgment, listed in `residualRisks`). It also records the repo's
-   declared language(s) as `scope.langs` (the primary `<html lang>` subtags seen, most
-   frequent first, e.g. `["fr"]`) — the repo signal `--lang auto` resolves from downstream.
-3. **Triage the results:**
-   - engine `NC` = confirmed candidates (each finding cites `file:line`);
-   - `manual` *needs-rendering* criteria (contrast 1.4.3, focus visible 2.4.7, reflow
-     1.4.10…) → route to `scan`, **never** silently `C`. Note: contrast on
-     **inline literal colours** is now decided statically (1.4.3 turns `NC` for that
-     subset); contrast via external CSS or variables stays residual (→ dynamic tier);
-   - `manual` *judgment* criteria (alt relevance under 1.1.1, link purpose 2.4.4, reading
-     / tab order…) → the AI agent adjudicates them from context via `verify --manual` (gated).
-4. **Decide each applicable criterion**: `C`, `NC` or `NA` (with a justification). For a
-   criterion's detail and grounding: `node scripts/ultra11y.mjs criteria 1.1.1`.
-5. **Render the report:**
+   ou sur un extrait : `node scripts/ultra11y.mjs audit - < page.html --json`.
+   L’`AuditResult` classe chaque critère de succès en `C` / `NC` / `NA` (statique) ou
+   `manual` (rendu / jugement, listés dans `residualRisks`). Il enregistre aussi la ou les
+   langues déclarées du dépôt dans `scope.langs` (les sous-étiquettes `<html lang>` principales
+   rencontrées, les plus fréquentes d’abord, par exemple `["fr"]`) — le signal du dépôt à
+   partir duquel `--lang auto` se résout en aval.
+3. **Triez les résultats :**
+   - `NC` du moteur = candidats confirmés (chaque constat cite `file:line`) ;
+   - critères `manual` *needs-rendering* (contraste 1.4.3, focus visible 2.4.7, redistribution
+     1.4.10…) → à orienter vers `scan`, **jamais** passés en `C` en silence. Remarque : le
+     contraste sur les **couleurs littérales en ligne** est désormais tranché statiquement
+     (1.4.3 passe en `NC` pour ce sous-ensemble) ; le contraste via une CSS externe ou des
+     variables reste résiduel (→ niveau dynamique) ;
+   - critères `manual` *judgment* (pertinence de l’alternative sous 1.1.1, fonction du lien
+     2.4.4, ordre de lecture / de tabulation…) → l’agent IA les arbitre à partir du contexte
+     via `verify --manual` (sous garde-fou).
+4. **Tranchez chaque critère applicable** : `C`, `NC` ou `NA` (avec une justification). Pour
+   le détail et les fondements d’un critère : `node scripts/ultra11y.mjs criteria 1.1.1`.
+5. **Produisez le rapport :**
    ```
    node scripts/ultra11y.mjs report --in audit.json --out audits
    ```
-   → `audits/rgaa-YYYY-MM-DD.md`, the report for every reader (level, what to fix, on which
-   pages and URLs, then 5 sections), and beside it `audits/annexe-technique-rgaa-YYYY-MM-DD.md`,
-   the technical annex (method, `file:line` occurrences, commands, exhaustive grid) — see
-   `references/methodology.md`. The annex's section A renders one compact **auditor block**
-   per NC criterion, grouped by severity — built from the SAME units `prd` and `tickets`
-   emit (see `references/prd.md`), so report and backlog never drift. Keep both files
-   together: `check`/`verify --report` read the annex the report links to. For a country
-   standard, add `--standard rgaa` (see `references/standards.md`). Pass `--lang` to match
-   your conversation; without it, `auto` resolves the audit's `scope.langs` → the
-   standard's default locale → English. Add `--json` to `report` for a machine summary
-   (`{path, conformancePct, date, standard}`) instead of just the path.
-6. **Check integrity:**
+   → `audits/rgaa-YYYY-MM-DD.md`, le rapport pour tous les lecteurs (niveau, quoi corriger,
+   sur quelles pages et URL, puis 5 sections), et à côté `audits/annexe-technique-rgaa-YYYY-MM-DD.md`,
+   l’annexe technique (méthode, occurrences `file:line`, commandes, grille exhaustive) — voir
+   `references/methodology.md`. La section A de l’annexe produit un **bloc auditeur** compact
+   par critère NC, regroupés par sévérité — construits à partir des MÊMES unités que celles
+   qu’émettent `prd` et `tickets` (voir `references/prd.md`), de sorte que le rapport et le
+   backlog ne divergent jamais. Gardez les deux fichiers ensemble : `check`/`verify --report`
+   lisent l’annexe vers laquelle pointe le rapport. Pour un référentiel national, ajoutez
+   `--standard rgaa` (voir `references/standards.md`). Passez `--lang` pour correspondre à
+   votre conversation ; sans lui, `auto` résout `scope.langs` de l’audit → la locale par défaut
+   du référentiel → l’anglais. Ajoutez `--json` à `report` pour obtenir un résumé machine
+   (`{path, conformancePct, date, standard}`) au lieu du seul chemin.
+6. **Vérifiez l’intégrité :**
    ```
    node scripts/ultra11y.mjs check --report audits/rgaa-YYYY-MM-DD.md
    ```
-   Fails if a section is missing, a cited criterion does not exist, or an `NA` is unjustified.
-7. **High assurance (optional)**: `references/verify.md` — prove every non-conformity is
-   real before you ship.
+   Échoue si une section manque, si un critère cité n’existe pas, ou si un `NA` n’est pas
+   justifié.
+7. **Haute assurance (facultatif)** : `references/verify.md` — prouvez que chaque
+   non-conformité est réelle avant de livrer.
 
-## The normative page sample (échantillon) — country-standard audits
+## L’échantillon de pages normatif (échantillon) — audits selon un référentiel national
 
-A file-tree audit answers "is this markup conformant?"; a **country-standard** audit (RGAA,
-Section 508…) is normatively defined over a **representative page sample**, not the whole
-repo. Declare that sample once in `.ultra11yrc.json`:
+Un audit d’arborescence de fichiers répond à « ce balisage est-il conforme ? » ; un audit selon
+un **référentiel national** (RGAA, Section 508…) est défini normativement sur un **échantillon
+de pages représentatif**, pas sur l’ensemble du dépôt. Déclarez cet échantillon une fois dans
+`.ultra11yrc.json` :
 
 ```json
 { "standard": "rgaa",
@@ -83,72 +91,81 @@ repo. Declare that sample once in `.ultra11yrc.json`:
   } }
 ```
 
-- `sample.pages[]` are the audited URLs (each may sit behind `auth` with a per-page
-  `storageState`); `transverse` names the elements audited on **every** page (header, nav,
-  footer, modals…). The `storageState` **path** is used but its content is never read into
-  any output.
-- **Propose it, do not hand-pick it**: `pages discover --sitemap <url> | --crawl <url> |
-  --from-snapshots --propose --write` writes a deterministic sample — the same site gives the
-  same pages whatever model runs it. Each pick carries its reason in `notes`; a required kind
-  with no page goes to `"absent": [{ "kind": "recherche", "reason": "…" }]`. Keep the
-  proposal; a hand edit records its reason (a page's `notes`, or an `absent` entry for a kind
-  taken out).
-- **Lint the coverage**: `node scripts/ultra11y.mjs sample check` reports which **required
-  page kinds** the active standard's `sampleMethodology` expects but the sample lacks (RGAA:
-  accueil, contact, mentions légales, déclaration d'accessibilité, plan du site, aide,
-  authentification, recherche, documents téléchargeables, pages représentatives…). A kind
-  listed in `sample.absent` is reported with its reason instead; a kind dropped without one is
-  missing. Advisory (exit 0) unless the `sample` block is malformed (exit 2).
-- **Scan the sample**: `scan --sample --merge audits/audit-latest.json` iterates every page,
-  keeps each finding's page name + auth flag as provenance, and merges the rendered verdicts
-  in (see `references/dynamic.md`).
-- **Partial-audit honesty**: a `--standard rgaa` report produced **without** a merged sample
-  scan is flagged **partial** — a CLI warning + a report banner naming the needs-rendering
-  criteria that were not tested. Say the audit is partial rather than implying full coverage.
+- `sample.pages[]` sont les URL auditées (chacune peut se trouver derrière `auth` avec un
+  `storageState` par page) ; `transverse` nomme les éléments audités sur **chaque** page
+  (en-tête, navigation, pied de page, modales…). Le **chemin** `storageState` est utilisé, mais
+  son contenu n’est jamais lu dans aucune sortie.
+- **Faites-le proposer, ne le choisissez pas à la main** : `pages discover --sitemap <url> | --crawl <url> |
+  --from-snapshots --propose --write` écrit un échantillon déterministe — le même site donne les
+  mêmes pages quel que soit le modèle qui l’exécute. Chaque choix porte sa raison dans `notes` ;
+  un type requis sans page va dans `"absent": [{ "kind": "recherche", "reason": "…" }]`. Gardez
+  la proposition ; une modification à la main consigne sa raison (les `notes` d’une page, ou une
+  entrée `absent` pour un type retiré).
+- **Contrôlez la couverture** : `node scripts/ultra11y.mjs sample check` signale quels **types
+  de pages requis** le `sampleMethodology` du référentiel actif attend mais qui manquent à
+  l’échantillon (RGAA : accueil, contact, mentions légales, déclaration d'accessibilité, plan du
+  site, aide, authentification, recherche, documents téléchargeables, pages représentatives…).
+  Un type listé dans `sample.absent` est signalé avec sa raison à la place ; un type retiré sans
+  raison est manquant. Consultatif (code de sortie 0) sauf si le bloc `sample` est mal formé
+  (code de sortie 2).
+- **Scannez l’échantillon** : `scan --sample --merge audits/audit-latest.json` parcourt chaque
+  page, conserve le nom de page et l’indicateur d’authentification de chaque constat comme
+  provenance, et fusionne les verdicts rendus (voir `references/dynamic.md`).
+- **Honnêteté de l’audit partiel** : un rapport `--standard rgaa` produit **sans** scan
+  d’échantillon fusionné est marqué **partiel** — un avertissement de la CLI + une bannière dans
+  le rapport nommant les critères needs-rendering qui n’ont pas été testés. Dites que l’audit est
+  partiel plutôt que de laisser entendre une couverture complète.
 
-## Downloadable PDF documents
+## Documents PDF téléchargeables
 
-`audit report.pdf` or `audit "public/**/*.pdf"` reads PDF files with the engine's own reader
-(Node built-ins only — `zlib` for object and xref streams; classic and stream xrefs, incremental
-updates, a repair scan when the offsets lie). A directory input never pulls in the PDFs it holds:
-a PDF is audited when it is named, matched by a glob ending in `.pdf`, or downloaded by `scan`
-or by the Playwright fixture into `.ultra11y/documents/` (re-ingested automatically; `--no-pdf`
-opts out — see `references/dynamic.md` for which links count and how a session reaches them).
-Five document checks
-run on each file:
+`audit report.pdf` ou `audit "public/**/*.pdf"` lit les fichiers PDF avec le lecteur propre du
+moteur (modules natifs de Node uniquement — `zlib` pour les flux d’objets et de xref ; xref
+classiques et en flux, mises à jour incrémentales, un balayage de réparation quand les offsets
+mentent). Une entrée de type répertoire n’embarque jamais les PDF qu’il contient : un PDF est
+audité quand il est nommé, quand il correspond à un glob se terminant par `.pdf`, ou quand il est
+téléchargé par `scan` ou par la fixture Playwright dans `.ultra11y/documents/` (réingéré
+automatiquement ; `--no-pdf` désactive — voir `references/dynamic.md` pour savoir quels liens
+comptent et comment une session les atteint).
+Cinq contrôles de document
+s’exécutent sur chaque fichier :
 
-| Rule | What it observes | WCAG |
+| Règle | Ce qu’elle observe | WCAG |
 |---|---|---|
-| `pdf-untagged` | no `/MarkInfo << /Marked true >>`, or no `/StructTreeRoot` (PDF/UA-1 §7.1) | 1.3.1 |
-| `pdf-lang-missing` | no `/Lang` on the catalog (PDF/UA-1 §7.2) | 3.1.1 |
-| `pdf-title-missing` | no `/Title` (Info or XMP `dc:title`), or `/DisplayDocTitle` not true (PDF18) | 2.4.2 |
-| `pdf-no-text` | no font resource and no text-showing operator on any page — an image-only scan | 1.1.1 |
-| `pdf-structure-shallow` | advisory: tagged, but no heading, or a table with no `TH` | 1.3.1 |
+| `pdf-untagged` | pas de `/MarkInfo << /Marked true >>`, ou pas de `/StructTreeRoot` (PDF/UA-1 §7.1) | 1.3.1 |
+| `pdf-lang-missing` | pas de `/Lang` sur le catalogue (PDF/UA-1 §7.2) | 3.1.1 |
+| `pdf-title-missing` | pas de `/Title` (Info ou XMP `dc:title`), ou `/DisplayDocTitle` qui n’est pas à true (PDF18) | 2.4.2 |
+| `pdf-no-text` | aucune ressource de police et aucun opérateur d’affichage de texte sur aucune page — un scan composé uniquement d’images | 1.1.1 |
+| `pdf-structure-shallow` | consultatif : balisé, mais sans titre de section, ou un tableau sans `TH` | 1.3.1 |
 
-The audit JSON lists every document under `documents[]` with each check's outcome — `fail`,
-`not-detected` or `not-checked` — and the report renders them in a « Documents téléchargeables »
-section, the Markdown and the HTML (`report --html`) alike, from one model. **`not-detected` is not a pass**: these checks prove the absence of the gross failures,
-never PDF/UA conformance, which a validator (veraPDF, PAC) establishes. An encrypted, malformed,
-truncated or oversized file is reported **unreadable**, never as conforming.
+Le JSON d’audit liste chaque document sous `documents[]` avec le résultat de chaque contrôle —
+`fail`, `not-detected` ou `not-checked` — et le rapport les présente dans une section
+« Documents téléchargeables », en Markdown comme en HTML (`report --html`), à partir d’un seul
+modèle. **`not-detected` n’est pas une réussite** : ces contrôles prouvent l’absence des défauts
+grossiers, jamais la conformité PDF/UA, qu’un validateur (veraPDF, PAC) établit. Un fichier
+chiffré, mal formé, tronqué ou trop volumineux est signalé **illisible**, jamais comme conforme.
 
-Document findings live in `documentFindings`, **outside** the WCAG criteria: the PDF is not the
-page that links it, and a conforming alternate version may exist. Under RGAA they are routed by
-rule id to **13.3** as candidate evidence, and the 13.3 brief lists each document with its checks,
-citable at the file's `%PDF-x.y` header line — the agent rules, with something to cite.
+Les constats sur documents vivent dans `documentFindings`, **en dehors** des critères WCAG : le
+PDF n’est pas la page qui pointe vers lui, et une version alternative conforme peut exister. Sous
+RGAA, ils sont orientés par identifiant de règle vers le **13.3** comme preuves candidates, et le
+brief du 13.3 liste chaque document avec ses contrôles, citable à la ligne d’en-tête `%PDF-x.y`
+du fichier — l’agent tranche, avec de quoi citer.
 
-**Optional: veraPDF.** When `verapdf` is on `PATH` (or `ULTRA11Y_VERAPDF=<path>`), the brief of a
-criterion that lists PDFs also carries veraPDF's PDF/UA-1 result per document, in a block
-labelled **external validator**: another tool's word, not evidence, not citable, deciding
-nothing — PDF/UA-1 is not RGAA 13.3 (an accessible alternative version satisfies it whatever the
-PDF is). A run that fails is printed as « not validated », never as compliant. Nothing is
-installed or required; `ULTRA11Y_VERAPDF=off` turns it off.
+**Facultatif : veraPDF.** Quand `verapdf` est dans le `PATH` (ou `ULTRA11Y_VERAPDF=<path>`), le
+brief d’un critère qui liste des PDF porte aussi le résultat PDF/UA-1 de veraPDF pour chaque
+document, dans un bloc intitulé **external validator** : la parole d’un autre outil, pas une
+preuve, non citable, ne tranchant rien — PDF/UA-1 n’est pas le RGAA 13.3 (une version
+alternative accessible le satisfait quel que soit le PDF). Une exécution qui échoue est affichée
+« not validated », jamais comme conforme. Rien n’est installé ni requis ; `ULTRA11Y_VERAPDF=off`
+le désactive.
 
-## Golden rules
+## Règles d’or
 
-- **Never invent a non-conformity**: every `NC` must cite a real, resolvable element
-  (`check` verifies it).
-- **Residual is explicit, never silently `C`**: an unproven *needs-rendering* criterion goes to
-  `scan`; a *judgment* criterion the AI agent adjudicates via `verify --manual` (gated). Any
-  criterion still undecided stays in the "to assess manually" section with a recorded reason.
-- The report's **automatic static-check pass rate** covers only the machine-decidable
-  subset; full WCAG conformance requires your manual review (it is not a conformance rate).
+- **N’inventez jamais une non-conformité** : chaque `NC` doit citer un élément réel et résoluble
+  (`check` le vérifie).
+- **Le résiduel est explicite, jamais un `C` silencieux** : un critère *needs-rendering* non
+  prouvé va vers `scan` ; un critère *judgment*, l’agent IA l’arbitre via `verify --manual`
+  (sous garde-fou). Tout critère encore non tranché reste dans la section « à évaluer
+  manuellement », avec une raison consignée.
+- Le **taux de réussite des contrôles statiques automatiques** du rapport ne couvre que le
+  sous-ensemble décidable par la machine ; la conformité WCAG complète exige votre revue manuelle
+  (ce n’est pas un taux de conformité).
