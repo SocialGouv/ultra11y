@@ -50,17 +50,22 @@ export interface CliResult {
   stderr: string;
 }
 
-/** Run the bundle as a subprocess. Never throws on a non-zero exit — the code is returned. */
-export function runCli(args: string[], opts: { input?: string; cwd?: string; env?: NodeJS.ProcessEnv } = {}): CliResult {
+/** Run the bundle as a subprocess. Never throws on a non-zero exit — the code is returned.
+ *
+ *  `timeoutMs` kills a child that outlives it, and the kill is reported in `stderr`: the call is
+ *  synchronous, so vitest's own timer cannot interrupt it and would only notice once it returned. */
+export function runCli(args: string[], opts: { input?: string; cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): CliResult {
   const res = spawnSync(process.execPath, [BUNDLE, ...args], {
     input: opts.input,
     cwd: opts.cwd ?? REPO_ROOT,
     encoding: "utf8",
     env: opts.env ?? process.env,
     maxBuffer: 64 * 1024 * 1024,
+    timeout: opts.timeoutMs,
   });
-  if (res.error) throw res.error;
-  return { code: res.status ?? -1, stdout: res.stdout ?? "", stderr: res.stderr ?? "" };
+  if (res.error && !(opts.timeoutMs && res.signal)) throw res.error;
+  const killed = res.signal ? `\n[runCli] killed by ${res.signal} after ${opts.timeoutMs ?? "?"}ms: ${args.join(" ")}` : "";
+  return { code: res.status ?? -1, stdout: res.stdout ?? "", stderr: (res.stderr ?? "") + killed };
 }
 
 /** Shape of the audit --json payload, kept loose (only the fields the E2E tests read). */

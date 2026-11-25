@@ -23783,6 +23783,42 @@ async function waitForLoaded(page, timeoutMs, intervalMs = 150) {
   }
 }
 var LOADING_TIMEOUT_MS = 1e4;
+var DOM_QUIET_MS = 300;
+var DOM_SETTLE_MAX_MS = 3e3;
+function domSettledExpr(quietMs = DOM_QUIET_MS, maxMs = DOM_SETTLE_MAX_MS) {
+  return `new Promise((done) => {
+  const started = performance.now();
+  const hook = globalThis.__ultra11yTimers;
+  const later = (fn, ms) => ((hook && hook.orig && hook.orig.st) || setTimeout).call(globalThis, fn, ms);
+  let quiet;
+  let ceiling;
+  const finish = (settled) => {
+    clearTimeout(quiet);
+    clearTimeout(ceiling);
+    observer.disconnect();
+    done({ settled, waitedMs: Math.round(performance.now() - started) });
+  };
+  const arm = () => {
+    clearTimeout(quiet);
+    quiet = later(() => finish(true), ${quietMs});
+  };
+  const observer = new MutationObserver((records) => {
+    if (records.some((r) => r.type !== 'attributes' || r.attributeName !== 'style')) arm();
+  });
+  observer.observe(document.documentElement || document, { childList: true, subtree: true, characterData: true, attributes: true });
+  ceiling = later(() => finish(false), ${maxMs});
+  arm();
+})`;
+}
+async function waitForDomSettled(page, quietMs = DOM_QUIET_MS, maxMs = DOM_SETTLE_MAX_MS) {
+  const started = Date.now();
+  try {
+    const r2 = await page.evaluate(domSettledExpr(quietMs, maxMs));
+    return { settled: r2?.settled === true, waitedMs: Date.now() - started };
+  } catch {
+    return { settled: false, waitedMs: Date.now() - started };
+  }
+}
 var FULL_SCREENSHOT_MAX_HEIGHT = 8e3;
 var ELEMENT_WALK = `(root) => {
   const RAW_TEXT = new Set(['script', 'style', 'title', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes']);
@@ -61394,7 +61430,7 @@ async function runOnPage(browser, axe, target, isFile, opts) {
     const response = await page.goto(url, { waitUntil: "load", timeout: 45e3 });
     await page.waitForLoadState("networkidle", { timeout: 8e3 }).catch(() => {
     });
-    await page.waitForTimeout(1200);
+    await waitForDomSettled(page);
     await waitForLoaded(page, LOADING_TIMEOUT_MS);
     const landedUrl = page.url() || url;
     const httpStatus = typeof response?.status === "function" ? response.status() : void 0;

@@ -46,6 +46,7 @@ import {
   LOADING_STATE,
   LOADING_TIMEOUT_MS,
   slugifyPageId,
+  waitForDomSettled,
   waitForLoaded,
 } from "./snapshot.js";
 import { today } from "./util.js";
@@ -677,9 +678,11 @@ async function runOnPage(
     const response = await page.goto(url, { waitUntil: "load", timeout: 45000 });
     // Let the client hydrate and any framework JS inject content/landmarks (SPA routes,
     // DSFR JS) before measuring — otherwise axe/probes see the pre-hydration DOM and
-    // report false "no h1 / not in a landmark". Bounded networkidle + a short settle.
+    // report false "no h1 / not in a landmark". Bounded networkidle, then until the DOM stops
+    // changing (#206): a fixed sleep here guessed the hydration time, ran short on a loaded
+    // machine and was dead time on an idle one. The settle is a condition, bounded.
     await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(1200);
+    await waitForDomSettled(page);
     // …and for the page to stop declaring itself loading (#135): `aria-busy`, a spinner, a
     // « Chargement… » where the content will be. Bounded; a page still loading is collected
     // all the same and marked by the collector, never filed as an ordinary capture.

@@ -128,6 +128,64 @@ export async function waitForLoaded(
 /** How long a producer waits, by default, for a page to stop declaring itself loading. */
 export const LOADING_TIMEOUT_MS = 10_000;
 
+/** How long the DOM must stay untouched to count as settled, and the most a settle may take. */
+export const DOM_QUIET_MS = 300;
+export const DOM_SETTLE_MAX_MS = 3000;
+
+/** THE SETTLE — wait for the page's own scripts to stop rewriting the DOM (#206).
+ *
+ *  A fixed sleep after `load` guessed how long hydration takes: on a loaded machine the guess
+ *  ran out before the framework had injected its content, and the probes measured the
+ *  pre-hydration DOM; on an idle one it was dead time on every page. This asks the page
+ *  instead: a MutationObserver watches the document and the promise resolves once `quietMs`
+ *  pass with no structural change (nodes, text, attributes other than `style`, which is what an
+ *  animation rewrites every frame), or at `maxMs` for a page that never stops. Resolves to the
+ *  milliseconds waited and whether the DOM actually went quiet.
+ *
+ *  Its timers are the ORIGINAL setTimeout when the behaviour timer hook is installed
+ *  (src/behaviour.ts): scheduled through the hook they would be counted as the page's own. */
+export function domSettledExpr(quietMs = DOM_QUIET_MS, maxMs = DOM_SETTLE_MAX_MS): string {
+  return `new Promise((done) => {
+  const started = performance.now();
+  const hook = globalThis.__ultra11yTimers;
+  const later = (fn, ms) => ((hook && hook.orig && hook.orig.st) || setTimeout).call(globalThis, fn, ms);
+  let quiet;
+  let ceiling;
+  const finish = (settled) => {
+    clearTimeout(quiet);
+    clearTimeout(ceiling);
+    observer.disconnect();
+    done({ settled, waitedMs: Math.round(performance.now() - started) });
+  };
+  const arm = () => {
+    clearTimeout(quiet);
+    quiet = later(() => finish(true), ${quietMs});
+  };
+  const observer = new MutationObserver((records) => {
+    if (records.some((r) => r.type !== 'attributes' || r.attributeName !== 'style')) arm();
+  });
+  observer.observe(document.documentElement || document, { childList: true, subtree: true, characterData: true, attributes: true });
+  ceiling = later(() => finish(false), ${maxMs});
+  arm();
+})`;
+}
+
+/** Wait, BOUNDED, for the DOM to settle (see domSettledExpr). Never throws: a page that cannot
+ *  run the observer is measured as it stands, exactly as a page that never went quiet is. */
+export async function waitForDomSettled(
+  page: { evaluate(script: string): Promise<unknown> },
+  quietMs = DOM_QUIET_MS,
+  maxMs = DOM_SETTLE_MAX_MS,
+): Promise<{ settled: boolean; waitedMs: number }> {
+  const started = Date.now();
+  try {
+    const r = (await page.evaluate(domSettledExpr(quietMs, maxMs))) as { settled?: unknown } | null;
+    return { settled: r?.settled === true, waitedMs: Date.now() - started };
+  } catch {
+    return { settled: false, waitedMs: Date.now() - started };
+  }
+}
+
 /** The tallest full-page screenshot taken, in CSS pixels. A whole page is what a reviewer
  *  judges, but an infinite feed would otherwise produce an image nobody can open. */
 export const FULL_SCREENSHOT_MAX_HEIGHT = 8000;

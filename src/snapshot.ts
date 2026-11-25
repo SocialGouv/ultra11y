@@ -684,6 +684,7 @@ export {
   FULL_SCREENSHOT_MAX_HEIGHT,
   LOADING_STATE,
   LOADING_TIMEOUT_MS,
+  waitForDomSettled,
   waitForLoaded,
 } from "./collector.js";
 
