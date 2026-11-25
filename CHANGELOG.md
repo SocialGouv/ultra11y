@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+# [9.4.0](https://github.com/SocialGouv/ultra11y/compare/v9.3.0...v9.4.0) (2026-11-25)
+
+
+### Features
+
+* **serve:** local results server with audit history, evolution and static export ([#219](https://github.com/SocialGouv/ultra11y/issues/219)) ([75ad7c0](https://github.com/SocialGouv/ultra11y/commit/75ad7c09ca27d2c44f0d2e7766d2d373d345e656))
+
 # [9.3.0](https://github.com/SocialGouv/ultra11y/compare/v9.2.0...v9.3.0) (2026-11-25)
 
 
