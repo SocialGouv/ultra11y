@@ -54,6 +54,32 @@ describe("audit history", () => {
     }
   });
 
+  it("keeps the shallowest of identical copies, so the latest audit keeps its files", () => {
+    const dir = tmp();
+    try {
+      const raw = readFileSync(join(AUDITS, "audit-latest.json"), "utf8");
+      writeFileSync(join(dir, "audit-latest.json"), raw);
+      // A digit-named dated copy sorts BEFORE the root file in a depth-first walk.
+      mkdirSync(join(dir, "2026-10-15"));
+      writeFileSync(join(dir, "2026-10-15", "audit-latest.json"), raw);
+      writeFileSync(join(dir, "annexe-technique-rgaa-2026-10-15.md"), "# Annexe\n\n## I. Carte de l'application\n");
+      mkdirSync(join(dir, "assets"));
+      writeFileSync(join(dir, "assets", "accueil.png"), readFileSync(join(FIX, ".ultra11y", "pages", "accueil", "screen.png")));
+      const h = discoverAudits(dir);
+      expect(h).toHaveLength(1);
+      expect(h[0]!.dir).toBe(dir);
+      expect(h[0]!.rel).toBe("audit-latest.json");
+      const site = buildSite({ auditsDir: dir, root: join(dir, "no-project"), lang: "fr" });
+      const files = site.routes.get("audits/2026-10-15/files.html")!();
+      expect(files).toContain('href="../../files/audits/annexe-technique-rgaa-2026-10-15.md"');
+      expect(files).toContain('href="../../files/audits/assets/accueil.png"');
+      const sheet = site.routes.get("audits/2026-10-15/pages/accueil.html")!();
+      expect(sheet).toContain('src="../../../files/audits/assets/accueil.png"');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("reuses the report's rates instead of recomputing them", () => {
     for (const e of discoverAudits(AUDITS)) {
       const s = summarize(e, "rgaa", "fr");

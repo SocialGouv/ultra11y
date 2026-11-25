@@ -99,7 +99,13 @@ const slug = (s: string): string => s.replace(/[^A-Za-z0-9._-]+/g, "-").replace(
 export function discoverAudits(dir: string): AuditEntry[] {
   const found: Omit<AuditEntry, "id">[] = [];
   const seen = new Set<string>();
-  for (const f of jsonFiles(dir)) {
+  // SHALLOWEST FIRST, so that among identical copies the one kept is the canonical
+  // `audits/audit-latest.json`, not a dated copy (`audits/2026-10-15/…`) that a depth-first
+  // walk reaches earlier because digits sort before letters. The kept entry's directory is
+  // where its report, its annex and its `assets/` screenshots live.
+  const depth = (f: JsonFile): number => relative(dir, f.file).split(sep).length;
+  const files = jsonFiles(dir).sort((a, b) => depth(a) - depth(b) || a.file.localeCompare(b.file));
+  for (const f of files) {
     let raw: string;
     try {
       raw = readFileSync(f.file, "utf8");

@@ -66153,7 +66153,9 @@ var slug2 = (s2) => s2.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[-.]+|-+$/g, 
 function discoverAudits(dir) {
   const found = [];
   const seen = /* @__PURE__ */ new Set();
-  for (const f2 of jsonFiles(dir)) {
+  const depth = (f2) => relative13(dir, f2.file).split(sep6).length;
+  const files = jsonFiles(dir).sort((a2, b) => depth(a2) - depth(b) || a2.file.localeCompare(b.file));
+  for (const f2 of files) {
     let raw;
     try {
       raw = readFileSync27(f2.file, "utf8");
