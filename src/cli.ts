@@ -92,7 +92,19 @@ import {
 } from "./ledger.js";
 import { combineDynamic, mergeDynamic, mergeSnapshotAudit, scanPageSummary } from "./scan.js";
 import { resolveAxeEngine } from "./axe-engine.js";
-import { ALL_ROUTES_MAX, type ObservedPage, type RouteSource, readRoutes, routeCounts, routeCoverage, routePath, routesToScan, writeRoutes } from "./routes.js";
+import {
+  ALL_ROUTES_MAX,
+  type ObservedPage,
+  type RouteCheck,
+  type RouteSource,
+  readRoutes,
+  routeCounts,
+  routeCoverage,
+  routePath,
+  routesToScan,
+  unreachableSamplePages,
+  writeRoutes,
+} from "./routes.js";
 import type { SampleMethodology } from "./standards/types.js";
 import { applyProposal, DEFAULT_SAMPLE_SIZE, type ProposalInput, proposeSample, type SampleProposal, skeletonOf } from "./sample-propose.js";
 import { DOCUMENTS_DIR, downloadSnapshotDocuments } from "./documents.js";
@@ -126,6 +138,7 @@ import {
 import { attributePages, derivePages, pageScopesFrom, pagesOf, renderPageGrid, unattributedFindings } from "./pages.js";
 import { pagesForStandard, renderPageDocument, renderPagesDocument, renderPagesIndex } from "./pages-report.js";
 import { crawlBound, crawlUrls, extractTitle, parseSitemapUrls } from "./crawl.js";
+import { classifyProbe, describeUnreachable, type PageProbe, probePage, type Unreachable } from "./reachability.js";
 import { CORE_KEY, derivePackResults, resolveStandard, getPack, isCore, loadPack, findingsForStandard, type StandardId } from "./standards/index.js";
 import { auditDocumentFor, isCurrentAudit, packAuditDocument, unwrapAudit } from "./standards/document.js";
 import { loadRuntimeStandards, loadConfig, type Ultra11yConfig } from "./config.js";
@@ -816,6 +829,20 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
     const recorded = readSnapshots(root);
     const snaps = sampleFromSnapshots(recorded);
     if (!snaps.length) {
+      // `--routes-only` is an ordinary step of a full audit (references/full-audit.md §1): it
+      // folds into the inventory whatever routes the E2E run reached, and a project without E2E
+      // captures simply has none to fold. Nothing to add is not a failure — exiting 1 there
+      // stopped every audit of such a project at its first step. Building a SAMPLE from the
+      // snapshots (no --routes-only) is different: there is nothing to build it from, and that
+      // stays an error.
+      if (p.flags["routes-only"] === true) {
+        console.error(
+          lang === "fr"
+            ? `ℹ️ ultra11y pages discover : aucun instantané sous ${join(root, PAGES_DIR)} — aucune route capturée par des tests E2E à ajouter à l'inventaire. Rien n'a été écrit.`
+            : `ℹ️ ultra11y pages discover: no snapshot under ${join(root, PAGES_DIR)} — no route captured by E2E tests to add to the inventory. Nothing was written.`,
+        );
+        return 0;
+      }
       console.error(
         lang === "fr"
           ? `ultra11y pages discover : aucun instantané sous ${join(root, PAGES_DIR)} — lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.`
@@ -860,19 +887,22 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
   // The crawl fetches every page it walks in order to read its links. Memoize those
   // responses so the titles cost NOTHING extra — only the leaves (and every sitemap URL,
   // which is never fetched during discovery) need a request of their own.
-  const cache = new Map<string, string>();
-  const fetchHtml = async (url: string): Promise<string> => {
-    const hit = cache.get(url);
-    if (hit !== undefined) return hit;
-    let html = "";
-    try {
-      const res = await fetch(url, { redirect: "follow" });
-      if (res.ok) html = await res.text();
-    } catch {
-      /* unreachable page — it still belongs in the sample, it simply gets no title */
+  //
+  // Each response is kept WITH ITS STATUS and the address it was served from: the status is
+  // what tells a page of the site from a dead link, and the landing address is the base the
+  // page's own links resolve against (src/reachability.ts).
+  const cache = new Map<string, Promise<PageProbe>>();
+  const fetchProbe = (url: string): Promise<PageProbe> => {
+    let hit = cache.get(url);
+    if (!hit) {
+      hit = probePage(url);
+      cache.set(url, hit);
     }
-    cache.set(url, html);
-    return html;
+    return hit;
+  };
+  const fetchHtml = async (url: string): Promise<{ html: string; url: string }> => {
+    const got = await fetchProbe(url);
+    return { html: got.html, url: got.url };
   };
 
   let urls: string[];
@@ -882,7 +912,7 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
     // that truncation without a word.
     const cap = crawlBound(max);
     urls = sitemap
-      ? ((u) => (Number.isFinite(cap) ? u.slice(0, cap) : u))(parseSitemapUrls(await fetchHtml(sitemap)))
+      ? ((u) => (Number.isFinite(cap) ? u.slice(0, cap) : u))(parseSitemapUrls((await fetchHtml(sitemap)).html))
       : await crawlUrls(crawl!, { fetchHtml, depth, max, onPage: (url, n) => console.error(`ultra11y pages discover: ${n} — ${url}`) });
   } catch (e) {
     console.error(`ultra11y pages discover: ${e instanceof Error ? e.message : String(e)}`);
@@ -897,23 +927,74 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
     return 1;
   }
 
-  // The inventory first: it is every route found, whatever the sample keeps of them.
-  recordRouteInventory(p, lang, urls, sitemap ? "sitemap" : "crawl");
-  if (p.flags["routes-only"] === true) return 0;
-
-  // Titles, bounded and best-effort: a page whose document has none keeps a name humanized
-  // from its path rather than an invented one.
-  const titles = new Map<string, string>();
+  // EVERY URL IS ASKED, bounded in concurrency. The crawl has fetched most of them already (the
+  // cache answers those); the leaves and every sitemap URL need a request of their own. What
+  // each one answered decides whether it is a page of the site at all.
   const CONCURRENCY = 6;
   const queue = [...urls];
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-      for (let url = queue.shift(); url !== undefined; url = queue.shift()) {
-        const t = extractTitle(await fetchHtml(url));
-        if (t) titles.set(url, t);
-      }
+      for (let url = queue.shift(); url !== undefined; url = queue.shift()) await fetchProbe(url);
     }),
   );
+  const probes = new Map<string, PageProbe>();
+  for (const url of urls) probes.set(url, await fetchProbe(url));
+  const verdicts = urls.map((url) => ({ url, probe: probes.get(url)!, verdict: classifyProbe(probes.get(url)!) }));
+  const unreachable: Unreachable[] = verdicts.flatMap(({ verdict }) => (verdict.ok ? [] : [verdict]));
+  const checks = new Map<string, RouteCheck>(
+    verdicts.map(({ url, probe, verdict }) => [
+      url,
+      {
+        ...(probe.status !== undefined ? { status: probe.status } : {}),
+        ...(probe.url !== url ? { landed: probe.url } : {}),
+        ...(!verdict.ok ? { refused: verdict.reason } : {}),
+      },
+    ]),
+  );
+
+  // The inventory first: it is every route found, whatever the sample keeps of them — a dead
+  // link included, with what it answered, so `sample check` can name a declared page that
+  // cannot be audited and the annex can say why a route was never reached.
+  recordRouteInventory(p, lang, urls, sitemap ? "sitemap" : "crawl", checks);
+
+  // A URL that is not a page leaves the sample BY NAME. Proposing it made a sample of pages
+  // named « Error response » and « Directory listing for /documents/ », which `sample check`
+  // then called complete and `scan --sample` refused one by one.
+  for (const u of unreachable)
+    console.error(
+      lang === "fr"
+        ? `⚠️ ultra11y pages discover : écartée de l'échantillon — ${describeUnreachable(u, lang)}.`
+        : `⚠️ ultra11y pages discover: left out of the sample — ${describeUnreachable(u, lang)}.`,
+    );
+  if (p.flags["routes-only"] === true) return 0;
+
+  // The pages of the site, at the address each one is served from: a redirect that only adds
+  // or removes a trailing slash is followed (`/documents` → `/documents/`), and the sample
+  // declares the landing address, so the scan opens it directly. Two discovered URLs landing on
+  // the same address are one page.
+  const pageUrls: string[] = [];
+  const htmlOf = new Map<string, string>();
+  for (const { probe, verdict } of verdicts) {
+    if (!verdict.ok || htmlOf.has(verdict.url)) continue;
+    pageUrls.push(verdict.url);
+    htmlOf.set(verdict.url, probe.html);
+  }
+  if (!pageUrls.length) {
+    console.error(
+      lang === "fr"
+        ? `ultra11y pages discover : aucune des ${urls.length} URL découverte(s) ne répond comme une page du site — rien à proposer. Vérifiez l'URL de départ et que le serveur est lancé.`
+        : `ultra11y pages discover: none of the ${urls.length} discovered URL(s) answers as a page of the site — nothing to propose. Check the start URL and that the server is running.`,
+    );
+    return 1;
+  }
+
+  // Titles, best-effort: a page whose document has none keeps a name humanized from its path
+  // rather than an invented one.
+  const titles = new Map<string, string>();
+  for (const url of pageUrls) {
+    const t = extractTitle(htmlOf.get(url) ?? "");
+    if (t) titles.set(url, t);
+  }
 
   if (p.flags.propose === true) {
     // The template fingerprint comes from a snapshot when the project has one for the route:
@@ -929,8 +1010,8 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
       if (!snapshotOf.has(key))
         snapshotOf.set(key, { id: s.meta.id, skeleton: skeletonOf(s.dom), ...(s.meta.auth !== undefined ? { auth: s.meta.auth } : {}) });
     }
-    const inputs: ProposalInput[] = urls.map((url) => {
-      const html = cache.get(url);
+    const inputs: ProposalInput[] = pageUrls.map((url) => {
+      const html = htmlOf.get(url);
       const title = titles.get(url);
       const snap = snapshotOf.get(routePath(url));
       return {
@@ -940,14 +1021,14 @@ async function cmdPagesDiscover(p: ParsedArgs): Promise<number> {
         ...(snap ? { id: snap.id, skeleton: snap.skeleton, ...(snap.auth !== undefined ? { auth: snap.auth } : {}) } : {}),
       };
     });
-    return writeProposedSample(p, lang, inputs);
+    return writeProposedSample(p, lang, inputs, unreachable);
   }
-  return writeDiscoveredSample(p, lang, proposeSamplePages(urls, titles), urls.length);
+  return writeDiscoveredSample(p, lang, proposeSamplePages(pageUrls, titles), pageUrls.length, unreachable);
 }
 
 /** `pages discover --propose`: the deterministic sample (src/sample-propose.ts), printed, or
  *  written over the declared pages with --write (human work kept — see applyProposal). */
-function writeProposedSample(p: ParsedArgs, lang: Lang, inputs: ProposalInput[]): number {
+function writeProposedSample(p: ParsedArgs, lang: Lang, inputs: ProposalInput[], unreachable: readonly Unreachable[] = []): number {
   const key = typeof p.flags.standard === "string" && p.flags.standard ? p.flags.standard : "rgaa";
   let methodology: SampleMethodology | undefined;
   let locale = "fr";
@@ -1012,6 +1093,7 @@ function writeProposedSample(p: ParsedArgs, lang: Lang, inputs: ProposalInput[])
           documents: proposal.documents,
           clusters: proposal.clusters,
           leftOut: proposal.leftOut,
+          ...(unreachable.length ? { unreachable } : {}),
           kept: applied.kept.map((x) => ({ id: x.id, url: x.url })),
           dropped: applied.dropped.map((x) => ({ id: x.id, url: x.url })),
         },
@@ -1123,10 +1205,10 @@ export function stampRoutes(result: AuditResult, root: string, lang: Lang, extra
 /** Persist the discovered routes to `.ultra11y/routes.json` (with `--write` or `--routes-only`).
  *  The inventory is the whole application; the sample is what the verdicts are stated over.
  *  Every later audit lists each inventory route with how it was observed (src/routes.ts). */
-function recordRouteInventory(p: ParsedArgs, lang: Lang, urls: readonly string[], via: RouteSource): void {
+function recordRouteInventory(p: ParsedArgs, lang: Lang, urls: readonly string[], via: RouteSource, checks?: ReadonlyMap<string, RouteCheck>): void {
   if (p.flags.write !== true && p.flags["routes-only"] !== true) return;
   const root = typeof p.flags.root === "string" && p.flags.root ? p.flags.root : ".";
-  const { file, added, total } = writeRoutes(root, urls, via);
+  const { file, added, total } = writeRoutes(root, urls, via, checks);
   console.error(
     lang === "fr"
       ? `ultra11y pages discover : inventaire des routes → ${file} (${total} route(s), ${added} nouvelle(s)). \`ultra11y scan --sample --all-routes\` couvre l'échantillon puis le reste.`
@@ -1134,7 +1216,7 @@ function recordRouteInventory(p: ParsedArgs, lang: Lang, urls: readonly string[]
   );
 }
 
-function writeDiscoveredSample(p: ParsedArgs, lang: Lang, proposed: SamplePage[], found: number): number {
+function writeDiscoveredSample(p: ParsedArgs, lang: Lang, proposed: SamplePage[], found: number, unreachable: readonly Unreachable[] = []): number {
   let existing: SampleConfig | undefined;
   try {
     existing = loadConfig(process.cwd())?.sample;
@@ -1153,7 +1235,8 @@ function writeDiscoveredSample(p: ParsedArgs, lang: Lang, proposed: SamplePage[]
     return 1;
   }
 
-  if (p.flags.json) console.log(JSON.stringify({ sample: v.sample, added: merged.added, kept: merged.kept }, null, 2));
+  if (p.flags.json)
+    console.log(JSON.stringify({ sample: v.sample, added: merged.added, kept: merged.kept, ...(unreachable.length ? { unreachable } : {}) }, null, 2));
 
   if (p.flags.write !== true) {
     if (!p.flags.json) {
@@ -4428,6 +4511,29 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
       return 1;
     }
   }
+  // Addresses the server only canonicalised, followed and recorded where the browser landed.
+  for (const f of dynamic.followed ?? [])
+    console.error(
+      lang === "fr"
+        ? `ℹ️ ultra11y scan : « ${f.id} » — ${f.requested} redirige vers ${f.landed} (même page, adresse canonicalisée) : page auditée et enregistrée à ${f.landed}. Déclarez cette adresse dans l'échantillon pour l'ouvrir directement.`
+        : `ℹ️ ultra11y scan: "${f.id}" — ${f.requested} redirects to ${f.landed} (same page, canonical address): audited and recorded at ${f.landed}. Declare that address in the sample to open it directly.`,
+    );
+  // A PARTIAL SAMPLE IS NOT A PASS. The run above refused some sample pages and measured the
+  // rest: the report is written, the refused pages are named in it, and the exit code says the
+  // sample was not audited in full — exiting 0 there handed CI a green step for a deliverable
+  // stated over 2 pages of an 11-page sample. Under --baseline the gate below decides instead:
+  // a page already unrenderable in the baseline does not block, a newly unrenderable one does.
+  const sampleIdSet = new Set((useSample && sampleConfig ? sampleConfig.pages : []).map((pg) => pg.id));
+  const refusedSample = (dynamic.redirected ?? []).filter((r) => sampleIdSet.has(r.id));
+  const finish = (): number => {
+    if (!refusedSample.length || !sampleConfig) return 0;
+    console.error(
+      lang === "fr"
+        ? `✗ ultra11y scan : échantillon partiel — ${refusedSample.length} page(s) sur ${sampleConfig.pages.length} non enregistrée(s) : ${refusedSample.map((r) => `« ${r.name} » (${r.id})`).join(", ")}. Le rapport ne couvre que les pages mesurées ; corrigez ces pages ou l'échantillon, puis relancez \`scan --sample\`.`
+        : `✗ ultra11y scan: partial sample — ${refusedSample.length} of ${sampleConfig.pages.length} page(s) not recorded: ${refusedSample.map((r) => `"${r.name}" (${r.id})`).join(", ")}. The report covers the measured pages only; fix those pages or the sample, then re-run \`scan --sample\`.`,
+    );
+    return 1;
+  };
   // THE RENDERED GATE. Only what the baseline does not hold blocks; a page the baseline never
   // rendered is new, so all of it is. No model decides anything here: identity is the finding's
   // rule, criterion, route path and selector (src/baseline.ts `dynamicFindingId`).
@@ -4628,7 +4734,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
             : `${dynamic.snapshots.length} page snapshot(s) written to ${PAGES_DIR}/ — commit them to audit those pages offline (\`ultra11y pages\`).`,
         );
     }
-    return 0;
+    return finish();
   }
   if (p.flags.json) console.log(JSON.stringify(dynamic, null, 2));
   else {
@@ -4645,7 +4751,7 @@ async function cmdScan(p: ParsedArgs): Promise<number> {
           : `\n${dynamic.snapshots.length} page snapshot(s) written to ${PAGES_DIR}/ — \`ultra11y audit\` picks them up automatically.`,
       );
   }
-  return 0;
+  return finish();
 }
 
 /** `sample check` — advisory lint of the configured page sample (`.ultra11yrc.json`
@@ -4719,6 +4825,11 @@ function cmdSample(p: ParsedArgs): number {
   const snapshotted = sampleFromSnapshots(readSnapshots(root));
   const union = unionSample(v.sample, snapshotted);
   const { missing, waived } = lintSample(union.sample, methodology);
+  // DECLARED PAGES KNOWN NOT TO BE PAGES. Discovery probed their route and it answered an
+  // error, a redirect elsewhere or a directory listing (`.ultra11y/routes.json`, `refused`). A
+  // kind « covered » by a 404 is not covered: no verdict will ever be stated over that page, and
+  // `scan --sample` refuses it. Read from the inventory only — this lint makes no request.
+  const unreachable = unreachableSamplePages(readRoutes(root), v.sample.pages);
   const loc = pack?.defaultLocale ?? "fr";
   const counts = {
     declared: v.sample.pages.length,
@@ -4735,6 +4846,8 @@ function cmdSample(p: ParsedArgs): number {
           ...counts,
           undeclaredPages: union.undeclared.map((x) => ({ id: x.id, url: x.url })),
           uncapturedPages: union.uncaptured.map((x) => ({ id: x.id, url: x.url })),
+          unreachablePages: unreachable.map((x) => ({ id: x.id, url: x.url, ...x.check })),
+          complete: missing.length === 0 && counts.undeclared === 0 && unreachable.length === 0,
           missing: missing.map((k) => ({ id: k.id, label: kindLabel(k, loc) })),
           waived: waived.map((w) => ({ id: w.kind.id, label: kindLabel(w.kind, loc), reason: w.reason })),
           warnings: v.warnings,
@@ -4755,7 +4868,21 @@ function cmdSample(p: ParsedArgs): number {
   // A kind can be absent for a good reason — it cannot be absent for no reason. A recorded one
   // is listed with its reason, so the omission stays visible without nagging.
   for (const w of waived) console.log(`ℹ️ ${kindLabel(w.kind, loc)} — ${lang === "fr" ? "absent, raison consignée" : "absent, reason recorded"} : ${w.reason}`);
-  if (missing.length) {
+  for (const u of unreachable)
+    console.log(
+      lang === "fr"
+        ? `⚠️ Page déclarée injoignable — « ${u.name} » (${u.id}) : ${describeUnreachable({ url: u.url, reason: u.check.refused, ...u.check }, lang)} lors de la dernière découverte. Retirez-la, ou déclarez l'adresse réelle de la page.`
+        : `⚠️ Declared page unreachable — "${u.name}" (${u.id}): ${describeUnreachable({ url: u.url, reason: u.check.refused, ...u.check }, lang)} at the last discovery. Remove it, or declare the page's real address.`,
+    );
+  if (unreachable.length && !missing.length) {
+    // Never « complete » over pages that cannot be audited: the kinds they cover are covered by
+    // nothing a verdict will be stated over.
+    console.log(
+      lang === "fr"
+        ? `⚠️ Échantillon non complet (${union.sample.pages.length} page(s)) — ${unreachable.length} page(s) déclarée(s) connue(s) injoignable(s) : ${unreachable.map((u) => u.id).join(", ")}. Relancez \`pages discover\` une fois corrigées.`
+        : `⚠️ Sample not complete (${union.sample.pages.length} page(s)) — ${unreachable.length} declared page(s) known to be unreachable: ${unreachable.map((u) => u.id).join(", ")}. Re-run \`pages discover\` once fixed.`,
+    );
+  } else if (missing.length) {
     console.log(
       (lang === "fr"
         ? `⚠️ Échantillon incomplet (${union.sample.pages.length} page(s)) — types de page requis absents (${pack!.name}) :`

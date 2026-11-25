@@ -1402,6 +1402,11 @@ export interface DynamicResult {
   // Sample pages dropped because the browser landed on a different path than the one asked
   // for. Absent when every page was reached. Optional/additive — see ScanRedirect.
   redirected?: ScanRedirect[];
+  // Sample pages whose server only canonicalised the address (a trailing slash added or
+  // removed, a scheme, a port, a `www.`): followed, audited and recorded at `landed`, the
+  // address the browser measured and the base the page's links resolve against.
+  // Optional/additive — absent when no address moved.
+  followed?: { id: string; requested: string; landed: string }[];
   // The axe-core build this run injected (src/axe-engine.ts): its version, and whether it was
   // ultra11y's pinned copy or the audited project's fallback. Optional/additive.
   axe?: AxeEngineInfo;

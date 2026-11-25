@@ -389,14 +389,15 @@ export function toDynamicResult(out: RunnerOutput, target: string, lang: Lang = 
   return { tool: "ultra11y", engine, target, date: today(), findings, ...(out.axe ? { axe: out.axe } : {}) };
 }
 
-/** Fetch a URL's served HTML (zero-dep, Node global fetch). Empty string on error. */
-async function fetchHtml(url: string): Promise<string> {
+/** Fetch a URL's served HTML (zero-dep, Node global fetch), with the address it was served
+ *  from after redirects — the base its links resolve against. Empty on error. */
+async function fetchHtml(url: string): Promise<{ html: string; url: string }> {
   try {
     const res = await fetch(url, { redirect: "follow" });
-    if (!res.ok) return "";
-    return await res.text();
+    if (!res.ok) return { html: "", url };
+    return { html: await res.text(), url: res.url || url };
   } catch {
-    return "";
+    return { html: "", url };
   }
 }
 
@@ -417,7 +418,7 @@ export interface DiscoverOpts {
 export async function discoverUrls(opts: DiscoverOpts): Promise<string[]> {
   const max = crawlBound(opts.max);
   if (opts.sitemap) {
-    const urls = parseSitemapUrls(await fetchHtml(opts.sitemap));
+    const urls = parseSitemapUrls((await fetchHtml(opts.sitemap)).html);
     const kept = Number.isFinite(max) ? urls.slice(0, max) : urls;
     kept.forEach((u, i) => opts.onPage?.(u, i + 1));
     return kept;

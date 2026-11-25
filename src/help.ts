@@ -437,9 +437,13 @@ Options:
                      discovered route in the inventory .ultra11y/routes.json
   --routes-only      pages discover: record the route inventory (.ultra11y/routes.json) and
                      leave the sample untouched — the RGAA sample stays the one you chose,
-                     and the report's annex lists every other route with how it was observed
+                     and the report's annex lists every other route with how it was observed.
+                     With --from-snapshots and no snapshot, there is nothing to add: exit 0
   --from-snapshots   pages discover: build the sample from .ultra11y/pages instead of crawling —
-                     the only route that sees a state-reached page (a modal, a funnel step)
+                     the only route that sees a state-reached page (a modal, a funnel step).
+                     --sitemap/--crawl ask every URL: one answering an HTTP error, redirecting
+                     to another page or serving a directory listing is left out of the sample
+                     by name, and recorded as such in .ultra11y/routes.json
   --propose          pages discover: propose a DETERMINISTIC sample instead of every page —
                      the required kinds of the standard (--standard, default rgaa) matched by
                      keyword on the sorted URLs and titles, the search page with a fixed
@@ -459,7 +463,11 @@ Options:
                      the routes left out are listed « not reached », never dropped
   --sample           scan: scan the NORMATIVE page sample from .ultra11yrc.json (its
                      sample.pages), per-page storage-state overriding --storage-state,
-                     aggregating one result with per-page provenance for the report
+                     aggregating one result with per-page provenance for the report.
+                     A page that redirects elsewhere or answers HTTP >= 400 is refused and
+                     named; any refused page makes the run exit 1 (partial sample), the
+                     report still written. A trailing-slash redirect is followed and the
+                     page recorded at its landing address
   --no-snapshot      scan: do NOT persist each scanned page to .ultra11y/pages/<id>/.
                      Snapshots are ON by default: the browser is already on the page, and
                      without one the page can never be re-audited offline nor earn a
@@ -968,10 +976,14 @@ Options :
   --routes-only      pages discover : enregistrer l'inventaire des routes (.ultra11y/routes.json) et
                      laisser l'échantillon intact — l'échantillon RGAA reste celui que vous avez
                      choisi, et l'annexe du rapport liste chaque autre route avec la façon dont
-                     elle a été observée
+                     elle a été observée. Avec --from-snapshots et aucun instantané, il n'y a
+                     rien à ajouter : sortie 0
   --from-snapshots   pages discover : construire l'échantillon à partir de .ultra11y/pages au lieu de
                      crawler — la seule voie qui voit une page atteinte par un état (une modale,
-                     une étape de tunnel)
+                     une étape de tunnel). --sitemap/--crawl interrogent chaque URL : celle qui
+                     répond une erreur HTTP, redirige vers une autre page ou sert un listing de
+                     répertoire est écartée de l'échantillon et nommée, et consignée comme telle
+                     dans .ultra11y/routes.json
   --propose          pages discover : proposer un échantillon DÉTERMINISTE plutôt que toutes les
                      pages — les types exigés par le référentiel (--standard, rgaa par défaut)
                      repérés par mot-clé sur les URL et titres triés, la page de recherche avec
@@ -994,7 +1006,11 @@ Options :
   --sample           scan : scanner l'échantillon de pages NORMATIF de .ultra11yrc.json (son
                      sample.pages), le storage-state de chaque page l'emportant sur
                      --storage-state, en agrégeant un résultat avec la provenance par page pour
-                     le rapport
+                     le rapport. Une page qui redirige ailleurs ou répond HTTP >= 400 est
+                     refusée et nommée ; toute page refusée fait sortir avec 1 (échantillon
+                     partiel), le rapport étant tout de même écrit. Une redirection qui
+                     n'ajoute ou ne retire qu'une barre oblique finale est suivie, et la page
+                     enregistrée à son adresse d'arrivée
   --no-snapshot      scan : NE PAS conserver chaque page scannée dans .ultra11y/pages/<id>/.
                      Les instantanés sont actifs par défaut : le navigateur est déjà sur la page,
                      et sans instantané la page ne peut jamais être ré-auditée hors ligne ni

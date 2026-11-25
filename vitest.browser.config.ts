@@ -12,6 +12,7 @@ export default defineConfig({
       "tests/full-audit.e2e.test.ts",
       "tests/render-snapshot.e2e.test.ts",
       "tests/capture-probes.e2e.test.ts",
+      "tests/scan-redirects.e2e.test.ts",
     ],
     pool: "forks",
     maxWorkers: 1,

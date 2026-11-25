@@ -152,8 +152,14 @@ export function crawlBound(n: number | undefined): number {
   return n === undefined || !Number.isFinite(n) || n <= 0 ? Number.POSITIVE_INFINITY : n;
 }
 
+/** What a crawl fetch answers: the body, or the body AND the address it was served from after
+ *  redirects. The second form matters: a page reached through a redirect (`/documents` → 301 →
+ *  `/documents/`) has its relative links written against the LANDING address, and resolving them
+ *  against the requested one walks a different, often nonexistent, set of URLs. */
+export type CrawlFetched = string | { html: string; url?: string };
+
 export interface CrawlOpts {
-  fetchHtml: (url: string) => Promise<string>;
+  fetchHtml: (url: string) => Promise<CrawlFetched>;
   /** Link hops to follow. Absent or 0 ⇒ unbounded (see `crawlBound`). */
   depth?: number;
   /** Cap on pages visited. Absent or 0 ⇒ unbounded (see `crawlBound`). */
@@ -184,12 +190,18 @@ export async function crawlUrls(start: string, opts: CrawlOpts): Promise<string[
     opts.onPage?.(url, order.length);
     if (d >= depth) continue;
     let html = "";
+    let base = url;
     try {
-      html = await opts.fetchHtml(url);
+      const got = await opts.fetchHtml(url);
+      if (typeof got === "string") html = got;
+      else {
+        html = got.html;
+        if (got.url) base = got.url;
+      }
     } catch {
       continue;
     }
-    for (const link of extractLinks(html, url)) {
+    for (const link of extractLinks(html, base)) {
       const canon = canonicalUrl(link);
       if (seen.has(canon)) continue;
       seen.add(canon);

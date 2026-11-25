@@ -274,7 +274,7 @@ jobs:
       - name: checkA11y, the probes and axe against real Chromium
         env:
           ULTRA11Y_REQUIRE_BROWSER: "1"
-        run: pnpm run test:browser tests/browser-tier.e2e.test.ts tests/capture-probes.e2e.test.ts
+        run: pnpm run test:browser tests/browser-tier.e2e.test.ts tests/capture-probes.e2e.test.ts tests/scan-redirects.e2e.test.ts
       # THE REFERENCE RUN of references/full-audit.md (#171): the whole chain — proposed sample,
       # render, audit, scan, worklist, scripted verdicts, fold, trial with --prune, report, page
       # dossiers and every `check` gate — on tests/fixtures/full-audit-app. No model is called:

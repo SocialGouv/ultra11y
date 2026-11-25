@@ -43,7 +43,15 @@ node scripts/ultra11y.mjs pages discover --from-snapshots --routes-only  # route
 ```
 
 `--routes-only` laisse intact l’échantillon RGAA choisi ; `--write` fusionne en plus les routes
-dans l’échantillon.
+dans l’échantillon. Sur un projet sans captures E2E, `--from-snapshots --routes-only` n’a rien à
+ajouter : il le dit et sort avec 0 (sans `--routes-only`, construire un échantillon à partir
+d’instantanés absents reste une erreur, code 1).
+
+La découverte interroge chaque URL. Une URL qui répond une erreur HTTP, redirige vers une autre
+page ou sert un listing de répertoire est **écartée de l’échantillon et nommée** (⚠️ sur la
+sortie d’erreur), et consignée comme telle dans l’inventaire ; une redirection qui n’ajoute ou
+ne retire qu’une barre oblique finale est suivie, et la page déclarée à son adresse d’arrivée.
+Lisez ces avertissements : une page écartée est souvent un lien mort du site, donc un constat.
 
 **Construisez ensuite l’échantillon RGAA à partir de la proposition, jamais à la main.** Deux
 exécutions qui choisissent leurs pages à la main auditent des pages différentes, et leurs
@@ -64,7 +72,10 @@ identifiants, slugs et dates normalisés, ou squelette du DOM quand un instantan
 page est écrit dans `sample.absent` avec la raison. **Conservez-la.** Ne la modifiez qu’avec
 une raison enregistrée : une page que vous ajoutez porte ses `notes`, un type que vous retirez
 reçoit une entrée `sample.absent`. `sample check` signale comme manquant un type retiré sans
-raison.
+raison, et ne dit jamais « complet » quand une page déclarée est connue injoignable (l’inventaire
+des routes a enregistré son erreur HTTP, sa redirection ou son listing de répertoire) : il la
+nomme. Un `scan --sample` dont une seule page est refusée sort avec 1 et nomme les pages
+refusées (`references/pages.md`, règle 0).
 
 Dès qu’un inventaire existe, chaque `audit` et chaque `scan --merge` liste chaque route dans
 l’annexe (section F) : capturée par les tests E2E, scannée, code source seulement, ou non

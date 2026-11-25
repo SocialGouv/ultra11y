@@ -38,6 +38,7 @@ import {
 import { type AxeEngine, resolveAxeEngine, runAxe } from "./axe-engine.js";
 import { TIMER_HOOK, behaviourSources, startBehaviour } from "./behaviour.js";
 import { sampleScope } from "./sample.js";
+import { landedOnRequestedPage } from "./reachability.js";
 import { CONSENT_STATE } from "./consent.js";
 import {
   COLLECT_SNAPSHOT,
@@ -566,59 +567,11 @@ export function clicksAllowed(storageState: string | undefined, interactClicks: 
   return interactClicks === true || !storageState;
 }
 
-/** Did the browser end up on the page we ASKED for?
- *
- *  A sample page's declared id/name is the identity the report and the per-page grid speak,
- *  and it is applied to whatever the browser had on screen. So a route that redirects — an
- *  expired session bouncing to /login, a wizard step the application state does not open —
- *  gets recorded under the requested page's name while showing another screen entirely.
- *  Nothing about the resulting document looks wrong, which is what makes it the worst
- *  failure mode an accessibility report has: a reader sees a page sheet, a screenshot and a
- *  conformance rate, and none of it describes the page named at the top.
- *
- *  What counts as "the same page" is decided per component, because which component carries
- *  the route is the app's choice, not ours:
- *
- *  - **path** always, trailing slash folded (`/aide/` ≡ `/aide`).
- *  - **fragment** only when the REQUEST had one. That is the hash-router case, where the
- *    fragment IS the route: asking for `#/admin` and landing on `#/login` is precisely the
- *    bounce this guard exists to catch, and comparing paths alone (both empty) would miss it.
- *    When the request carried no fragment, one the app appended to its own route is noise.
- *  - **query** on the same rule, for `?page=admin` style routing.
- *  - **host** always, since a same-path bounce to an IdP or a maintenance host is exactly the
- *    misattribution above. Only the scheme, the port and a `www.` prefix may differ — those
- *    are canonicalisation, not another page.
- *
- *  `requested` must be the RESOLVED navigation target, not the raw config value: a relative
- *  `dist/index.html` becomes `file:///abs/dist/index.html` before `goto`, and comparing the
- *  two forms would drop every relative file target. Anything unparseable is treated as a
- *  match — this guard catches a redirect, it does not invent one. Exported for the
- *  browser-free policy test. */
-export function landedOnRequestedPage(requested: string, landed: string): boolean {
-  if (!landed || requested === landed) return true;
-  const parse = (u: string): URL | undefined => {
-    try {
-      return new URL(u, "http://x.invalid");
-    } catch {
-      return undefined;
-    }
-  };
-  const a = parse(requested);
-  const b = parse(landed);
-  if (!a || !b) return true;
-
-  const path = (u: URL): string => u.pathname.replace(/\/+$/, "");
-  if (path(a) !== path(b)) return false;
-
-  // `www.` is canonicalisation; a different host is a different site.
-  const host = (u: URL): string => u.hostname.replace(/^www\./, "");
-  if (host(a) !== host(b)) return false;
-
-  // Only compared when the REQUEST carried one — see the doc block.
-  if (a.hash && a.hash !== b.hash) return false;
-  if (a.search && a.search !== b.search) return false;
-  return true;
-}
+/** Did the browser end up on the page we ASKED for? — src/reachability.ts, shared with
+ *  `pages discover` so discovery and the scan agree on what « it moved » means. Re-exported
+ *  here for the callers (and the browser-free policy test) that always imported it from the
+ *  scan runtime. */
+export { landedOnRequestedPage } from "./reachability.js";
 
 // ---- CI probe-string guard ------------------------------------------------------------
 /** EVERY string-evaluated browser expression this runtime ships — the constants plus the
@@ -1148,6 +1101,17 @@ export async function runScanManyLocal(urls: string[], opts: LocalManyOpts): Pro
   };
 }
 
+/** Origin + path of a URL — the part a server redirect canonicalises. The raw string when it
+ *  does not parse. */
+function addressOf(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.origin + u.pathname;
+  } catch {
+    return url;
+  }
+}
+
 /** Run the local dynamic tier over a NORMATIVE page SAMPLE (one browser, one context per
  *  page). Each page's own `storageState` OVERRIDES the run-wide one, so a mixed sample
  *  (some pages public, some authenticated) is scanned with the right session per page; the
@@ -1166,6 +1130,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
   // rather than from what this runtime is capable of measuring — see `measuredScs`.
   const outs: RunnerOutput[] = [];
   const redirected: ScanRedirect[] = [];
+  const redirectsFollowed: { id: string; requested: string; landed: string }[] = [];
   const scannedUrls: string[] = [];
   try {
     for (const page of pages) {
@@ -1215,10 +1180,23 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
       }
       findings.push(...tagSampleFindings(toDynamicResult(out, page.url, lang, LOCAL_ENGINE).findings, page));
       outs.push(out);
-      scannedUrls.push(page.url);
+      // FOLLOWED, NOT HIDDEN. `landedOnRequestedPage` lets a served page through when the
+      // server only canonicalised its address — a trailing slash added or removed (`/documents`
+      // → 301 → `/documents/`), a scheme, a port, a `www.`. What the browser measured is then
+      // the LANDING page, so that is the address recorded: the snapshot's url is the base its
+      // links resolve against (src/documents.ts reads it), and recording the requested one
+      // resolved a `formulaire.pdf` link on `/documents/` to `/formulaire.pdf` — a 404. The
+      // declared id and name are unchanged: it is the same route.
+      // Only when the ADDRESS moved (origin or path): a query or fragment the app appended to its
+      // own route is noise `landedOnRequestedPage` already ignores, and recording it would split
+      // the route from its inventory entry.
+      const followed = !isFile && /^https?:\/\//i.test(landedUrl) && addressOf(landedUrl) !== addressOf(page.url);
+      const recordedPage = followed ? { ...page, url: landedUrl } : page;
+      if (followed) redirectsFollowed.push({ id: page.id, requested: page.url, landed: landedUrl });
+      scannedUrls.push(recordedPage.url);
       // The sample page's declared id/name/auth/notes win over anything derived from the
       // URL: that identity is what the report and the per-page grid speak.
-      const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, page.url, page) : undefined;
+      const id = opts.snapshotRoot ? writeRunnerSnapshot(opts.snapshotRoot, out, recordedPage.url, recordedPage) : undefined;
       if (id) snapshots.push(id);
     }
   } finally {
@@ -1243,6 +1221,7 @@ export async function runSampleScanLocal(pages: SamplePage[], opts: LocalManyOpt
     ...(scannedUrls.length ? { scanned: scannedUrls } : {}),
     ...(snapshots.length ? { snapshots } : {}),
     ...(redirected.length ? { redirected } : {}),
+    ...(redirectsFollowed.length ? { followed: redirectsFollowed } : {}),
   };
 }
 
