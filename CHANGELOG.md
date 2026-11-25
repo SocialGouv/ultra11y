@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [8.5.1](https://github.com/SocialGouv/ultra11y/compare/v8.5.0...v8.5.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **snapshot:** dropped behaviour entries never read as absence, and journey steps count only the page's own timers ([#198](https://github.com/SocialGouv/ultra11y/issues/198)) ([#200](https://github.com/SocialGouv/ultra11y/issues/200)) ([c3f3894](https://github.com/SocialGouv/ultra11y/commit/c3f3894d350aee26925ed6af2be5e3fc7714304e))
+
 # [8.5.0](https://github.com/SocialGouv/ultra11y/compare/v8.4.0...v8.5.0) (2026-11-25)
 
 
