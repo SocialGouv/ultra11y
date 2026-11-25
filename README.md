@@ -75,12 +75,31 @@ Composants : `npx ultra11y render .` rend chaque composant, page et story avec l
 `react-dom/server` du projet, dans un harnais jetable, sans lire ni lancer ses tests. Les rendus
 vont dans `.ultra11y/captures/` et `audit` les lit. Ce qui n’a pas pu être rendu (contexte
 manquant, props, API du navigateur, chargement de données, délai) est listé avec la raison dans
-l’annexe du rapport. Voir [`references/rendered.md`](skills/ultra11y/references/rendered.md).
+l’annexe du rapport. Chaque rendu est ensuite ouvert dans Chromium, quand Playwright est
+disponible : une capture d’écran et un passage d’axe-core, montrés dans le rapport
+(`.ultra11y/render-snapshots/`). Ces rendus isolés illustrent le rapport sans jamais trancher
+un critère ; `--no-snapshots` saute ce passage. Voir
+[`references/rendered.md`](skills/ultra11y/references/rendered.md).
 
-**3. En CI : le bot [`rgaa-audit` d’iterion](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit).**
+**3. Relire une pull request.** `npx ultra11y affected --since origin/main` liste les pages
+qu’un changement peut atteindre, en remontant le graphe d’imports jusqu’aux routes.
+`npx ultra11y scan --since origin/main --base-url <url> --baseline <scan.json>` ne rend que ces
+pages et ne fait échouer la CI que sur les **nouvelles** non-conformités, absentes du `scan --json`
+de la branche de base.
+
+**4. En CI : le bot [`rgaa-audit` d’iterion](https://github.com/SocialGouv/iterion/tree/main/bots/rgaa-audit).**
 Il installe le moteur à une version épinglée, rend l’échantillon de pages, fait arbitrer et
 contre-vérifier les critères par des agents en lecture seule, contrôle le résultat avec `check`
 et ouvre un ticket par critère non conforme. Voir [`references/ci.md`](skills/ultra11y/references/ci.md).
+
+**Ce que le navigateur enregistre.** Sur chaque page mesurée et chaque étape de parcours, le
+scan garde l’arbre d’accessibilité (`axtree.json`), ce qu’un lecteur d’écran annoncerait à
+partir de cet arbre (`sr.json`), et l’inventaire des médias avec une mesure des flashs sur un
+court enregistrement de la page (`media.json`). L’agent s’en sert comme preuves pour les
+thématiques 4, 7, 11 et le critère 13.7. `npx ultra11y criteria --plan` donne le plan de
+travail : pour chaque critère, la source de preuve qui le tranche (code, graphe entre
+fichiers, page rendue, navigateur, jugement). Le rapport se termine par l’annexe I,
+« Carte de l’application » : chaque route, et comment elle a été observée.
 
 ## Commandes
 
@@ -90,7 +109,10 @@ lancer elle-même, avec `npx ultra11y <commande>` (tout le reste : `npx ultra11y
 | Commande | Rôle |
 |---|---|
 | `audit <chemins> --out audits --json` | passe le moteur statique sur le code |
+| `render .` | rend les composants et les capture dans Chromium (`--no-snapshots` pour s’en passer) |
 | `scan <url> --merge audits/audit-latest.json` | mesure une page dans un navigateur |
+| `affected --since <ref>` | liste les pages qu’un changement atteint |
+| `scan --since <ref> --base-url <url> --baseline <scan.json>` | ne rend que ces pages, échoue seulement sur les nouvelles non-conformités |
 | `journey run --all --keyboard --merge audits/audit-latest.json` | rejoue au clavier les parcours écrits par l’agent ([`journeys.md`](skills/ultra11y/references/journeys.md)) |
 | `report --in audits/audit-latest.json --html` | écrit le rapport daté |
 | `pages --in audits/audit-latest.json --format report --split page` | un dossier par page |
@@ -98,6 +120,7 @@ lancer elle-même, avec `npx ultra11y <commande>` (tout le reste : `npx ultra11y
 | `check --report <rapport.md>` | contrôle l’intégrité d’un rapport |
 | `tickets --in audits/audit-latest.json --dry-run` | prépare les tickets GitHub, GitLab ou Jira |
 | `criteria 8.3` | texte officiel d’un critère, ses tests, le glossaire |
+| `criteria --plan` | le plan de travail : quelle source de preuve tranche chaque critère |
 | `install --all` · `status` | branche le hook dans les agents, dit ce qui est actif |
 
 ## Pourquoi s’y fier
@@ -147,4 +170,4 @@ Conventional Commits : un commit sans préfixe `feat:` ou `fix:` ne déclenche a
   ([w3c/wcag](https://github.com/w3c/wcag)), © **W3C**, sous **W3C Document License**.
 - Le format du rapport s’inspire des conventions d’audit de la DINUM et d’etalab-ia ; les règles
   d’écriture accessible sont adaptées de la skill SocialGouv. Aucun code source n’a été copié.
-- Détail de chaque source et de chaque dépendance intégrée : `NOTICE`. Audit de maintenance et de sécurité des dépendances : `docs/dependencies.md`.
+- Détail de chaque source et de chaque dépendance intégrée : `NOTICE`. Audit de maintenance et de sécurité des dépendances : [`docs/dependencies.md`](docs/dependencies.md).
