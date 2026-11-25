@@ -145,7 +145,7 @@ const T = {
     averageExcluded: (n: number) => `${n} page(s) sans critère décidé sont exclues de la moyenne.`,
     journeysTitle: "Parcours",
     journeysIntro: (n: number) =>
-      `${n} parcours. Chaque étape réalisée enregistre un état de page, audité comme une page mais compté à part : il n'entre ni dans le nombre de pages ni dans le taux moyen.`,
+      `${n} parcours. Chaque étape réalisée enregistre un état de page, audité comme une page mais compté à part : ses non-conformités comptent pour sa page, il n'entre ni dans le nombre de pages ni dans le taux moyen.`,
     noJourneys: "Aucun parcours dans cet audit : `journey run` n'a pas été lancé, ou ses résultats n'ont pas été fusionnés.",
     journeyFile: "Fichier",
     journeyStatus: "Statut",
@@ -255,7 +255,7 @@ const T = {
     averageExcluded: (n: number) => `${n} page(s) with no decided criterion are left out of the mean.`,
     journeysTitle: "Journeys",
     journeysIntro: (n: number) =>
-      `${n} journey(s). Each step done records a page state, audited like a page but counted apart: it enters neither the page count nor the mean rate.`,
+      `${n} journey(s). Each step done records a page state, audited like a page but counted apart: its non-conformities count against its page, and it enters neither the page count nor the mean rate.`,
     noJourneys: "No journey in this audit: `journey run` was not run, or its results were not merged.",
     journeyFile: "File",
     journeyStatus: "Status",

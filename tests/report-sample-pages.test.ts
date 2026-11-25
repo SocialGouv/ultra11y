@@ -90,6 +90,30 @@ describe("sample pages, journey states and out-of-sample routes", () => {
     expect(avg.pct).toBe(Math.round(mean * 100));
   });
 
+  it("folds a journey state's non-conformities into its sample page, and keeps the stray route apart", () => {
+    const state = scope.find((p) => p.kind === "journey-state")!;
+    expect(state.parent).toBe("contact");
+    const contact = derived.find((p) => p.id === "contact")!;
+    expect(contact.states).toEqual(["contact-01-click-button-envoyer"]);
+    // The title missing in the state is missing on the contact page — and the finding still
+    // names the state it was seen in.
+    const f85 = contact.criteria.find((c) => c.id === "2.4.2")!;
+    expect(f85.status).toBe("NC");
+    expect(f85.findings.every((f) => f.page === "contact-01-click-button-envoyer")).toBe(true);
+    expect(derived.find((p) => p.id === "accueil")!.criteria.find((c) => c.id === "2.4.2")!.status).not.toBe("NC");
+    // The folded state lowers the contact page's rate, never raises it.
+    const avg = averageConformanceRate(audit, derived, "rgaa", "fr");
+    const rate = Object.fromEntries(avg.pages.map((p) => [p.id, p.validated / p.applicable]));
+    expect(rate.contact).toBeLessThan(rate.accueil!);
+  });
+
+  it("folds nothing into a page when the state's address is not a sample page", () => {
+    const a = sampleWithExtras();
+    a.scope.sample!.pages = a.scope.sample!.pages.filter((p) => p.id !== "contact");
+    const s = pagesOf(a).find((p) => p.kind === "journey-state")!;
+    expect(s.parent).toBeUndefined();
+  });
+
   it("counts two audited pages in the report header and lists the state and the route apart", () => {
     const md = renderPackReport(audit, loadPack("rgaa"), "fr");
     expect(md).toContain("- **Pages auditées** : 2 — accueil, contact");

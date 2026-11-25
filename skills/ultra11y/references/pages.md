@@ -230,6 +230,9 @@ de l’échantillon, `journey-state` pour un état enregistré par un parcours r
 donne alors `{ name, step }`), `out-of-sample` pour une route capturée que l’échantillon déclaré
 ne liste pas. Ces deux dernières gardent leur fiche et leurs constats, qui comptent pour leur
 critère, mais elles ne sont pas comptées comme pages auditées et n’entrent pas dans le taux moyen.
+Un état de parcours est sa page dans un autre état : quand la page de même adresse est dans
+l’échantillon (`parent`), ses non-conformités sont reportées sur la fiche et le taux de cette page
+(listée avec ses `states`), chaque constat gardant le nom de l’état où il a été vu.
 
 `averageRate` (sous un pack uniquement) est le **« taux moyen de conformité »** du RGAA — le
 second chiffre que la méthode demande pour un échantillon, à côté du taux global : `{ pct, pages: [{ id, name, url,

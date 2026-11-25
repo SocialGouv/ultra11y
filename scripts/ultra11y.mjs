@@ -52869,12 +52869,19 @@ function classifyPages(result, pages) {
     }
   const sampleUrls = new Set((sample ?? []).map((p2) => p2.url));
   const rank = { page: 0, "out-of-sample": 1, "journey-state": 2 };
+  const address = (u2) => u2.split("#")[0];
   const classified = pages.map((p2) => {
     const journey = states.get(p2.id);
     if (journey) return { ...p2, kind: "journey-state", journey };
     if (sample?.length && !sampleIds.has(p2.id) && !sampleUrls.has(p2.url)) return { ...p2, kind: "out-of-sample" };
     return p2;
   });
+  const byUrl = /* @__PURE__ */ new Map();
+  for (const p2 of classified) if (p2.kind === void 0 && !byUrl.has(address(p2.url))) byUrl.set(address(p2.url), p2.id);
+  for (const [i, p2] of classified.entries()) {
+    const parent = p2.kind === "journey-state" ? byUrl.get(address(p2.url)) : void 0;
+    if (parent) classified[i] = { ...p2, parent };
+  }
   return classified.map((p2, i) => ({ p: p2, i })).sort((a2, b) => rank[a2.p.kind ?? "page"] - rank[b.p.kind ?? "page"] || a2.i - b.i).map(({ p: p2 }) => p2);
 }
 function samplePages(pages) {
@@ -53026,7 +53033,9 @@ function derivePages(result, pages) {
   if (!pages.length) return [];
   const out = [];
   for (const p2 of pages) {
-    const own = result.findings.filter((f2) => f2.page === p2.id);
+    const states = p2.kind === void 0 ? pages.filter((x2) => x2.parent === p2.id).map((x2) => x2.id) : [];
+    const ids2 = /* @__PURE__ */ new Set([p2.id, ...states]);
+    const own = result.findings.filter((f2) => f2.page !== void 0 && ids2.has(f2.page));
     const criteria = result.criteria.map((c) => {
       const pf = own.filter((f2) => f2.criteriaId === c.id);
       const status = pageStatus(c, pf, p2.basis, p2.coverage);
@@ -53055,6 +53064,8 @@ function derivePages(result, pages) {
       basis: p2.basis,
       ...p2.kind ? { kind: p2.kind } : {},
       ...p2.journey ? { journey: p2.journey } : {},
+      ...p2.parent ? { parent: p2.parent } : {},
+      ...states.length ? { states } : {},
       criteria,
       findings: own,
       conformancePct: rate,
@@ -53187,13 +53198,23 @@ function adjudicationOnPage(result, adjudication, page) {
   const stamped = new Set(page.findings.map(findingId));
   const sources = result.scope.pages?.find((p2) => p2.id === page.id)?.sources ?? [];
   const onPage = (f2) => stamped.has(findingId(f2)) || sources.some((s2) => pathMatch2(f2.origin?.sourceFile ?? f2.file, s2));
-  const seen = result.scope.pageSubjects?.[page.id];
+  const subjectMap = result.scope.pageSubjects;
+  const seenHere = subjectMap?.[page.id];
+  const seen = seenHere && page.states?.length ? [...seenHere, ...page.states.flatMap((id) => subjectMap?.[id] ?? [])] : seenHere;
   const absentHere = (id) => {
     if (!seen) return false;
     const wcag = getCriterion(loadPack(adjudication.standard), id)?.wcag ?? [];
     return subjectsAbsent(subjectsForPackCriterion(adjudication.standard, id, wcag), new Set(seen));
   };
   const criteria = adjudication.criteria.flatMap((c) => {
+    const stateNc = (page.states ?? []).map((id) => c.pages?.[id]).filter((o) => o?.status === "NC");
+    if (stateNc.length) {
+      const { pages: _perPage, citations: _runCitations, ...rest } = c;
+      const own = c.pages?.[page.id];
+      const findings2 = [...own?.status === "NC" ? own.findings ?? [] : [], ...stateNc.flatMap((o) => o.findings ?? [])];
+      const justification = own?.status === "NC" ? own.justification : stateNc[0].justification;
+      return [{ ...rest, status: "NC", ...justification ? { justification } : {}, findings: findings2 }];
+    }
     const outcome = c.pages?.[page.id];
     if (outcome) {
       const { pages: _perPage, citations: _runCitations, reason: _runReason, ...rest } = c;
@@ -53217,7 +53238,10 @@ function adjudicationOnPage(result, adjudication, page) {
   return { ...adjudication, criteria };
 }
 function pageView(result, page) {
-  const own = result.scope.pageSubjects?.[page.id];
+  const subjects = result.scope.pageSubjects;
+  const mine = subjects?.[page.id];
+  const own = mine && page.states?.length ? [.../* @__PURE__ */ new Set([...mine, ...page.states.flatMap((id) => subjects?.[id] ?? [])])] : mine;
+  const here = /* @__PURE__ */ new Set([page.id, ...page.states ?? []]);
   const packAdjudication = result.packAdjudication ? adjudicationOnPage(result, result.packAdjudication, page) : void 0;
   return {
     ...result,
@@ -53225,9 +53249,9 @@ function pageView(result, page) {
     ...packAdjudication ? { packAdjudication } : {},
     criteria: page.criteria,
     findings: page.findings,
-    ...result.packFindings ? { packFindings: result.packFindings.filter((f2) => f2.page === page.id) } : {},
+    ...result.packFindings ? { packFindings: result.packFindings.filter((f2) => f2.page !== void 0 && here.has(f2.page)) } : {},
     // A document's findings are attributed to each page linking it (src/audit.ts foldDocument).
-    ...result.documentFindings ? { documentFindings: result.documentFindings.filter((f2) => f2.page === page.id) } : {}
+    ...result.documentFindings ? { documentFindings: result.documentFindings.filter((f2) => f2.page !== void 0 && here.has(f2.page)) } : {}
   };
 }
 function pageGridModel(result, derived, standard, lang) {
@@ -57768,7 +57792,7 @@ var L7 = {
     // Task 5 — « Constats par page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Constats par page",
     perPageNote: "Pour chaque page de l'\xE9chantillon : sa capture d'\xE9cran et les crit\xE8res non conformes relev\xE9s sur cette page.",
-    pageKindsNote: "Les lignes marqu\xE9es \xAB \xE9tat de parcours \xBB (un \xE9tat d'une page, enregistr\xE9 par un parcours rejou\xE9) ou \xAB hors \xE9chantillon \xBB (une route captur\xE9e que l'\xE9chantillon ne d\xE9clare pas) ne sont pas des pages de l'\xE9chantillon : leurs constats comptent pour leur crit\xE8re, mais elles n'entrent ni dans le nombre de pages audit\xE9es ni dans le taux moyen.",
+    pageKindsNote: "Les lignes marqu\xE9es \xAB \xE9tat de parcours \xBB (un \xE9tat d'une page, enregistr\xE9 par un parcours rejou\xE9) ou \xAB hors \xE9chantillon \xBB (une route captur\xE9e que l'\xE9chantillon ne d\xE9clare pas) ne sont pas des pages de l'\xE9chantillon : leurs constats comptent pour leur crit\xE8re \u2014 et, pour un \xE9tat, pour la page de l'\xE9chantillon dont il est un \xE9tat \u2014, mais elles n'entrent ni dans le nombre de pages audit\xE9es ni dans le taux moyen.",
     pageNcCriteria: (n) => `${n} crit\xE8re(s) non conforme(s) sur cette page`,
     transverseNote: (list) => `\xC9l\xE9ments transverses audit\xE9s sur chaque page : ${list}.`,
     authYes: "\u{1F512} authentification requise",
@@ -58024,7 +58048,7 @@ var L7 = {
     // Task 5 — « Findings per page » (Ara-style per-sample-page synthesis).
     perPageTitle: "Findings per page",
     perPageNote: "For each sample page: its screenshot and the criteria found non-conforming on that page.",
-    pageKindsNote: "Rows marked \u201Cjourney state\u201D (a state of a page, recorded by a replayed journey) or \u201Coutside the sample\u201D (a captured route the sample does not declare) are not pages of the sample: their findings count against their criterion, but they enter neither the audited page count nor the mean rate.",
+    pageKindsNote: "Rows marked \u201Cjourney state\u201D (a state of a page, recorded by a replayed journey) or \u201Coutside the sample\u201D (a captured route the sample does not declare) are not pages of the sample: their findings count against their criterion \u2014 and, for a state, against the sample page it is a state of \u2014 but they enter neither the audited page count nor the mean rate.",
     pageNcCriteria: (n) => `${n} non-conforming criterion/criteria on this page`,
     transverseNote: (list) => `Transverse elements audited on every page: ${list}.`,
     authYes: "\u{1F512} authentication required",
@@ -66996,7 +67020,7 @@ var T6 = {
     averageOpen: (n) => `Provisoire : ${n} crit\xE8re(s) restent \xE0 \xE9valuer sur ces pages.`,
     averageExcluded: (n) => `${n} page(s) sans crit\xE8re d\xE9cid\xE9 sont exclues de la moyenne.`,
     journeysTitle: "Parcours",
-    journeysIntro: (n) => `${n} parcours. Chaque \xE9tape r\xE9alis\xE9e enregistre un \xE9tat de page, audit\xE9 comme une page mais compt\xE9 \xE0 part : il n'entre ni dans le nombre de pages ni dans le taux moyen.`,
+    journeysIntro: (n) => `${n} parcours. Chaque \xE9tape r\xE9alis\xE9e enregistre un \xE9tat de page, audit\xE9 comme une page mais compt\xE9 \xE0 part : ses non-conformit\xE9s comptent pour sa page, il n'entre ni dans le nombre de pages ni dans le taux moyen.`,
     noJourneys: "Aucun parcours dans cet audit : `journey run` n'a pas \xE9t\xE9 lanc\xE9, ou ses r\xE9sultats n'ont pas \xE9t\xE9 fusionn\xE9s.",
     journeyFile: "Fichier",
     journeyStatus: "Statut",
@@ -67102,7 +67126,7 @@ var T6 = {
     averageOpen: (n) => `Provisional: ${n} criterion(ia) remain to assess on these pages.`,
     averageExcluded: (n) => `${n} page(s) with no decided criterion are left out of the mean.`,
     journeysTitle: "Journeys",
-    journeysIntro: (n) => `${n} journey(s). Each step done records a page state, audited like a page but counted apart: it enters neither the page count nor the mean rate.`,
+    journeysIntro: (n) => `${n} journey(s). Each step done records a page state, audited like a page but counted apart: its non-conformities count against its page, and it enters neither the page count nor the mean rate.`,
     noJourneys: "No journey in this audit: `journey run` was not run, or its results were not merged.",
     journeyFile: "File",
     journeyStatus: "Status",

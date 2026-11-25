@@ -126,12 +126,22 @@ function classifyPages(result: AuditResult, pages: PageScope[]): PageScope[] {
     }
   const sampleUrls = new Set((sample ?? []).map((p) => p.url));
   const rank = { page: 0, "out-of-sample": 1, "journey-state": 2 } as const;
-  const classified = pages.map((p) => {
+  // A STATE IS ITS PAGE IN ANOTHER STATE: it belongs to the sample page at the same address,
+  // and what fails in it fails on that page. A state whose page is not in the sample belongs to
+  // no page of it, and counts against its criterion only.
+  const address = (u: string) => u.split("#")[0]!;
+  const classified: PageScope[] = pages.map((p) => {
     const journey = states.get(p.id);
     if (journey) return { ...p, kind: "journey-state" as const, journey };
     if (sample?.length && !sampleIds.has(p.id) && !sampleUrls.has(p.url)) return { ...p, kind: "out-of-sample" as const };
     return p;
   });
+  const byUrl = new Map<string, string>();
+  for (const p of classified) if (p.kind === undefined && !byUrl.has(address(p.url))) byUrl.set(address(p.url), p.id);
+  for (const [i, p] of classified.entries()) {
+    const parent = p.kind === "journey-state" ? byUrl.get(address(p.url)) : undefined;
+    if (parent) classified[i] = { ...p, parent };
+  }
   // Sample pages first, then the routes outside it, then the journey states: a stable sort, so
   // each group keeps the order the audit recorded.
   return classified
@@ -464,7 +474,11 @@ export function derivePages(result: AuditResult, pages: PageScope[]): PageResult
   if (!pages.length) return [];
   const out: PageResult[] = [];
   for (const p of pages) {
-    const own = result.findings.filter((f) => f.page === p.id);
+    // A sample page carries the findings of its journey states: they were seen on this page, in
+    // another state. Each finding keeps its own `page`, so every list still names the state.
+    const states = p.kind === undefined ? pages.filter((x) => x.parent === p.id).map((x) => x.id) : [];
+    const ids = new Set([p.id, ...states]);
+    const own = result.findings.filter((f) => f.page !== undefined && ids.has(f.page));
     const criteria: CriterionResult[] = result.criteria.map((c) => {
       const pf = own.filter((f) => f.criteriaId === c.id);
       const status = pageStatus(c, pf, p.basis, p.coverage);
@@ -500,6 +514,8 @@ export function derivePages(result: AuditResult, pages: PageScope[]): PageResult
       basis: p.basis,
       ...(p.kind ? { kind: p.kind } : {}),
       ...(p.journey ? { journey: p.journey } : {}),
+      ...(p.parent ? { parent: p.parent } : {}),
+      ...(states.length ? { states } : {}),
       criteria,
       findings: own,
       conformancePct: rate,
@@ -779,7 +795,10 @@ function adjudicationOnPage(
   const stamped = new Set(page.findings.map(findingId));
   const sources = result.scope.pages?.find((p) => p.id === page.id)?.sources ?? [];
   const onPage = (f: Finding): boolean => stamped.has(findingId(f)) || sources.some((s) => pathMatch(f.origin?.sourceFile ?? f.file, s));
-  const seen = result.scope.pageSubjects?.[page.id];
+  const subjectMap = result.scope.pageSubjects;
+  const seenHere = subjectMap?.[page.id];
+  // Its states' subjects are this page's too (#232).
+  const seen = seenHere && page.states?.length ? [...seenHere, ...page.states.flatMap((id) => subjectMap?.[id] ?? [])] : seenHere;
   const absentHere = (id: string): boolean => {
     if (!seen) return false;
     const wcag = getCriterion(loadPack(adjudication.standard), id)?.wcag ?? [];
@@ -796,6 +815,16 @@ function adjudicationOnPage(
     // page outcome's alone. decidedBy/auditor travel through the spread: the provenance
     // says WHO ruled, and it ruled here too. Pages NOT named in the map fall through to the
     // run-wide handling below, unchanged.
+    // A NON-CONFORMITY RULED ON ONE OF ITS STATES IS A NON-CONFORMITY OF THE PAGE (#232). It wins
+    // over the page's own outcome: a page is conforming only if it conforms in every state.
+    const stateNc = (page.states ?? []).map((id) => c.pages?.[id]).filter((o) => o?.status === "NC");
+    if (stateNc.length) {
+      const { pages: _perPage, citations: _runCitations, ...rest } = c;
+      const own = c.pages?.[page.id];
+      const findings = [...(own?.status === "NC" ? (own.findings ?? []) : []), ...stateNc.flatMap((o) => o!.findings ?? [])];
+      const justification = own?.status === "NC" ? own.justification : stateNc[0]!.justification;
+      return [{ ...rest, status: "NC" as const, ...(justification ? { justification } : {}), findings }];
+    }
     const outcome = c.pages?.[page.id];
     if (outcome) {
       // The run-wide citations are other pages' evidence: the page shows only its own. A
@@ -848,7 +877,11 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
   // « the ensemble has two navigation systems » on a page that happens to carry one.
   //
   // Absent map ⇒ unchanged behaviour, so an audit written before the fold reads as it always did.
-  const own = result.scope.pageSubjects?.[page.id];
+  // A state's subjects exist on its page: the error message a submit reveals is on the form.
+  const subjects = result.scope.pageSubjects;
+  const mine = subjects?.[page.id];
+  const own = mine && page.states?.length ? [...new Set([...mine, ...page.states.flatMap((id) => subjects?.[id] ?? [])])] : mine;
+  const here = new Set([page.id, ...(page.states ?? [])]);
   const packAdjudication = result.packAdjudication ? adjudicationOnPage(result, result.packAdjudication, page) : undefined;
   return {
     ...result,
@@ -856,9 +889,9 @@ export function pageView(result: AuditResult, page: PageResult): AuditResult {
     ...(packAdjudication ? { packAdjudication } : {}),
     criteria: page.criteria,
     findings: page.findings,
-    ...(result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page === page.id) } : {}),
+    ...(result.packFindings ? { packFindings: result.packFindings.filter((f) => f.page !== undefined && here.has(f.page)) } : {}),
     // A document's findings are attributed to each page linking it (src/audit.ts foldDocument).
-    ...(result.documentFindings ? { documentFindings: result.documentFindings.filter((f) => f.page === page.id) } : {}),
+    ...(result.documentFindings ? { documentFindings: result.documentFindings.filter((f) => f.page !== undefined && here.has(f.page)) } : {}),
   };
 }
 

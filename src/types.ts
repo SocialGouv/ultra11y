@@ -824,6 +824,9 @@ export interface PageScope {
   kind?: "journey-state" | "out-of-sample";
   /** For a journey state: the journey and the step that recorded it (step 0 is the start). */
   journey?: { name: string; step: number };
+  /** For a journey state: the sample page it is a state of (same URL), when the sample has one.
+   *  Its non-conformities count against that page's sheet and rate (#232). */
+  parent?: string;
 }
 
 /** One page's projection of the audit. Derived, never stored on the AuditResult: the full
@@ -836,6 +839,10 @@ export interface PageResult {
   basis: PageScope["basis"];
   kind?: PageScope["kind"];
   journey?: PageScope["journey"];
+  parent?: PageScope["parent"];
+  /** For a sample page: the journey states folded into it — a state is the page in another
+   *  state, so what fails there fails on the page (#232). */
+  states?: string[];
   criteria: CriterionResult[];
   findings: Finding[];
   // NULL WHEN NOTHING WAS DECIDED. A rate over zero decided criteria is not a rate, and printing

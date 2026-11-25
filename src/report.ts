@@ -216,7 +216,7 @@ const L = {
     perPageTitle: "Constats par page",
     perPageNote: "Pour chaque page de l'échantillon : sa capture d'écran et les critères non conformes relevés sur cette page.",
     pageKindsNote:
-      "Les lignes marquées « état de parcours » (un état d'une page, enregistré par un parcours rejoué) ou « hors échantillon » (une route capturée que l'échantillon ne déclare pas) ne sont pas des pages de l'échantillon : leurs constats comptent pour leur critère, mais elles n'entrent ni dans le nombre de pages auditées ni dans le taux moyen.",
+      "Les lignes marquées « état de parcours » (un état d'une page, enregistré par un parcours rejoué) ou « hors échantillon » (une route capturée que l'échantillon ne déclare pas) ne sont pas des pages de l'échantillon : leurs constats comptent pour leur critère — et, pour un état, pour la page de l'échantillon dont il est un état —, mais elles n'entrent ni dans le nombre de pages auditées ni dans le taux moyen.",
     pageNcCriteria: (n: number) => `${n} critère(s) non conforme(s) sur cette page`,
     transverseNote: (list: string) => `Éléments transverses audités sur chaque page : ${list}.`,
     authYes: "🔒 authentification requise",
@@ -534,7 +534,7 @@ const L = {
     perPageTitle: "Findings per page",
     perPageNote: "For each sample page: its screenshot and the criteria found non-conforming on that page.",
     pageKindsNote:
-      "Rows marked “journey state” (a state of a page, recorded by a replayed journey) or “outside the sample” (a captured route the sample does not declare) are not pages of the sample: their findings count against their criterion, but they enter neither the audited page count nor the mean rate.",
+      "Rows marked “journey state” (a state of a page, recorded by a replayed journey) or “outside the sample” (a captured route the sample does not declare) are not pages of the sample: their findings count against their criterion — and, for a state, against the sample page it is a state of — but they enter neither the audited page count nor the mean rate.",
     pageNcCriteria: (n: number) => `${n} non-conforming criterion/criteria on this page`,
     transverseNote: (list: string) => `Transverse elements audited on every page: ${list}.`,
     authYes: "🔒 authentication required",
