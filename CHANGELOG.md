@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here, generated automatically from the Conventional Commits by semantic-release.
 
+## [9.0.2](https://github.com/SocialGouv/ultra11y/compare/v9.0.1...v9.0.2) (2026-11-25)
+
+
+### Bug Fixes
+
+* **scan:** the stateful scan e2e no longer races the input-overflow measure ([#206](https://github.com/SocialGouv/ultra11y/issues/206)) ([#207](https://github.com/SocialGouv/ultra11y/issues/207)) ([fde7972](https://github.com/SocialGouv/ultra11y/commit/fde79723fb9b0d83f25dc7c5f76dcf4128bf423d))
+
 ## [9.0.1](https://github.com/SocialGouv/ultra11y/compare/v9.0.0...v9.0.1) (2026-11-25)
 
 
