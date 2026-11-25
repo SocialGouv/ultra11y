@@ -1,4 +1,4 @@
-import { realpathSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from "node:fs";
+import { realpathSync, writeFileSync, mkdirSync, existsSync, copyFileSync, rmSync } from "node:fs";
 import { join, relative, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -42,6 +42,7 @@ import {
   runRenderEngine,
   type TranspilerName,
 } from "./render-engine.js";
+import { RENDER_SNAPSHOT_INDEX, RENDER_SNAPSHOTS_DIR, renderSnapshotScopeFor, snapshotCounts, snapshotRenderCaptures } from "./render-snapshot.js";
 import { CAPTURES_DIR, computeCaptureCoverage, parseCaptureProvenance, formatCaptureComment, type CaptureEntry } from "./capture.js";
 import { buildGraphStreaming } from "./graph/build.js";
 import { discover } from "./discover.js";
@@ -129,7 +130,7 @@ import { buildTrialSummary, formatTrialSummary } from "./trial-summary.js";
 import { readStdin, readText, today } from "./util.js";
 import { duplicateJourneyNames, journeyScopeFor, listJourneyFiles, readJourneyRuns, writeJourneyRuns, JOURNEYS_DIR, JOURNEY_RUNS_FILE } from "./journey.js";
 import { JOURNEY_ENGINE, runJourneys } from "./journey-run.js";
-import type { RenderSignals } from "./types.js";
+import type { RenderSignals, RenderSnapshotIndex } from "./types.js";
 
 const HELP = `ultra11y v${VERSION}
 Audit a site against RGAA 4.1.2, the French State's accessibility standard, and
@@ -150,7 +151,7 @@ Usage:
   ultra11y prd      --in <audit.json> [--out <dir>] [--split criterion] [--format audit|doc] [--no-technical] [--standard rgaa] [--lang auto|en|fr]
   ultra11y tickets  --in <audit.json> [--provider auto|github|gitlab|jira] [--grain criterion|page|page-criterion|single|file] [--transport auto|cli|rest]
   ultra11y tickets  [--out <dir>] [--max-tickets <n>] [--dry-run] [--json] [--standard rgaa] [--no-technical] [--lang auto|en|fr]
-  ultra11y render   [<dir>] [--transpiler esbuild|typescript|sucrase] [--timeout <ms>] [--include <glob>] [--exclude <glob>] [--no-stories] [--json]   (ultra11y's render engine: components, pages, stories → .ultra11y/captures + .ultra11y/render.json)
+  ultra11y render   [<dir>] [--transpiler esbuild|typescript|sucrase] [--timeout <ms>] [--include <glob>] [--exclude <glob>] [--no-stories] [--no-snapshots] [--browser-path <file>] [--json]   (ultra11y's render engine: components, pages, stories → .ultra11y/captures + .ultra11y/render.json + .ultra11y/render-snapshots)
   ultra11y render   [<dir>] --detect | --coverage | --storybook [--captures <dir>] [--json] [--lang auto|en|fr]
   ultra11y criteria [<sc>] [--list] [--standard rgaa] [--theme <N>] [--generate] [--json] [--lang auto|en|fr]
   ultra11y criteria --glossary [<term>]   (the terms the standard DEFINES — its tests depend on them)
@@ -220,6 +221,15 @@ Commands:
              (provenance: source, component, renderer, styles="none"); every unit,
              rendered, skipped with the reason, or not attempted, is listed in
              .ultra11y/render.json, which 'audit' reads into the report's annex.
+             Then each capture is opened in Chromium (when Playwright and a browser
+             are available — otherwise it says so and the static captures stand):
+             a screenshot and an axe pass, with the project's global CSS when found
+             (root layout/_app/main imports, linked public/ stylesheets, a build's
+             compiled CSS for Tailwind/Sass sources). Written to
+             .ultra11y/render-snapshots/ (PNG + index.json) and shown in the report.
+             These are ISOLATED component renders: page-level axe rules are set
+             aside, style-dependent ones too without the full CSS, and no snapshot
+             observation ever decides a criterion. --no-snapshots skips the pass.
              --detect prints the framework's build→audit recipe instead.
              --coverage reports which components have a rendered capture vs
              which are still opaque-source-only blind spots. --storybook attributes
@@ -388,6 +398,7 @@ Options:
   --timeout <ms>     render: per-unit render budget (default 10000); a unit past it is recorded as a timeout
   --transpiler <t>   render: esbuild|typescript|sucrase — the project's transpiler to load TSX/JSX with (default: the first resolvable)
   --no-stories       render: leave the Storybook stories out
+  --no-snapshots     render: skip the visual pass (screenshot + axe of each capture in Chromium). Env: ULTRA11Y_RENDER_SNAPSHOTS=off
   --coverage         render: report rendered-capture coverage (covered vs blind-spot components); with --json emits the coverage object
   --storybook        render: attribute per-story HTML (via storybook-static index.json) into .ultra11y/captures (point the HTML dir with --captures)
   --captures <dir>   audit/render: rendered-capture dir to ingest (default: .ultra11y/captures)
@@ -486,7 +497,7 @@ Options:
   --local            scan: alias of --runtime local
   --cwd <dir>        scan: resolves @playwright/test + @axe-core/playwright (and the
                      browser) from here first (e.g. --cwd packages/app)
-  --browser-path <file>  scan / status --browser: launch THIS browser executable (e.g. a
+  --browser-path <file>  scan / render / status --browser: launch THIS browser executable (e.g. a
                      distribution's /usr/bin/chromium) instead of the one Playwright resolves.
                      Explicit: never replaced by a fallback. Env: ULTRA11Y_BROWSER_PATH
   --storage-state <file>  scan: Playwright storageState JSON for
@@ -704,9 +715,11 @@ const BOOLEAN_FLAGS = new Set([
   "require-captures",
   "storybook",
   "coverage",
-  // `render`: print the framework recipe instead of rendering; leave the stories out.
+  // `render`: print the framework recipe instead of rendering; leave the stories out; skip
+  // the visual snapshot pass (src/render-snapshot.ts).
   "detect",
   "no-stories",
+  "no-snapshots",
   "write",
   // `pages discover`: build the sample from the snapshots the E2E producer already wrote,
   // instead of crawling — the only route that can see a state-reached page.
@@ -1155,7 +1168,13 @@ async function cmdAudit(p: ParsedArgs): Promise<number> {
   const rendersInScope = p.flags["no-captures"] !== true && !inputs.includes("-") && !scopedToDiff;
   if (rendersInScope || inputs.includes(capturesDir)) {
     const renders = renderScopeFor(capturesDir);
-    if (renders) result.scope.renders = renders;
+    if (renders) {
+      // The visual snapshots of those captures, when `render` took them: evidence for the
+      // reader (annex G, HTML report), from an ISOLATED render — never a verdict.
+      const snapshots = renderSnapshotScopeFor(capturesDir);
+      if (snapshots) renders.snapshots = snapshots;
+      result.scope.renders = renders;
+    }
   }
 
   // Only persist audit-latest.json when an output dir is explicitly requested. A plain
@@ -2762,6 +2781,24 @@ async function cmdRenderEngine(p: ParsedArgs, root: string, lang: Lang): Promise
     onProgress: p.flags.json ? undefined : (done, total, file) => console.error(`ultra11y render: [${done}/${total}] ${file}`),
   });
   const n = renderCounts(manifest.units);
+  // The visual pass: each capture opened in Chromium (screenshot + axe, the project's CSS when
+  // found). Optional by design — without a browser the static captures stand as they are, and
+  // the line below says so.
+  const snapshotsOff = p.flags["no-snapshots"] === true || /^(off|0|false)$/i.test(process.env.ULTRA11Y_RENDER_SNAPSHOTS ?? "");
+  const snapshots =
+    !snapshotsOff && n.rendered > 0
+      ? await snapshotRenderCaptures({
+          root,
+          manifest,
+          ...(browserPathOf(p.flags) ? { browserPath: browserPathOf(p.flags) } : {}),
+          warn: (m) => console.error(m),
+          onProgress: p.flags.json ? undefined : (done, total, id) => console.error(`ultra11y render: snapshot [${done}/${total}] ${id}`),
+        })
+      : undefined;
+  // No pass this run: the previous run's pictures would show components as they no longer are.
+  if (!snapshots) rmSync(join(root, RENDER_SNAPSHOTS_DIR), { recursive: true, force: true });
+  const snapshotLine = snapshotSummaryLine(snapshots, snapshotsOff, n.rendered, lang);
+  if (snapshotLine && p.flags.json) console.error(snapshotLine);
   // A run with units that rendered none of them fails, so it is never a green no-op: a CI step
   // must see it. The manifest is written either way, and `audit` reports every reason.
   const code = manifest.units.length > 0 && n.rendered === 0 ? 1 : 0;
@@ -2788,6 +2825,7 @@ async function cmdRenderEngine(p: ParsedArgs, root: string, lang: Lang): Promise
         ? `  ${manifest.testFilesIgnored} fichier(s) de test, de mock ou d'instantané laissé(s) de côté sans être lus.`
         : `  ${manifest.testFilesIgnored} test, mock or snapshot file(s) left out, unread.`,
     );
+  if (snapshotLine) out.push(snapshotLine);
   out.push(
     fr
       ? `→ captures dans ${join(root, CAPTURES_DIR)}, manifeste ${join(root, RENDER_MANIFEST)}. Puis : ultra11y audit (depuis ${root}).`
@@ -2801,6 +2839,37 @@ async function cmdRenderEngine(p: ParsedArgs, root: string, lang: Lang): Promise
         : `ultra11y render: no unit rendered out of ${manifest.units.length} — every reason is in ${join(root, RENDER_MANIFEST)} and in the audit.`,
     );
   return code;
+}
+
+/** The one line `render` prints about the visual snapshot pass: what it took, with which
+ *  styles, or why it took nothing. Undefined when there was nothing to snapshot. */
+function snapshotSummaryLine(index: RenderSnapshotIndex | undefined, off: boolean, rendered: number, lang: Lang): string | undefined {
+  const fr = lang === "fr";
+  if (rendered === 0) return undefined;
+  if (off || !index)
+    return fr
+      ? "  Instantanés visuels désactivés (--no-snapshots / ULTRA11Y_RENDER_SNAPSHOTS=off) : seules les captures HTML statiques sont écrites."
+      : "  Visual snapshots off (--no-snapshots / ULTRA11Y_RENDER_SNAPSHOTS=off): only the static HTML captures are written.";
+  if (index.unavailable)
+    return fr
+      ? `  Instantanés visuels non pris, faute de navigateur (${index.unavailable}). Les captures HTML statiques restent auditées comme avant.`
+      : `  Visual snapshots not taken, no browser (${index.unavailable}). The static HTML captures are still audited as before.`;
+  const c = snapshotCounts(index);
+  const styles =
+    index.styles.status === "none"
+      ? fr
+        ? "SANS le CSS du projet (aucune feuille de style globale trouvée) : styles par défaut du navigateur, contrastes non retenus"
+        : "WITHOUT the project's CSS (no global stylesheet found): browser default styles, contrast not counted"
+      : index.styles.status === "partial"
+        ? fr
+          ? `avec une partie du CSS du projet (${index.styles.files.length} feuille(s) chargée(s), ${index.styles.skipped.length} écartée(s)) : contrastes non retenus`
+          : `with part of the project's CSS (${index.styles.files.length} stylesheet(s) loaded, ${index.styles.skipped.length} left out): contrast not counted`
+        : fr
+          ? `avec le CSS du projet (${index.styles.files.length} feuille(s))`
+          : `with the project's CSS (${index.styles.files.length} stylesheet(s))`;
+  return fr
+    ? `  Instantanés visuels : ${c.snapshotted} pris, ${c.failed} en échec — ${styles}. axe sur rendu isolé : ${c.counted} observation(s) à confirmer sur la page réelle, ${c.setAside} écartée(s) ; aucune ne fonde un verdict. → ${RENDER_SNAPSHOT_INDEX}`
+    : `  Visual snapshots: ${c.snapshotted} taken, ${c.failed} failed — ${styles}. axe on isolated renders: ${c.counted} observation(s) to confirm on the real page, ${c.setAside} set aside; none decides a verdict. → ${RENDER_SNAPSHOT_INDEX}`;
 }
 
 function cmdCheck(p: ParsedArgs): number {

@@ -9,13 +9,14 @@
 // no reviewer opens twice. So there is a budget and a LADDER — and the rule the ladder obeys
 // is that IMAGES DEGRADE AND NON-CONFORMITIES NEVER DO. Every rung is announced in the
 // document itself and on stderr; nothing is dropped quietly.
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { findingId } from "./baseline.js";
 import { evidenceRefusals, type EvidenceManifest } from "./evidence.js";
 import { renderHtmlDocument, type Run } from "./html.js";
 import { compositeDoc, indexDoc, pageDoc, pagesIndexDoc, type CropLookup, type RefusalLookup } from "./html-report.js";
 import { derivePages, pagesOf } from "./pages.js";
+import type { SnapshotHref } from "./render-snapshot-report.js";
 import { CORE, type StandardId, isCore, loadPack } from "./standards/index.js";
 import type { AuditResult, Finding, Lang } from "./types.js";
 
@@ -214,10 +215,13 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
   const refusals = refusalLookup(opts.evidence, lang);
   let compositePath: string | undefined;
   if (!flat) {
+    const shots = componentShots(result, opts.outDir);
     const composite = compositeDoc(result, {
       standard,
       lang,
       crops: budgetedCrops,
+      componentShots: shots.href,
+      componentShotsLinked: shots.linked,
       ...(refusals ? { refusals } : {}),
       nav: nav.map((n) => ({ ...n, current: n.href === `./${compositeName}` })),
     });
@@ -290,6 +294,41 @@ export function writeHtml(result: AuditResult, opts: EmitOpts): EmitResult {
     imagesDropped: rung.steps.includes("none"),
     notices,
   };
+}
+
+/** Bytes of component snapshots (src/render-snapshot.ts) the composite embeds. Separate from
+ *  the evidence budget on purpose: these pictures illustrate no non-conformity, so they must
+ *  never push a crop out. Past it, a snapshot is copied to `assets/components/` and linked —
+ *  the same place the Markdown annex puts it. */
+export const COMPONENT_INLINE_BUDGET = 4 * 1024 * 1024;
+
+function componentShots(result: AuditResult, outDir: string): { href: SnapshotHref; linked: number } {
+  const units = result.scope.renders?.snapshots?.units ?? [];
+  const href = new Map<string, string>();
+  let spent = 0;
+  let linked = 0;
+  for (const u of units) {
+    if (!u.screenshot) continue;
+    const size = inlineSize(u.screenshot);
+    if (!size) continue;
+    if (spent + size <= COMPONENT_INLINE_BUDGET) {
+      const uri = dataUri(u.screenshot);
+      if (uri) {
+        spent += size;
+        href.set(u.id, uri);
+        continue;
+      }
+    }
+    try {
+      mkdirSync(join(outDir, "assets", "components"), { recursive: true });
+      copyFileSync(u.screenshot, join(outDir, "assets", "components", `${u.id}.png`));
+      href.set(u.id, `./assets/components/${u.id}.png`);
+      linked++;
+    } catch {
+      // Not copyable: shown without its picture rather than with a broken link.
+    }
+  }
+  return { href: (u) => href.get(u.id), linked };
 }
 
 function noticeRuns(notices: string[]): Run[] {

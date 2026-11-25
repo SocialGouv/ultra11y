@@ -47,6 +47,7 @@ import {
 import { CORE, type StandardId, isCore, loadPack, standardLabel, titlePlain } from "./standards/index.js";
 import { findingsForStandard } from "./standards/derive.js";
 import type { Block, Cell, Doc, Run } from "./html.js";
+import { renderSnapshotBlocks, type SnapshotHref } from "./render-snapshot-report.js";
 import type { AuditResult, Finding, Lang, PageResult, Status } from "./types.js";
 
 /** Resolves the annotated crop for one occurrence. Same contract as the auditor block's
@@ -68,6 +69,10 @@ export interface HtmlReportOpts {
   refusals?: RefusalLookup;
   /** Sibling documents, for the nav. */
   nav?: Doc["nav"];
+  /** The render engine's visual snapshots: where each PNG is (data: URI or file), and how many
+   *  were linked instead of embedded (src/render-snapshot-report.ts). */
+  componentShots?: SnapshotHref;
+  componentShotsLinked?: number;
 }
 
 /** The refusal list as blocks: the sentence, then one item per reason. */
@@ -657,6 +662,7 @@ export function compositeDoc(result: AuditResult, opts: HtmlReportOpts = {}): Do
   const scope = pagesOf(result);
   if (scope.length) blocks.push(...crossGridBlocks(result, derivePages(result, scope), standard, lang));
   blocks.push(...documentsBlocks(result, lang));
+  blocks.push(...renderSnapshotBlocks(result, lang, opts.componentShots ?? (() => undefined), opts.componentShotsLinked ?? 0));
   // The file opens on the summary (the level, what to fix); the index of the sections that
   // follow sits right after it, and lists only headings that carry an anchor to land on.
   const contents: Run[][] = blocks

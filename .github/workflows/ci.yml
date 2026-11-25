@@ -283,6 +283,12 @@ jobs:
         env:
           ULTRA11Y_REQUIRE_BROWSER: "1"
         run: pnpm run test:browser tests/full-audit.e2e.test.ts
+      # The render engine's captures opened in Chromium (#210): screenshot + axe, the project's
+      # CSS when found, and the report that shows them — labelled as isolated renders.
+      - name: Render snapshots of the components in real Chromium
+        env:
+          ULTRA11Y_REQUIRE_BROWSER: "1"
+        run: pnpm run test:browser tests/render-snapshot.e2e.test.ts
 
   # THE OPENCODE PLUGIN, IN A REAL OPENCODE — BOTH MAJORS.
   #
