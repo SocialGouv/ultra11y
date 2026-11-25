@@ -269,6 +269,10 @@ export function writeRunnerSnapshot(
       // looked. The journey runner (#189) goes through this same function, so it only has to set
       // `snapshot.scripts` from src/behaviour.ts to write the same file.
       ...(collected.scripts ? { scripts: collected.scripts } : {}),
+      // The accessibility tree (and, derived from it by writeSnapshot, the screen-reader digest)
+      // and the media probe (#208). Same rule as the probes: measured here, persisted here.
+      ...(collected.axtree ? { axtree: collected.axtree } : {}),
+      ...(collected.media ? { media: collected.media } : {}),
       ...(collected.screenshot ? { screenshotBase64: collected.screenshot } : {}),
       ...(collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {}),
       ...(collected.screenshot320 ? { screenshot320Base64: collected.screenshot320 } : {}),

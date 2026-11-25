@@ -238,10 +238,10 @@ var require_utils = __commonJS({
       REGEX_SPECIAL_CHARS_GLOBAL
     } = require_constants();
     exports.isObject = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
-    exports.hasRegexChars = (str) => REGEX_SPECIAL_CHARS.test(str);
-    exports.isRegexChar = (str) => str.length === 1 && exports.hasRegexChars(str);
-    exports.escapeRegex = (str) => str.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
-    exports.toPosixSlashes = (str) => str.replace(REGEX_BACKSLASH, "/");
+    exports.hasRegexChars = (str2) => REGEX_SPECIAL_CHARS.test(str2);
+    exports.isRegexChar = (str2) => str2.length === 1 && exports.hasRegexChars(str2);
+    exports.escapeRegex = (str2) => str2.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
+    exports.toPosixSlashes = (str2) => str2.replace(REGEX_BACKSLASH, "/");
     exports.isWindows = () => {
       if (typeof navigator !== "undefined" && navigator.platform) {
         const platform = navigator.platform.toLowerCase();
@@ -252,8 +252,8 @@ var require_utils = __commonJS({
       }
       return false;
     };
-    exports.removeBackslashes = (str) => {
-      return str.replace(REGEX_REMOVE_BACKSLASH, (match) => {
+    exports.removeBackslashes = (str2) => {
+      return str2.replace(REGEX_REMOVE_BACKSLASH, (match) => {
         return match === "\\" ? "" : match;
       });
     };
@@ -343,7 +343,7 @@ var require_scan = __commonJS({
       const slashes = [];
       const tokens = [];
       const parts = [];
-      let str = input;
+      let str2 = input;
       let index = -1;
       let start = 0;
       let lastIndex = 0;
@@ -362,10 +362,10 @@ var require_scan = __commonJS({
       let code2;
       let token = { value: "", depth: 0, isGlob: false };
       const eos = () => index >= length;
-      const peek = () => str.charCodeAt(index + 1);
+      const peek = () => str2.charCodeAt(index + 1);
       const advance = () => {
         prev = code2;
-        return str.charCodeAt(++index);
+        return str2.charCodeAt(++index);
       };
       while (index < length) {
         code2 = advance();
@@ -542,24 +542,24 @@ var require_scan = __commonJS({
         isExtglob = false;
         isGlob = false;
       }
-      let base = str;
+      let base = str2;
       let prefix2 = "";
       let glob = "";
       if (start > 0) {
-        prefix2 = str.slice(0, start);
-        str = str.slice(start);
+        prefix2 = str2.slice(0, start);
+        str2 = str2.slice(start);
         lastIndex -= start;
       }
       if (base && isGlob === true && lastIndex > 0) {
-        base = str.slice(0, lastIndex);
-        glob = str.slice(lastIndex);
+        base = str2.slice(0, lastIndex);
+        glob = str2.slice(lastIndex);
       } else if (isGlob === true) {
         base = "";
-        glob = str;
+        glob = str2;
       } else {
-        base = str;
+        base = str2;
       }
-      if (base && base !== "" && base !== "/" && base !== str) {
+      if (base && base !== "" && base !== "/" && base !== str2) {
         if (isPathSeparator(base.charCodeAt(base.length - 1))) {
           base = base.slice(0, -1);
         }
@@ -1606,8 +1606,8 @@ var require_parse = __commonJS({
         if (opts2.noglobstar === true) return star;
         return `(${capture2}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
       };
-      const create = (str) => {
-        switch (str) {
+      const create = (str2) => {
+        switch (str2) {
           case "*":
             return `${nodot}${ONE_CHAR}${star}`;
           case ".*":
@@ -1625,7 +1625,7 @@ var require_parse = __commonJS({
           case "**/.*":
             return `(?:${nodot}${globstar(opts)}${SLASH_LITERAL})?${DOT_LITERAL}${ONE_CHAR}${star}`;
           default: {
-            const match = /^(.*?)\.(\w+)$/.exec(str);
+            const match = /^(.*?)\.(\w+)$/.exec(str2);
             if (!match) return;
             const source2 = create(match[1]);
             if (!source2) return;
@@ -1656,9 +1656,9 @@ var require_picomatch = __commonJS({
     var picomatch2 = (glob, options, returnState = false) => {
       if (Array.isArray(glob)) {
         const fns = glob.map((input) => picomatch2(input, options, returnState));
-        const arrayMatcher = (str) => {
+        const arrayMatcher = (str2) => {
           for (const isMatch of fns) {
-            const state2 = isMatch(str);
+            const state2 = isMatch(str2);
             if (state2) return state2;
           }
           return false;
@@ -1734,7 +1734,7 @@ var require_picomatch = __commonJS({
       const regex = glob instanceof RegExp ? glob : picomatch2.makeRe(glob, options);
       return regex.test(utils.basename(input, { windows: posix4 }));
     };
-    picomatch2.isMatch = (str, patterns, options) => picomatch2(patterns, options)(str);
+    picomatch2.isMatch = (str2, patterns, options) => picomatch2(patterns, options)(str2);
     picomatch2.parse = (pattern, options) => {
       if (Array.isArray(pattern)) return pattern.map((p2) => picomatch2.parse(p2, options));
       return parse2(pattern, { ...options, fastpaths: false });
@@ -2072,7 +2072,7 @@ var require_ignore = __commonJS({
         // Zero, one or several directories
         // should not use '*', or it will be replaced by the next replacer
         // Check if it is not the last `'/**'`
-        (_2, index, str) => index + 6 < str.length ? str.slice(index + 6) === "\\/" ? "(?:\\/[^\\/]+)+" : "(?:\\/[^\\/]+)*" : `\\/${TRAILING_DOUBLESTAR}`,
+        (_2, index, str2) => index + 6 < str2.length ? str2.slice(index + 6) === "\\/" ? "(?:\\/[^\\/]+)+" : "(?:\\/[^\\/]+)*" : `\\/${TRAILING_DOUBLESTAR}`,
         "*"
       ],
       // normal intermediate wildcards
@@ -2351,16 +2351,16 @@ var require_ignore = __commonJS({
         return this._make(MODE_CHECK_IGNORE, key2);
       }
       _make(mode, key2) {
-        const str = pinWildcards(
+        const str2 = pinWildcards(
           mode === MODE_IGNORE ? this.regexPrefix.replace(REGEX_REPLACE_TRAILING_WILDCARD, replaceTrailingWildcard).replace(REGEX_REPLACE_TRAILING_DOUBLESTAR, replaceTrailingDoublestar) : checkSourceOf(this.body, this.regexPrefix)
         );
-        const regex = this.ignoreCase ? new RegExp(str, "i") : new RegExp(str);
+        const regex = this.ignoreCase ? new RegExp(str2, "i") : new RegExp(str2);
         return define(this, key2, regex);
       }
     };
-    var hasTrailingBackslash = (str) => {
+    var hasTrailingBackslash = (str2) => {
       let count = 0;
-      while (str[str.length - count - 1] === ESCAPE) {
+      while (str2[str2.length - count - 1] === ESCAPE) {
         count++;
       }
       return count % 2 === 1;
@@ -2639,7 +2639,7 @@ var require_ignore = __commonJS({
     var factory = (options) => new Ignore(options);
     var isPathValid = (path) => checkPath(convertPath(path), path, RETURN_FALSE);
     var setupWindows = () => {
-      const makePosix = (str) => /^\\\\\?\\/.test(str) || /["<>|\u0000-\u001F]+/u.test(str) ? str : str.replace(/\\/g, "/");
+      const makePosix = (str2) => /^\\\\\?\\/.test(str2) || /["<>|\u0000-\u001F]+/u.test(str2) ? str2 : str2.replace(/\\/g, "/");
       checkPath.convert = makePosix;
       const REGEX_TEST_WINDOWS_PATH_ABSOLUTE = /^[a-z]:\//i;
       checkPath.isNotRelative = (path) => REGEX_TEST_WINDOWS_PATH_ABSOLUTE.test(path) || isNotRelative(path);
@@ -8033,14 +8033,14 @@ function parseHtml(source, file, lossy = false, sfc = false) {
     if (node.type === "tag" || node.type === "script" || node.type === "style") {
       const dh = node;
       const start = dh.startIndex ?? 0;
-      const { line, col } = lineColAt(lineStarts, start);
+      const { line: line2, col } = lineColAt(lineStarts, start);
       const el = {
         type: "element",
         tag: sfc ? dh.name : dh.name.toLowerCase(),
         attribs: { ...dh.attribs },
         children: [],
         parent,
-        line,
+        line: line2,
         col,
         start,
         end: dh.endIndex ?? start
@@ -8159,11 +8159,11 @@ function jsxToHtml(source) {
 
 // node_modules/@babel/parser/lib/index.js
 var Position = class {
-  constructor(line, col, index) {
+  constructor(line2, col, index) {
     this.line = void 0;
     this.column = void 0;
     if (index !== void 0) this.index = void 0;
-    this.line = line;
+    this.line = line2;
     this.column = col;
     if (index !== void 0) this.index = index;
   }
@@ -8180,11 +8180,11 @@ var SourceLocation = class {
 };
 function createPositionWithColumnOffset(position, columnOffset) {
   const {
-    line,
+    line: line2,
     column,
     index
   } = position;
-  return new Position(line, column + columnOffset, index + columnOffset);
+  return new Position(line2, column + columnOffset, index + columnOffset);
 }
 var code = "BABEL_PARSER_SOURCETYPE_MODULE_REQUIRED";
 var ModuleErrors = {
@@ -8495,11 +8495,11 @@ function toParseErrorConstructor({
     }
     defineHidden(error, "clone", function clone(overrides = {}) {
       const {
-        line,
+        line: line2,
         column,
         index = pos
       } = overrides.loc ?? loc;
-      return constructor(new Position(line, column), index, {
+      return constructor(new Position(line2, column), index, {
         ...details,
         ...overrides.details
       });
@@ -14274,9 +14274,9 @@ var Tokenizer2 = class extends CommentsParser {
     });
   }
   finishOp(type, size) {
-    const str = this.input.slice(this.state.pos, this.state.pos + size);
+    const str2 = this.input.slice(this.state.pos, this.state.pos + size);
     this.state.pos += size;
-    this.finishToken(type, str);
+    this.finishToken(type, str2);
   }
   readRegexp() {
     const startLoc = this.state.startLoc;
@@ -14368,8 +14368,8 @@ var Tokenizer2 = class extends CommentsParser {
       throw this.raise(Errors.NumberIdentifier, this.state.curPosition());
     }
     if (isBigInt) {
-      const str = this.input.slice(start, this.state.pos).replace(/[_n]/g, "");
-      this.finishToken(132, str);
+      const str2 = this.input.slice(start, this.state.pos).replace(/[_n]/g, "");
+      this.finishToken(132, str2);
       return;
     }
     this.finishToken(131, val);
@@ -14413,7 +14413,7 @@ var Tokenizer2 = class extends CommentsParser {
       isFloat = true;
       next = this.input.charCodeAt(this.state.pos);
     }
-    const str = this.input.slice(start, this.state.pos).replaceAll("_", "");
+    const str2 = this.input.slice(start, this.state.pos).replaceAll("_", "");
     if (next === 110) {
       if (isFloat || hasLeadingZero) {
         this.raise(Errors.InvalidBigIntLiteral, startLoc);
@@ -14425,10 +14425,10 @@ var Tokenizer2 = class extends CommentsParser {
       throw this.raise(Errors.NumberIdentifier, this.state.curPosition());
     }
     if (isBigInt) {
-      this.finishToken(132, str);
+      this.finishToken(132, str2);
       return;
     }
-    const val = isOctal ? parseInt(str, 8) : parseFloat(str);
+    const val = isOctal ? parseInt(str2, 8) : parseFloat(str2);
     this.finishToken(131, val);
   }
   readCodePoint(throwOnInvalid) {
@@ -14441,7 +14441,7 @@ var Tokenizer2 = class extends CommentsParser {
   }
   readString(quote) {
     const {
-      str,
+      str: str2,
       pos,
       curLine,
       lineStart
@@ -14449,7 +14449,7 @@ var Tokenizer2 = class extends CommentsParser {
     this.state.pos = pos + 1;
     this.state.lineStart = lineStart;
     this.state.curLine = curLine;
-    this.finishToken(130, str);
+    this.finishToken(130, str2);
   }
   readTemplateContinuation() {
     if (!this.match(4)) {
@@ -14461,7 +14461,7 @@ var Tokenizer2 = class extends CommentsParser {
   readTemplateToken() {
     const opening2 = this.input[this.state.pos];
     const {
-      str,
+      str: str2,
       firstInvalidLoc,
       pos,
       curLine,
@@ -14474,10 +14474,10 @@ var Tokenizer2 = class extends CommentsParser {
       this.state.firstInvalidTemplateEscapePos = new Position(firstInvalidLoc.curLine, firstInvalidLoc.pos - firstInvalidLoc.lineStart, this.sourceToOffsetPos(firstInvalidLoc.pos));
     }
     if (this.input.codePointAt(pos) === 96) {
-      this.finishToken(20, firstInvalidLoc ? null : opening2 + str + "`");
+      this.finishToken(20, firstInvalidLoc ? null : opening2 + str2 + "`");
     } else {
       this.state.pos++;
-      this.finishToken(21, firstInvalidLoc ? null : opening2 + str + "${");
+      this.finishToken(21, firstInvalidLoc ? null : opening2 + str2 + "${");
     }
   }
   recordStrictModeErrors(toParseError, at) {
@@ -24470,6 +24470,250 @@ async function startBehaviour(page, opts = {}) {
   };
 }
 
+// src/screen-reader.ts
+var AX_MAX_NODES = 6e3;
+var SR_MAX_ENTRIES = 2e3;
+var NAME_MAX = 200;
+var RAW_TEXT = /* @__PURE__ */ new Set(["script", "style", "title", "textarea", "xmp", "iframe", "noembed", "noframes"]);
+function ordinalsOf(root) {
+  const out = /* @__PURE__ */ new Map();
+  let i = 0;
+  let drift = false;
+  const walk4 = (parent) => {
+    for (const child of parent.children ?? []) {
+      if (drift) return;
+      if (child.nodeType !== 1) continue;
+      const tag = (child.localName || child.nodeName || "").toLowerCase();
+      out.set(child.backendNodeId, { i: i++, tag });
+      if (RAW_TEXT.has(tag)) continue;
+      if (tag === "noscript") {
+        const hasElement = (child.children ?? []).some((c) => c.nodeType === 1);
+        const text = (child.children ?? []).some((c) => c.nodeType === 3 && /</.test(String(c.nodeValue ?? "")));
+        if (!hasElement && text) {
+          drift = true;
+          return;
+        }
+      }
+      walk4(tag === "template" && child.templateContent ? child.templateContent : child);
+    }
+  };
+  walk4(root);
+  return drift ? void 0 : out;
+}
+var str = (v2) => v2?.value === void 0 || v2.value === null ? "" : String(v2.value);
+var clip = (s2) => {
+  const t3 = s2.replace(/\s+/g, " ").trim();
+  return t3.length > NAME_MAX ? `${t3.slice(0, NAME_MAX - 1)}\u2026` : t3;
+};
+function statesOf(props) {
+  const states = [];
+  let level;
+  let disabled;
+  let focusable;
+  for (const p2 of props ?? []) {
+    const v2 = p2.value?.value;
+    switch (p2.name) {
+      case "level":
+        if (typeof v2 === "number") level = v2;
+        break;
+      case "disabled":
+        if (v2 === true) {
+          disabled = true;
+          states.push("disabled");
+        }
+        break;
+      case "focusable":
+        if (v2 === true) focusable = true;
+        break;
+      case "checked":
+        states.push(v2 === "mixed" ? "mixed" : v2 === "true" || v2 === true ? "checked" : "not checked");
+        break;
+      case "pressed":
+        states.push(v2 === "mixed" ? "mixed" : v2 === "true" || v2 === true ? "pressed" : "not pressed");
+        break;
+      case "expanded":
+        states.push(v2 === true || v2 === "true" ? "expanded" : "collapsed");
+        break;
+      case "selected":
+        if (v2 === true || v2 === "true") states.push("selected");
+        break;
+      case "invalid":
+        if (v2 !== "false" && v2 !== false && v2 !== void 0) states.push(v2 === "true" || v2 === true ? "invalid" : `invalid=${String(v2)}`);
+        break;
+      case "required":
+      case "readonly":
+      case "multiselectable":
+      case "modal":
+      case "busy":
+      case "atomic":
+        if (v2 === true || v2 === "true") states.push(p2.name);
+        break;
+      case "haspopup":
+      case "live":
+      case "autocomplete":
+      case "orientation":
+      case "roledescription":
+      case "current":
+        if (v2 !== void 0 && v2 !== "" && v2 !== "false" && v2 !== false && v2 !== "off") states.push(`${p2.name}=${String(v2)}`);
+        break;
+      default:
+        break;
+    }
+  }
+  return { states, ...level !== void 0 ? { level } : {}, ...disabled ? { disabled } : {}, ...focusable ? { focusable } : {} };
+}
+var DROPPED_ROLES = /* @__PURE__ */ new Set(["InlineTextBox", "LineBreak"]);
+var SILENT_ROLES = /* @__PURE__ */ new Set(["generic", "none", "presentation", "LayoutTable", "LayoutTableRow", "LayoutTableCell", "Section", "Ignored"]);
+function buildAxTree(nodes, ordinals) {
+  const byId2 = new Map(nodes.map((n) => [n.nodeId, n]));
+  const root = nodes.find((n) => n.parentId === void 0) ?? nodes[0];
+  if (!root) return void 0;
+  let kept = 0;
+  const seen = /* @__PURE__ */ new Set();
+  const convert = (n) => {
+    if (seen.has(n.nodeId)) return [];
+    seen.add(n.nodeId);
+    const kids = () => (n.childIds ?? []).flatMap((id) => byId2.has(id) && kept < AX_MAX_NODES ? convert(byId2.get(id)) : []);
+    const role = str(n.role);
+    if (n.ignored || DROPPED_ROLES.has(role)) return kids();
+    const { states, level, disabled, focusable } = statesOf(n.properties);
+    const name = clip(str(n.name));
+    if (SILENT_ROLES.has(role) && !name && !states.length) return kids();
+    if (kept >= AX_MAX_NODES) return [];
+    kept++;
+    const join38 = n.backendDOMNodeId !== void 0 ? ordinals?.get(n.backendDOMNodeId) : void 0;
+    const value = clip(str(n.value));
+    const description = clip(str(n.description));
+    const children = kids();
+    return [
+      {
+        role,
+        ...name ? { name } : {},
+        ...value ? { value } : {},
+        ...description ? { description } : {},
+        ...level !== void 0 ? { level } : {},
+        ...disabled ? { disabled } : {},
+        ...focusable ? { focusable } : {},
+        ...states.length ? { states } : {},
+        ...join38 ? { i: join38.i, tag: join38.tag } : {},
+        ...children.length ? { children } : {}
+      }
+    ];
+  };
+  const out = convert(root);
+  return out[0];
+}
+async function captureAxTree(page) {
+  let client;
+  try {
+    client = await page.context().newCDPSession(page);
+  } catch {
+    return void 0;
+  }
+  try {
+    const { nodes } = await client.send("Accessibility.getFullAXTree");
+    let ordinals;
+    try {
+      const { root } = await client.send("DOM.getDocument", { depth: -1, pierce: false });
+      ordinals = ordinalsOf(root);
+    } catch {
+    }
+    return buildAxTree(nodes, ordinals);
+  } catch {
+    return void 0;
+  } finally {
+    await client.detach().catch(() => {
+    });
+  }
+}
+var NAME_FROM_CONTENT = /* @__PURE__ */ new Set([
+  "link",
+  "button",
+  "heading",
+  "menuitem",
+  "menuitemcheckbox",
+  "menuitemradio",
+  "tab",
+  "option",
+  "treeitem",
+  "checkbox",
+  "radio",
+  "switch",
+  "cell",
+  "gridcell",
+  "columnheader",
+  "rowheader",
+  "tooltip",
+  "LabelText",
+  "legend",
+  "caption",
+  "figcaption",
+  "term",
+  "code"
+]);
+var TEXT_ROLES = /* @__PURE__ */ new Set(["StaticText", "text"]);
+var QUIET = /* @__PURE__ */ new Set(["RootWebArea", "WebArea", "generic", "none", "presentation", "paragraph", "LabelText", "Section", "div"]);
+function line(n) {
+  const role = n.role ?? "";
+  const name = n.name ?? "";
+  if (TEXT_ROLES.has(role)) return `"${name}"`;
+  const head = role === "heading" && n.level !== void 0 ? `heading level ${n.level}` : role;
+  const parts = [`${head}${name ? ` "${name}"` : ""}`];
+  if (n.value) parts[0] += ` = "${n.value}"`;
+  parts.push(...n.states ?? []);
+  return `${parts.join(", ")}${n.description ? ` \u2014 "${n.description}"` : ""}`;
+}
+function announce(tree) {
+  const entries = [];
+  let truncated = false;
+  const visit = (n, inNamed) => {
+    if (entries.length >= SR_MAX_ENTRIES) {
+      truncated = true;
+      return;
+    }
+    const role = n.role ?? "";
+    const name = n.name ?? "";
+    const isText2 = TEXT_ROLES.has(role);
+    const speak = isText2 ? !inNamed && name !== "" : !QUIET.has(role) || (n.states?.length ?? 0) > 0;
+    if (speak)
+      entries.push({
+        role: isText2 ? "text" : role,
+        name,
+        ...n.value ? { value: n.value } : {},
+        ...n.description ? { description: n.description } : {},
+        states: [...n.states ?? []],
+        text: line(n),
+        ...n.i !== void 0 && n.tag ? { i: n.i, tag: n.tag } : {}
+      });
+    const named3 = inNamed || NAME_FROM_CONTENT.has(role) && name !== "" || SR_FIELD_ROLES.has(role);
+    for (const c of n.children ?? []) visit(c, named3);
+  };
+  if (tree) visit(tree, false);
+  return { v: 1, entries, ...truncated ? { truncated } : {} };
+}
+var SR_FIELD_ROLES = /* @__PURE__ */ new Set(["textbox", "searchbox", "combobox", "listbox", "checkbox", "radio", "switch", "slider", "spinbutton", "TextField"]);
+var SR_WIDGET_ROLES = /* @__PURE__ */ new Set([
+  "button",
+  "menu",
+  "menubar",
+  "menuitem",
+  "menuitemcheckbox",
+  "menuitemradio",
+  "tab",
+  "tablist",
+  "tabpanel",
+  "tree",
+  "treeitem",
+  "dialog",
+  "alertdialog",
+  "grid",
+  "toolbar",
+  "disclosure-triangle",
+  "DisclosureTriangle"
+]);
+var SR_LIVE_ROLES = /* @__PURE__ */ new Set(["status", "alert", "log", "marquee", "timer", "progressbar"]);
+var SR_SCRIPTED_STATES = /^(?:expanded|collapsed|pressed|not pressed|checked|not checked|mixed|selected|haspopup=|current=|busy)/;
+
 // src/probes.ts
 var PROBES_VERSION = 2;
 var WALK_DEPENDENT_SCS = ["1.4.13", "2.1.2", "2.4.7", "2.4.11", "4.1.3"];
@@ -25649,7 +25893,13 @@ ${snap.dom}
 `);
   if (snap.boxes) writeFileSync(join3(dir, "boxes.json"), `${JSON.stringify(snap.boxes)}
 `);
-  if (snap.axtree) writeFileSync(join3(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}
+  if (snap.axtree) {
+    writeFileSync(join3(dir, "axtree.json"), `${JSON.stringify(snap.axtree)}
+`);
+    writeFileSync(join3(dir, "sr.json"), `${JSON.stringify(announce(snap.axtree))}
+`);
+  }
+  if (snap.media) writeFileSync(join3(dir, "media.json"), `${JSON.stringify(snap.media)}
 `);
   if (snap.css) writeFileSync(join3(dir, "css.json"), `${JSON.stringify(snap.css)}
 `);
@@ -25700,6 +25950,8 @@ function readSnapshot(dir) {
   const styles = readJson(join3(dir, "styles.json"));
   const boxes = readJson(join3(dir, "boxes.json"));
   const axtree = readJson(join3(dir, "axtree.json"));
+  const sr = readSr(dir);
+  const media = readMedia(dir);
   const css = readJson(join3(dir, "css.json"));
   const probes = readJson(join3(dir, "probes.json"));
   const axe = readJson(join3(dir, "axe.json"));
@@ -25713,6 +25965,8 @@ function readSnapshot(dir) {
     ...styles ? { styles } : {},
     ...boxes ? { boxes } : {},
     ...axtree ? { axtree } : {},
+    ...sr ? { sr } : {},
+    ...media ? { media } : {},
     ...css ? { css } : {},
     ...probes ? { probes } : {},
     ...axe ? { axe } : {},
@@ -25721,6 +25975,23 @@ function readSnapshot(dir) {
     ...existsSync2(full) ? { screenshotFull: "screen-full.png" } : {},
     ...existsSync2(narrow) ? { screenshot320: "screen-320.png" } : {}
   };
+}
+function readSr(dir) {
+  const raw = readJson(join3(dir, "sr.json"));
+  if (!isObj(raw) || raw.v !== 1 || !Array.isArray(raw.entries)) return void 0;
+  const entries = raw.entries.filter(
+    (e) => isObj(e) && isStr(e.role) && isStr(e.name) && isStr(e.text) && Array.isArray(e.states)
+  );
+  return { v: 1, entries, ...raw.truncated === true ? { truncated: true } : {} };
+}
+function readMedia(dir) {
+  const raw = readJson(join3(dir, "media.json"));
+  if (!isObj(raw) || raw.v !== 1 || !Array.isArray(raw.items)) return void 0;
+  const items = raw.items.filter(
+    (e) => isObj(e) && isStr(e.tag) && isStr(e.selector) && Array.isArray(e.tracks) && Array.isArray(e.companions)
+  );
+  const flash = isObj(raw.flash) && isStr(raw.flash.outcome) && isNum(raw.flash.frames) ? raw.flash : void 0;
+  return { v: 1, items, ...flash ? { flash } : {}, ...isStr(raw.flashSkipped) ? { flashSkipped: raw.flashSkipped } : {} };
 }
 function readScripts(dir) {
   return asScriptsDigest(readJson(join3(dir, "scripts.json")));
@@ -25871,6 +26142,8 @@ function attachSignals(doc) {
   const styles = readJson(join3(dir, "styles.json"));
   const boxes = readJson(join3(dir, "boxes.json"));
   const axtree = readJson(join3(dir, "axtree.json"));
+  const sr = readSr(dir);
+  const media = readMedia(dir);
   const css = readJson(join3(dir, "css.json"));
   const meta2 = readJson(join3(dir, "meta.json"));
   const loading = Array.isArray(meta2?.loading) ? meta2.loading.filter((m3) => typeof m3 === "string") : [];
@@ -25894,6 +26167,10 @@ function attachSignals(doc) {
     // Not aligned wholesale like the styles: its reader verifies each entry's tag against the
     // DOM, because an element the page created during the window legitimately has no ordinal.
     ...scripts ? { scripts } : {},
+    // Element-indexed by ordinal + tag like the scripts digest, and verified per entry by its
+    // reader (src/adjudicate-subjects.ts) for the same reason.
+    ...sr ? { sr } : {},
+    ...media ? { media } : {},
     ...truncated ? { truncated } : {},
     ...loading.length ? { capturedLoading: loading } : {}
   };
@@ -35464,8 +35741,8 @@ function normalize2(p2) {
   return { ...p2, key: String(p2.key).toLowerCase() };
 }
 function formatIssues(issues) {
-  const order = (s2) => s2 === "error" ? 0 : 1;
-  return [...issues].sort((a2, b) => order(a2.severity) - order(b.severity)).map((x2) => `  ${x2.severity === "error" ? "\u2717" : "\u26A0"} ${x2.path ? `${x2.path}: ` : ""}${x2.message}`);
+  const order2 = (s2) => s2 === "error" ? 0 : 1;
+  return [...issues].sort((a2, b) => order2(a2.severity) - order2(b.severity)).map((x2) => `  ${x2.severity === "error" ? "\u2717" : "\u26A0"} ${x2.path ? `${x2.path}: ` : ""}${x2.message}`);
 }
 
 // src/standards/registry.ts
@@ -35733,6 +36010,210 @@ ${e.origin}`;
   return [...by.values()].sort((a2, b) => a2.version.localeCompare(b.version) || a2.origin.localeCompare(b.origin)).map((e) => ({ version: e.version, origin: e.origin, ...e.runners.size ? { runner: [...e.runners].sort().join(",") } : {} }));
 }
 
+// src/media.ts
+var FLASH_WINDOW_MS = 1500;
+var FLASH_MIN_FPS = 20;
+var FLASH_AREA_THRESHOLD = Math.round(341 * 256 / 4);
+var FRAME_WIDTH = 160;
+var CELL = 4;
+var MEDIA_MAX = 60;
+var COMPANION_WORDS = "transcri|version textuelle|texte (?:alternatif|integral|int\xE9gral)|sous-titr|audiodescri|audio-descri|description (?:audio|d\xE9taill\xE9e|detaillee)|caption|subtitle|audio description|text version";
+var MEDIA_PROBE = `(() => {
+  const MAX = ${MEDIA_MAX};
+  const WORDS = new RegExp(${JSON.stringify(COMPANION_WORDS)}, 'i');
+  const PLAYER = /youtube|youtu\\.be|vimeo|dailymotion|dai\\.ly|peertube|soundcloud|spotify|deezer|podcast|player|video|audio|wistia|brightcove|jwplayer|kaltura/i;
+  const els = (${ELEMENT_WALK})(document);
+  const ordinal = new Map(els.map((e, i) => [e, i]));
+  const sel = (e) => e.localName + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/)[0] : '');
+  const txt = (e) => ((e && (e.innerText || e.textContent)) || '').replace(/\\s+/g, ' ').trim().slice(0, 160);
+  const companions = (e) => {
+    const out = [];
+    for (const attr of ['aria-describedby', 'aria-labelledby']) {
+      for (const id of (e.getAttribute(attr) || '').split(/\\s+/).filter(Boolean)) {
+        const t = document.getElementById(id);
+        if (t) out.push({ via: attr, text: txt(t) });
+      }
+    }
+    const fig = e.closest('figure');
+    const cap = fig && fig.querySelector('figcaption');
+    if (cap) out.push({ via: 'figcaption', text: txt(cap) });
+    // Next to the player: its two nearest siblings on each side, and its wrappers', two levels up.
+    const near = (n) => {
+      const out = [];
+      for (let s = n.previousElementSibling, k = 0; s && k < 2; s = s.previousElementSibling, k++) out.push(s);
+      for (let s = n.nextElementSibling, k = 0; s && k < 2; s = s.nextElementSibling, k++) out.push(s);
+      return out;
+    };
+    let node = e;
+    for (let depth = 0; depth < 3 && node && node !== document.body; depth++) {
+      for (const sib of near(node)) {
+        if (!sib) continue;
+        if (sib.localName === 'details' && WORDS.test(txt(sib))) out.push({ via: 'details', text: txt(sib) });
+        const links = sib.matches('a[href]') ? [sib] : Array.from(sib.querySelectorAll('[href]')).filter((x) => x.localName === 'a').slice(0, 10);
+        for (const a of links) {
+          const label = txt(a) + ' ' + (a.getAttribute('title') || '') + ' ' + (a.getAttribute('aria-label') || '');
+          if (WORDS.test(label) || WORDS.test(a.getAttribute('href') || '')) out.push({ via: 'adjacent-link', text: txt(a), href: a.getAttribute('href') || '' });
+        }
+        if (!links.length && sib.localName !== 'details' && WORDS.test(txt(sib))) out.push({ via: 'adjacent-text', text: txt(sib) });
+      }
+      node = node.parentElement;
+    }
+    const seen = new Set();
+    return out.filter((c) => { const k = c.via + '|' + c.text + '|' + (c.href || ''); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 8);
+  };
+  const items = [];
+  const push = (e, kind) => {
+    if (items.length >= MAX) return;
+    const tag = e.localName;
+    const m = (tag === 'video' || tag === 'audio') ? e : null;
+    const tracks = Array.from(e.querySelectorAll ? e.querySelectorAll('track') : []).map((t) => ({
+      kind: t.getAttribute('kind') || 'subtitles',
+      ...(t.getAttribute('srclang') ? { srclang: t.getAttribute('srclang') } : {}),
+      ...(t.getAttribute('label') ? { label: t.getAttribute('label') } : {}),
+      ...(t.getAttribute('src') ? { src: t.getAttribute('src') } : {}),
+      readyState: typeof t.readyState === 'number' ? t.readyState : undefined,
+      ...(t.hasAttribute('default') ? { default: true } : {}),
+    }));
+    const src = e.currentSrc || e.getAttribute('src') || e.getAttribute('data') || (e.querySelector && e.querySelector('source') ? e.querySelector('source').getAttribute('src') : '') || '';
+    items.push({
+      tag: tag,
+      ...(ordinal.has(e) ? { i: ordinal.get(e) } : {}),
+      selector: sel(e),
+      ...(src ? { src: String(src).slice(0, 200) } : {}),
+      kind: kind,
+      ...(m ? { controls: m.controls, autoplay: m.autoplay, muted: m.muted, loop: m.loop, paused: m.paused } : {}),
+      ...(m && Number.isFinite(m.duration) ? { duration: Math.round(m.duration * 10) / 10 } : {}),
+      tracks: tracks,
+      companions: companions(e),
+    });
+  };
+  for (const e of els) {
+    const tag = e.localName;
+    if (tag === 'video' || tag === 'audio') push(e, 'temporal');
+    else if (tag === 'iframe' && PLAYER.test((e.getAttribute('src') || '') + ' ' + (e.getAttribute('title') || '') + ' ' + (e.getAttribute('allow') || ''))) push(e, 'temporal');
+    else if ((tag === 'object' || tag === 'embed') && /video|audio|mp4|webm|ogg|mp3|wav|flash|swf/i.test((e.getAttribute('type') || '') + ' ' + (e.getAttribute('src') || e.getAttribute('data') || ''))) push(e, 'temporal');
+    else if (tag === 'canvas') push(e, 'animated');
+    else if (tag === 'img' && /\\.(gif|apng)(?:[?#]|$)/i.test(e.currentSrc || e.getAttribute('src') || '')) push(e, 'animated');
+    else if (tag === 'svg' && e.querySelector('animate, animateTransform, animateMotion, set')) push(e, 'animated');
+    else if (tag === 'marquee' || tag === 'blink') push(e, 'animated');
+    else {
+      const cs = getComputedStyle(e);
+      if (cs.animationName && cs.animationName !== 'none' && parseFloat(cs.animationDuration) > 0) push(e, 'animated');
+    }
+  }
+  return items;
+})()`;
+var linear = (c) => {
+  const s2 = c / 255;
+  return s2 <= 0.04045 ? s2 / 12.92 : ((s2 + 0.055) / 1.055) ** 2.4;
+};
+function luminanceGrid(img, cell3 = CELL) {
+  const cols = Math.max(1, Math.floor(img.width / cell3));
+  const rows = Math.max(1, Math.floor(img.height / cell3));
+  const lum = new Float64Array(cols * rows);
+  for (let r2 = 0; r2 < rows; r2++)
+    for (let c = 0; c < cols; c++) {
+      let sum = 0;
+      let n = 0;
+      for (let y = r2 * cell3; y < Math.min(img.height, (r2 + 1) * cell3); y++)
+        for (let x2 = c * cell3; x2 < Math.min(img.width, (c + 1) * cell3); x2++) {
+          const p2 = img.at(x2, y);
+          if (!p2) continue;
+          sum += 0.2126 * linear(p2.r) + 0.7152 * linear(p2.g) + 0.0722 * linear(p2.b);
+          n++;
+        }
+      lum[r2 * cols + c] = n ? sum / n : 0;
+    }
+  return { cols, rows, lum };
+}
+function measureFlashes(frames, cellArea, durationMs) {
+  const fps = durationMs > 0 ? Math.round((frames.length - 1) / durationMs * 1e3 * 10) / 10 : 0;
+  const base = { frames: frames.length, durationMs: Math.round(durationMs), fps, areaThreshold: FLASH_AREA_THRESHOLD };
+  if (frames.length < 2) return { ...base, maxFlashesPerSecond: 0, flashingArea: 0, outcome: "undersampled" };
+  const cells = frames[0].lum.length;
+  const changes = Array.from({ length: cells }, () => []);
+  for (let k = 0; k < cells; k++) {
+    let ref = frames[0].lum[k];
+    let dir = 0;
+    for (const f2 of frames.slice(1)) {
+      const v2 = f2.lum[k] ?? ref;
+      const delta = v2 - ref;
+      if (Math.abs(delta) >= 0.1 && Math.min(v2, ref) < 0.8) {
+        const d2 = Math.sign(delta);
+        if (d2 !== dir) {
+          changes[k].push(f2.t);
+          dir = d2;
+        }
+        ref = v2;
+      } else if (dir > 0 && v2 > ref || dir < 0 && v2 < ref) ref = v2;
+    }
+  }
+  let maxFlashes = 0;
+  let maxArea = 0;
+  const starts = [...new Set(changes.flat())].sort((a2, b) => a2 - b);
+  for (const t0 of starts) {
+    let over = 0;
+    for (const list of changes) {
+      const n = list.filter((t3) => t3 >= t0 && t3 < t0 + 1e3).length;
+      const flashes = Math.floor(n / 2);
+      if (flashes > maxFlashes) maxFlashes = flashes;
+      if (flashes > 3) over++;
+    }
+    if (over * cellArea > maxArea) maxArea = over * cellArea;
+  }
+  const any = changes.some((l) => l.length > 0);
+  const outcome = maxFlashes > 3 && maxArea >= FLASH_AREA_THRESHOLD ? "over-threshold" : fps < FLASH_MIN_FPS ? "undersampled" : any ? "below-threshold" : "none";
+  return { ...base, maxFlashesPerSecond: maxFlashes, flashingArea: Math.round(maxArea), outcome };
+}
+async function recordFlashes(page, ms = FLASH_WINDOW_MS) {
+  let client;
+  try {
+    client = await page.context().newCDPSession(page);
+  } catch (e) {
+    return { skipped: `no DevTools session to record the viewport (${String(e?.message ?? e).split("\n")[0]})` };
+  }
+  try {
+    const vp = await page.evaluate("({ w: window.innerWidth, h: window.innerHeight })");
+    const scale = FRAME_WIDTH / Math.max(1, vp.w);
+    const clip2 = { x: 0, y: 0, width: vp.w, height: vp.h, scale };
+    const frames = [];
+    const started = Date.now();
+    while (Date.now() - started < ms) {
+      const t3 = Date.now() - started;
+      const shot = await client.send("Page.captureScreenshot", { format: "png", clip: clip2, captureBeyondViewport: false });
+      const img = decodePng(Buffer.from(shot.data, "base64"));
+      if (!img) return { skipped: "a recorded frame could not be decoded" };
+      frames.push({ t: t3, lum: luminanceGrid(img).lum });
+    }
+    const durationMs = frames.length > 1 ? frames[frames.length - 1].t - frames[0].t : 0;
+    const cssCell = CELL / scale;
+    return { flash: measureFlashes(frames, cssCell * cssCell, durationMs) };
+  } catch (e) {
+    return { skipped: `the viewport recording failed (${String(e?.message ?? e).split("\n")[0]})` };
+  } finally {
+    await client.detach().catch(() => {
+    });
+  }
+}
+async function probeMedia(page, opts) {
+  let items;
+  try {
+    items = await page.evaluate(MEDIA_PROBE) ?? [];
+  } catch {
+    return void 0;
+  }
+  if (!opts.flash) return { v: 1, items, flashSkipped: "not measured on this capture (a journey state records the media inventory only)" };
+  return measureFlashInto(page, { v: 1, items });
+}
+async function measureFlashInto(page, media) {
+  const { flash, skipped } = await recordFlashes(page);
+  delete media.flash;
+  delete media.flashSkipped;
+  if (flash) media.flash = flash;
+  if (skipped) media.flashSkipped = skipped;
+  return media;
+}
+
 // src/adjudicate-subjects.ts
 var VOLATILE = [
   [/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, "<date>"],
@@ -35767,11 +36248,11 @@ function h(doc, el, note, cls, markupExtra) {
     markup: markupOf(el, markupExtra)
   };
 }
-function hAt(doc, line, selector, note, cls) {
+function hAt(doc, line2, selector, note, cls) {
   return {
-    ev: { file: doc.file, line, selector, snippet: (doc.source.split("\n")[line - 1] ?? "").trim().slice(0, 160), note },
+    ev: { file: doc.file, line: line2, selector, snippet: (doc.source.split("\n")[line2 - 1] ?? "").trim().slice(0, 160), note },
     cls: stable(cls),
-    at: line
+    at: line2
   };
 }
 function pdfDocumentAnchor(doc) {
@@ -35878,8 +36359,8 @@ function linesOf(doc, re2, cap = 200) {
   const g = new RegExp(re2.source, re2.flags.includes("g") ? re2.flags : `${re2.flags}g`);
   let m3;
   while ((m3 = g.exec(doc.source)) && out.length < cap) {
-    const line = doc.source.slice(0, m3.index).split("\n").length;
-    out.push({ line, text: (doc.source.split("\n")[line - 1] ?? "").trim().slice(0, 120) });
+    const line2 = doc.source.slice(0, m3.index).split("\n").length;
+    out.push({ line: line2, text: (doc.source.split("\n")[line2 - 1] ?? "").trim().slice(0, 120) });
     if (m3.index === g.lastIndex) g.lastIndex++;
   }
   return out;
@@ -35896,8 +36377,8 @@ function codeLinesOf(doc, re2, cap = 200) {
     const inBlock = blocks.some(([s2, e]) => at >= s2 && at <= e);
     const inTag = doc.source.lastIndexOf("<", at) > doc.source.lastIndexOf(">", at - 1);
     if (inBlock || inTag) {
-      const line = doc.source.slice(0, at).split("\n").length;
-      out.push({ line, text: (lines[line - 1] ?? "").trim().slice(0, 120) });
+      const line2 = doc.source.slice(0, at).split("\n").length;
+      out.push({ line: line2, text: (lines[line2 - 1] ?? "").trim().slice(0, 120) });
     }
     if (m3.index === g.lastIndex) g.lastIndex++;
   }
@@ -36599,8 +37080,8 @@ var SUBJECTS = {
   repeatedBlocks: (docs) => docs.flatMap((d2) => {
     const page = pageOfDoc(d2.file) ?? "source";
     return elementsByTag(d2, "header", "nav", "footer").map((e) => {
-      const order = elementsByTag(d2, "a").filter((a2) => ancestors(a2).includes(e)).map((a2) => t(a2, 24)).slice(0, 20).join(" \u203A ");
-      return h(d2, e, `page="${page}" <${e.tag}> order: ${order}`, `repeated|${page}|${e.tag}`);
+      const order2 = elementsByTag(d2, "a").filter((a2) => ancestors(a2).includes(e)).map((a2) => t(a2, 24)).slice(0, 20).join(" \u203A ");
+      return h(d2, e, `page="${page}" <${e.tag}> order: ${order2}`, `repeated|${page}|${e.tag}`);
     });
   }),
   // Elements whose ARIA name, role or state is authored rather than native.
@@ -36801,13 +37282,13 @@ var SUBJECTS = {
       }
       return [hAt(d2, 1, "doctype", `page="${page}" doctype=${dt === "" ? "(none on the page)" : dt}`, `doctype|${dt}`)];
     }
-    const line = lineOf(d2, /<!DOCTYPE/i);
-    if (line === void 0) {
+    const line2 = lineOf(d2, /<!DOCTYPE/i);
+    if (line2 === void 0) {
       const root = elementsByTag(d2, "html")[0];
       return root && d2.kind === "html" ? [h(d2, root, `source file declares NO doctype before <html>`, `doctype|none`)] : [];
     }
-    const decl = (d2.source.split("\n")[line - 1] ?? "").trim().slice(0, 80);
-    return [hAt(d2, line, "doctype", `source file ${decl}`, `doctype|${decl}`)];
+    const decl = (d2.source.split("\n")[line2 - 1] ?? "").trim().slice(0, 80);
+    return [hAt(d2, line2, "doctype", `source file ${decl}`, `doctype|${decl}`)];
   }),
   // A visible text label alongside an accessible name that replaces it.
   nameVsAccName: (docs) => docs.flatMap(
@@ -37029,6 +37510,11 @@ var SUBJECTS = {
   // images, canvas, scripts and stylesheet animation rules. That gave the adjudicator lots of
   // evidence and none of the evidence the three-flash test actually asks for.
   flashes: (docs) => docs.flatMap((d2) => [
+    // The measure first: on a captured page it is what the three-flash test is ruled on.
+    ...((page) => {
+      const a2 = page === void 0 ? void 0 : flashAnchor(d2, page);
+      return a2 ? [a2] : [];
+    })(pageOfDoc(d2.file)),
     ...d2.elements.filter((e) => ["video", "img", "svg", "canvas", "embed", "object", "blink"].includes(e.tag)).map(
       (e) => h(
         d2,
@@ -37346,10 +37832,11 @@ var SUBJECTS = {
       (e) => ["video", "audio"].includes(e.tag) || ["object", "embed"].includes(e.tag) && embeddedMediaKind(e) !== "non-temporal" || e.tag === "iframe" && TEMPORAL_MEDIA_HOST.test(`${attr(e, "src") ?? ""} ${attr(e, "title") ?? ""} ${attr(e, "allow") ?? ""}`)
     ).map((e) => {
       const tracks = elementsByTag(d2, "track").filter((x2) => ancestors(x2).includes(e)).map((x2) => `${attr(x2, "kind") ?? "subtitles"}:${attr(x2, "srclang") ?? ""}`);
+      const probed = mediaItemFor(d2, e);
       return h(
         d2,
         e,
-        `<${e.tag}> src="${(attr(e, "src") ?? attr(e, "data") ?? "").slice(0, 80)}" controls=${attr(e, "controls") !== void 0} autoplay=${attr(e, "autoplay") !== void 0} tracks=[${tracks.join(", ")}] heading="${nearestHeading(d2, e) ?? ""}" \u2014 is it identified by adjacent text, and does it have its transcript/captions/description?`,
+        `<${e.tag}> src="${(attr(e, "src") ?? attr(e, "data") ?? "").slice(0, 80)}" controls=${attr(e, "controls") !== void 0} autoplay=${attr(e, "autoplay") !== void 0} tracks=[${tracks.join(", ")}] heading="${nearestHeading(d2, e) ?? ""}"${probed ? ` \u2014 ${mediaFacts(probed)}` : ""} \u2014 is it identified by adjacent text, and does it have its transcript/captions/description?`,
         `tmedia|${e.tag}|${attr(e, "src") ?? attr(e, "data") ?? ""}`
       );
     })
@@ -37498,14 +37985,14 @@ var SUBJECTS = {
   tabOrder: (docs) => docs.flatMap((d2) => {
     const focusables = d2.elements.filter(isTabbable);
     if (!focusables.length) return [];
-    const order = focusables.slice(0, 15).map(
+    const order2 = focusables.slice(0, 15).map(
       (e) => `${e.tag}${attr(e, "tabindex") !== void 0 ? `[tabindex=${attr(e, "tabindex")}]` : ""} "${t(e, 20) || attr(e, "aria-label") || attr(e, "name") || ""}"`
     ).join(" \u2192 ");
     return [
       h(
         d2,
         focusables[0],
-        `page="${pageOfDoc(d2.file) ?? "source"}" tab order (DOM): ${order}${focusables.length > 15 ? ` \u2026 (${focusables.length} focusable)` : ""} \u2014 does it follow the reading order?`,
+        `page="${pageOfDoc(d2.file) ?? "source"}" tab order (DOM): ${order2}${focusables.length > 15 ? ` \u2026 (${focusables.length} focusable)` : ""} \u2014 does it follow the reading order?`,
         `taborder|${pageOfDoc(d2.file) ?? d2.file}`
       )
     ];
@@ -37770,6 +38257,97 @@ var BEHAVIOUR_SUBJECTS = {
   )
 };
 Object.assign(SUBJECTS, BEHAVIOUR_SUBJECTS);
+function srAnchor(d2, e, note, cls) {
+  const el = e.i !== void 0 ? d2.elements[e.i] : void 0;
+  if (el && e.tag && el.tag.toLowerCase() === e.tag.toLowerCase()) return h(d2, el, note, cls);
+  return hAt(d2, 1, `sr:${e.role}`, `${note} [not joined to an element of dom.html]`, cls);
+}
+var srSays = (page, e) => `page="${page}" a screen reader would announce (simulated from the captured accessibility tree): ${e.text}${e.name ? "" : " \u2014 NO accessible name"}`;
+var srClass = (kind, e) => `sr|${kind}|${e.role}|${e.name}|${e.states.join(",")}|${e.description ?? ""}`;
+function srSubject(kind, pick2, coverage) {
+  return (docs) => docs.flatMap((d2) => {
+    const page = pageOfDoc(d2.file);
+    const sr = d2.signals?.sr;
+    if (page === void 0 || !sr) return [];
+    const hits = sr.entries.filter(pick2);
+    const out = hits.map((e) => srAnchor(d2, e, srSays(page, e), srClass(kind, e)));
+    if (coverage)
+      out.unshift(
+        hAt(
+          d2,
+          1,
+          `sr:${kind}`,
+          `page="${page}" screen-reader simulation (sr.json, ${plural(sr.entries.length, "announcement")} in reading order${sr.truncated ? ", CAPPED \u2014 absence proves nothing" : ""}): ${coverage(hits.length)}`,
+          `srcov|${kind}|${hits.length}|${sr.truncated ? "capped" : ""}`
+        )
+      );
+    return out;
+  });
+}
+var SR_SUBJECTS = {
+  // RGAA 11.x — every form field as announced: its role, the name a reader says, and the states
+  // (required, invalid, expanded…) the page exposes on that state. An EXISTENCE subject: a page
+  // whose tree announces no form field has none for theme 11 to be about.
+  "sr:fields": srSubject("fields", (e) => SR_FIELD_ROLES.has(e.role)),
+  // RGAA 7.1 / 7.3 — the widgets a script drives, and any node whose state a script keeps in
+  // step (expanded, pressed, selected, checked): what a reader is told about them.
+  "sr:widgets": srSubject(
+    "widgets",
+    (e) => !SR_FIELD_ROLES.has(e.role) && (SR_WIDGET_ROLES.has(e.role) || e.states.some((st) => SR_SCRIPTED_STATES.test(st))),
+    (n) => `${plural(n, "scripted widget or stateful control", "scripted widgets or stateful controls")} announced`
+  ),
+  // RGAA 7.5 — what a reader hears without moving to it: status, alert, log, timer, progress,
+  // and any region exposing `live`.
+  "sr:live": srSubject(
+    "live",
+    (e) => SR_LIVE_ROLES.has(e.role) || e.states.some((st) => st.startsWith("live=")),
+    (n) => `${plural(n, "live region or status", "live regions or statuses")} exposed`
+  )
+};
+Object.assign(SUBJECTS, SR_SUBJECTS);
+function mediaItemFor(d2, el) {
+  const items = d2.signals?.media?.items;
+  if (!items?.length) return void 0;
+  const at = d2.elements.indexOf(el);
+  return items.find((m3) => m3.i === at && m3.tag.toLowerCase() === el.tag.toLowerCase());
+}
+function mediaFacts(m3) {
+  const tracks = m3.tracks.length ? m3.tracks.map(
+    (t3) => `${t3.kind}${t3.srclang ? `:${t3.srclang}` : ""}${t3.label ? ` "${t3.label}"` : ""} (${t3.readyState === 2 ? "loaded" : t3.readyState === 3 ? "FAILED to load" : t3.readyState === 1 ? "loading" : "not loaded"})`
+  ).join(", ") : "none";
+  const comps = m3.companions.length ? m3.companions.map((c) => `${c.via} "${c.text.slice(0, 80)}"${c.href ? ` -> ${c.href.slice(0, 80)}` : ""}`).join("; ") : "none found beside it";
+  const play = [
+    m3.duration !== void 0 ? `${m3.duration}s` : "",
+    m3.autoplay ? "autoplay" : "",
+    m3.muted ? "muted" : "",
+    m3.loop ? "loop" : "",
+    m3.controls === false ? "no native controls" : m3.controls ? "native controls" : ""
+  ].filter(Boolean).join(", ");
+  return `browser media probe: tracks [${tracks}]; captions/transcripts/descriptions in the DOM: ${comps}${play ? `; ${play}` : ""}`;
+}
+function flashAnchor(d2, page) {
+  const media = d2.signals?.media;
+  if (!media) return void 0;
+  const animated = media.items.length;
+  const f2 = media.flash;
+  const limits = "only the viewport, after load, with nobody touching the page; saturated-red flashes are not measured";
+  if (!f2)
+    return hAt(
+      d2,
+      1,
+      "probe:flash",
+      `page="${page}" flash measure did NOT run: ${media.flashSkipped ?? "no reason recorded"} \u2014 ${plural(animated, "media or animated element", "media or animated elements")} inventoried`,
+      `flashskip|${media.flashSkipped ?? ""}|${animated}`
+    );
+  const said = f2.outcome === "undersampled" ? `UNDERSAMPLED (${f2.fps} frames/s, under the ${FLASH_MIN_FPS} frames/s a negative result needs: a faster flash would alias to a slower one or to a still page) \u2014 measured nothing` : f2.outcome === "none" ? "no luminance flash in any cell" : f2.outcome === "below-threshold" ? `luminance changes seen, at most ${f2.maxFlashesPerSecond} flash(es)/s, flashing area ${f2.flashingArea} px\xB2 (threshold ${f2.areaThreshold} px\xB2) \u2014 under the general flash threshold` : `OVER the general flash threshold: ${f2.maxFlashesPerSecond} flashes/s over ${f2.flashingArea} px\xB2 (threshold ${f2.areaThreshold} px\xB2)`;
+  return hAt(
+    d2,
+    1,
+    "probe:flash",
+    `page="${page}" flash measure RAN on a ${f2.durationMs} ms viewport recording (${f2.frames} frames, ${f2.fps} frames/s \u2014 flashing observable up to ${Math.floor(f2.fps / 2)} Hz): ${said}; ${plural(animated, "media or animated element", "media or animated elements")} on the page \u2014 ${limits}`,
+    `flash|${f2.outcome}|${f2.maxFlashesPerSecond}|${animated}`
+  );
+}
 var SC_SUBJECTS = {
   "1.1.1": ["images"],
   "1.2.1": ["motion"],
@@ -37868,9 +38446,9 @@ var PACK_SUBJECTS = {
     "9.3": ["lists"],
     "9.4": ["quotes"],
     // Theme 11 — forms.
-    "11.1": ["controls"],
-    "11.2": ["controls"],
-    "11.3": ["controls", "nameVsAccName"],
+    "11.1": ["controls", "sr:fields"],
+    "11.2": ["controls", "sr:fields"],
+    "11.3": ["controls", "nameVsAccName", "sr:fields"],
     "11.4": ["controls"],
     "11.5": ["controls"],
     "11.6": ["controls", "landmarks"],
@@ -37880,8 +38458,8 @@ var PACK_SUBJECTS = {
     // Fields stay listed beside the buttons so an audit recorded before `buttons` existed (whose
     // subjectsSeen cannot contain it) is never read as « no button anywhere ».
     "11.9": ["buttons", "controls"],
-    "11.10": ["controls", "errors"],
-    "11.11": ["errors", "controls"],
+    "11.10": ["controls", "errors", "sr:fields"],
+    "11.11": ["errors", "controls", "sr:fields"],
     "11.12": ["controls", "errors"],
     "11.13": ["autocomplete"],
     // Theme 12 — navigation.
@@ -37930,11 +38508,11 @@ var PACK_SUBJECTS = {
     // handlers and the focusable surface, never about the page's headings and lists.
     // The behaviour digest (scripts.json, #190) is what these are judged on in a capture: a
     // listener on a `<div>`, an `aria-expanded` the script toggles, a status that is announced.
-    "7.1": ["aria", "pointerHandlers", "behaviour:clickable", "behaviour:aria"],
+    "7.1": ["aria", "pointerHandlers", "behaviour:clickable", "behaviour:aria", "sr:widgets"],
     "7.2": ["scriptAlternatives"],
-    "7.3": ["pointerHandlers", "pointerActions", "focusables", "behaviour:keyboard", "behaviour:clickable"],
+    "7.3": ["pointerHandlers", "pointerActions", "focusables", "behaviour:keyboard", "behaviour:clickable", "sr:widgets"],
     "7.4": ["contextChange"],
-    "7.5": ["liveRegions", "rendered:4.1.3", "behaviour:live"],
+    "7.5": ["liveRegions", "rendered:4.1.3", "behaviour:live", "sr:live"],
     // Theme 10 — presentation. These ask what survives when CSS is off, what the stylesheet
     // reorders, and what is hidden on purpose.
     //
@@ -37997,7 +38575,10 @@ var EXISTENCE_SUBJECTS = /* @__PURE__ */ new Set([
   "scriptAlternatives",
   // A page that declares no default language has no language code for 8.4 to be about. The
   // `<html>` element is always there; the attribute is what this subject looks for.
-  "declaredLang"
+  "declaredLang",
+  // A page whose captured accessibility tree announces no form field (#208). Its silence is the
+  // tree's, so beside `controls` it can only ever make an absence harder to conclude, never easier.
+  "sr:fields"
 ]);
 var ALWAYS_APPLICABLE = {
   rgaa: /* @__PURE__ */ new Set(["8.1", "8.2", "8.3", "8.5", "10.1", "10.3", "10.4", "10.11", "10.12", "12.8", "13.9"])
@@ -40065,14 +40646,14 @@ var tableEmptyDataCell = {
     const out = [];
     for (const t3 of doc.elements) {
       if (t3.tag !== "table" || isLayoutTable(t3)) continue;
-      for (const cell2 of descendants(t3)) {
-        if (cell2.tag !== "td") continue;
-        if (mayInjectContent(cell2)) continue;
-        if (cell2.children.some((c) => c.type === "element")) continue;
-        if ((attr(cell2, "aria-label") ?? "").trim() || hasAttr(cell2, "aria-labelledby")) continue;
-        const txt = visibleText(cell2);
+      for (const cell3 of descendants(t3)) {
+        if (cell3.tag !== "td") continue;
+        if (mayInjectContent(cell3)) continue;
+        if (cell3.children.some((c) => c.type === "element")) continue;
+        if ((attr(cell3, "aria-label") ?? "").trim() || hasAttr(cell3, "aria-labelledby")) continue;
+        const txt = visibleText(cell3);
         if (txt !== "" && txt !== "-") continue;
-        out.push({ criteriaId: "1.3.1", el: cell2, msgId: "table-empty-data-cell", advisory: true });
+        out.push({ criteriaId: "1.3.1", el: cell3, msgId: "table-empty-data-cell", advisory: true });
       }
     }
     return out;
@@ -43608,11 +44189,11 @@ function readsProps(fnNode) {
 function analyzeComponent(name, file, fnNode) {
   const control = findControl(fnNode);
   if (!control) {
-    const { line: line2, col: col2 } = posOf(fnNode);
+    const { line: line3, col: col2 } = posOf(fnNode);
     return {
       name,
       file,
-      line: line2,
+      line: line3,
       col: col2,
       hasControl: false,
       rendersIconOnlyControl: false,
@@ -43622,7 +44203,7 @@ function analyzeComponent(name, file, fnNode) {
       forwardsAria: false
     };
   }
-  const { line, col } = posOf(control);
+  const { line: line2, col } = posOf(control);
   const attrs = controlAttrs(control);
   const spreadsProps = hasSpread(control);
   const forwardsAria = attrs.some((a2) => (attrName(a2) === "aria-label" || attrName(a2) === "aria-labelledby") && attrIsExpr(a2));
@@ -43634,7 +44215,7 @@ function analyzeComponent(name, file, fnNode) {
   return {
     name,
     file,
-    line,
+    line: line2,
     col,
     hasControl: true,
     rendersIconOnlyControl,
@@ -43869,8 +44450,8 @@ function gitChangedFiles(ref) {
   const out = /* @__PURE__ */ new Set();
   const add2 = (s2) => {
     if (!s2) return;
-    for (const line of s2.split("\n")) {
-      const t3 = line.trim();
+    for (const line2 of s2.split("\n")) {
+      const t3 = line2.trim();
       if (t3) out.add(t3);
     }
   };
@@ -45637,6 +46218,7 @@ function newAccum() {
     renderedRan: /* @__PURE__ */ new Map(),
     probedScs: /* @__PURE__ */ new Map(),
     axeRan: /* @__PURE__ */ new Set(),
+    pageCaptures: /* @__PURE__ */ new Map(),
     axeEngines: [],
     subjectsSeen: /* @__PURE__ */ new Set(),
     pageSubjects: /* @__PURE__ */ new Map()
@@ -45725,6 +46307,8 @@ function foldDoc(acc, doc, graph) {
   const pageId = snapshotPageId(doc.file);
   if (pageId) {
     acc.pageIds.add(pageId);
+    const files = captureFilesOf(doc.signals);
+    if (files.length) acc.pageCaptures.set(pageId, /* @__PURE__ */ new Set([...acc.pageCaptures.get(pageId) ?? [], ...files]));
     const placeholder = Boolean(doc.signals?.capturedLoading?.length);
     if (!placeholder) {
       const own = acc.pageSubjects.get(pageId) ?? /* @__PURE__ */ new Set();
@@ -45842,18 +46426,35 @@ function scopeCoverage(acc) {
     scs: onEvery(acc.probedScs)
   };
 }
+function captureFilesOf(signals) {
+  if (!signals) return [];
+  const out = [];
+  if (signals.styles) out.push("styles.json");
+  if (signals.boxes) out.push("boxes.json");
+  if (signals.css) out.push("css.json");
+  if (signals.probes) out.push("probes.json");
+  if (signals.axe) out.push("axe.json");
+  if (signals.scripts) out.push("scripts.json");
+  if (signals.axtree) out.push("axtree.json");
+  if (signals.sr) out.push("sr.json");
+  if (signals.media) out.push("media.json");
+  if (signals.screenshot) out.push("screen.png");
+  return out;
+}
 function pageCoverageOf(acc) {
   const out = {};
   const on3 = (m3, page) => [...m3.entries()].filter(([, pages]) => pages.has(page)).map(([k]) => k).sort();
   for (const id of [...acc.pageIds].sort()) {
     const rules = on3(acc.renderedRan, id);
     const scs = on3(acc.probedScs, id);
+    const captures = [...acc.pageCaptures.get(id) ?? []].sort();
     out[id] = {
       // Its DOM was parsed and folded, so the whole static rule set ran against it.
       dom: true,
       ...acc.axeRan.has(id) ? { axe: true } : {},
       ...rules.length ? { rules } : {},
-      ...scs.length ? { scs } : {}
+      ...scs.length ? { scs } : {},
+      ...captures.length ? { captures } : {}
     };
   }
   return out;
@@ -52235,8 +52836,8 @@ function occurrencesByPage(findings, resolver) {
     if (entry2) entry2.count++;
     else counts.set(page.id, { page, count: 1 });
   }
-  const order = new Map(resolver.pages.map((p2, i) => [p2.id, i]));
-  const pages = [...counts.values()].sort((a2, b) => b.count - a2.count || (order.get(a2.page.id) ?? 0) - (order.get(b.page.id) ?? 0));
+  const order2 = new Map(resolver.pages.map((p2, i) => [p2.id, i]));
+  const pages = [...counts.values()].sort((a2, b) => b.count - a2.count || (order2.get(a2.page.id) ?? 0) - (order2.get(b.page.id) ?? 0));
   return { pages, orphans, approximate };
 }
 function unattributedFindings(result) {
@@ -53157,10 +53758,10 @@ function acceptanceCriteria(unit, standard, lang, opts = {}) {
   const s2 = L4[lang];
   const prefix2 = opts.checkbox ? "- [ ] " : "- ";
   const hints = [...new Set(unit.findings.map((f2) => `\`${f2.selectorHint}\``))].slice(0, 3).join(", ") || "\u2014";
-  const line = (req, ref) => `${prefix2}**${s2.given}** ${s2.givenElements(hints)} \xB7 **${s2.when}** ${s2.acWhen} \xB7 **${s2.then}** \xAB ${req} \xBB (${ref}).`;
+  const line2 = (req, ref) => `${prefix2}**${s2.given}** ${s2.givenElements(hints)} \xB7 **${s2.when}** ${s2.acWhen} \xB7 **${s2.then}** \xAB ${req} \xBB (${ref}).`;
   if (isCore(standard)) {
     const sc = unit.criteriaId;
-    return [line(scTitle(sc, lang) ?? sc, `WCAG ${sc}`)];
+    return [line2(scTitle(sc, lang) ?? sc, `WCAG ${sc}`)];
   }
   const pack = loadPack(standard);
   const tests = packTestsCited(
@@ -53168,8 +53769,8 @@ function acceptanceCriteria(unit, standard, lang, opts = {}) {
     unit.criteriaId,
     unit.findings.filter((f2) => !f2.advisory).map((f2) => f2.normativeRef)
   );
-  if (!tests.length) return [line(unit.title, `${pack.name} ${unit.criteriaId}`)];
-  return tests.map((t3) => line(t3.wording, `${pack.name} ${t3.id}`));
+  if (!tests.length) return [line2(unit.title, `${pack.name} ${unit.criteriaId}`)];
+  return tests.map((t3) => line2(t3.wording, `${pack.name} ${t3.id}`));
 }
 function toRuleOnSection(r2, standard, lang) {
   if (isCore(standard)) return [];
@@ -53488,9 +54089,9 @@ function readCitation(c) {
   if (typeof c !== "string") return c;
   const at = c.lastIndexOf(":");
   if (at <= 0) return null;
-  const line = Number.parseInt(c.slice(at + 1), 10);
-  if (!Number.isFinite(line)) return null;
-  return { file: c.slice(0, at), line, selector: "", snippet: "" };
+  const line2 = Number.parseInt(c.slice(at + 1), 10);
+  if (!Number.isFinite(line2)) return null;
+  return { file: c.slice(0, at), line: line2, selector: "", snippet: "" };
 }
 function auditFiles(audit, cwd) {
   const inputs = audit.scope.inputs.filter((i) => i !== "-" && i !== "<stdin>");
@@ -53616,8 +54217,8 @@ function cites0(anchors, c, drift) {
     const at = a2.lastIndexOf(":");
     if (at < 0) continue;
     if (canonicalEvidenceFile(a2.slice(0, at)) !== canonicalEvidenceFile(c.file)) continue;
-    const line = Number.parseInt(a2.slice(at + 1), 10);
-    if (Number.isFinite(line) && Math.abs(line - c.line) <= drift) return true;
+    const line2 = Number.parseInt(a2.slice(at + 1), 10);
+    if (Number.isFinite(line2) && Math.abs(line2 - c.line) <= drift) return true;
   }
   return false;
 }
@@ -54232,13 +54833,13 @@ function duplicateCharges(findings) {
   }
   return out;
 }
-var anchorKey = (file, line, selector) => `${file.trim()}|${line}|${selector.trim()}`;
+var anchorKey = (file, line2, selector) => `${file.trim()}|${line2}|${selector.trim()}`;
 var EMPTY_IDS = /* @__PURE__ */ new Set();
 function citationsOf(it) {
   return citesRecord(it.citations ?? []);
 }
 function citesRecord(cs) {
-  const cites = cs.map((c) => typeof c === "string" ? readCitation(c) : c).filter((c) => c !== null && c !== void 0).map(({ file, line, selector, snippet: snippet2, note }) => ({ file, line, selector, snippet: snippet2, ...note ? { note } : {} }));
+  const cites = cs.map((c) => typeof c === "string" ? readCitation(c) : c).filter((c) => c !== null && c !== void 0).map(({ file, line: line2, selector, snippet: snippet2, note }) => ({ file, line: line2, selector, snippet: snippet2, ...note ? { note } : {} }));
   return cites.length ? { citations: cites } : {};
 }
 function auditorOf(it) {
@@ -54322,6 +54923,8 @@ var CAPTURE_FILES = [
   "axe.json",
   "scripts.json",
   "axtree.json",
+  "sr.json",
+  "media.json",
   "screen.png",
   "screen-full.png",
   "screen-320.png"
@@ -54336,6 +54939,8 @@ var CAPTURE_FILE_LABEL = {
     "axe.json": "les r\xE9sultats axe-core de la page",
     "scripts.json": "le comportement JavaScript de la page (\xE9couteurs, mutations ARIA, r\xE9gions live, minuteurs, contenus en mouvement)",
     "axtree.json": "l'arbre d'accessibilit\xE9",
+    "sr.json": "ce qu'un lecteur d'\xE9cran annoncerait, dans l'ordre de lecture (simul\xE9 depuis l'arbre d'accessibilit\xE9)",
+    "media.json": "les m\xE9dias de la page (pistes, sous-titres et transcriptions trouv\xE9s dans le DOM) et la mesure des flashs",
     "screen.png": "la capture d'\xE9cran",
     "screen-full.png": "la page enti\xE8re en capture d'\xE9cran",
     "screen-320.png": "la page \xE0 320px de large, telle que la sonde de redistribution l'a mesur\xE9e"
@@ -54349,6 +54954,8 @@ var CAPTURE_FILE_LABEL = {
     "axe.json": "axe-core's results on the page",
     "scripts.json": "the page's JavaScript behaviour (listeners, ARIA mutations, live regions, timers, moving content)",
     "axtree.json": "the accessibility tree",
+    "sr.json": "what a screen reader would announce, in reading order (simulated from the accessibility tree)",
+    "media.json": "the page's media (tracks, captions and transcripts found in the DOM) and the flash measure",
     "screen.png": "the screenshot",
     "screen-full.png": "the whole page as a screenshot",
     "screen-320.png": "the page at 320px width, as the reflow probe measured it"
@@ -54538,8 +55145,8 @@ function glossaryBlock(pack, crit, lang) {
 }
 function testMarkupTokens(lines) {
   const out = /* @__PURE__ */ new Set();
-  for (const line of lines) {
-    for (const m3 of line.matchAll(/`([^`]+)`/g)) {
+  for (const line2 of lines) {
+    for (const m3 of line2.matchAll(/`([^`]+)`/g)) {
       const span = (m3[1] ?? "").trim();
       const tag = /^<\s*([a-zA-Z][a-zA-Z0-9-]*)\s*\/?>$/.exec(span);
       if (tag?.[1]) {
@@ -54684,7 +55291,7 @@ function formatAdjudication(items, lang = "en", standard = CORE2, opts = {}) {
           const lines = tests[k] ?? [];
           const mark = anyTouched && touched.get(k) ? ` \u2B24 _(${s2.touched})_` : "";
           out.push(`- \`${it.criteriaId}.${k}\`${mark} ${plainTest(lines[0] ?? "")}`);
-          for (const line of lines.slice(1)) out.push(`  - ${plainTest(line)}`);
+          for (const line2 of lines.slice(1)) out.push(`  - ${plainTest(line2)}`);
           const method = crit?.methodology?.[k];
           if (method?.trim()) {
             const flat = plainTest(method).replace(/\s+/g, " ").trim();
@@ -55525,6 +56132,249 @@ function renderPageDocument(result, page, opts = {}) {
   return out.join("\n");
 }
 
+// src/coverage-matrix.ts
+var EVIDENCE_SOURCES = ["static", "render", "snapshot", "journey", "judgement"];
+var CAPTURE_ONLY_SUBJECTS = /* @__PURE__ */ new Set(["doctype", "computedColours"]);
+var DOCUMENT_SUBJECTS = /* @__PURE__ */ new Set(["doctype", "docTitle", "docLang", "declaredLang", "siteMapPage", "markupValidity"]);
+var BROWSER_SUBJECT = /^(?:rendered|behaviour|sr):/;
+var BROWSER_ENRICHED_SUBJECTS = /* @__PURE__ */ new Set(["flashes", "temporalMedia"]);
+var PAGE_SCOPE_RULES = new Set(ALL_RULES.filter((r2) => r2.scope === "page").map((r2) => r2.id));
+function subjectSources(id) {
+  if (BROWSER_SUBJECT.test(id)) return ["snapshot", "journey"];
+  const out = [];
+  if (!CAPTURE_ONLY_SUBJECTS.has(id)) out.push("static");
+  if (!CAPTURE_ONLY_SUBJECTS.has(id) && !DOCUMENT_SUBJECTS.has(id)) out.push("render");
+  out.push("snapshot");
+  if (BROWSER_ENRICHED_SUBJECTS.has(id)) out.push("journey");
+  return out;
+}
+function ruleSources(ruleId, standard) {
+  const tier = ruleTier(ruleId, isCore(standard) ? void 0 : loadPack(standard));
+  if (tier === "judgment") return ["judgement"];
+  if (tier === "browser") return ["journey"];
+  if (tier === "rendered-page") return ["snapshot"];
+  if (tier === "cross-file") return ["static"];
+  const bare = ruleId.replace(/\*$/, "");
+  return PAGE_SCOPE_RULES.has(bare) ? ["static", "snapshot"] : ["static", "render", "snapshot"];
+}
+var order = (s2) => EVIDENCE_SOURCES.filter((x2) => s2.includes(x2));
+function coverageMatrix(standard) {
+  const coverage = standardCoverage(standard);
+  const rows = isCore(standard) ? allSC().map((sc) => ({ id: sc.sc, rules: [...sc.ruleIds], subjects: subjectsForSc(sc.sc) })) : allCriteria(loadPack(standard)).map((pc) => ({
+    id: pc.id,
+    rules: [.../* @__PURE__ */ new Set([...pc.appliesTo?.ruleIds ?? [], ...(pc.automation?.rules ?? []).map((r2) => r2.id)])],
+    subjects: subjectsForPackCriterion(standard, pc.id, pc.wcag)
+  }));
+  return rows.map(({ id, rules, subjects }) => {
+    const paths = [];
+    for (const r2 of rules) for (const source of ruleSources(r2, standard)) paths.push({ source, via: `rule:${r2}` });
+    for (const s2 of subjects) if (SUBJECTS[s2]) for (const source of subjectSources(s2)) paths.push({ source, via: `subject:${s2}` });
+    if (subjects.some((s2) => SUBJECTS[s2])) paths.push({ source: "judgement", via: "verify --manual" });
+    return {
+      id,
+      tier: coverage.get(id)?.tier ?? "judgment",
+      sources: order([...new Set(paths.map((p2) => p2.source))]),
+      paths
+    };
+  });
+}
+function matrixBySource(matrix) {
+  const out = Object.fromEntries(EVIDENCE_SOURCES.map((s2) => [s2, []]));
+  for (const row of matrix) for (const s2 of row.sources) out[s2].push(row.id);
+  return out;
+}
+
+// src/app-map.ts
+var CAPTURE_LABEL = {
+  fr: {
+    "styles.json": "styles calcul\xE9s",
+    "boxes.json": "bo\xEEtes",
+    "css.json": "feuilles de style",
+    "probes.json": "sondes",
+    "axe.json": "axe-core",
+    "scripts.json": "comportement JavaScript",
+    "axtree.json": "arbre d'accessibilit\xE9",
+    "sr.json": "lecteur d'\xE9cran simul\xE9",
+    "media.json": "m\xE9dias et flashs",
+    "screen.png": "capture d'\xE9cran"
+  },
+  en: {
+    "styles.json": "computed styles",
+    "boxes.json": "boxes",
+    "css.json": "stylesheets",
+    "probes.json": "probes",
+    "axe.json": "axe-core",
+    "scripts.json": "JavaScript behaviour",
+    "axtree.json": "accessibility tree",
+    "sr.json": "simulated screen reader",
+    "media.json": "media and flashes",
+    "screen.png": "screenshot"
+  }
+};
+var CAPTURE_ORDER = [
+  "styles.json",
+  "boxes.json",
+  "css.json",
+  "axe.json",
+  "probes.json",
+  "scripts.json",
+  "axtree.json",
+  "sr.json",
+  "media.json",
+  "screen.png"
+];
+var S2 = {
+  fr: {
+    title: "I. Carte de l'application \u2014 ce qui a \xE9t\xE9 vu, et comment",
+    intro: (routes, pages, journeys, states, units) => `${routes} route(s) connue(s), ${pages} page(s) et \xE9tat(s) de page lus par l'audit, ${journeys} parcours (${states} \xE9tat(s) enregistr\xE9(s)), ${units} unit\xE9(s) rendue(s) par le moteur ultra11y. Pour chaque page : d'o\xF9 elle vient, quel instrument l'a vue et ce qu'il en a enregistr\xE9 ; puis, pour chaque source de preuve, ce qu'elle a vu dans cet audit et les crit\xE8res qu'elle peut atteindre. Cette carte constate, elle ne d\xE9cide rien : un crit\xE8re qu'une source peut atteindre n'est pas pour autant d\xE9cid\xE9.`,
+    pagesTitle: "Pages et \xE9tats observ\xE9s",
+    pagesHead: "| Page | Adresse | Origine | Vue par | Enregistr\xE9 |",
+    sample: "route de l'\xE9chantillon",
+    outOfSample: "route hors \xE9chantillon",
+    declared: "page d\xE9clar\xE9e",
+    state: (j, n, label) => `parcours **${j}**, \xE9tape ${n} : ${label}`,
+    browserScan: "navigateur (scan)",
+    browserJourney: "navigateur (journey run)",
+    browserE2E: "tests E2E (capture)",
+    sourceOnly: "code source seulement",
+    notAudited: "capture pr\xE9sente, non lue",
+    loading: "captur\xE9e pendant le chargement",
+    dom: "DOM",
+    measured: (n) => `sondes : ${n} crit\xE8re(s) WCAG mesur\xE9(s)`,
+    nothing: "\u2014",
+    unitsTitle: "Composants rendus, par route",
+    unitsHead: "| Route | Unit\xE9s rendues par le moteur |",
+    isolated: "composants isol\xE9s",
+    unitsNone: "Aucune unit\xE9 rendue par le moteur ultra11y dans cet audit.",
+    sourcesTitle: "Crit\xE8res par source de preuve",
+    sourcesHead: "| Source | Ce que cet audit en a vu | Crit\xE8res atteints | Dont d\xE9cid\xE9s |",
+    source: {
+      static: "Statique (code source, `audit`)",
+      render: "Rendu (moteur de rendu, `render`)",
+      snapshot: "Instantan\xE9 (page captur\xE9e)",
+      journey: "Navigateur (`scan`, `journey run`)",
+      judgement: "Jugement (`verify --manual`)"
+    },
+    seen: {
+      static: (n) => `${n} fichier(s) lu(s)`,
+      render: (n) => `${n} unit\xE9(s) rendue(s)`,
+      snapshot: (n) => `${n} page(s) et \xE9tat(s) captur\xE9(s)`,
+      journey: (axe, states) => `${axe} page(s) et \xE9tat(s) mesur\xE9(s) par axe-core, dont ${states} \xE9tat(s) de parcours`,
+      judgement: (n) => `${n} crit\xE8re(s) tranch\xE9(s) par l'adjudicateur`
+    },
+    decided: (d2, n) => `${d2} / ${n}`
+  },
+  en: {
+    title: "I. Application map \u2014 what was seen, and how",
+    intro: (routes, pages, journeys, states, units) => `${routes} known route(s), ${pages} page(s) and page state(s) read by the audit, ${journeys} journey(s) (${states} state(s) recorded), ${units} unit(s) rendered by ultra11y's engine. For each page: where it comes from, which instrument saw it and what that instrument recorded; then, for each evidence source, what it saw in this audit and the criteria it can reach. This map states facts and decides nothing: a criterion a source can reach is not thereby decided.`,
+    pagesTitle: "Pages and states observed",
+    pagesHead: "| Page | Address | Origin | Seen by | Recorded |",
+    sample: "sample route",
+    outOfSample: "route outside the sample",
+    declared: "declared page",
+    state: (j, n, label) => `journey **${j}**, step ${n}: ${label}`,
+    browserScan: "browser (scan)",
+    browserJourney: "browser (journey run)",
+    browserE2E: "E2E tests (capture)",
+    sourceOnly: "source code only",
+    notAudited: "capture on disk, not read",
+    loading: "captured while loading",
+    dom: "DOM",
+    measured: (n) => `probes: ${n} WCAG criterion(ia) measured`,
+    nothing: "\u2014",
+    unitsTitle: "Rendered components, by route",
+    unitsHead: "| Route | Units rendered by the engine |",
+    isolated: "isolated components",
+    unitsNone: "No unit was rendered by ultra11y's engine in this audit.",
+    sourcesTitle: "Criteria by evidence source",
+    sourcesHead: "| Source | What this audit saw of it | Criteria reached | Of which decided |",
+    source: {
+      static: "Static (source code, `audit`)",
+      render: "Render (render engine, `render`)",
+      snapshot: "Snapshot (captured page)",
+      journey: "Browser (`scan`, `journey run`)",
+      judgement: "Judgement (`verify --manual`)"
+    },
+    seen: {
+      static: (n) => `${n} file(s) read`,
+      render: (n) => `${n} unit(s) rendered`,
+      snapshot: (n) => `${n} page(s) and state(s) captured`,
+      journey: (axe, states) => `${axe} page(s) and state(s) measured by axe-core, ${states} of them journey states`,
+      judgement: (n) => `${n} criterion(ia) ruled by the adjudicator`
+    },
+    decided: (d2, n) => `${d2} / ${n}`
+  }
+};
+var cell = (t3) => t3.replace(/\|/g, "\\|").replace(/\n/g, " ");
+function recorded(cov, lang) {
+  const s2 = S2[lang];
+  if (!cov) return s2.nothing;
+  const files = new Set(cov.captures ?? []);
+  const parts = [s2.dom];
+  for (const f2 of CAPTURE_ORDER) {
+    if (!files.has(f2)) continue;
+    parts.push(f2 === "probes.json" && cov.scs?.length ? s2.measured(cov.scs.length) : CAPTURE_LABEL[lang][f2] ?? f2);
+  }
+  for (const f2 of files) if (!CAPTURE_ORDER.includes(f2)) parts.push(f2);
+  return parts.join(", ");
+}
+function renderAppMap(r2, standard, rows, lang) {
+  const s2 = S2[lang];
+  const pages = r2.scope.pages ?? [];
+  const routes = r2.scope.routes ?? [];
+  if (!pages.length && !routes.length) return [];
+  const journeys = r2.scope.journeys?.journeys ?? [];
+  const units = r2.scope.renders?.units ?? [];
+  const rendered = units.filter((u2) => u2.status === "rendered");
+  const stateOf = /* @__PURE__ */ new Map();
+  for (const j of journeys) for (const st of j.steps) if (st.page) stateOf.set(st.page, s2.state(cell(j.name), st.n, cell(st.label)));
+  const routeOf = new Map(routes.filter((x2) => x2.page).map((x2) => [x2.page, x2]));
+  const coverage = r2.scope.pageCoverage ?? {};
+  const out = [`## ${s2.title}`, "", s2.intro(routes.length, pages.length, journeys.length, stateOf.size, rendered.length), ""];
+  out.push(`### ${s2.pagesTitle}`, "", s2.pagesHead, "|---|---|---|---|---|");
+  for (const p2 of pages) {
+    const route = routeOf.get(p2.id);
+    const origin = stateOf.get(p2.id) ?? (route ? route.sample ? s2.sample : s2.outOfSample : s2.declared);
+    const cov = coverage[p2.id];
+    const by = p2.basis === "attributed" ? s2.sourceOnly : p2.basis === "not-audited" ? s2.notAudited : `${stateOf.has(p2.id) ? s2.browserJourney : route?.observed === "captured" ? s2.browserE2E : s2.browserScan}${p2.basis === "loading" ? ` (${s2.loading})` : ""}`;
+    out.push(
+      `| \`${cell(p2.id)}\` | \`${cell(route?.path ?? p2.route ?? p2.url)}\` | ${origin} | ${by} | ${p2.basis === "snapshot" || p2.basis === "loading" ? recorded(cov, lang) : s2.nothing} |`
+    );
+  }
+  out.push("");
+  out.push(`### ${s2.unitsTitle}`, "");
+  if (!rendered.length) out.push(s2.unitsNone, "");
+  else {
+    out.push(s2.unitsHead, "|---|---|");
+    const byRoute = /* @__PURE__ */ new Map();
+    for (const u2 of rendered) {
+      const key2 = u2.route !== void 0 ? `\`${cell(u2.route)}\`` : s2.isolated;
+      const label = `${u2.kind === "story" ? `${u2.component} \xB7 ${u2.export}` : u2.component} (\`${cell(u2.file)}\`)`;
+      byRoute.set(key2, [...byRoute.get(key2) ?? [], label]);
+    }
+    for (const [route, list] of [...byRoute.entries()].sort(([a2], [b]) => a2 === s2.isolated ? 1 : b === s2.isolated ? -1 : a2.localeCompare(b)))
+      out.push(`| ${route} | ${list.map(cell).join(" \xB7 ")} |`);
+    out.push("");
+  }
+  out.push(`### ${s2.sourcesTitle}`, "", s2.sourcesHead, "|---|---|---|---|");
+  const reached = matrixBySource(coverageMatrix(standard));
+  const statusOf = new Map(rows.map((x2) => [x2.id, x2]));
+  const captured = pages.filter((p2) => p2.basis === "snapshot" || p2.basis === "loading");
+  const axe = captured.filter((p2) => coverage[p2.id]?.axe).length;
+  const judged = rows.filter((x2) => x2.decidedBy === "agent" || x2.decidedBy === "human").length;
+  for (const src of EVIDENCE_SOURCES) {
+    const ids2 = reached[src];
+    const seen = src === "static" ? s2.seen.static(r2.scope.files) : src === "render" ? s2.seen.render(rendered.length) : src === "snapshot" ? s2.seen.snapshot(captured.length) : src === "journey" ? s2.seen.journey(axe, captured.filter((p2) => stateOf.has(p2.id)).length) : s2.seen.judgement(judged);
+    const decided = ids2.filter((id) => {
+      const st = statusOf.get(id)?.status;
+      return st === "C" || st === "NC" || st === "NA";
+    }).length;
+    out.push(`| ${s2.source[src]} | ${seen} | ${ids2.map((id) => `\`${id}\``).join(" \xB7 ") || s2.nothing} | ${s2.decided(decided, ids2.length)} |`);
+  }
+  out.push("");
+  return out;
+}
+
 // src/render-snapshot-report.ts
 import { copyFileSync, existsSync as existsSync17, mkdirSync as mkdirSync7 } from "fs";
 import { join as join17, relative as relative8 } from "path";
@@ -55628,10 +56478,10 @@ function observationLines(u2, lang) {
 }
 function renderSnapshotAnnex(idx, lang, outDir) {
   const s2 = L6[lang];
-  const cell2 = (t3) => t3.replace(/\n/g, " ");
+  const cell3 = (t3) => t3.replace(/\n/g, " ");
   const out = [`### ${s2.title}`, ""];
   if (idx.unavailable) {
-    out.push(`> ${s2.unavailable(cell2(idx.unavailable))}`, "");
+    out.push(`> ${s2.unavailable(cell3(idx.unavailable))}`, "");
     return out;
   }
   if (!idx.units.length) {
@@ -55642,9 +56492,9 @@ function renderSnapshotAnnex(idx, lang, outDir) {
   out.pop();
   out.push("");
   for (const u2 of ordered(idx)) {
-    out.push("<details>", `<summary>${cell2(unitLabel(u2, lang))} \u2014 <code>${cell2(u2.file)}</code></summary>`, "");
+    out.push("<details>", `<summary>${cell3(unitLabel(u2, lang))} \u2014 <code>${cell3(u2.file)}</code></summary>`, "");
     if (u2.status === "failed") {
-      out.push(`_${s2.failed(cell2(u2.error ?? "?"))}_`, "", "</details>", "");
+      out.push(`_${s2.failed(cell3(u2.error ?? "?"))}_`, "", "</details>", "");
       continue;
     }
     if (u2.screenshot && existsSync17(u2.screenshot)) {
@@ -55661,7 +56511,7 @@ function renderSnapshotAnnex(idx, lang, outDir) {
     }
     const o = observationLines(u2, lang);
     out.push(o.head);
-    if (o.items.length) out.push("", ...o.items.map((i) => `- ${cell2(i)}`));
+    if (o.items.length) out.push("", ...o.items.map((i) => `- ${cell3(i)}`));
     for (const t3 of o.tail) out.push("", `_${t3}_`);
     out.push("", "</details>", "");
   }
@@ -56389,7 +57239,7 @@ function exhaustiveGrid(groups, standard, lang, title) {
     "| --- | :---: | :---: | --- |"
   ];
   for (const row of rows) {
-    const owner = cell(ownerLabel(row, s2.owner));
+    const owner = cell2(ownerLabel(row, s2.owner));
     out.push(`| ${row.label} | ${row.inapplicable ? "NA" : row.status === "manual" ? "?" : row.status} | ${automationCell(standard, row.id)} | ${owner} |`);
   }
   out.push("", "</details>", "");
@@ -56398,7 +57248,7 @@ function exhaustiveGrid(groups, standard, lang, title) {
 function folded(summary, lines) {
   return ["<details>", `<summary>${summary}</summary>`, "", ...lines, "", "</details>", ""];
 }
-function cell(text) {
+function cell2(text) {
   return mdText(text).replace(/\s*\n\s*/g, " ").replace(/\|/g, "\\|");
 }
 function scaleText(scale, lang) {
@@ -56517,10 +57367,10 @@ function renderSummary(m3, lang) {
     if (m3.fix.pagesColumn) {
       out.push(`| ${priority2} | ${criterion} | ${occurrences} | ${m3.fix.pagesColumn} | ${fix} |`, "| --- | --- | :---: | --- | --- |");
       for (const r2 of m3.fix.rows)
-        out.push(`| ${r2.icon} ${r2.priority} | ${cell(r2.criterion)} | ${r2.occurrences} | ${pagesCell(r2.pages, lang)} | ${cell(r2.fix)} |`);
+        out.push(`| ${r2.icon} ${r2.priority} | ${cell2(r2.criterion)} | ${r2.occurrences} | ${pagesCell(r2.pages, lang)} | ${cell2(r2.fix)} |`);
     } else {
       out.push(`| ${priority2} | ${criterion} | ${occurrences} | ${fix} |`, "| --- | --- | :---: | --- |");
-      for (const r2 of m3.fix.rows) out.push(`| ${r2.icon} ${r2.priority} | ${cell(r2.criterion)} | ${r2.occurrences} | ${cell(r2.fix)} |`);
+      for (const r2 of m3.fix.rows) out.push(`| ${r2.icon} ${r2.priority} | ${cell2(r2.criterion)} | ${r2.occurrences} | ${cell2(r2.fix)} |`);
     }
     out.push("");
   }
@@ -56802,8 +57652,8 @@ function render(r2, lang, opts) {
     out.push(`| ${s2.pageCol} | ${s2.urlCol} | ${conf ? s2.conformanceCol : s2.rateCol} |`, "| --- | --- | --- |");
     for (const p2 of derivedPages) {
       const criteria = pageCriterionRows(r2, p2, opts.standard, lang);
-      const cell2 = conf ? pageConformanceCell(conf.get(p2.id), lang) : formatPageRate(criteria, opts.standard, lang);
-      out.push(`| ${mdText(p2.name)}${p2.auth ? " \u{1F512}" : ""} | ${urlText(p2.url)} | ${cell2} |`);
+      const cell3 = conf ? pageConformanceCell(conf.get(p2.id), lang) : formatPageRate(criteria, opts.standard, lang);
+      out.push(`| ${mdText(p2.name)}${p2.auth ? " \u{1F512}" : ""} | ${urlText(p2.url)} | ${cell3} |`);
     }
     out.push("");
   }
@@ -57021,15 +57871,17 @@ function render(r2, lang, opts) {
   if (r2.scope.renders?.units.length) ax.push("", ...renderRenderUnits(r2.scope.renders, lang));
   if (r2.scope.renders?.units.length && r2.scope.renders.snapshots) ax.push(...renderSnapshotAnnex(r2.scope.renders.snapshots, lang, opts.outDir));
   if (r2.scope.journeys?.journeys.length) ax.push("", ...renderJourneys(r2.scope.journeys, lang));
+  const map = renderAppMap(r2, opts.standard, rows, lang);
+  if (map.length) ax.push("", ...map);
   return { report: out.join("\n"), annex: ax.join("\n"), reportFile, annexFile };
 }
 function renderRoutes(routes, lang) {
   const s2 = L7[lang];
-  const cell2 = (t3) => t3.replace(/\|/g, "\\|");
+  const cell3 = (t3) => t3.replace(/\|/g, "\\|");
   const out = [`## ${s2.annexRoutesTitle}`, "", s2.routesIntro(routes.length), "", s2.routesHead, "|---|---|---|---|---|"];
   for (const r2 of routes)
     out.push(
-      `| \`${cell2(r2.path)}\` | ${r2.sample ? s2.routeInSample : s2.routeOutOfSample} | ${s2.routeObserved[r2.observed] ?? r2.observed} | ${r2.page ? `\`${cell2(r2.page)}\`` : "\u2014"} | ${r2.why ? cell2(s2.routeWhy(r2.why.reason, r2.why.detail)) : ""} |`
+      `| \`${cell3(r2.path)}\` | ${r2.sample ? s2.routeInSample : s2.routeOutOfSample} | ${s2.routeObserved[r2.observed] ?? r2.observed} | ${r2.page ? `\`${cell3(r2.page)}\`` : "\u2014"} | ${r2.why ? cell3(s2.routeWhy(r2.why.reason, r2.why.detail)) : ""} |`
     );
   const missing = routes.filter((r2) => r2.observed === "not-reached").length;
   out.push("");
@@ -57038,7 +57890,7 @@ function renderRoutes(routes, lang) {
 }
 function renderJourneys(journeys, lang) {
   const s2 = L7[lang];
-  const cell2 = (t3) => t3.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const cell3 = (t3) => t3.replace(/\|/g, "\\|").replace(/\n/g, " ");
   const list = journeys.journeys;
   const count = (st) => list.filter((j) => j.status === st).length;
   const out = [
@@ -57051,7 +57903,7 @@ function renderJourneys(journeys, lang) {
   ];
   for (const j of list) {
     out.push(
-      `| **${cell2(j.name)}** (${s2.journeyMode(j.keyboard)}) | \u2014 | \`${cell2(j.file)}\` | ${s2.journeyStatus[j.status] ?? j.status} | \u2014 | ${j.reason ? cell2(j.reason) : ""} |`
+      `| **${cell3(j.name)}** (${s2.journeyMode(j.keyboard)}) | \u2014 | \`${cell3(j.file)}\` | ${s2.journeyStatus[j.status] ?? j.status} | \u2014 | ${j.reason ? cell3(j.reason) : ""} |`
     );
     for (const st of j.steps) {
       const note = [
@@ -57061,7 +57913,7 @@ function renderJourneys(journeys, lang) {
         st.note
       ].filter(Boolean).join(" \u2014 ");
       out.push(
-        `| ${cell2(j.name)} | ${st.n} | ${cell2(st.label)} | ${s2.journeyStatus[st.status] ?? st.status} | ${st.page ? `\`${cell2(st.page)}\`` : "\u2014"} | ${cell2(note)} |`
+        `| ${cell3(j.name)} | ${st.n} | ${cell3(st.label)} | ${s2.journeyStatus[st.status] ?? st.status} | ${st.page ? `\`${cell3(st.page)}\`` : "\u2014"} | ${cell3(note)} |`
       );
     }
   }
@@ -57075,7 +57927,7 @@ function renderReasonLabel(reason, lang) {
 }
 function renderRenderUnits(renders, lang) {
   const s2 = L7[lang];
-  const cell2 = (t3) => t3.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const cell3 = (t3) => t3.replace(/\|/g, "\\|").replace(/\n/g, " ");
   const tools = [renders.renderer, renders.transpiler].filter(Boolean).join(", ");
   const out = [
     `## ${s2.annexRendersTitle}`,
@@ -57090,7 +57942,7 @@ function renderRenderUnits(renders, lang) {
   for (const u2 of units) {
     const unit = u2.kind === "story" ? `${u2.component} \xB7 ${u2.export}` : u2.route !== void 0 ? `${u2.component} (\`${u2.route}\`)` : u2.component;
     const why = u2.reason ? `${s2.renderReason[u2.reason] ?? u2.reason}${u2.detail ? ` \u2014 ${u2.detail}` : ""}` : "";
-    out.push(`| ${cell2(unit)} | \`${cell2(u2.file)}\` | ${s2.renderKind[u2.kind] ?? u2.kind} | ${s2.renderStatus[u2.status] ?? u2.status} | ${cell2(why)} |`);
+    out.push(`| ${cell3(unit)} | \`${cell3(u2.file)}\` | ${s2.renderKind[u2.kind] ?? u2.kind} | ${s2.renderStatus[u2.status] ?? u2.status} | ${cell3(why)} |`);
   }
   const missing = renders.units.filter((u2) => u2.status !== "rendered" && u2.reason !== "via-story").length;
   out.push("");
@@ -57502,8 +58354,8 @@ function ghErrorReason(err) {
   if (!err || typeof err !== "object") return void 0;
   const e = err;
   const stderr = typeof e.stderr === "string" ? e.stderr : Buffer.isBuffer(e.stderr) ? e.stderr.toString("utf8") : "";
-  const line = stderr.split("\n").map((l) => l.trim()).find(Boolean);
-  if (line) return line;
+  const line2 = stderr.split("\n").map((l) => l.trim()).find(Boolean);
+  if (line2) return line2;
   if (typeof e.message === "string" && e.message) return e.message.split("\n")[0].trim() || void 0;
   return void 0;
 }
@@ -57740,8 +58592,8 @@ function execReason(err) {
   if (!err || typeof err !== "object") return void 0;
   const e = err;
   const stderr = typeof e.stderr === "string" ? e.stderr : Buffer.isBuffer(e.stderr) ? e.stderr.toString("utf8") : "";
-  const line = stderr.split("\n").map((l) => l.trim()).find(Boolean);
-  if (line) return line;
+  const line2 = stderr.split("\n").map((l) => l.trim()).find(Boolean);
+  if (line2) return line2;
   return typeof e.message === "string" ? e.message.split("\n")[0]?.trim() ?? void 0 : void 0;
 }
 function resolve9(opts) {
@@ -57848,7 +58700,7 @@ function resolve10(opts) {
   return { ...base, reason: "no Jira credentials \u2014 set JIRA_EMAIL + JIRA_API_TOKEN (Cloud) or JIRA_TOKEN (Server/DC)" };
 }
 function toAdf(markdown) {
-  const content = markdown.split("\n").map((line) => line.trimEnd()).filter((line) => line.length > 0).map((line) => ({ type: "paragraph", content: [{ type: "text", text: line }] }));
+  const content = markdown.split("\n").map((line2) => line2.trimEnd()).filter((line2) => line2.length > 0).map((line2) => ({ type: "paragraph", content: [{ type: "text", text: line2 }] }));
   return { type: "doc", version: 1, content: content.length ? content : [{ type: "paragraph", content: [] }] };
 }
 function createJiraProvider(opts = {}) {
@@ -58165,8 +59017,8 @@ function classifyRenderFailure(f2) {
   return "error";
 }
 var firstLine2 = (s2) => {
-  const line = s2?.split("\n").find((l) => l.trim())?.trim();
-  return line ? line.length > 240 ? `${line.slice(0, 237)}\u2026` : line : void 0;
+  const line2 = s2?.split("\n").find((l) => l.trim())?.trim();
+  return line2 ? line2.length > 240 ? `${line2.slice(0, 237)}\u2026` : line2 : void 0;
 };
 function rendererRunner() {
   return String.raw`"use strict";
@@ -58430,11 +59282,11 @@ function attempt(runner, jobFile, cwd, unitMs, loadMs) {
       }, ms);
     };
     arm(loadMs);
-    const onLine = (line) => {
-      if (!line.trim()) return;
+    const onLine = (line2) => {
+      if (!line2.trim()) return;
       let msg;
       try {
-        msg = JSON.parse(line);
+        msg = JSON.parse(line2);
       } catch {
         return;
       }
@@ -58804,14 +59656,14 @@ function crawlBound(n) {
 async function crawlUrls(start, opts) {
   const depth = crawlBound(opts.depth);
   const max = crawlBound(opts.max);
-  const order = [];
+  const order2 = [];
   const first = canonicalUrl(start);
   const seen = /* @__PURE__ */ new Set([first]);
   const queue = [{ url: first, d: 0 }];
-  while (queue.length > 0 && order.length < max) {
+  while (queue.length > 0 && order2.length < max) {
     const { url, d: d2 } = queue.shift();
-    order.push(url);
-    opts.onPage?.(url, order.length);
+    order2.push(url);
+    opts.onPage?.(url, order2.length);
     if (d2 >= depth) continue;
     let html = "";
     try {
@@ -58826,7 +59678,7 @@ async function crawlUrls(start, opts) {
       queue.push({ url: canon, d: d2 + 1 });
     }
   }
-  return order;
+  return order2;
 }
 
 // src/scan.ts
@@ -58941,6 +59793,10 @@ function writeRunnerSnapshot(root, out, target, page, extra = {}) {
       // looked. The journey runner (#189) goes through this same function, so it only has to set
       // `snapshot.scripts` from src/behaviour.ts to write the same file.
       ...collected.scripts ? { scripts: collected.scripts } : {},
+      // The accessibility tree (and, derived from it by writeSnapshot, the screen-reader digest)
+      // and the media probe (#208). Same rule as the probes: measured here, persisted here.
+      ...collected.axtree ? { axtree: collected.axtree } : {},
+      ...collected.media ? { media: collected.media } : {},
       ...collected.screenshot ? { screenshotBase64: collected.screenshot } : {},
       ...collected.screenshotFull ? { screenshotFullBase64: collected.screenshotFull } : {},
       ...collected.screenshot320 ? { screenshot320Base64: collected.screenshot320 } : {}
@@ -59076,8 +59932,8 @@ function resolveHostAnchor(file, snippet2) {
   }
   const starts = lineStartsOf(source);
   const at = (start, len) => {
-    const { line, col } = lineColAt(starts, start);
-    return { line, col, start, end: start + len };
+    const { line: line2, col } = lineColAt(starts, start);
+    return { line: line2, col, start, end: start + len };
   };
   let idx = source.indexOf(s2);
   if (idx >= 0) return at(idx, s2.length);
@@ -59929,6 +60785,8 @@ async function runOnPage(browser, axe, target, isFile, opts) {
       } catch {
       }
       if (snapshot) {
+        const axtree = await captureAxTree(page);
+        if (axtree) snapshot.axtree = axtree;
         try {
           screenshot = (await page.screenshot({ fullPage: false })).toString("base64");
         } catch {
@@ -59941,10 +60799,13 @@ async function runOnPage(browser, axe, target, isFile, opts) {
           } catch {
           }
         }
+        const media = await probeMedia(page, { flash: false });
+        if (media) snapshot.media = media;
       }
     }
     const behaviour = snapshot ? await startBehaviour(page) : void 0;
     await behaviour?.idle();
+    if (snapshot?.media) await measureFlashInto(page, snapshot.media);
     const axeRun = await runAxe(axe, page, "scan");
     const violations = axeRun.violations.map((v2) => ({
       id: v2.id,
@@ -60706,21 +61567,21 @@ async function snapshotRenderCaptures(opts) {
               await page.evaluate(FONTS_READY).catch(() => void 0);
               const box = await page.evaluate(CONTENT_BOX);
               const shotPath = join21(outDir, `${u2.id}.png`);
-              let clip;
+              let clip2;
               if (box && box.n > 0 && Number.isFinite(box.x1)) {
                 const x2 = Math.max(0, Math.floor(box.x1 - PAD));
                 const y = Math.max(0, Math.floor(box.y1 - PAD));
                 const width = Math.max(1, Math.min(Math.ceil(box.x2 + PAD), Math.max(box.w, VIEWPORT.width)) - x2);
                 const height = Math.max(1, Math.min(Math.ceil(box.y2 + PAD) - y, SNAPSHOT_MAX_HEIGHT));
-                clip = { x: x2, y, width, height };
+                clip2 = { x: x2, y, width, height };
               }
-              await page.screenshot({ path: shotPath, ...clip ? { fullPage: true, clip } : { fullPage: false } });
+              await page.screenshot({ path: shotPath, ...clip2 ? { fullPage: true, clip: clip2 } : { fullPage: false } });
               const run = await runAxe(axe, page, "render-snapshot");
               engine ??= run.engine;
               rec.status = "snapshotted";
               rec.screenshot = toPosix2(join21(RENDER_SNAPSHOTS_DIR, `${u2.id}.png`));
-              rec.width = clip?.width ?? VIEWPORT.width;
-              rec.height = clip?.height ?? VIEWPORT.height;
+              rec.width = clip2?.width ?? VIEWPORT.width;
+              rec.height = clip2?.height ?? VIEWPORT.height;
               rec.violations = snapshotViolations(run.violations, styles.status);
             } catch (e) {
               rec.error = (e instanceof Error ? e.message : String(e)).split("\n")[0];
@@ -60847,7 +61708,7 @@ function formatPackCriterion(pack, c, lang = "en") {
   if (testKeys.length) {
     out.push(`${lang === "fr" ? "Tests" : "Tests"} :`);
     for (const k of testKeys) {
-      for (const line of c.tests[k]) out.push(`  ${c.id}.${k} ${line.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1")}`);
+      for (const line2 of c.tests[k]) out.push(`  ${c.id}.${k} ${line2.replace(/\[([^\]]+)\]\(#[^)]*\)/g, "$1")}`);
       const method = c.methodology?.[k];
       if (method?.trim()) {
         out.push(
@@ -60899,6 +61760,9 @@ function runPlan(opts) {
   const sourceIsEnough = entries.filter(([, c]) => c.sourceIsEnough).length;
   const canFailFromSource = entries.filter(([, c]) => !c.sourceIsEnough && c.canFailFrom.includes("source")).map(([id]) => id);
   const label = standardLabel(opts.standard);
+  const matrix = coverageMatrix(opts.standard);
+  const bySource = matrixBySource(matrix);
+  const pathless = matrix.filter((m3) => m3.paths.length === 0).map((m3) => m3.id);
   if (opts.json) {
     const plan = {
       standard: opts.standard,
@@ -60907,7 +61771,10 @@ function runPlan(opts) {
       tiers,
       sourceIsEnough,
       needsMore: coverage.size - sourceIsEnough,
-      canFailFromSource
+      canFailFromSource,
+      sources: Object.fromEntries(EVIDENCE_SOURCES.map((s2) => [s2, { count: bySource[s2].length, ids: bySource[s2] }])),
+      pathless,
+      matrix: matrix.map((m3) => ({ id: m3.id, sources: m3.sources, paths: m3.paths }))
     };
     console.log(JSON.stringify(plan, null, 2));
     return 0;
@@ -60918,8 +61785,20 @@ function runPlan(opts) {
   console.log(
     fr ? `${coverage.size - sourceIsEnough} crit\xE8re(s) sur ${coverage.size} exigent plus que le code source pour \xEAtre d\xE9clar\xE9s conformes ; ${canFailFromSource.length} peuvent n\xE9anmoins \xEAtre d\xE9clar\xE9s non conformes depuis le source.` : `${coverage.size - sourceIsEnough} of ${coverage.size} criteria need more than source to be declared conformant; ${canFailFromSource.length} of those can still be failed from source.`
   );
+  console.log(fr ? "Sources de preuve (crit\xE8res atteints par chacune) :" : "Evidence sources (criteria each one reaches):");
+  for (const s2 of EVIDENCE_SOURCES) console.log(`  ${SOURCE_LABEL[s2][fr ? "fr" : "en"].padEnd(38)} ${String(bySource[s2].length).padStart(3)}`);
+  console.log(
+    pathless.length ? fr ? `${pathless.length} crit\xE8re(s) sans aucune source de preuve : ${pathless.join(" ")}.` : `${pathless.length} criterion(ia) with no evidence source: ${pathless.join(" ")}.` : fr ? `Chacun des ${matrix.length} crit\xE8res est atteint par au moins une source de preuve (--json : le d\xE9tail par crit\xE8re).` : `Every one of the ${matrix.length} criteria is reached by at least one evidence source (--json: the paths per criterion).`
+  );
   return 0;
 }
+var SOURCE_LABEL = {
+  static: { fr: "statique (source, audit)", en: "static (source, audit)" },
+  render: { fr: "rendu (moteur de rendu, render)", en: "render (render engine)" },
+  snapshot: { fr: "instantan\xE9 (page captur\xE9e)", en: "snapshot (captured page)" },
+  journey: { fr: "navigateur (scan, journey run)", en: "browser (scan, journey run)" },
+  judgement: { fr: "jugement (verify --manual)", en: "judgement (verify --manual)" }
+};
 function runWcag(opts) {
   if (opts.id) {
     const sc = getSC(opts.id);
@@ -61056,18 +61935,18 @@ function buildWorklistFromAuditorBlocks(reportMd, standard, max) {
   const lines = reportMd.split("\n");
   let currentId = null;
   for (let i = 0; i < lines.length && items.length < max; i++) {
-    const line = lines[i];
-    const c = critLine.exec(line);
+    const line2 = lines[i];
+    const c = critLine.exec(line2);
     if (c) {
       currentId = c[1];
       continue;
     }
-    if (HEADING_LINE.test(line)) {
+    if (HEADING_LINE.test(line2)) {
       currentId = null;
       continue;
     }
     if (!currentId) continue;
-    const occ = AUDITOR_OCCURRENCE.exec(line);
+    const occ = AUDITOR_OCCURRENCE.exec(line2);
     if (!occ) continue;
     items.push({ n: items.length + 1, criteriaId: currentId, file: occ[1], line: Number(occ[2]), selector: occ[3], claim: occ[4], verdict: null, note: "" });
   }
@@ -61249,7 +62128,7 @@ function formatWorklist(items, semantic, standard = "wcag", lang = "en") {
   }
   out.push("");
   out.push(s2.checklistTitle, "");
-  for (const line of s2.checklist) out.push(line);
+  for (const line2 of s2.checklist) out.push(line2);
   if (cItems.length) out.push(s2.conformityCheck);
   out.push("");
   return out.join("\n");
@@ -61446,9 +62325,9 @@ function checkReport(md, standard = "wcag", lang = "en", opts = {}) {
     }
   }
   const naSection = sectionBody(md, 4);
-  for (const line of naSection.split("\n")) {
-    const item = naItem.exec(line);
-    if (item && !line.includes("_")) issues.push(s2.na(item[1]));
+  for (const line2 of naSection.split("\n")) {
+    const item = naItem.exec(line2);
+    if (item && !line2.includes("_")) issues.push(s2.na(item[1]));
   }
   const rateLines = documentHeaders(md).flatMap((header3) => [...header3.matchAll(/^-\s+\*\*[^*\n]*\*\*\s*:\s*\**\s*(\d+(?:[.,]\d+)?)\s*%([^\n]*)$/gm)]);
   if (perPage) {
@@ -61571,9 +62450,9 @@ function synthesisTotals(md) {
 }
 function agentConformities(md) {
   let count = 0;
-  for (const line of md.split("\n")) {
-    if (!line.startsWith("|")) continue;
-    const cells = line.slice(1, line.endsWith("|") ? -1 : void 0).split("|").map((cell2) => cell2.trim());
+  for (const line2 of md.split("\n")) {
+    if (!line2.startsWith("|")) continue;
+    const cells = line2.slice(1, line2.endsWith("|") ? -1 : void 0).split("|").map((cell3) => cell3.trim());
     if (cells.length === 4 && (cells[1] === "C" || cells[1] === "NA") && (cells[3] === "AI" || cells[3] === "IA" || /^audit(?:eur|or)\b/.test(cells[3])))
       count++;
   }
@@ -61583,24 +62462,24 @@ function documentHeaders(md) {
   const headers = [];
   let current = [];
   let fence = null;
-  for (const line of md.split("\n")) {
-    const f2 = /^\s*(```+|~~~+)/.exec(line);
+  for (const line2 of md.split("\n")) {
+    const f2 = /^\s*(```+|~~~+)/.exec(line2);
     if (f2) {
       const mark = f2[1];
       if (fence === null) fence = mark[0].repeat(mark.length);
       else if (mark.startsWith(fence[0]) && mark.length >= fence.length) fence = null;
     }
-    if (fence === null && /^#\s/.test(line)) {
+    if (fence === null && /^#\s/.test(line2)) {
       if (current?.length) headers.push(current.join("\n"));
-      current = [line];
+      current = [line2];
       continue;
     }
-    if (fence === null && /^##\s/.test(line)) {
+    if (fence === null && /^##\s/.test(line2)) {
       if (current?.length) headers.push(current.join("\n"));
       current = null;
       continue;
     }
-    current?.push(line);
+    current?.push(line2);
   }
   if (current?.length) headers.push(current.join("\n"));
   return headers;
@@ -61802,7 +62681,7 @@ var REASON = {
   }
 };
 var clearing = (rec) => rec.status === "C" || rec.status === "NA";
-var key = (file, line, selector) => `${file.trim()}|${line}|${(selector ?? "").trim()}`;
+var key = (file, line2, selector) => `${file.trim()}|${line2}|${(selector ?? "").trim()}`;
 var findingKey = (f2) => key(f2.file, f2.line, f2.selectorHint);
 function pruneRefuted(audit, standard, items, lang = "en", untried = []) {
   const next = structuredClone(audit);
@@ -61975,11 +62854,11 @@ function verdictStillHolds(entry2, today2, opts) {
       `Ledger verdict is STALE \u2014 the harvest for this criterion is now EMPTY where it held ${was} item(s) on ${entry2.date}. Nothing was examined, which is not the same claim as nothing being wrong.`
     );
   }
-  const recorded = new Set(entry2.evidenceAnchors.split(","));
+  const recorded2 = new Set(entry2.evidenceAnchors.split(","));
   const added = /* @__PURE__ */ new Set();
   for (const e of today2) {
     const rooted = anchorHash(e, root);
-    if (!recorded.has(rooted) && !recorded.has(anchorHash(e))) added.add(rooted);
+    if (!recorded2.has(rooted) && !recorded2.has(anchorHash(e))) added.add(rooted);
   }
   if (added.size > 0) {
     return stale(
@@ -63930,7 +64809,7 @@ function cropFinding(ctx, f2, geometry) {
     clipped: visibleFraction < 1
   };
 }
-var S2 = {
+var S3 = {
   fr: {
     // No `N.N —` sequence: src/check.ts scans the WHOLE document for criterion mentions.
     alt: (sel, page) => `Capture recadr\xE9e de l'\xE9l\xE9ment ${sel} sur la page ${page}, entour\xE9 d'un cadre`,
@@ -63977,7 +64856,7 @@ function evidenceRefusals(m3, pageId, lang) {
   const missing = t3.located - t3.imaged;
   if (missing <= 0) return void 0;
   const entries = Object.entries(t3.skipped).filter(([, n]) => n);
-  const s2 = S2[lang];
+  const s2 = S3[lang];
   return {
     headline: s2.notImaged(missing),
     reasons: entries.sort((a2, b) => b[1] - a2[1]).map(([reason, n]) => `${n} \u2014 ${s2.reasons[reason]}`)
@@ -64079,7 +64958,7 @@ function writeEvidence(result, opts) {
         box: crop.box,
         scale: crop.scale,
         clipped: crop.clipped,
-        alt: { fr: S2.fr.alt(f2.selectorHint, pageId), en: S2.en.alt(f2.selectorHint, pageId) }
+        alt: { fr: S3.fr.alt(f2.selectorHint, pageId), en: S3.en.alt(f2.selectorHint, pageId) }
       });
     }
   }
@@ -65996,10 +66875,10 @@ function formatTrialSummary(s2, lang = "en") {
   if (s2.contestedEngine.length) why.push(t3.whyContested(s2.contestedEngine.length));
   if (s2.untried.length) why.push(t3.whyUntried(s2.untried.length));
   if (s2.foreign.length) why.push(t3.whyForeign(s2.foreign.length));
-  const line = (e) => `- **${e.criteriaId}** (${e.kind === "c" ? "C" : "NC"}) ${e.file ? `\`${e.file}:${e.line}\`${e.selector ? ` (\`${e.selector}\`)` : ""} ` : ""}\u2014 ${e.claim.replace(/\s+/g, " ").trim()} \u2014 ${t3.verdict} ${e.verdict ?? "\u2205"}${e.note.trim() ? ` \u2014 ${t3.note} ${e.note.trim()}` : ""}`;
+  const line2 = (e) => `- **${e.criteriaId}** (${e.kind === "c" ? "C" : "NC"}) ${e.file ? `\`${e.file}:${e.line}\`${e.selector ? ` (\`${e.selector}\`)` : ""} ` : ""}\u2014 ${e.claim.replace(/\s+/g, " ").trim()} \u2014 ${t3.verdict} ${e.verdict ?? "\u2205"}${e.note.trim() ? ` \u2014 ${t3.note} ${e.note.trim()}` : ""}`;
   const list = (xs) => xs.length ? `${t3.distinct(ids(xs).length)}.
 
-${xs.map(line).join("\n")}` : t3.none;
+${xs.map(line2).join("\n")}` : t3.none;
   const row = (label, c) => `| ${label} | ${c.supported} | ${c.partial} | ${c.refuted} | ${c.unsupported} | ${c.unadjudicated} | ${c.invalid} | ${c.missing} |`;
   const idRow = (role, f2) => `| ${role} | \`${f2.path}\`${f2.date ? ` (${f2.date})` : ""} | \`${f2.sha256.slice(0, 12)}\` |`;
   return [
@@ -66549,6 +67428,8 @@ async function capture(page, axe, lang) {
   } catch {
   }
   if (snapshot) {
+    const axtree = await captureAxTree(page);
+    if (axtree) snapshot.axtree = axtree;
     try {
       snapshot.screenshot = (await page.screenshot({ fullPage: false })).toString("base64");
     } catch {
@@ -66561,6 +67442,8 @@ async function capture(page, axe, lang) {
       } catch {
       }
     }
+    const media = await probeMedia(page, { flash: false });
+    if (media) snapshot.media = media;
   }
   const behaviour = snapshot ? await startBehaviour(page) : void 0;
   await behaviour?.idle();
@@ -67811,8 +68694,8 @@ async function cmdPagesDiscover(p2) {
   const crawl = typeof p2.flags.crawl === "string" ? p2.flags.crawl : void 0;
   if (p2.flags["from-snapshots"] === true) {
     const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
-    const recorded = readSnapshots(root);
-    const snaps = sampleFromSnapshots(recorded);
+    const recorded2 = readSnapshots(root);
+    const snaps = sampleFromSnapshots(recorded2);
     if (!snaps.length) {
       console.error(
         lang === "fr" ? `ultra11y pages discover : aucun instantan\xE9 sous ${join37(root, PAGES_DIR)} \u2014 lancez d'abord vos tests E2E avec checkA11y, ou \`scan --sample\`.` : `ultra11y pages discover: no snapshot under ${join37(root, PAGES_DIR)} \u2014 run your E2E tests with checkA11y first, or \`scan --sample\`.`
@@ -67830,7 +68713,7 @@ async function cmdPagesDiscover(p2) {
       return writeProposedSample(
         p2,
         lang,
-        recorded.map((s2) => ({
+        recorded2.map((s2) => ({
           id: s2.meta.id,
           url: s2.meta.url,
           title: extractTitle(s2.dom) ?? s2.meta.name,
@@ -67892,8 +68775,8 @@ async function cmdPagesDiscover(p2) {
   if (p2.flags.propose === true) {
     const root = typeof p2.flags.root === "string" && p2.flags.root ? p2.flags.root : ".";
     const snapshotOf = /* @__PURE__ */ new Map();
-    const recorded = readSnapshots(root).sort((a2, b) => a2.meta.id.length - b.meta.id.length || (a2.meta.id < b.meta.id ? -1 : a2.meta.id > b.meta.id ? 1 : 0));
-    for (const s2 of recorded) {
+    const recorded2 = readSnapshots(root).sort((a2, b) => a2.meta.id.length - b.meta.id.length || (a2.meta.id < b.meta.id ? -1 : a2.meta.id > b.meta.id ? 1 : 0));
+    for (const s2 of recorded2) {
       const key2 = routePath(s2.meta.url);
       if (!snapshotOf.has(key2))
         snapshotOf.set(key2, { id: s2.meta.id, skeleton: skeletonOf(s2.dom), ...s2.meta.auth !== void 0 ? { auth: s2.meta.auth } : {} });
@@ -68202,7 +69085,7 @@ async function cmdPages(p2) {
     console.error(
       lang === "fr" ? `ultra11y : ${manifest.totals.imaged} vignette(s) \xE9crite(s) dans ${join37(outDir, "assets")}.` : `ultra11y: ${manifest.totals.imaged} crop(s) written to ${join37(outDir, "assets")}.`
     );
-    for (const line of total) console.error(line);
+    for (const line2 of total) console.error(line2);
   }
   const evidenceOpts = {
     ...cropFor ? { cropFor } : {},
@@ -68527,7 +69410,7 @@ async function cmdReport(p2) {
   }
   const manifest = p2.flags.evidence === true ? writeEvidence(evidenceScope(result, standard), { outDir: out, ...evidenceCapsOf(p2) }) : void 0;
   if (manifest) {
-    for (const line of evidenceNotice(manifest, null, lang)) console.error(line);
+    for (const line2 of evidenceNotice(manifest, null, lang)) console.error(line2);
   }
   const cropFor = manifest ? (f2) => {
     const c = manifest.crops.get(findingId(f2));
@@ -70085,8 +70968,8 @@ async function cmdScan(p2) {
       }
       maxRoutes = n;
     }
-    const recorded = readSnapshots(routesRoot).map((s2) => ({ id: s2.meta.id, url: s2.meta.url, ...s2.meta.runner ? { runner: s2.meta.runner } : {} }));
-    routePlan = routesToScan(inventory, { ...useSample && sampleConfig ? { sample: sampleConfig.pages } : {}, captured: recorded, max: maxRoutes });
+    const recorded2 = readSnapshots(routesRoot).map((s2) => ({ id: s2.meta.id, url: s2.meta.url, ...s2.meta.runner ? { runner: s2.meta.runner } : {} }));
+    routePlan = routesToScan(inventory, { ...useSample && sampleConfig ? { sample: sampleConfig.pages } : {}, captured: recorded2, max: maxRoutes });
     console.error(
       lang === "fr" ? `ultra11y scan : ${inventory.routes.length} route(s) inventori\xE9e(s) \u2014 ${useSample && sampleConfig ? `${sampleConfig.pages.length} page(s) d'\xE9chantillon, puis ` : ""}${routePlan.scan.length} route(s) hors \xE9chantillon \xE0 scanner, ${routePlan.captured.length} d\xE9j\xE0 captur\xE9e(s) par les tests E2E${routePlan.bounded.length ? `, ${routePlan.bounded.length} au-del\xE0 de --max-routes ${maxRoutes} (list\xE9es \xAB non atteintes \xBB)` : ""}.` : `ultra11y scan: ${inventory.routes.length} inventoried route(s) \u2014 ${useSample && sampleConfig ? `${sampleConfig.pages.length} sample page(s), then ` : ""}${routePlan.scan.length} route(s) beyond the sample to scan, ${routePlan.captured.length} already captured by the E2E tests${routePlan.bounded.length ? `, ${routePlan.bounded.length} beyond --max-routes ${maxRoutes} (listed "not reached")` : ""}.`
     );

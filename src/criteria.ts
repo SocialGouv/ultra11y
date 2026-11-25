@@ -25,6 +25,7 @@ import {
   type StandardPack,
   type PackCriterion,
 } from "./standards/index.js";
+import { EVIDENCE_SOURCES, type EvidenceSource, coverageMatrix, matrixBySource } from "./coverage-matrix.js";
 
 const AUTO_LABEL: Record<string, { fr: string; en: string }> = {
   static: { fr: "automatisable (moteur)", en: "automatable (engine)" },
@@ -186,6 +187,11 @@ function runPlan(opts: CriteriaOpts): number {
   const sourceIsEnough = entries.filter(([, c]) => c.sourceIsEnough).length;
   const canFailFromSource = entries.filter(([, c]) => !c.sourceIsEnough && c.canFailFrom.includes("source")).map(([id]) => id);
   const label = standardLabel(opts.standard);
+  // The second table of the plan (#208): per criterion, the evidence sources that reach it and
+  // what carries each path (src/coverage-matrix.ts). A criterion with none is listed, never hidden.
+  const matrix = coverageMatrix(opts.standard);
+  const bySource = matrixBySource(matrix);
+  const pathless = matrix.filter((m) => m.paths.length === 0).map((m) => m.id);
   if (opts.json) {
     const plan = {
       standard: opts.standard,
@@ -195,6 +201,9 @@ function runPlan(opts: CriteriaOpts): number {
       sourceIsEnough,
       needsMore: coverage.size - sourceIsEnough,
       canFailFromSource,
+      sources: Object.fromEntries(EVIDENCE_SOURCES.map((s) => [s, { count: bySource[s].length, ids: bySource[s] }])),
+      pathless,
+      matrix: matrix.map((m) => ({ id: m.id, sources: m.sources, paths: m.paths })),
     };
     console.log(JSON.stringify(plan, null, 2));
     return 0;
@@ -207,8 +216,27 @@ function runPlan(opts: CriteriaOpts): number {
       ? `${coverage.size - sourceIsEnough} critère(s) sur ${coverage.size} exigent plus que le code source pour être déclarés conformes ; ${canFailFromSource.length} peuvent néanmoins être déclarés non conformes depuis le source.`
       : `${coverage.size - sourceIsEnough} of ${coverage.size} criteria need more than source to be declared conformant; ${canFailFromSource.length} of those can still be failed from source.`,
   );
+  console.log(fr ? "Sources de preuve (critères atteints par chacune) :" : "Evidence sources (criteria each one reaches):");
+  for (const s of EVIDENCE_SOURCES) console.log(`  ${SOURCE_LABEL[s][fr ? "fr" : "en"].padEnd(38)} ${String(bySource[s].length).padStart(3)}`);
+  console.log(
+    pathless.length
+      ? fr
+        ? `${pathless.length} critère(s) sans aucune source de preuve : ${pathless.join(" ")}.`
+        : `${pathless.length} criterion(ia) with no evidence source: ${pathless.join(" ")}.`
+      : fr
+        ? `Chacun des ${matrix.length} critères est atteint par au moins une source de preuve (--json : le détail par critère).`
+        : `Every one of the ${matrix.length} criteria is reached by at least one evidence source (--json: the paths per criterion).`,
+  );
   return 0;
 }
+
+const SOURCE_LABEL: Record<EvidenceSource, { fr: string; en: string }> = {
+  static: { fr: "statique (source, audit)", en: "static (source, audit)" },
+  render: { fr: "rendu (moteur de rendu, render)", en: "render (render engine)" },
+  snapshot: { fr: "instantané (page capturée)", en: "snapshot (captured page)" },
+  journey: { fr: "navigateur (scan, journey run)", en: "browser (scan, journey run)" },
+  judgement: { fr: "jugement (verify --manual)", en: "judgement (verify --manual)" },
+};
 
 function runWcag(opts: CriteriaOpts): number {
   if (opts.id) {

@@ -50,6 +50,8 @@ import {
   waitForLoaded,
 } from "./snapshot.js";
 import { today } from "./util.js";
+import { captureAxTree } from "./screen-reader.js";
+import { MEDIA_PROBE, measureFlashInto, probeMedia } from "./media.js";
 
 export const LOCAL_ENGINE = "axe-core@playwright (local)";
 
@@ -655,6 +657,8 @@ export function probeSources(): Record<string, string> {
     CONSENT_STATE,
     // The behaviour digest's window (src/behaviour.ts), evaluated by the same producers.
     ...behaviourSources(),
+    // The media inventory (src/media.ts), evaluated by `scan` and `journey run`.
+    MEDIA_PROBE,
   };
 }
 
@@ -719,6 +723,10 @@ async function runOnPage(
         // it simply earns no snapshot — and therefore no conforming-by-silence verdict.
       }
       if (snapshot) {
+        // THE ACCESSIBILITY TREE, on the same pristine DOM (#208): what a screen reader is handed,
+        // joined to dom.html by ordinal. `sr.json` is derived from it when the snapshot is written.
+        const axtree = await captureAxTree(page);
+        if (axtree) snapshot.axtree = axtree;
         try {
           screenshot = ((await page.screenshot({ fullPage: false })) as Buffer).toString("base64");
         } catch {
@@ -735,6 +743,11 @@ async function runOnPage(
             /* the report shows the viewport shot instead */
           }
         }
+        // THE MEDIA PROBE (#208): the media inventory — tracks as loaded, captions and transcripts
+        // found beside each player — taken here, on the DOM just serialized, so its ordinals join.
+        // The flash measure is recorded below, inside the behaviour window.
+        const media = await probeMedia(page, { flash: false });
+        if (media) snapshot.media = media;
       }
     }
 
@@ -744,6 +757,9 @@ async function runOnPage(
     // button the live-region pass clicks toggles its `aria-expanded` under the observer.
     const behaviour = snapshot ? await startBehaviour(page) : undefined;
     await behaviour?.idle();
+    // The flash measure (#208), after the idle half and before axe or any probe touches the page:
+    // screenshots mutate no DOM, so the window still opened on the DOM just serialized.
+    if (snapshot?.media) await measureFlashInto(page, snapshot.media);
 
     // The controlled axe run (src/axe-engine.ts): ultra11y's pinned axe-core and rule tags.
     const axeRun = await runAxe(axe, page, "scan");

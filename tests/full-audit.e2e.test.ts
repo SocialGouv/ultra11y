@@ -106,6 +106,24 @@ const reactResolvable = (() => {
   }
 })();
 
+// THE CRITERIA THIS RUN MAY LEAVE UNDECIDED (#208) — and nothing else. Every one of the 106 RGAA
+// criteria has to come out of the chain with a verdict, except these, each with the reason a
+// verdict on this fixture would be a guess. The list is the run's `--allow-undecided` file too
+// (tests/fixtures/full-audit-verdicts.json `undecidable`), and the two are held equal below, so
+// neither can grow without this justification being written.
+const ALLOWED_UNDECIDED: Record<string, string> = {
+  // The trial refutes the « non applicable » claim on purpose: it is how this run proves that
+  // `verify --apply --prune` sends a refuted claim back to « à évaluer ». A refuted claim stays
+  // undecided until someone re-rules it; deciding it here would hide the very hand-off under test.
+  "1.3": "refuted by the adversarial trial on purpose, to exercise --prune; a refuted claim is never re-decided by the tool",
+  // The fixture deliberately does not serve its image files (it tests that the engine never
+  // guesses from an image it cannot see): an image of text is a property of the pixels.
+  "1.8": "the image file is not served, so no capture shows whether it is an image of text",
+  // Markup validity needs a validator run on every page, and ultra11y ships none (no new
+  // dependency): its own rules prove some invalid markup NC, never a whole page valid.
+  "8.2": "validity of the generated source needs an external validator, which this run does not have",
+};
+
 let project = "";
 let origin = "";
 let server: Server | undefined;
@@ -422,6 +440,23 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
           ".ultra11y/undecidable-rgaa.json",
         ]);
         expect(decided).toMatch(/106 critères portent un verdict/);
+        // …and WITHOUT the allowance, exactly the allow-listed criteria are still open, on the run
+        // and on every page: 103 of 106 decided. Before the media and screen-reader probes (#208),
+        // 13.7 was on that list too (102 of 106).
+        const open = await ultra11y(["check", "--in", "audits/audit-latest.json", "--standard", "rgaa", "--require-decided=pages", "--json"]);
+        const gate = JSON.parse(open.out.slice(open.out.indexOf("{"))) as {
+          decided: { undecided: string[]; total: number; pages?: { id: string; undecided: string[] }[] };
+        };
+        const allowed = Object.keys(ALLOWED_UNDECIDED).sort();
+        expect(AUDITOR.undecidable.entries.map((e) => e.criteriaId).sort(), "the --allow-undecided file is the allow-list").toEqual(allowed);
+        expect(gate.decided.total).toBe(106);
+        expect([...gate.decided.undecided].sort(), "criteria left undecided outside the justified allow-list").toEqual(allowed);
+        expect(gate.decided.total - gate.decided.undecided.length).toBe(103);
+        for (const pg of gate.decided.pages ?? [])
+          expect(
+            pg.undecided.filter((id) => !ALLOWED_UNDECIDED[id]),
+            `page ${pg.id}: undecided outside the allow-list`,
+          ).toEqual([]);
         await step(["check", "--report", "audits/pages/index.md", "--standard", "rgaa"]);
         annex = read(report.replace("/rgaa-", "/annexe-technique-rgaa-"));
       } catch (e) {
@@ -479,6 +514,68 @@ describe("the full RGAA audit, end to end on a fixture application (references/f
       expect(s.timers!.longTimeouts, id).toEqual([]);
       expect(s.timers!.metaRefresh, id).toBeUndefined();
     }
+  });
+
+  // #208 — the media and screen-reader probes: every capture carries its accessibility tree, what
+  // a screen reader would announce from it, and the media inventory; every scanned page its flash
+  // measure. The announcements are the page STATE's: the disclosure is « collapsed » before the
+  // journey clicks it and « expanded » after.
+  it("records the accessibility tree, the screen-reader announcements and the media probe on every capture", () => {
+    if (!browserAvailable) return;
+    const base = join(project, ".ultra11y", "pages");
+    const ids = readdirSync(base).filter((d) => existsSync(join(base, d, "dom.html")));
+    expect(ids.length).toBeGreaterThan(10);
+    type Sr = { v: number; entries: { role: string; name: string; states: string[]; text: string; i?: number }[] };
+    type Media = { v: number; items: unknown[]; flash?: { outcome: string; fps: number; frames: number }; flashSkipped?: string };
+    for (const id of ids) {
+      for (const f of ["axtree.json", "sr.json", "media.json"]) expect(existsSync(join(base, id, f)), `${id}/${f}`).toBe(true);
+      const sr = readJson<Sr>(`.ultra11y/pages/${id}/sr.json`);
+      expect(sr.entries.length, id).toBeGreaterThan(5);
+      expect(
+        sr.entries.some((e) => e.role === "main"),
+        id,
+      ).toBe(true);
+      const media = readJson<Media>(`.ultra11y/pages/${id}/media.json`);
+      expect(media.items, id).toEqual([]);
+      if (/^(contact|rubriques)-\d{2}-/.test(id)) expect(media.flashSkipped, id).toMatch(/journey state/);
+      else {
+        expect(media.flash?.outcome, `${id}: ${JSON.stringify(media.flash)}`).toBe("none");
+        expect(media.flash!.fps, id).toBeGreaterThanOrEqual(20);
+      }
+    }
+    const say = (id: string) => readJson<Sr>(`.ultra11y/pages/${id}/sr.json`).entries.map((e) => e.text);
+    // The unlabelled email field of the contact form is announced with no name at all.
+    const contact = readJson<Sr>(".ultra11y/pages/contact/sr.json").entries;
+    expect(contact.filter((e) => e.role === "textbox").map((e) => e.name)).toEqual(["Nom", "", "Message"]);
+    expect(say("rubriques-00-start")).toContain('button "Rubriques", collapsed');
+    expect(say("rubriques-01-click-button-rubriques")).toContain('button "Rubriques", expanded');
+    // The typed value is announced, and — an `type="email"` field holding no address — so is its
+    // invalid state, the moment the browser computes it.
+    expect(say("contact-02-fill-css-input-name-courriel-pas-une-adr")).toContain('textbox = "pas-une-adresse", invalid');
+    // …and the adjudicator is shown them: 11.1 the nameless field, 13.7 the flash measure, 7.1 the
+    // disclosure's state.
+    const todo = readJson<{ items: { criteriaId: string; evidence?: Anchor[] }[] }>("audits/ADJUDICATE.todo.json");
+    const ev = (id: string) => todo.items.find((i) => i.criteriaId === id)?.evidence ?? [];
+    expect(ev("11.1").some((e) => /screen reader would announce .*textbox — NO accessible name/.test(e.note ?? ""))).toBe(true);
+    expect(ev("13.7").some((e) => e.selector === "probe:flash" && /flash measure RAN .*no luminance flash/.test(e.note ?? ""))).toBe(true);
+    expect(ev("7.1").some((e) => /button "Rubriques", (?:collapsed|expanded)/.test(e.note ?? ""))).toBe(true);
+  });
+
+  it("maps the application in annex I: pages and states, instruments, rendered units and criteria per source", () => {
+    if (!browserAvailable) return;
+    expect(annex).toMatch(/^## I\. Carte de l'application/m);
+    expect(annex).toMatch(
+      /\| `contact` \| `\/contact` \| route de l'échantillon \| navigateur \(scan\) \| DOM, .*arbre d'accessibilité, lecteur d'écran simulé, médias et flashs/,
+    );
+    expect(annex).toMatch(
+      /\| `rubriques-01-click-button-rubriques` \| .* \| parcours \*\*rubriques\*\*, étape 1 : click button "Rubriques" \| navigateur \(journey run\) \|/,
+    );
+    if (reactResolvable) expect(annex).toMatch(/\| composants isolés \| .*Button \(`src\/components\/Button\.tsx`\)/);
+    for (const src of ["Statique", "Rendu", "Instantané", "Navigateur", "Jugement"]) expect(annex).toMatch(new RegExp(`^\\| ${src} \\(`, "m"));
+    // Every theme's first criterion, and the media one, appear under at least one source.
+    const section = annex.slice(annex.indexOf("### Critères par source de preuve"));
+    for (let theme = 1; theme <= 13; theme++) expect(section).toContain(`\`${theme}.1\``);
+    expect(section).toContain("`13.7`");
   });
 
   it("writes every deliverable the skill hands over", () => {

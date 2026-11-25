@@ -2141,9 +2141,10 @@ const SNIPPET_SHOWN = 200;
 
 /** The files a page capture may hold, in the order a reader opens them. Only `dom.html` and
  *  `meta.json` are written for every capture; each other file exists only when its producer
- *  supplied that digest (src/snapshot.ts `writeSnapshot`) — and `axtree.json` is written by no
- *  capture path the engine ships. So a brief never names one from this list without having
- *  found it on disk. */
+ *  supplied that digest (src/snapshot.ts `writeSnapshot`) — `axtree.json` and the `sr.json`
+ *  derived from it only by a Chromium producer (`scan`, `journey run`), `media.json` only by
+ *  those two as well. So a brief never names one from this list without having found it on
+ *  disk. */
 export const CAPTURE_FILES = [
   "dom.html",
   "styles.json",
@@ -2153,6 +2154,8 @@ export const CAPTURE_FILES = [
   "axe.json",
   "scripts.json",
   "axtree.json",
+  "sr.json",
+  "media.json",
   "screen.png",
   "screen-full.png",
   "screen-320.png",
@@ -2169,6 +2172,8 @@ const CAPTURE_FILE_LABEL: Record<Lang, Record<CaptureFile, string>> = {
     "axe.json": "les résultats axe-core de la page",
     "scripts.json": "le comportement JavaScript de la page (écouteurs, mutations ARIA, régions live, minuteurs, contenus en mouvement)",
     "axtree.json": "l'arbre d'accessibilité",
+    "sr.json": "ce qu'un lecteur d'écran annoncerait, dans l'ordre de lecture (simulé depuis l'arbre d'accessibilité)",
+    "media.json": "les médias de la page (pistes, sous-titres et transcriptions trouvés dans le DOM) et la mesure des flashs",
     "screen.png": "la capture d'écran",
     "screen-full.png": "la page entière en capture d'écran",
     "screen-320.png": "la page à 320px de large, telle que la sonde de redistribution l'a mesurée",
@@ -2182,6 +2187,8 @@ const CAPTURE_FILE_LABEL: Record<Lang, Record<CaptureFile, string>> = {
     "axe.json": "axe-core's results on the page",
     "scripts.json": "the page's JavaScript behaviour (listeners, ARIA mutations, live regions, timers, moving content)",
     "axtree.json": "the accessibility tree",
+    "sr.json": "what a screen reader would announce, in reading order (simulated from the accessibility tree)",
+    "media.json": "the page's media (tracks, captions and transcripts found in the DOM) and the flash measure",
     "screen.png": "the screenshot",
     "screen-full.png": "the whole page as a screenshot",
     "screen-320.png": "the page at 320px width, as the reflow probe measured it",

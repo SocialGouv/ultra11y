@@ -445,8 +445,9 @@ export interface CssDigest {
 }
 
 /** The accessibility tree as the browser computed it. Deliberately loose: producers differ.
- *  Recorded when a producer supplies it; no rule consumes it yet — it rides along as evidence
- *  for the agent's adjudication rather than driving an automated verdict. */
+ *  `scan` and `journey run` record it from Chromium (src/screen-reader.ts); no rule consumes it —
+ *  it rides along as evidence for the agent's adjudication, through the screen-reader digest
+ *  derived from it (`sr.json`), rather than driving an automated verdict. */
 export interface AxNode {
   role?: string;
   name?: string;
@@ -455,7 +456,107 @@ export interface AxNode {
   level?: number;
   disabled?: boolean;
   focusable?: boolean;
+  /** The other states the browser exposes (`required`, `invalid`, `expanded`, `checked`,
+   *  `pressed`, `selected`, `readonly`, `live=polite`…), as `name` or `name=value` tokens. */
+  states?: string[];
+  /** The DOM element this node is for, as its document-order ordinal (the join key styles.json
+   *  and boxes.json share) and its tag, which the reader verifies before using the ordinal. */
+  i?: number;
+  tag?: string;
   children?: AxNode[];
+}
+
+/** One thing a screen reader would announce, in reading order (`sr.json`, src/screen-reader.ts). */
+export interface SrEntry {
+  role: string;
+  name: string;
+  value?: string;
+  description?: string;
+  states: string[];
+  /** The whole announcement, as one line: `textbox "Courriel", required, invalid`. */
+  text: string;
+  /** The DOM element, when the node joins one (see AxNode.i). */
+  i?: number;
+  tag?: string;
+}
+
+/** What a screen reader would announce on one page state, derived from its `axtree.json` alone.
+ *  A SIMULATION: it reads the tree the browser computed, never a real assistive technology, so it
+ *  says what is exposed — never how a given reader voices it. */
+export interface SrDigest {
+  v: 1;
+  entries: SrEntry[];
+  /** The tree held more announceable nodes than SR_MAX_ENTRIES: the list is a prefix. */
+  truncated?: boolean;
+}
+
+/** One `<track>` of a media element, as the browser loaded it. */
+export interface MediaTrack {
+  kind: string;
+  srclang?: string;
+  label?: string;
+  src?: string;
+  /** HTMLTrackElement.readyState: 0 none, 1 loading, 2 loaded, 3 error. */
+  readyState?: number;
+  default?: boolean;
+}
+
+/** A caption, transcript or description found in the DOM for a media element, and how. */
+export interface MediaCompanion {
+  via: "aria-describedby" | "aria-labelledby" | "figcaption" | "adjacent-link" | "adjacent-text" | "details";
+  text: string;
+  href?: string;
+}
+
+/** One media element of a page, as the browser measured it (`media.json`). */
+export interface MediaItem {
+  tag: string;
+  /** Document-order ordinal and tag, verified on read (see AxNode.i). */
+  i?: number;
+  selector: string;
+  src?: string;
+  /** `temporal` (video, audio, a player iframe or embed) or `animated` (canvas, animated image,
+   *  SVG animation): the things a luminance flash or a time-based medium can live in. */
+  kind: "temporal" | "animated";
+  controls?: boolean;
+  autoplay?: boolean;
+  muted?: boolean;
+  loop?: boolean;
+  /** Seconds; absent when the browser did not know it (not loaded, a stream, an iframe). */
+  duration?: number;
+  paused?: boolean;
+  tracks: MediaTrack[];
+  companions: MediaCompanion[];
+}
+
+/** The flash measurement: a short frame sequence of the viewport, read for general flashes
+ *  (WCAG 2.3.1 / RGAA 13.7 — pairs of opposing relative-luminance changes of at least 10 %, the
+ *  darker state under 0.80). */
+export interface FlashMeasure {
+  /** Frames actually captured, and over how long. */
+  frames: number;
+  durationMs: number;
+  fps: number;
+  /** The highest count of flashes in any one-second window, over any grid cell. */
+  maxFlashesPerSecond: number;
+  /** The largest area, in CSS pixels, that flashed more than 3 times in one second. */
+  flashingArea: number;
+  /** The threshold area used, in CSS pixels (a quarter of a 10° visual field at 1024×768). */
+  areaThreshold: number;
+  /** `none` no flash seen; `below-threshold` flashes, but at most 3/s or on a small area;
+   *  `over-threshold` more than 3/s on a large area; `undersampled` too few frames per second
+   *  for a 3-per-second count to mean anything — measured nothing. */
+  outcome: "none" | "below-threshold" | "over-threshold" | "undersampled";
+}
+
+/** `media.json`: the media of a page state and, when it ran, the flash measure. */
+export interface MediaDigest {
+  v: 1;
+  items: MediaItem[];
+  /** Absent when the measure did not run on this state (a journey state, a failure). */
+  flash?: FlashMeasure;
+  /** Why the flash measure did not run or did not finish. */
+  flashSkipped?: string;
 }
 
 /** What the 320px reflow probe found laid out BEYOND the viewport, per element (#184): text
@@ -646,6 +747,10 @@ export interface RenderSignals {
    *  styles, but verified PER ENTRY by its reader rather than wholesale: an element the page
    *  created during the window has no ordinal, and that must not refuse the rest. */
   scripts?: ScriptsDigest;
+  /** What a screen reader would announce on this page state (`sr.json`). */
+  sr?: SrDigest;
+  /** The page's media and the flash measure (`media.json`). */
+  media?: MediaDigest;
 }
 
 // ---- the page dimension -----------------------------------------------------------------
@@ -677,6 +782,10 @@ export interface PageCoverage {
   /** Success criteria a LIVE PROBE measured here (zoom, 320px reflow, text spacing, Tab,
    *  hover). A probe that did not run measured nothing — its silence is never a verdict. */
   scs?: string[];
+  /** The capture files this page's evidence was read from (`dom.html` aside): `axtree.json`,
+   *  `sr.json`, `media.json`, `probes.json`, `axe.json`, `scripts.json`, `screen.png`… What was
+   *  seen and how, for the application map annex — never a verdict. */
+  captures?: string[];
 }
 
 export interface PageScope {

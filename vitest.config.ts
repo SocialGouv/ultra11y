@@ -34,6 +34,8 @@ export default defineConfig({
       "tests/full-audit.e2e.test.ts",
       // The render engine's visual snapshot pass opens its captures in Chromium.
       "tests/render-snapshot.e2e.test.ts",
+      // The media and screen-reader probes (#208) record a real viewport and read a real tree.
+      "tests/capture-probes.e2e.test.ts",
       "tests/opencode-smoke.e2e.test.ts",
       "tests/codex-smoke.e2e.test.ts",
     ],
