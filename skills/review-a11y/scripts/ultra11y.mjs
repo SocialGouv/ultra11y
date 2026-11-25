@@ -55150,6 +55150,9 @@ var T = {
     touched: "la source moissonn\xE9e porte ce m\xE9canisme",
     touchedLegend: "\xAB \u2B24 \xBB signale les tests dont le M\xC9CANISME appara\xEEt dans la source moissonn\xE9e (la balise ou l'attribut que le test nomme lui-m\xEAme). C'est une aide \xE0 la lecture, pas un verdict : **l'absence de marque n'affirme rien** \u2014 un test non marqu\xE9 reste \xE0 trancher comme les autres, et beaucoup de tests portent sur autre chose que du balisage (un intitul\xE9 visible, un bouton adjacent, un comportement).",
     inheritedDecide: (sc) => `R\xE8gle de d\xE9cision (h\xE9rit\xE9e du crit\xE8re de succ\xE8s WCAG ${sc}, qui pose une question plus large \u2014 le texte du r\xE9f\xE9rentiel prime)`,
+    protocolSection: "Protocole de d\xE9cision h\xE9rit\xE9 de WCAG",
+    protocolLead: (name, id) => `Les protocoles des crit\xE8res de succ\xE8s WCAG auxquels ${name} ${id} est rattach\xE9 : un compl\xE9ment pour mener l'examen, qui pose souvent une question plus large. Les tests et la m\xE9thodologie ci-dessus priment et fondent seuls le verdict.`,
+    inheritedComplement: (sc) => `Crit\xE8re de succ\xE8s WCAG ${sc}`,
     officialSource: (name, id) => `Texte officiel du crit\xE8re ${name} ${id}`,
     webLookup: "Le texte ci-dessus est celui du r\xE9f\xE9rentiel : c'est LUI qui tranche. Si une formulation reste ambigu\xEB et que vous disposez d'un outil web, vous POUVEZ consulter la page officielle ci-dessus pour la lever \u2014 jamais pour la contredire, jamais pour \xE9largir un test, et une page web n'est jamais un `normativeRef` : seules les r\xE9f\xE9rences normatives list\xE9es ci-dessous en sont.",
     technicalNote: "Note technique",
@@ -55206,6 +55209,9 @@ var T = {
     touched: "the harvested source carries this mechanism",
     touchedLegend: "\xAB \u2B24 \xBB marks the tests whose MECHANISM appears in the harvested source (the tag or attribute the test itself names). It is a reading aid, not a verdict: **an unmarked test asserts nothing** \u2014 it is still yours to rule on, and plenty of tests are about something other than markup (a visible label, an adjacent button, a behaviour).",
     inheritedDecide: (sc) => `Decision rule (inherited from WCAG success criterion ${sc}, which asks a broader question \u2014 the standard's own text prevails)`,
+    protocolSection: "Decision protocol inherited from WCAG",
+    protocolLead: (name, id) => `The protocols of the WCAG success criteria ${name} ${id} maps onto: a complement for running the review, which often asks a broader question. The tests and methodology above prevail and alone ground the verdict.`,
+    inheritedComplement: (sc) => `WCAG success criterion ${sc}`,
     officialSource: (name, id) => `Official text of ${name} criterion ${id}`,
     webLookup: "The text above is the standard's own, and it is what decides. If a wording stays ambiguous and you have a web tool, you MAY consult the official page above to settle it \u2014 never to contradict it, never to widen a test, and a web page is never a `normativeRef`: only the normative references listed below are.",
     technicalNote: "Technical note",
@@ -55223,8 +55229,6 @@ var T = {
   }
 };
 var MAX_REFS = 12;
-var MAX_METHODOLOGY_CHARS = 900;
-var MAX_UNTOUCHED_METHODOLOGY_CHARS = 260;
 function siblingBlock(pack, id, lang, s2) {
   const sibs = siblingCriteria(pack, id, lang);
   if (!sibs.length) return [];
@@ -55320,6 +55324,19 @@ function runWideNotes(items, lang, pack, opts, allPages = false) {
   if (opts.pages?.length) out.push(`> ${s2.pagesNote(opts.pages, allPages)}`, "");
   return out;
 }
+function inheritedProtocolLines(protocols, s2, label) {
+  const out = [];
+  for (const p2 of protocols) {
+    out.push(`> **${label(p2.sc)}** \u2014 ${p2.decide}`, "");
+    if (p2.na) out.push(`> **${s2.na}** \u2014 ${p2.na}`, "");
+    if (p2.questions.length) {
+      out.push(`> ${s2.questions}:`, "");
+      for (const q3 of p2.questions) out.push(`- ${q3}`);
+      out.push("");
+    }
+  }
+  return out;
+}
 function criterionSections(items, lang, standard, pack, opts, shown) {
   const s2 = T[lang];
   const out = [];
@@ -55374,18 +55391,10 @@ function criterionSections(items, lang, standard, pack, opts, shown) {
     const pdfs = [...new Set(it.evidence.filter((e) => isPdfPath(e.file)).map((e) => e.file))];
     if (pdfs.length) out.push(...veraPdfBlock(pdfs, lang, opts.cwd));
     const crit = pack ? getCriterion(pack, it.criteriaId) : void 0;
+    const hasMethodology = !!crit?.methodology && Object.keys(crit.methodology).length > 0;
+    const inherited = pack ? adjudicationForWcagRefs(crit?.wcag ?? [], lang) : [];
     if (pack) {
-      if (!crit?.methodology || Object.keys(crit.methodology).length === 0) {
-        for (const p2 of adjudicationForWcagRefs(crit?.wcag ?? [], lang)) {
-          out.push(`> **${s2.inheritedDecide(p2.sc)}** \u2014 ${p2.decide}`, "");
-          if (p2.na) out.push(`> **${s2.na}** \u2014 ${p2.na}`, "");
-          if (p2.questions.length) {
-            out.push(`> ${s2.questions}:`, "");
-            for (const q3 of p2.questions) out.push(`- ${q3}`);
-            out.push("");
-          }
-        }
-      }
+      if (!hasMethodology) out.push(...inheritedProtocolLines(inherited, s2, s2.inheritedDecide));
     } else {
       const protocol = ADJUDICATION[it.criteriaId];
       if (protocol) {
@@ -55420,11 +55429,7 @@ function criterionSections(items, lang, standard, pack, opts, shown) {
           out.push(`- \`${it.criteriaId}.${k}\`${mark} ${plainTest(lines[0] ?? "")}`);
           for (const line2 of lines.slice(1)) out.push(`  - ${plainTest(line2)}`);
           const method = crit?.methodology?.[k];
-          if (method?.trim()) {
-            const flat = plainTest(method).replace(/\s+/g, " ").trim();
-            const cap = !anyTouched || touched.get(k) ? MAX_METHODOLOGY_CHARS : MAX_UNTOUCHED_METHODOLOGY_CHARS;
-            out.push(`  - _${s2.methodology}_ : ${flat.length > cap ? `${flat.slice(0, cap)}\u2026` : flat}`);
-          }
+          if (method?.trim()) out.push(`  - _${s2.methodology}_ : ${plainTest(method).replace(/\s+/g, " ").trim()}`);
         }
         out.push("");
       }
@@ -55439,6 +55444,10 @@ function criterionSections(items, lang, standard, pack, opts, shown) {
       out.push(...packGuidanceBlock(standard, it.criteriaId, lang));
       out.push(...sourceBlock(s2, pack.name, it.criteriaId, criterionUrl(pack, it.criteriaId), opts.web === true));
       if (keys.length) out.push(`> ${s2.packRefs(pack.name)}: ${keys.map((k) => `\`${it.criteriaId}.${k}\``).join(", ")}`, "");
+      if (hasMethodology && inherited.length && opts.protocols !== false) {
+        out.push(`### ${s2.protocolSection}`, "", `> ${s2.protocolLead(pack.name, it.criteriaId)}`, "");
+        out.push(...inheritedProtocolLines(inherited, s2, s2.inheritedComplement));
+      }
     } else {
       out.push(...sourceBlock(s2, "WCAG", it.criteriaId, understanding(it.criteriaId), opts.web === true));
       const refs = techniquesFor(it.criteriaId);

@@ -140,7 +140,7 @@ Le savoir du domaine d’abord, puis l’outillage. Lisez celle qui correspond �
 
 | Savoir en accessibilité | |
 |---|---|
-| `references/adjudication.md` | Comment décider chacun des 52 critères que le moteur vous remet — la règle de décision, quand NA est légitime, les questions |
+| `references/adjudication.md` | Critère RGAA par critère RGAA : les tests citables, les notes de décision et le protocole hérité des critères de succès WCAG rattachés — la règle de décision, quand NA est légitime, les questions |
 | `references/naming.md` | Calcul du nom accessible, 2.5.3 étiquette dans le nom, CSS de masquage visuel, nommer les images/SVG/figures |
 | `references/widgets.md` | Motifs composites de l’ARIA APG, contrats clavier, gestion du focus, changements de route en SPA, régions live |
 | `references/forms-and-errors.md` | Étiquettes et instructions, la liste des jetons `autocomplete`, identification/suggestion/prévention des erreurs, saisie redondante, authentification accessible |

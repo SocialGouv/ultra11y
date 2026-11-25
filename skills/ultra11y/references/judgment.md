@@ -74,29 +74,28 @@ verdict défendable et enregistré, jamais inventé, jamais « conforme » en si
 ### Le protocole de décision
 
 Chaque critère résiduel de `ADJUDICATE.md` est pré-chargé, à côté des preuves récoltées, avec
-son **protocole de décision** (`src/data/adjudication.json`, dans les deux langues, couvrant LES
-52 critères que le moteur ne peut pas décider) :
+le **protocole de décision** des critères de succès WCAG auxquels il est rattaché
+(`src/data/adjudication.json`, dans les deux langues, couvrant les 52 critères de succès que le
+moteur ne peut pas décider) :
 
-- **la règle de décision** — ce qui rend ce critère Conforme ou Non conforme. Pas un indice :
-  la règle que vous appliquez. Un critère transmis sans règle énoncée, c’est là qu’un audit se
-  transforme discrètement en opinion ;
+- **la règle de décision** — ce qui rend ce critère de succès Conforme ou Non conforme ;
 - **quand `NA` est légitime** — pour que « non applicable » soit un verdict justifié plutôt
   qu’une échappatoire ;
-- **les questions** qu’un auditeur se pose pour y arriver ;
-- **les références citables** — les techniques et échecs W3C de ce critère, c’est-à-dire
-  exactement l’ensemble dont un `normativeRef` peut provenir. `verify --apply` rejette une
-  référence qui ne se résout pas, donc proposer les références valides est ce qui empêche une
-  citation inventée.
-
-Le même protocole est publié comme page autonome, `references/adjudication.md`, générée à
-partir de ce jeu de données — lisez-la quand vous voulez la vue d’ensemble plutôt qu’un seul
-item de la liste de travail.
+- **les questions** qu’un auditeur se pose pour y arriver.
 
 **Il est indexé par critère de succès WCAG, et ce n’est pas l’instrument.** Un critère RGAA a
-le sien — voir la section suivante. Il n’est hérité via la
-table de correspondance que par un critère de pack qui n’en porte aucun, et le brief le dit
-quand c’est le cas : un critère de succès pose couramment une question plus large que le
-critère qui lui est rattaché.
+le sien — ses tests et sa méthodologie officielle, voir la section suivante. Le protocole hérité
+ferme donc le brief, dans une section à part (« Protocole de décision hérité de WCAG »), après le
+texte du référentiel, et annoncé comme un complément pour mener l’examen : un critère de succès
+pose couramment une question plus large que le critère qui lui est rattaché, et le texte du
+référentiel prime. Seul un critère de pack sans méthodologie propre en fait sa règle de décision,
+et le brief le dit alors en tête (« Règle de décision (héritée du critère de succès WCAG …) »).
+
+La vue d’ensemble est publiée comme page autonome, `references/adjudication.md`, générée par
+critère RGAA à partir des mêmes données — tests citables, notes de décision et protocoles hérités
+de chaque critère ; lisez-la quand vous voulez le tableau entier plutôt qu’un seul item de la
+liste de travail.
+
 Ce sont des invites, pas des verdicts : vous répondez toujours à partir des preuves et
 enregistrez `C`/`NC`/`NA`/`manual` (+ une recommandation lorsqu’une bonne pratique n’a pas de
 test normatif en échec).
@@ -187,8 +186,8 @@ déterministes mais pas de preuve positive complète.
 - sous chaque test, la **méthodologie de test officielle** du référentiel — la procédure qu’il
   publie pour ce test, étape par étape (le RGAA documente ses 258 tests). Le test énonce CE QUI
   est exigé ; elle énonce COMMENT c’est vérifié, dans les mots mêmes du référentiel. C’est la
-  règle de décision sous un pack, et c’est pourquoi le protocole WCAG ci-dessus n’est pas
-  emprunté ici ;
+  règle de décision sous un pack, imprimée **en entier**, jamais tronquée — et c’est pourquoi le
+  protocole WCAG ci-dessus n’y figure qu’en complément, à la fin du brief ;
 - un **⬤** sur les tests dont le MÉCANISME apparaît dans la source récoltée — la balise ou
   l’attribut que le test nomme lui-même, apparié au balisage que la récolte a réellement trouvé.
   Le RGAA 11.2 pose la même question sur six mécanismes d’étiquetage ; sur une page qui étiquette

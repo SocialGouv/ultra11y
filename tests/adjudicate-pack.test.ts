@@ -325,7 +325,7 @@ describe("the rendered worklist is self-sufficient", () => {
     expect(testMarkupTokens(["Chaque bouton adjacent au champ de formulaire …"])).toEqual([]);
   });
 
-  // THE INSTRUMENT, and the reason the WCAG protocol is not borrowed here. `ADJUDICATION` is
+  // THE INSTRUMENT, and the reason the WCAG protocol is not THE rule here. `ADJUDICATION` is
   // keyed by success criterion — 52 keys, every one of them three segments — so a lookup on
   // an RGAA id (two segments) could only ever miss, and for a long time the pack brief
   // carried the numbered tests with nothing that said how to read them.
@@ -336,10 +336,14 @@ describe("the rendered worklist is self-sufficient", () => {
     expect(t).toMatch(/Retrouver dans le document les champs de formulaire dont l’étiquette est fournie par un élément/);
   });
 
-  it("does NOT borrow a WCAG decision rule for a criterion that has its own methodology", () => {
+  it("never passes a WCAG rule off as the rule of a criterion that has its own methodology", () => {
     // Every RGAA criterion documents every one of its tests (258/258), so the crosswalk
     // fallback never fires here — and a borrowed rule must never pass for the standard's own.
-    expect(md()).not.toContain("Règle de décision (héritée");
+    // The mapped SC's protocol is still printed (#230), but in a section of its own, after the
+    // standard's text, announced as a complement (tests/adjudicate-brief-protocols.test.ts).
+    const t = md();
+    expect(t).not.toContain("Règle de décision (héritée");
+    expect(t).toContain("### Protocole de décision hérité de WCAG");
   });
 
   it("labels the borrowed rule as inherited when a criterion has no methodology of its own", () => {
