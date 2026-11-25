@@ -4,12 +4,12 @@
     "name": "maxgfr",
     "url": "https://github.com/maxgfr"
   },
-  "description": "Accessibility tooling for coding agents: RGAA 4.1.2, the French State's standard — engine-decided where it can be, agent-adjudicated and counter-checked where it must be.",
+  "description": "Outillage d’accessibilité pour agents de code : RGAA 4.1.2, le référentiel de l’État — tranché par le moteur quand c’est possible, arbitré par l’agent et contre-vérifié quand il le faut.",
   "plugins": [
     {
       "name": "ultra11y",
       "source": "./",
-      "description": "RGAA 4.1.2 accessibility audits: automatic review before commit, push and pull request, plus dated, evidenced Markdown, HTML and per-page conformance reports in Claude Code.",
+      "description": "Audits d’accessibilité RGAA 4.1.2 : revue automatique avant commit, push et pull request, et rapports de conformité datés et prouvés, en Markdown, en HTML et page par page, dans Claude Code.",
       "version": "9.4.0",
       "author": { "name": "maxgfr" },
       "homepage": "https://github.com/SocialGouv/ultra11y",

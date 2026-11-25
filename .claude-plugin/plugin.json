@@ -1,6 +1,6 @@
 {
   "name": "ultra11y",
-  "description": "RGAA 4.1.2 accessibility audits, the French State's standard: automatic review before commit, push and pull request, plus dated, evidenced Markdown, HTML and per-page conformance reports. Never declares conforming what it has not verified.",
+  "description": "Audits d’accessibilité RGAA 4.1.2, le référentiel de l’État : revue automatique avant commit, push et pull request, et rapports de conformité datés et prouvés, en Markdown, en HTML et page par page. Ne déclare jamais conforme ce qu’il n’a pas vérifié.",
   "version": "9.4.0",
   "author": { "name": "maxgfr" },
   "homepage": "https://github.com/SocialGouv/ultra11y",
